@@ -1,0 +1,9 @@
+[scylla]
+
+[scylla.development]
+hosts = ["172.22.0.4", "172.22.0.3", "172.22.0.2"]
+keyspace = "nodecosmos"
+
+[scylla.production]
+hosts = ["${SCYLLA_HOST_1}", "${SCYLLA_HOST_2}", "${SCYLLA_HOST_3}"]
+keyspace = "nodecosmos"
