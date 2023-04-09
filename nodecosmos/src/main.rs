@@ -14,11 +14,18 @@ use models::*;
 
 use crate::db::*;
 
+
 #[tokio::main]
 async fn main() {
-    let caching_session = init_session().await;
-    let user = User {
+    // Example usage:
+    partial_user!(PartialUser, id, username, email);
+
+    let mut partial_user = PartialUser {
         id: Uuid::new_v4(),
-        ..Default::default()
-    }.find_by_primary_key(&caching_session).await.unwrap();
+        username: "test".to_string(),
+        email: "test@gmail.com".to_string(),
+    };
+
+    println!("{:?}", partial_user);
+
 }

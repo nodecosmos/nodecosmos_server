@@ -1,4 +1,4 @@
-mod user;
+pub mod user;
 mod udts;
 mod materialized_views;
 

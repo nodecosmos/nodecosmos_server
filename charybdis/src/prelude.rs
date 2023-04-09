@@ -12,7 +12,8 @@ pub use crate::{
 pub use charybdis_macros::{
     charybdis_udt_model,
     charybdis_model,
-    charybdis_view_model
+    charybdis_view_model,
+    partial_model_generator,
 };
 
 // scylla

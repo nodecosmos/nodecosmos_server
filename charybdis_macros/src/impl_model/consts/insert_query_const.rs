@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::ImplItem;
+use syn::{FieldsNamed, ImplItem};
 use crate::parser::CharybdisArgs;
 
 
@@ -9,18 +9,28 @@ use crate::parser::CharybdisArgs;
 // Always pass partition key values as bound values.
 // Otherwise the driver can’t hash them to compute partition key and they will be sent
 // to the wrong node, which worsens performance.
-pub(crate) fn insert_query_const(ch_args: &CharybdisArgs) -> ImplItem {
-    let mut primary_key = ch_args.partition_keys.clone().unwrap();
-    let mut clustering_keys = ch_args.clustering_keys.clone().unwrap();
+pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
-    primary_key.append(clustering_keys.as_mut());
+    let comma_sep_cols: String = fields_named
+        .named
+        .iter()
+        .map(|field| field.ident.as_ref().unwrap().to_string())
+        .collect::<Vec<String>>()
+        .join(", ");
 
-    let primary_key_where_clause: String = primary_key.join(" = ? AND ");
-    let query_str = format!(
-        "INSERT INTO {} WHERE {}",
+    let coma_sep_values_placeholders: String = fields_named
+        .named
+        .iter()
+        .map(|_| "?".to_string())
+        .collect::<Vec<String>>()
+        .join(", ");
+
+    let query_str: String = format!(
+        "INSERT INTO {} ({}) VALUES ({})",
         table_name,
-        primary_key_where_clause
+        comma_sep_cols,
+        coma_sep_values_placeholders,
     );
 
 
