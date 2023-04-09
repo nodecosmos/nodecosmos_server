@@ -4,4 +4,5 @@ members = [
     "charybdis_cmd/migration",
     "charybdis",
     "charybdis_macros",
+    "charybdis_parser",
 ]

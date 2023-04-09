@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use syn::{Attribute, DeriveInput, FieldsNamed, parse_macro_input, parse_str, Type};
-use crate::parser::parse_named_fields;
+use charybdis_parser::parse_named_fields;
 
 ///
 /// ## Generates two declarative macros for partial model usage:

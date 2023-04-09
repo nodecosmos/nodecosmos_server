@@ -1,14 +1,9 @@
 [package]
-name = "charybdis_macros"
+name = "charybdis_parser"
 version = "0.1.0"
 edition = "2021"
 
-
-[lib]
-proc-macro = true
-
 [dependencies]
-charybdis_parser = { path = "../charybdis_parser" }
 proc-macro2 = "1.0.56"
 syn = { version = "2.0.10", features = ["full"] }
 quote = "1.0.26"

@@ -1,7 +1,7 @@
 use quote::quote;
 use syn::ImplItem;
 use crate::helpers::serialized_values_fields_adder;
-use crate::parser::CharybdisArgs;
+use charybdis_parser::CharybdisArgs;
 
 pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
     let mut primary_key = ch_args.partition_keys.clone().unwrap().clone();

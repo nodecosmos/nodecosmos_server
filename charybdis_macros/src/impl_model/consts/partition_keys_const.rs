@@ -1,6 +1,6 @@
 use quote::quote;
 use syn::ImplItem;
-use crate::parser::CharybdisArgs;
+use charybdis_parser::CharybdisArgs;
 
 pub(crate) fn partition_keys_const(ch_args: &CharybdisArgs) -> ImplItem {
     let partition_keys = ch_args.partition_keys.as_ref().unwrap_or_else(|| {

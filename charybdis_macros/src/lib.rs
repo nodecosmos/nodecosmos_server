@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-mod parser;
+use charybdis_parser;
 mod impl_model;
 mod macro_rules;
 mod helpers;
@@ -16,7 +16,7 @@ use syn::parse_macro_input;
 
 use crate::impl_model::*;
 use crate::macro_rules::*;
-use crate::parser::{
+use charybdis_parser::{
     CharybdisArgs,
     parse_named_fields
 };

@@ -1,6 +1,6 @@
 use quote::quote;
 use syn::{FieldsNamed, ImplItem};
-use crate::parser::CharybdisArgs;
+use charybdis_parser::CharybdisArgs;
 
 
 // From Scylla docs:
@@ -32,7 +32,6 @@ pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsN
         comma_sep_cols,
         coma_sep_values_placeholders,
     );
-
 
     let find_by_primary_key_query_const_str = quote! {
         const INSERT_QUERY: &'static str = #query_str;

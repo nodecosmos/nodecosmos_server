@@ -140,6 +140,16 @@ dependencies = [
 name = "charybdis_macros"
 version = "0.1.0"
 dependencies = [
+ "charybdis_parser",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.13",
+]
+
+[[package]]
+name = "charybdis_parser"
+version = "0.1.0"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.13",
@@ -528,8 +538,10 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 name = "migration"
 version = "0.1.0"
 dependencies = [
+ "charybdis_parser",
  "colored",
  "dotenv",
+ "futures",
  "quote",
  "scylla",
  "serde",

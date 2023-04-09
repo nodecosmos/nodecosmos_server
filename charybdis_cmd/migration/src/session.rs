@@ -3,7 +3,7 @@ use std::time::Duration;
 use dotenv::dotenv;
 use std::env;
 
-pub async fn initialize_session() -> Session {
+pub(crate) async fn initialize_session() -> Session {
     dotenv().ok();
 
     let scylla_host_1 = env::var("SCYLLA_HOST_1").expect("SCYLLA_HOST_1 must be set");

@@ -1,6 +1,31 @@
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
-pub type SchemaObject = HashMap<String, String>;
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SchemaObject {
+    pub fields: HashMap<String, String>,
+    pub type_name: String,
+    pub table_name: String,
+    pub base_table: String,
+    pub partition_keys: Vec<String>,
+    pub clustering_keys: Vec<String>,
+    pub secondary_indexes: Vec<String>,
+}
+
+impl SchemaObject {
+    pub fn new() -> Self {
+        SchemaObject {
+            fields: HashMap::new(),
+            type_name: String::new(),
+            table_name: String::new(),
+            base_table: String::new(),
+            partition_keys: Vec::new(),
+            clustering_keys: Vec::new(),
+            secondary_indexes: Vec::new(),
+        }
+    }
+}
+
 pub type SchemaObjects = HashMap<String, SchemaObject>;
 
 pub trait SchemaObjectTrait {
@@ -10,8 +35,8 @@ pub trait SchemaObjectTrait {
 impl SchemaObjectTrait for SchemaObject {
     fn get_cql_fields(&self) -> String {
         let mut cql_fields = String::new();
-        for (field_name, field_type) in self.iter() {
-            cql_fields.push_str(&format!("{} {}, ", field_name, field_type));
+        for (field_name, field_type) in self.fields.iter() {
+            cql_fields.push_str(&format!("{} {},\n", field_name, field_type));
         }
         cql_fields.pop();
         cql_fields.pop();

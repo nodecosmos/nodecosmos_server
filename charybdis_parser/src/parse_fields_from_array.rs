@@ -1,10 +1,7 @@
 use syn::{Expr, ExprArray};
-use crate::parser::parse_string_literal;
+use crate::parse_string_literal;
 
-/// It extracts the fields from an array expression like:
-/// &'static [&'static str] = &["id", "name", "age"]
-/// so where the array is a reference to array of strings
-#[allow(dead_code)]
+
 pub fn parse_fields_from_array_ref(array_ref_expr: &Expr) -> Vec<String> {
     match array_ref_expr {
         Expr::Reference(reference) => match *reference.expr.clone() {

@@ -1,6 +1,6 @@
 use quote::quote;
 use syn::{ImplItem};
-use crate::parser::{CharybdisArgs};
+use charybdis_parser::{CharybdisArgs};
 
 pub(crate) fn primary_key_const(ch_args: &CharybdisArgs) -> ImplItem {
     let mut primary_key = ch_args.partition_keys.clone().unwrap();
