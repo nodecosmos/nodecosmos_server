@@ -38,7 +38,7 @@ pub trait Model: Sized + FromRow + Default {
     const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
     const FIND_BY_PARTITION_KEY_QUERY: &'static str;
     const INSERT_QUERY: &'static str;
-    // consts UPDATE_QUERY: &'static str;
+    // const UPDATE_QUERY: &'static str;
     // consts DELETE_QUERY: &'static str;
 
     fn get_primary_key_values(&self) -> SerializedValues;

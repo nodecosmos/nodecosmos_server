@@ -71,6 +71,13 @@ use crate::parser::parse_named_fields;
 ///```
 pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
     let input: DeriveInput = parse_macro_input!(input as DeriveInput);
+
+    // TODO: for models without all clustering keys, this will panic!
+    //       we should add support for partial clustering keys.
+
+    // TODO: we enable better error handling for this macro as it hard to debug
+    //       nested macros when they panic.
+
     let charybdis_model_attr: &Attribute = input.attrs.iter()
         .find(|attr| attr.path().is_ident("charybdis_model"))
         .unwrap_or_else(|| panic!("Missing charybdis_model attribute"));

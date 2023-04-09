@@ -4,20 +4,21 @@
 * Scylla: NoSQL DB focused on performance
 * Charybdis: Thin layer  on top of `scylla_rust_driver` focused on easy of use and performance
 
-### Performance consideration:
-  - It's build on top of nightly rust and uses async/await
-  - It uses prepared statements with bound values (shard/token aware)
-  - CRUD query strings are macro generated and cached
-  - While it has expressive API it's very thin layer on top of scylla_rust_driver, and it does not introduce any overhead
-
 ### Usage considerations
-- Provide and expressive API for CRUD & Query operations on model as a whole
-- Provide easy way to manipulate model partially
-- Intelligent migration tool that analyzes the model/*.rs files and runs migrations according to differences between the model definition and database
+- Provide and expressive API for CRUD & Complex Query operations on model as a whole
+- Provide easy way to manipulate model partially by using partial_model! macro
+- Intelligent migration tool that analyzes the `model/*.rs` files and runs migrations according to differences between the model definition and database
+
+### Performance consideration:
+- It's build on top of nightly rust and uses async/await
+- It uses prepared statements with bound values (shard/token aware)
+- CRUD query strings are macro generated constants
+- While it has expressive API it's very thin layer on top of scylla_rust_driver, and it does not introduce any overhead
+- It doesn't have ORM query builder like `diesel` or `sqlx` because if used correctly it's not needed
 
 ### Usage:
 
-#### Declare model as a struct within src/models dir (Note we use 'src/models' as migration tool expects that)
+Declare model as a struct within src/models dir (Note we use 'src/models' as migration tool expects that)
 ```rust
 // src/modles/user.rs
 use charybdis::prelude::*;
@@ -37,14 +38,15 @@ pub struct User {
 }
 ```
 
-#### Migrate prev structure by using 'charybdis_cmd/migration' tool:
+Migrate prev structure by using 'charybdis_cmd/migration' tool:
+
 ```bash
 # Migration tool analyzes the model/*.rs files runs migrations according to differences between 
 # the model definition and database
 migrate
 ```
 
-#### Basic Operation
+Basic Operation
 
 ```rust
 mod models;
@@ -60,7 +62,9 @@ async fn main() {
     let user = User::from_json(json).insert(&session).await;
     
     // update
-    let user = User::from_json(json).update(&session).await;
+    let user = User::from_json(json);
+    user.username = "new_username".to_string();
+    user.update(&session).await;
     
     // delete
     let user = User::from_json(json).delete(&session).await;
@@ -68,6 +72,11 @@ async fn main() {
 
 ```
 #### Partial Model Operation
+
+<p style="color: #e4a47c">
+Note: For now both partition and clustering key fields are required.
+</p>
+In future we will add support for `partial_model!` to work with partial or no clustering key fields provided.
 
 ```rust
 // auto-generated macro helper
@@ -94,28 +103,10 @@ async fn main() {
 ```
 
 
-```rust
+### Future Plans:
+- Add support for many possible query variations like `Like`, `Contains`, `In`, `NotIn`, `Between`, `NotBetween`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual`, `NotEqual`, `Equal`, `NotLike`, `NotContains`, `NotIn`, `NotBetween`, `NotGreaterThan`, `NotLessThan`, `NotGreaterThanOrEqual`, `NotLessThanOrEqual`,
+- This way we have many possible queries as constants, and we don't need to generate them at runtime
 
-#[macro_export]
-macro_rules! partial_user {
-    ($struct_name:ident, $($field:ident),*) => {
-        #[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [], secondary_indexes = [])]
-        pub struct $struct_name {
-            $(pub $field: field_type!($field),)*
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! field_type {
-    (id) => { Uuid };
-    (username) => { Text };
-    (password) => { Text };
-    (hashed_password) => { Text };
-    (email) => { Text };
-    (created_at) => { Timestamp };
-    (updated_at) => { Timestamp };
-    (address) => { Address };
-}
-
-```
+Reason we think this is possible is because we can use `partial_model!` macro that is generated for each model,
+and we can use it to generate queries for each possible combination of fields as fields of interests are provided within struct. 
+However, we don't know how this will affect compile time performance, and we need to test it.

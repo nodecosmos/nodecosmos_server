@@ -7,12 +7,19 @@ mod helpers;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, FieldsNamed, ImplItem};
+use syn::{
+    DeriveInput,
+    FieldsNamed,
+    ImplItem
+};
 use syn::parse_macro_input;
 
 use crate::impl_model::*;
-use crate::macro_rules::partial_model_rule::partial_model_macro_generator;
-use crate::parser::{CharybdisArgs, parse_named_fields};
+use crate::macro_rules::*;
+use crate::parser::{
+    CharybdisArgs,
+    parse_named_fields
+};
 
 /// This macro generates the following constants:
 /// - `DB_MODEL_NAME`
@@ -119,9 +126,9 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_by_partition_key_query_const: ImplItem = find_by_partition_key_query_const(&args);
 
     // methods
-    let get_primary_key_values = get_primary_key_values(&args);
-    let get_partition_key_values = get_partition_key_values(&args);
-    let get_clustering_key_values = get_clustering_key_values(&args);
+    let get_primary_key_values: ImplItem = get_primary_key_values(&args);
+    let get_partition_key_values: ImplItem= get_partition_key_values(&args);
+    let get_clustering_key_values: ImplItem = get_clustering_key_values(&args);
 
     let expanded = quote! {
         #[derive(

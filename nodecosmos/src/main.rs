@@ -27,5 +27,4 @@ async fn main() {
     };
 
     println!("{:?}", partial_user);
-
 }
