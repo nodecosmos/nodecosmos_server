@@ -11,5 +11,4 @@ pub struct User {
     pub email: Text,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-    pub address: Address,
 }

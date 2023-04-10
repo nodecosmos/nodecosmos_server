@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use colored::Colorize;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,7 +37,7 @@ impl SchemaObjectTrait for SchemaObject {
     fn get_cql_fields(&self) -> String {
         let mut cql_fields = String::new();
         for (field_name, field_type) in self.fields.iter() {
-            cql_fields.push_str(&format!("{} {},\n", field_name, field_type));
+            cql_fields.push_str(&format!("    {} {},\n", field_name.bright_cyan().bold(), field_type.bright_yellow()));
         }
         cql_fields.pop();
         cql_fields.pop();

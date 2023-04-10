@@ -3,15 +3,16 @@ use scylla::Session;
 use crate::migration::migration::{Migration, MigrationObjectType};
 use crate::schema::{CurrentCodeSchema, CurrentDbSchema, SchemaObject};
 
-pub struct MigrationPlan<'a> {
+pub(crate) struct MigrationPlan<'a> {
     current_db_schema: &'a CurrentDbSchema,
     current_code_schema: &'a CurrentCodeSchema,
     session: &'a Session,
 }
 
 impl <'a>MigrationPlan<'a> {
-    pub fn new(current_db_schema: &'a CurrentDbSchema, current_code_schema: &'a CurrentCodeSchema, session: &'a Session)
-        -> Self {
+    pub(crate) fn new(current_db_schema: &'a CurrentDbSchema,
+                      current_code_schema: &'a CurrentCodeSchema,
+                      session: &'a Session) -> Self {
         MigrationPlan {
             current_db_schema,
             current_code_schema,
@@ -19,18 +20,19 @@ impl <'a>MigrationPlan<'a> {
         }
     }
 
-    pub fn run(&self) {
-        self.run_udts();
-        self.run_tables();
-        self.run_materialized_views();
+    pub(crate) async fn run(&self) {
+        self.run_udts().await.unwrap();
+        self.run_tables().await.unwrap();
+        self.run_materialized_views().await.unwrap();
+
 
         println!("{}", "Migration plan ran successfully!".bright_green());
     }
 
-    fn run_udts(&self) {
+    async fn run_udts(&self) -> Result<(), ()> {
         let empty_udt = SchemaObject::new();
 
-        self.current_code_schema.udts.iter().for_each(|(name, udt)| {
+        for (name, udt) in self.current_code_schema.udts.iter() {
             let migration = Migration::new(
                 name,
                 MigrationObjectType::UDT,
@@ -39,14 +41,16 @@ impl <'a>MigrationPlan<'a> {
                 &self.session,
             );
 
-            migration.run();
-        });
+            migration.run().await;
+        }
+
+        Ok(())
     }
 
-    fn run_tables(&self) {
+    async fn run_tables(&self) -> Result<(), ()>  {
         let empty_udt = SchemaObject::new();
 
-        self.current_code_schema.tables.iter().for_each(|(name, table)| {
+        for (name, table) in self.current_code_schema.tables.iter() {
             let migration = Migration::new(
                 name,
                 MigrationObjectType::Table,
@@ -55,14 +59,16 @@ impl <'a>MigrationPlan<'a> {
                 &self.session,
             );
 
-            migration.run();
-        });
+            migration.run().await;
+        }
+
+        Ok(())
     }
 
-    fn run_materialized_views(&self) {
+    async fn run_materialized_views(&self) -> Result<(), ()>  {
         let empty_udt = SchemaObject::new();
 
-        self.current_code_schema.materialized_views.iter().for_each(|(name, materialized_view)| {
+        for (name, materialized_view) in self.current_code_schema.materialized_views.iter() {
             let migration = Migration::new(
                 name,
                 MigrationObjectType::MaterializedView,
@@ -71,7 +77,9 @@ impl <'a>MigrationPlan<'a> {
                 &self.session,
             );
 
-            migration.run();
-        });
+            migration.run().await;
+        }
+
+        Ok(())
     }
 }

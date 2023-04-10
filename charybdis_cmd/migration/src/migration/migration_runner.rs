@@ -1,21 +1,30 @@
 use colored::*;
+use futures::TryFutureExt;
 use super::migration::{Migration, MigrationObjectType};
 use crate::schema::SchemaObjectTrait;
-use futures::executor::block_on;
-use futures::TryFutureExt;
+use strip_ansi_escapes::strip;
 
 impl <'a> Migration <'a> {
-    fn execute(&self, cql: &String) {
-        block_on(async {
-            println!("{} {}\n", "Running CQL:".bright_green(), cql.bright_purple());
+    async fn execute(&self, cql: &String) {
+        println!("{} {}", "Running CQL:".on_bright_green().black(), cql.bright_purple());
 
-            let _= self.session.query(cql.clone(), ()).unwrap_or_else(|err| {
-                panic!("Error running '{}': {}", cql, err);
-            }).await;
-        });
+        // remove all colors from cql string
+        let stripped = strip(cql.as_bytes()).unwrap();
+        let cql: String = String::from_utf8(stripped).unwrap();
+
+        let _= self.session.query(cql.clone(), ()).unwrap_or_else(|err| {
+            panic!(
+                "\n\n{} {}: \n\n{}\n\n",
+                "Error running CQL:".on_red().black(),
+                cql.magenta(),
+                err.to_string().bright_red()
+            );
+        }).await;
+
+        println!("{}\n", "Migration unit completed!".bright_green());
     }
 
-    pub(crate) fn run_first_migration(&self) {
+    pub(crate) async fn run_first_migration(&self) {
         println!(
             "{} {} {}",
             "Detected first migration run for: ".bright_cyan(),
@@ -26,15 +35,14 @@ impl <'a> Migration <'a> {
         match self.migration_object_type {
             MigrationObjectType::UDT => {
                 let cql = format!(
-                    "CREATE TYPE IF NOT EXISTS {} (\n{}\n);",
+                    "CREATE TYPE IF NOT EXISTS {}\n(\n{}\n);",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields()
                 );
 
-                self.execute(&cql);
+                self.execute(&cql).await;
             },
             MigrationObjectType::Table => {
-
                 let clustering_keys = self.current_code_schema.clustering_keys.join(", ");
                 let clustering_keys_clause = if clustering_keys.len() > 0 {
                     format!(",{}", clustering_keys)
@@ -43,14 +51,14 @@ impl <'a> Migration <'a> {
                 };
 
                 let cql = format!(
-                    "CREATE TABLE IF NOT EXISTS {}\n (\n{}, \nPRIMARY KEY (({}) {})\n);",
+                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n);",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields(),
                     self.current_code_schema.partition_keys.join(", "),
                     clustering_keys_clause,
                 );
 
-                self.execute(&cql);
+                self.execute(&cql).await;
             },
             MigrationObjectType::MaterializedView => {
                 let mut primary_key = self.current_code_schema.partition_keys.clone();
@@ -66,11 +74,12 @@ impl <'a> Migration <'a> {
                 );
 
 
-                let mv_fields_without_types = self.current_code_schema.fields.iter().map(|(k,_)| k.clone()).collect::<Vec<String>>();
+                let mv_fields_without_types = self.current_code_schema.fields
+                    .iter().map(|(k,_)| k.clone()).collect::<Vec<String>>();
 
                 let materialized_view_select_clause = format!(
-                    "SELECT \n{} \nFROM {}\n {}\n",
-                    mv_fields_without_types.join(",\n"),
+                    "SELECT {} \nFROM {}\n{}\n",
+                    mv_fields_without_types.join(", "),
                     self.current_code_schema.base_table.clone(),
                     materialized_view_where_clause
                 );
@@ -87,12 +96,12 @@ impl <'a> Migration <'a> {
                     primary_key_clause,
                 );
 
-                self.execute(&cql);
+                self.execute(&cql).await;
             },
         }
     }
 
-    pub(crate) fn run_field_added_migration(&self) {
+    pub(crate) async fn run_field_added_migration(&self) {
         println!(
             "{} {} {}",
             "Detected new fields for ".bright_cyan(),
@@ -100,20 +109,42 @@ impl <'a> Migration <'a> {
             self.migration_obj_type_str().bright_yellow()
         );
 
+        if self.migration_object_type == MigrationObjectType::Table {
+            self.run_table_field_added_migration().await;
+        } else {
+            self.run_udt_field_added_migration().await;
+        }
+    }
 
-        let new_fields = self.new_fields().join(", ");
+    async fn run_table_field_added_migration(&self) {
+        let add_fields_clause = self.new_fields().iter().map(|(field_name, field_type)| {
+            format!("{} {}", field_name, field_type)
+        }).collect::<Vec<String>>().join(", ");
 
         let cql = format!(
             "ALTER {} {} ADD ({})",
             self.migration_obj_type_str(),
             self.migration_object_name,
-            new_fields,
+            add_fields_clause,
         );
 
-        self.execute(&cql);
+        self.execute(&cql).await;
     }
 
-    pub(crate) fn run_field_removed_migration(&self) {
+    async fn run_udt_field_added_migration(&self) {
+        for (field_name, field_type) in self.new_fields() {
+            let cql = format!(
+                "ALTER TYPE {} ADD {} {}",
+                self.migration_object_name,
+                field_name,
+                field_type
+            );
+
+            self.execute(&cql).await;
+        }
+    }
+
+    pub(crate) async fn run_field_removed_migration(&self) {
         println!(
             "{} {} {}",
             "Detected removed fields for ".bright_cyan(),
@@ -130,10 +161,10 @@ impl <'a> Migration <'a> {
             removed_fields,
         );
 
-        self.execute(&cql);
+        self.execute(&cql).await;
     }
 
-    pub(crate) fn run_index_added_migration(&self) {
+    pub(crate) async fn run_index_added_migration(&self) {
         println!(
             "{} {} {}",
             "Detected new indexes for ".bright_cyan(),
@@ -149,10 +180,10 @@ impl <'a> Migration <'a> {
             new_indexes,
         );
 
-        self.execute(&cql);
+        self.execute(&cql).await;
     }
 
-    pub(crate) fn run_index_removed_migration(&self) {
+    pub(crate) async fn run_index_removed_migration(&self) {
         println!(
             "{} {} {}",
             "Detected removed indexes for ".bright_cyan(),
@@ -168,6 +199,6 @@ impl <'a> Migration <'a> {
             removed_indexes,
         );
 
-        self.execute(&cql);
+        self.execute(&cql).await;
     }
 }

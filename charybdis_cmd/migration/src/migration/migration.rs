@@ -4,24 +4,24 @@ use scylla::Session;
 use crate::schema::SchemaObject;
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum MigrationObjectType {
+pub(crate) enum MigrationObjectType {
     UDT,
     Table,
     MaterializedView,
 }
 
-pub struct Migration<'a> {
-    pub migration_object_name: &'a String,
-    pub migration_object_type: MigrationObjectType,
-    pub current_code_schema: &'a SchemaObject,
-    pub current_db_schema: &'a SchemaObject,
-    pub is_first_migration_run: bool,
+pub(crate) struct Migration<'a> {
+    pub(crate) migration_object_name: &'a String,
+    pub(crate) migration_object_type: MigrationObjectType,
+    pub(crate) current_code_schema: &'a SchemaObject,
+    pub(crate) current_db_schema: &'a SchemaObject,
+    pub(crate) is_first_migration_run: bool,
 
-    pub session: &'a Session,
+    pub(crate) session: &'a Session,
 }
 
 impl <'a> Migration<'a>  {
-    pub fn new(migration_object_name: &'a String,
+    pub(crate) fn new(migration_object_name: &'a String,
                migration_object_type: MigrationObjectType,
                current_code_schema: &'a SchemaObject,
                current_db_schema: &'a SchemaObject,
@@ -35,9 +35,10 @@ impl <'a> Migration<'a>  {
             session,
         }
     }
-    pub fn run (&self) {
+
+    pub(crate) async fn run (&self) {
         if self.is_first_migration_run {
-            self.run_first_migration();
+            self.run_first_migration().await;
             return;
         }
 
@@ -57,24 +58,27 @@ impl <'a> Migration<'a>  {
         let mut is_any_field_changed = false;
 
         if self.new_fields().len() > 0 {
-            self.run_field_added_migration();
+            self.panic_on_mv_fields_change();
+            self.run_field_added_migration().await;
             is_any_field_changed = true;
         }
 
         if self.removed_fields().len() > 0 {
-            self.run_field_removed_migration();
+            self.panic_on_mv_fields_change();
+            self.panic_on_udt_fields_removal();
+            self.run_field_removed_migration().await;
             is_any_field_changed = true;
         }
 
         if self.migration_object_type != MigrationObjectType::UDT {
             if self.new_secondary_indexes().len() > 0 {
                 is_any_field_changed = true;
-                self.run_index_added_migration();
+                self.run_index_added_migration().await;
             }
 
             if self.removed_secondary_indexes().len() > 0 {
                 is_any_field_changed = true;
-                self.run_index_removed_migration();
+                self.run_index_removed_migration().await;
             }
         }
 
@@ -83,33 +87,33 @@ impl <'a> Migration<'a>  {
                 "{} {} {}",
                 "No changes detected for ".bright_green(),
                 self.migration_object_name.bright_yellow(),
-                self.migration_obj_type_str().bright_yellow()
+                self.migration_obj_type_str().bright_magenta()
             );
         }
 
     }
 
-    pub fn migration_obj_type_str(&self) -> String {
+    pub(crate) fn migration_obj_type_str(&self) -> String {
         match self.migration_object_type {
-            MigrationObjectType::UDT => "UDT".to_string(),
+            MigrationObjectType::UDT => "Type".to_string(),
             MigrationObjectType::Table => "Table".to_string(),
             MigrationObjectType::MaterializedView => "Materialized View".to_string(),
         }
     }
 
-    pub fn new_fields(&self) -> Vec<String> {
-        let mut new_fields: Vec<String> = vec![];
+    pub(crate) fn new_fields(&self) -> Vec<(String, String)> {
+        let mut new_fields: Vec<(String, String)> = vec![];
 
-        for (field_name, _) in self.current_code_schema.fields.iter() {
+        for (field_name, field_type) in self.current_code_schema.fields.iter() {
             if !self.current_db_schema.fields.contains_key(field_name) {
-                new_fields.push(field_name.clone());
+                new_fields.push((field_name.clone(), field_type.clone()));
             }
         }
 
         new_fields
     }
 
-    pub fn removed_fields(&self) -> Vec<String> {
+    pub(crate) fn removed_fields(&self) -> Vec<String> {
         let mut removed_fields: Vec<String> = vec![];
 
         for (field_name, _) in self.current_db_schema.fields.iter() {
@@ -122,7 +126,7 @@ impl <'a> Migration<'a>  {
     }
 
 
-    pub fn new_secondary_indexes(&self) -> Vec<String> {
+    pub(crate) fn new_secondary_indexes(&self) -> Vec<String> {
         let mut new_indexes: Vec<String> = vec![];
 
         self.current_code_schema.secondary_indexes.iter().for_each(|index| {
@@ -134,7 +138,7 @@ impl <'a> Migration<'a>  {
         new_indexes
     }
 
-    pub fn removed_secondary_indexes(&self) -> Vec<String> {
+    pub(crate) fn removed_secondary_indexes(&self) -> Vec<String> {
         let mut removed_indexes: Vec<String> = vec![];
 
         self.current_db_schema.secondary_indexes.iter().for_each(|index| {
@@ -159,12 +163,28 @@ impl <'a> Migration<'a>  {
         false
     }
 
+    fn panic_on_udt_fields_removal(&self) {
+        if self.migration_object_type == MigrationObjectType::UDT {
+            if self.removed_fields().len() > 0 {
+                panic!("\n{}\n", "UDT fields removal is not allowed!".bold().bright_red());
+            }
+        }
+    }
+
+    fn panic_on_mv_fields_change(&self) {
+        if self.migration_object_type == MigrationObjectType::MaterializedView {
+            panic!("\n{}\n", "Materialized view fields change is not allowed!".bold().bright_red());
+        }
+    }
+
     fn partition_key_changed(&self) -> bool {
-        self.current_code_schema.partition_keys.clone().sort() != self.current_db_schema.partition_keys.clone().sort()
+        self.current_code_schema.partition_keys.clone().sort() !=
+            self.current_db_schema.partition_keys.clone().sort()
     }
 
     fn clustering_key_changed(&self) -> bool {
-        self.current_code_schema.clustering_keys.clone().sort() != self.current_db_schema.clustering_keys.clone().sort()
+        self.current_code_schema.clustering_keys.clone().sort() !=
+            self.current_db_schema.clustering_keys.clone().sort()
     }
 
 }

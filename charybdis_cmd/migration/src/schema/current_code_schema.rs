@@ -69,7 +69,8 @@ impl CurrentCodeSchema {
 
     pub fn populate_materialized_views(&mut self, entry: DirEntry) {
         let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
+        let schema_object: SchemaObject =
+            parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {

@@ -17,7 +17,7 @@ async fn main() {
 
 
     let migration_plan = MigrationPlan::new(&current_db_schema, &current_code_schema, &session);
-    migration_plan.run();
+    migration_plan.run().await;
 
     current_db_schema.write_schema_to_json().await.unwrap_or_else(|e| {
         eprintln!("Error writing schema to json: {}", e);

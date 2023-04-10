@@ -1,4 +1,4 @@
 mod migration_runner;
 mod migration;
 
-pub mod migration_plan;
+pub(crate) mod migration_plan;

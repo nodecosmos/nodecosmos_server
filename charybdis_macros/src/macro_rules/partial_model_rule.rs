@@ -96,6 +96,9 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         field_types.extend(quote! { (#name) => {#ty}; });
     };
 
+    let field_type_macro_name_str: String = format!("{}_field_type", macro_name_str);
+    let field_type_macro_name = Ident::new(&field_type_macro_name_str, proc_macro2::Span::call_site());
+
     let expanded: proc_macro2::TokenStream = quote! {
         #input
 
@@ -105,13 +108,13 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
             ($struct_name:ident, $($field:ident),*) => {
                 #charybdis_model_attr
                 pub struct $struct_name {
-                    $(pub $field: field_type!($field),)*
+                    $(pub $field: #field_type_macro_name!($field),)*
                 }
             };
         }
 
         #[macro_export]
-        macro_rules! field_type {
+        macro_rules! #field_type_macro_name {
             #field_types
         }
     };
