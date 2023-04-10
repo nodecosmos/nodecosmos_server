@@ -26,7 +26,7 @@ impl <'a>MigrationPlan<'a> {
         self.run_materialized_views().await.unwrap();
 
 
-        println!("{}", "Migration plan ran successfully!".bright_green());
+        println!("\n{}", "Migration plan ran successfully!".bright_green());
     }
 
     async fn run_udts(&self) -> Result<(), ()> {

@@ -4,6 +4,8 @@ use super::migration::{Migration, MigrationObjectType};
 use crate::schema::SchemaObjectTrait;
 use strip_ansi_escapes::strip;
 
+pub(crate) const INDEX_SUFFIX: &str = "idx";
+
 impl <'a> Migration <'a> {
     async fn execute(&self, cql: &String) {
         println!("{} {}", "Running CQL:".on_bright_green().black(), cql.bright_purple());
@@ -26,8 +28,8 @@ impl <'a> Migration <'a> {
 
     pub(crate) async fn run_first_migration(&self) {
         println!(
-            "{} {} {}",
-            "Detected first migration run for: ".bright_cyan(),
+            "{} {} {}!",
+            "Detected first migration run for:".bright_cyan(),
             self.migration_object_name.bright_yellow(),
             self.migration_obj_type_str().bright_magenta()
         );
@@ -172,15 +174,20 @@ impl <'a> Migration <'a> {
             self.migration_obj_type_str().bright_yellow()
         );
 
-        let new_indexes = self.new_secondary_indexes().join(", ");
+        let new_indexes = self.new_secondary_indexes();
 
-        let cql = format!(
-            "CREATE INDEX IF NOT EXISTS ON {} ({})",
-            self.migration_object_name,
-            new_indexes,
-        );
+        for column_name in new_indexes {
+            let index_name: String = self.construct_index_name(&column_name);
 
-        self.execute(&cql).await;
+            let cql = format!(
+                "CREATE INDEX IF NOT EXISTS {} ON {} ({})",
+                index_name,
+                self.migration_object_name,
+                column_name,
+            );
+
+            self.execute(&cql).await;
+        }
     }
 
     pub(crate) async fn run_index_removed_migration(&self) {
@@ -191,14 +198,15 @@ impl <'a> Migration <'a> {
             self.migration_obj_type_str().bright_yellow()
         );
 
-        let removed_indexes = self.removed_secondary_indexes().join(", ");
+        let removed_indexes = self.removed_secondary_indexes();
 
-        let cql = format!(
-            "DROP INDEX IF EXISTS ON {} ({})",
-            self.migration_object_name,
-            removed_indexes,
-        );
+        for index in removed_indexes {
+            let cql = format!(
+                "DROP INDEX {}",
+                index,
+            );
 
-        self.execute(&cql).await;
+            self.execute(&cql).await;
+        }
     }
 }

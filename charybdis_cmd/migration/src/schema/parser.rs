@@ -14,7 +14,7 @@ pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
         if entry.file_type().is_dir() && entry.file_name().to_string_lossy() == "models" {
             let parent_dir = entry.path().parent()?;
             if parent_dir.file_name().unwrap().to_string_lossy() == "src" {
-                println!("{}", "Detected 'src/models' directory".bright_green());
+                println!("{}\n", "Detected 'src/models' directory".bright_green().bold());
                 return Some(entry.into_path());
             }
         }

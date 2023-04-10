@@ -1,6 +1,110 @@
 {
-  "tables": {},
-  "udts": {},
-  "materialized_views": {},
+  "tables": {
+    "users": {
+      "fields": {
+        "username": "text",
+        "created_at": "timestamp",
+        "email": "text",
+        "id": "uuid",
+        "hashed_password": "text",
+        "password": "text",
+        "updated_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    }
+  },
+  "udts": {
+    "address": {
+      "fields": {
+        "country_4": "text",
+        "country_8": "text",
+        "state": "text",
+        "city": "text",
+        "zip": "text",
+        "country_10": "text",
+        "country_30": "text",
+        "country_24": "text",
+        "country_15": "text",
+        "country_12": "text",
+        "country_7": "text",
+        "country_22": "text",
+        "country_9": "text",
+        "country_2": "text",
+        "country_11": "text",
+        "country_21": "text",
+        "country": "text",
+        "country_19": "text",
+        "country_27": "text",
+        "country_29": "text",
+        "country_20": "text",
+        "country_26": "text",
+        "country_17": "text",
+        "country_23": "text",
+        "country_18": "text",
+        "country_16": "text",
+        "country_3": "text",
+        "street": "text",
+        "country_13": "text",
+        "country_5": "text",
+        "country_28": "text",
+        "country_6": "text",
+        "country_25": "text",
+        "country_14": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    }
+  },
+  "materialized_views": {
+    "users_by_username": {
+      "fields": {
+        "id": "uuid",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "email": "text",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "username"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    },
+    "users_by_email": {
+      "fields": {
+        "updated_at": "timestamp",
+        "created_at": "timestamp",
+        "username": "text",
+        "email": "text",
+        "id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    }
+  },
   "keyspace_name": "nodecosmos"
 }

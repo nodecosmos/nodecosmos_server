@@ -1,5 +1,6 @@
 use colored::Colorize;
 use scylla::Session;
+use crate::migration::migration_runner::INDEX_SUFFIX;
 
 use crate::schema::SchemaObject;
 
@@ -44,9 +45,9 @@ impl <'a> Migration<'a>  {
 
         if self.field_type_changed() {
             panic!("Field type changed is not supported yet!");
-            // TODO: implement question to user if he wants to continue
-            //  notify user that this will drop the column and create it again
 
+            // TODO: implement question to user if he wants to continue.
+            //  Notify user that this will drop and recreate the column!
             // self.run_field_type_changed_migration();
         }
 
@@ -129,9 +130,11 @@ impl <'a> Migration<'a>  {
     pub(crate) fn new_secondary_indexes(&self) -> Vec<String> {
         let mut new_indexes: Vec<String> = vec![];
 
-        self.current_code_schema.secondary_indexes.iter().for_each(|index| {
-            if !self.current_db_schema.secondary_indexes.contains(index) {
-                new_indexes.push(index.clone());
+        self.current_code_schema.secondary_indexes.iter().for_each(|sec_index_column| {
+            let index_name: String = self.construct_index_name(sec_index_column);
+
+            if !self.current_db_schema.secondary_indexes.contains(&index_name) {
+                new_indexes.push(sec_index_column.clone());
             }
         });
 
@@ -141,13 +144,22 @@ impl <'a> Migration<'a>  {
     pub(crate) fn removed_secondary_indexes(&self) -> Vec<String> {
         let mut removed_indexes: Vec<String> = vec![];
 
+        let code_sec_indexes: Vec<String> = self.current_code_schema.secondary_indexes
+            .iter()
+            .map(|sec_idx_col| self.construct_index_name(sec_idx_col))
+            .collect();
+
         self.current_db_schema.secondary_indexes.iter().for_each(|index| {
-            if !self.current_code_schema.secondary_indexes.contains(index) {
+            if !code_sec_indexes.contains(&index) {
                 removed_indexes.push(index.clone());
             }
         });
 
         removed_indexes
+    }
+
+    pub(crate) fn construct_index_name(&self, column_name: &String) -> String {
+        format!("{}_{}_{}", self.migration_object_name, column_name, INDEX_SUFFIX)
     }
 
     // private
@@ -178,13 +190,24 @@ impl <'a> Migration<'a>  {
     }
 
     fn partition_key_changed(&self) -> bool {
-        self.current_code_schema.partition_keys.clone().sort() !=
-            self.current_db_schema.partition_keys.clone().sort()
+        let mut code_partition_keys: Vec<String> = self.current_code_schema.partition_keys.clone();
+        let mut db_partition_keys = self.current_db_schema.partition_keys.clone();
+
+        code_partition_keys.sort();
+        db_partition_keys.sort();
+
+
+        code_partition_keys != db_partition_keys
     }
 
     fn clustering_key_changed(&self) -> bool {
-        self.current_code_schema.clustering_keys.clone().sort() !=
-            self.current_db_schema.clustering_keys.clone().sort()
+        let mut code_clustering_keys = self.current_code_schema.clustering_keys.clone();
+        let mut db_clustering_keys = self.current_db_schema.clustering_keys.clone();
+
+        code_clustering_keys.sort();
+        db_clustering_keys.sort();
+
+        code_clustering_keys != db_clustering_keys
     }
 
 }
