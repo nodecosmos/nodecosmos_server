@@ -22,7 +22,7 @@ pub type BigInt = i64;
 pub type Text = String;
 pub type Timestamp = chrono::DateTime<Utc>;
 pub type Inet = IpAddr;
-pub type List = Vec<CqlValue>;
+pub type List<T> = Vec<T>;
 pub type Set = Vec<CqlValue>;
 pub struct UserDefinedType {
     keyspace: String,

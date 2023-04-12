@@ -3,9 +3,10 @@ pub use crate::{
     model::*,
     operations::*,
     serializers::*,
+    errors::CharybdisError,
+    iterator::*,
     cql::types,
     cql::types::*,
-    errors::CharybdisError,
 };
 
 // orm macros
@@ -24,19 +25,22 @@ pub use scylla::{
         FromCqlVal,
         FromRow
     },
-    frame::value::{
-        SerializedResult,
-        SerializedValues
+    frame::{
+        value::{
+            SerializedResult,
+            SerializedValues,
+        },
+        response::result::Row,
     },
     transport::{
-        session::TypedRowIter
+        errors::QueryError,
     },
 };
 
 // scylla macros
 pub use scylla::macros::{
-    FromRow,
     ValueList,
+    FromRow,
     FromUserType,
     IntoUserType,
 };

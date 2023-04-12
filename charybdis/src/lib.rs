@@ -6,5 +6,8 @@ mod operations;
 mod serializers;
 mod model;
 
+pub(crate) mod errors;
+pub(crate) mod iterator;
+
+// all the public stuff
 pub mod prelude;
-pub mod errors;

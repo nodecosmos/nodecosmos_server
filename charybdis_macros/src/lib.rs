@@ -6,13 +6,12 @@ mod macro_rules;
 mod helpers;
 
 use proc_macro::TokenStream;
+use proc_macro2::Ident;
 use quote::quote;
-use syn::{
-    DeriveInput,
-    FieldsNamed,
-    ImplItem
-};
+use syn::{DeriveInput, Field, FieldsNamed, ImplItem};
 use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
 
 use crate::impl_model::*;
 use crate::macro_rules::*;
@@ -21,43 +20,30 @@ use charybdis_parser::{
     parse_named_fields
 };
 
-/// This macro generates the following constants:
-/// - `DB_MODEL_NAME`
-/// - `PARTITION_KEYS`
-/// - `CLUSTERING_KEYS`
-/// - `PRIMARY_KEY`
-/// - `SECONDARY_INDEXES`
-///
-/// - `FIND_BY_PRIMARY_KEY_QUERY`
-/// - `FIND_BY_PARTITION_KEY_QUERY`
-/// - `INSERT_QUERY`
-/// - `UPDATE_QUERY`
-/// - `DELETE_QUERY`
-///
-///
-/// This macro generates the following methods:
-/// - `get_primary_key_values`
-/// - `get_partition_key_values`
-/// - `get_clustering_key_values`
+/// This macro generates the implementation of the `Model` trait for the given struct.
 #[proc_macro_attribute]
 pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let args: CharybdisArgs = parse_macro_input!(args);
     let input: DeriveInput = parse_macro_input!(input);
 
-    let struct_name: &proc_macro2::Ident = &input.ident;
+    let struct_name: &Ident = &input.ident;
     let fields_named: &FieldsNamed = parse_named_fields(&input);
 
-    // consts generators
+    // basic consts
     let db_model_name_const: ImplItem = db_model_name_const(&args);
     let partition_keys_const: ImplItem = partition_keys_const(&args);
     let clustering_keys_const: ImplItem = clustering_keys_const(&args);
     let primary_key_const: ImplItem = primary_key_const(&args);
     let secondary_indexes_const: ImplItem = secondary_indexes_const(&args);
-    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args);
+
+    // operation consts
+    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args, fields_named);
     let find_by_partition_key_query_const: ImplItem = find_by_partition_key_query_const(&args);
     let insert_query_const: ImplItem = insert_query_const(&args, fields_named);
+    let update_query_const: ImplItem = update_query_const(&args, fields_named);
+    let delete_query_const: ImplItem = delete_query_const(&args, fields_named);
 
-    // methods generators
+    // methods
     let get_primary_key_values: ImplItem = get_primary_key_values(&args);
     let get_partition_key_values: ImplItem = get_partition_key_values(&args);
     let get_clustering_key_values: ImplItem = get_clustering_key_values(&args);
@@ -80,9 +66,12 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #partition_keys_const
             #primary_key_const
             #secondary_indexes_const
+            // operation consts
             #find_by_primary_key_query_const
             #find_by_partition_key_query_const
             #insert_query_const
+            #update_query_const
+            #delete_query_const
             // methods
             #get_primary_key_values
             #get_partition_key_values
@@ -91,11 +80,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
-}
-
-#[proc_macro_attribute]
-pub fn partial_model_generator(_: TokenStream, input: TokenStream) -> TokenStream {
-    partial_model_macro_generator(input)
 }
 
 /// This macro generates the following constants:
@@ -116,13 +100,14 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let input: DeriveInput = parse_macro_input!(input);
 
     let struct_name = &input.ident;
+    let fields_named: &FieldsNamed = parse_named_fields(&input);
 
     // consts
     let db_model_name_const: ImplItem = db_model_name_const(&args);
     let partition_keys_const: ImplItem = partition_keys_const(&args);
     let clustering_keys_const: ImplItem = clustering_keys_const(&args);
     let primary_key_const: ImplItem = primary_key_const(&args);
-    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args);
+    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args, fields_named);
     let find_by_partition_key_query_const: ImplItem = find_by_partition_key_query_const(&args);
 
     // methods
@@ -162,6 +147,15 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
 #[proc_macro_attribute]
 pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    // parse fields sorted by name
+    let fields_named: &FieldsNamed = parse_named_fields(&input);
+    let struct_name: &Ident = &input.ident;
+    let named: &Punctuated<Field, Comma> = &fields_named.named;
+
+    // sort fields by name
+    // https://github.com/scylladb/scylla-rust-driver/issues/370
+    let mut sorted_fields: Vec<_> = named.into_iter().collect();
+    sorted_fields.sort_by(|a, b| a.ident.as_ref().unwrap().cmp(b.ident.as_ref().unwrap()));
 
     let gen = quote! {
         #[derive(
@@ -173,8 +167,17 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
             Default,
             Debug,
         )]
-        #input
+        pub struct #struct_name {
+            #(#sorted_fields),*
+        }
     };
 
+    print!("{}", gen.to_string());
+
     gen.into()
+}
+
+#[proc_macro_attribute]
+pub fn partial_model_generator(_: TokenStream, input: TokenStream) -> TokenStream {
+    partial_model_macro_generator(input)
 }

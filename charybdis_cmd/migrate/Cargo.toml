@@ -1,5 +1,5 @@
 [package]
-name = "migration"
+name = "migrate"
 version = "0.1.0"
 edition = "2021"
 
@@ -19,5 +19,5 @@ futures = "0.3.28"
 strip-ansi-escapes = "0.1.1"
 
 [[bin]]
-name = "migration"
+name = "migrate"
 path = "src/migration_cli.rs"

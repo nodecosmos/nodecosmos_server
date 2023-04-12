@@ -2,13 +2,6 @@ use quote::quote;
 use syn::{FieldsNamed, ImplItem};
 use charybdis_parser::CharybdisArgs;
 
-
-// From Scylla docs:
-// Prepared queries have good performance, much better than simple queries.
-// By default they use shard/token aware load balancing.
-// Always pass partition key values as bound values.
-// Otherwise the driver can’t hash them to compute partition key and they will be sent
-// to the wrong node, which worsens performance.
 pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
@@ -33,9 +26,9 @@ pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsN
         coma_sep_values_placeholders,
     );
 
-    let find_by_primary_key_query_const_str = quote! {
+    let generated = quote! {
         const INSERT_QUERY: &'static str = #query_str;
     };
 
-    syn::parse_quote!(#find_by_primary_key_query_const_str)
+    syn::parse_quote!(#generated)
 }

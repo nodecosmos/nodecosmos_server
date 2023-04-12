@@ -1,4 +1,5 @@
-use crate::prelude::{FromRow, SerializedValues};
+use scylla::FromRow;
+use crate::prelude::{SerializedValues, CharybdisError};
 
 ///
 /// Model is a trait that defines the basic structure of a table in the database.
@@ -8,7 +9,7 @@ use crate::prelude::{FromRow, SerializedValues};
 /// ```rust
 /// use charybdis::prelude::*;
 ///
-/// #[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [])]
+/// #[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [], secondary_indexes=[])]
 /// pub struct User {
 ///     pub id: Uuid,
 ///     pub username: Text,
@@ -20,14 +21,13 @@ use crate::prelude::{FromRow, SerializedValues};
 /// }
 /// ```
 ///
-/// These fields are also used by smart `migration` tool that is used to
-/// automatically migrate the database schema from the code.
+/// These structure is used by smart `migration` tool that automatically migrate the database schema from the code.
 /// It detects changes in the model and automatically applies the changes to the database.
 ///
 /// If you have migration package installed, you can run the `migrate` command to automatically
 /// migrate the database schema without having to write any CQL queries.
 ///
-pub trait Model: Sized + FromRow + Default {
+pub trait Model: FromRow + Sized + Default {
     const DB_MODEL_NAME: &'static str;
 
     const PARTITION_KEYS: &'static [&'static str];
@@ -38,15 +38,19 @@ pub trait Model: Sized + FromRow + Default {
     const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
     const FIND_BY_PARTITION_KEY_QUERY: &'static str;
     const INSERT_QUERY: &'static str;
-    // const UPDATE_QUERY: &'static str;
-    // consts DELETE_QUERY: &'static str;
+    const UPDATE_QUERY: &'static str;
+    const DELETE_QUERY: &'static str;
 
+    // associated
+    // fn from_row(row: &Row) -> Result<Self, CharybdisError>;
+
+    // methods
     fn get_primary_key_values(&self) -> SerializedValues;
     fn get_partition_key_values(&self) -> SerializedValues;
     fn get_clustering_key_values(&self) -> SerializedValues;
 }
 
-pub trait MaterializedView: Sized + FromRow + Default {
+pub trait MaterializedView: FromRow + Sized + Default {
     const DB_MODEL_NAME: &'static str;
 
     const PARTITION_KEYS: &'static [&'static str];
@@ -61,6 +65,6 @@ pub trait MaterializedView: Sized + FromRow + Default {
     fn get_clustering_key_values(&self) -> SerializedValues;
 }
 
-pub trait Udt: Sized {
+pub trait Udt: FromRow + Sized {
     const DB_MODEL_NAME: &'static str;
 }

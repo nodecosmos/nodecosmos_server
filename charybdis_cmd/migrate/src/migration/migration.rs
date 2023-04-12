@@ -52,8 +52,21 @@ impl <'a> Migration<'a>  {
         }
 
         if self.migration_object_type != MigrationObjectType::UDT {
-            if self.partition_key_changed() { panic!("Partition key change is not allowed!"); }
-            if self.clustering_key_changed() { panic!("Clustering key change is not allowed!"); }
+            if self.partition_key_changed() {
+                panic!("\n\n{}\n{} {} {}\n\n",
+                       "Partition key change is not allowed!".bright_red(),
+                       "Illegal change in:".bright_red(),
+                       self.migration_object_name.bright_yellow(),
+                       self.migration_obj_type_str().bright_magenta());
+            }
+
+            if self.clustering_key_changed() {
+                panic!("\n\n{}\n{} {} {}\n\n",
+                       "Clustering key change is not allowed!".bright_red(),
+                       "Illegal change in:".bright_red(),
+                       self.migration_object_name.bright_yellow(),
+                       self.migration_obj_type_str().bright_magenta());
+            }
         }
 
         let mut is_any_field_changed = false;

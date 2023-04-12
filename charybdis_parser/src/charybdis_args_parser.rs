@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use syn::{Attribute, DeriveInput};
 use syn::parse::{Parse, ParseStream};
 use crate::parse_fields_from_array::parse_array_expr;
 
@@ -10,7 +11,19 @@ pub struct CharybdisArgs {
     pub partition_keys: Option<Vec<String>>,
     pub clustering_keys: Option<Vec<String>>,
     pub secondary_indexes: Option<Vec<String>>,
+}
 
+impl CharybdisArgs {
+    pub fn from_derive(input: &DeriveInput) -> Self {
+        let charybdis_model_attr: &Attribute = input.attrs
+            .iter()
+            .find(|attr| attr.path().is_ident("charybdis_model"))
+            .unwrap_or_else(|| panic!("Missing charybdis_model attribute"));
+        let args = charybdis_model_attr
+            .parse_args::<CharybdisArgs>()
+            .unwrap();
+        args
+    }
 }
 
 impl Parse for CharybdisArgs {

@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "nodecosmos",
-    "charybdis_cmd/migration",
+    "charybdis_cmd/migrate",
     "charybdis",
     "charybdis_macros",
     "charybdis_parser",

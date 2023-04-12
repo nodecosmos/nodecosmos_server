@@ -1,8 +1,11 @@
 use charybdis::prelude::*;
-use super::Address;
+use super::udts::Address;
 
 #[partial_model_generator]
-#[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [], secondary_indexes = [])]
+#[charybdis_model(table_name = "users",
+                 partition_keys = ["id"],
+                 clustering_keys = [],
+                 secondary_indexes = [])]
 pub struct User {
     pub id: Uuid,
     pub username: Text,
@@ -11,4 +14,5 @@ pub struct User {
     pub email: Text,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    pub address: Address,
 }

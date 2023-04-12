@@ -8,10 +8,10 @@ pub(crate) fn primary_key_const(ch_args: &CharybdisArgs) -> ImplItem {
 
     primary_key.append(clustering_keys.as_mut());
 
-    let primary_key_const = quote! {
+    let generated = quote! {
         const PRIMARY_KEY: &'static [&'static str] = &[#(#primary_key),*];
     };
 
-    syn::parse_quote!(#primary_key_const)
+    syn::parse_quote!(#generated)
 }
 
