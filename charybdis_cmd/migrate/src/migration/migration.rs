@@ -1,7 +1,7 @@
 use colored::Colorize;
 use scylla::Session;
-use crate::migration::migration_runner::INDEX_SUFFIX;
 
+use crate::migration::migration_runner::INDEX_SUFFIX;
 use crate::schema::SchemaObject;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -73,6 +73,7 @@ impl <'a> Migration<'a>  {
 
         if self.new_fields().len() > 0 {
             self.panic_on_mv_fields_change();
+
             self.run_field_added_migration().await;
             is_any_field_changed = true;
         }
@@ -80,6 +81,7 @@ impl <'a> Migration<'a>  {
         if self.removed_fields().len() > 0 {
             self.panic_on_mv_fields_change();
             self.panic_on_udt_fields_removal();
+
             self.run_field_removed_migration().await;
             is_any_field_changed = true;
         }

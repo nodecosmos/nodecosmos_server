@@ -7,7 +7,7 @@ mod serializers;
 mod model;
 
 pub(crate) mod errors;
-pub(crate) mod iterator;
 
 // all the public stuff
 pub mod prelude;
+mod query_builder;

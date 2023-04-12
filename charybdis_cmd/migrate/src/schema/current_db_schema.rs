@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use scylla::Session;
 use serde_json::to_string_pretty;
@@ -267,9 +268,12 @@ impl CurrentDbSchema {
         return Ok(json);
     }
 
-    pub(crate) async fn write_schema_to_json(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) async fn write_schema_to_json(&self, project_root: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         let json = self.get_current_schema_as_json().await?;
-        std::fs::write("../nodecosmos/current_schema.json", json)?;
+
+        let path = project_root.to_str().unwrap().to_string() + "/current_schema.json";
+
+        std::fs::write(path, json)?;
         return Ok(());
     }
 }

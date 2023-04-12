@@ -35,19 +35,20 @@ pub trait Model: FromRow + Sized + Default {
     const PRIMARY_KEY: &'static [&'static str];
     const SECONDARY_INDEXES: &'static [&'static str];
 
+    const INSERT_QUERY: &'static str;
+
     const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
     const FIND_BY_PARTITION_KEY_QUERY: &'static str;
-    const INSERT_QUERY: &'static str;
-    const UPDATE_QUERY: &'static str;
-    const DELETE_QUERY: &'static str;
 
-    // associated
-    // fn from_row(row: &Row) -> Result<Self, CharybdisError>;
+    const UPDATE_QUERY: &'static str;
+
+    const DELETE_QUERY: &'static str;
 
     // methods
     fn get_primary_key_values(&self) -> SerializedValues;
     fn get_partition_key_values(&self) -> SerializedValues;
     fn get_clustering_key_values(&self) -> SerializedValues;
+    fn get_update_values(&self) -> SerializedValues;
 }
 
 pub trait MaterializedView: FromRow + Sized + Default {

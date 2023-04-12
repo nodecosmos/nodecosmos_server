@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 use charybdis_parser;
-mod impl_model;
+mod model_impl;
 mod macro_rules;
 mod helpers;
 
@@ -13,7 +13,7 @@ use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 
-use crate::impl_model::*;
+use crate::model_impl::*;
 use crate::macro_rules::*;
 use charybdis_parser::{
     CharybdisArgs,
@@ -47,6 +47,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let get_primary_key_values: ImplItem = get_primary_key_values(&args);
     let get_partition_key_values: ImplItem = get_partition_key_values(&args);
     let get_clustering_key_values: ImplItem = get_clustering_key_values(&args);
+    let get_update_values: ImplItem = get_update_values(&args, fields_named);
 
     let expanded = quote! {
         #[derive(
@@ -57,6 +58,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             Default,
             Debug
         )]
+        #[serde(default)]
         #input
 
         impl charybdis::prelude::Model for #struct_name {
@@ -76,6 +78,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #get_primary_key_values
             #get_partition_key_values
             #get_clustering_key_values
+            #get_update_values
         }
     };
 

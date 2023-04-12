@@ -12,7 +12,7 @@ pub use scylla::frame::response::result::CqlValue;
 pub type Ascii = String;
 pub type Boolean = bool;
 pub type Blob = Vec<u8>;
-pub type Date = u32;
+pub type Date = chrono::DateTime<Utc>;
 pub type Double = f64;
 pub type Duration = CqlDuration;
 pub type Empty = ();

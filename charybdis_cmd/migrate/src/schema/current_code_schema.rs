@@ -1,6 +1,5 @@
 use walkdir::{DirEntry, WalkDir};
 use std::path::PathBuf;
-use structopt::StructOpt;
 use serde::{Serialize, Deserialize};
 
 use super::schema::SchemaObject;
@@ -11,14 +10,6 @@ const MODEL_MACRO_NAME: &str = "charybdis_model";
 const MATERIALIZED_VIEW_MACRO_NAME: &str = "charybdis_view_model";
 const UDT_MACRO_NAME: &str = "charybdis_udt_model";
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "my_cli_tool", about = "A CLI tool for Rust projects.")]
-struct Opt {
-    /// The path to the project root directory.
-    #[structopt(short, long, parse(from_os_str), default_value = ".")]
-    project_root: PathBuf,
-}
-
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct CurrentCodeSchema {
     pub tables: SchemaObjects,
@@ -27,24 +18,19 @@ pub struct CurrentCodeSchema {
 }
 
 impl CurrentCodeSchema {
-    pub fn new () -> CurrentCodeSchema {
+    pub fn new (project_root: &PathBuf) -> CurrentCodeSchema {
         let mut current_code_schema = CurrentCodeSchema {
             tables: SchemaObjects::new(),
             udts: SchemaObjects::new(),
             materialized_views: SchemaObjects::new(),
         };
 
-        current_code_schema.get_models_from_code();
+        current_code_schema.get_models_from_code(project_root);
 
         return current_code_schema;
     }
 
-    pub fn get_models_from_code(&mut self) {
-        let opt = Opt::from_args();
-
-        // // In the get_models_from_code function:
-        let project_root = opt.project_root;
-
+    pub fn get_models_from_code(&mut self, project_root: &PathBuf) {
         if let Some(models_base_dir) = find_src_models_dir(&project_root) {
             for entry in WalkDir::new(&models_base_dir) {
                 let entry: DirEntry = entry.unwrap();

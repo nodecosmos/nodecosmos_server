@@ -49,6 +49,8 @@ async fn main() {
 
     let res = user.insert(&session).await;
 
+    let mut user = User::new();
+    user.id = id;
     let res: User = user.find_by_primary_key(&session).await.unwrap();
 
     println!("{:?}", res);
@@ -68,12 +70,33 @@ async fn main() {
 
     println!("{:?}", res);
 
-    let user: User = User {
-        id,
-        ..Default::default()
-    };
+    let user = User {id, ..Default::default()};
+    let mut user: User = user.find_by_primary_key(&session).await.unwrap();
+
+    println!("{:?}", user);
+
+    user.username = "charybdis_username".to_string();
+    user.email = "goran@nodecosmos.com".to_string();
+
+    user.update(&session).await.unwrap();
 
     let res: User = user.find_by_primary_key(&session).await.unwrap();
 
     println!("{:?}", res);
+
+    let user_json: &str = r#"
+        {
+            "email": "test_email",
+            "username": "username"
+        }
+    "#;
+
+
+    let mut user = User::from_json(user_json);
+    user.id = Uuid::new_v4();
+    user.insert(&session).await;
+
+    user = user.find_by_primary_key(&session).await.unwrap();
+
+    println!("{:?}", user);
 }

@@ -1,6 +1,82 @@
 {
-  "tables": {},
-  "udts": {},
-  "materialized_views": {},
+  "tables": {
+    "users": {
+      "fields": {
+        "id": "uuid",
+        "updated_at": "timestamp",
+        "username": "text",
+        "hashed_password": "text",
+        "address": "address",
+        "created_at": "timestamp",
+        "email": "text",
+        "password": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    }
+  },
+  "udts": {
+    "address": {
+      "fields": {
+        "street": "text",
+        "country": "text",
+        "city": "text",
+        "state": "text",
+        "zip": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    }
+  },
+  "materialized_views": {
+    "users_by_email": {
+      "fields": {
+        "username": "text",
+        "id": "uuid",
+        "updated_at": "timestamp",
+        "created_at": "timestamp",
+        "email": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    },
+    "users_by_username": {
+      "fields": {
+        "username": "text",
+        "email": "text",
+        "id": "uuid",
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "username"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    }
+  },
   "keyspace_name": "nodecosmos"
 }

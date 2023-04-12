@@ -15,7 +15,7 @@ pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         serialized_values_fields_adder(primary_key);
 
 
-    let get_primary_key_values = quote! {
+    let generated = quote! {
         fn get_primary_key_values(&self) -> SerializedValues {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
@@ -25,7 +25,7 @@ pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         }
     };
 
-    syn::parse_quote!(#get_primary_key_values)
+    syn::parse_quote!(#generated)
 }
 
 pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
@@ -36,7 +36,7 @@ pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         serialized_values_fields_adder(partition_keys);
 
 
-    let get_primary_key_values = quote! {
+    let generated = quote! {
         fn get_partition_key_values(&self) -> SerializedValues {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
@@ -46,7 +46,7 @@ pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         }
     };
 
-    syn::parse_quote!(#get_primary_key_values)
+    syn::parse_quote!(#generated)
 }
 
 pub(crate) fn get_clustering_key_values(ch_args: &CharybdisArgs) -> ImplItem {
@@ -57,7 +57,7 @@ pub(crate) fn get_clustering_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         serialized_values_fields_adder(clustering_keys);
 
 
-    let get_primary_key_values = quote! {
+    let generated = quote! {
         fn get_clustering_key_values(&self) -> SerializedValues {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
@@ -67,5 +67,5 @@ pub(crate) fn get_clustering_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         }
     };
 
-    syn::parse_quote!(#get_primary_key_values)
+    syn::parse_quote!(#generated)
 }

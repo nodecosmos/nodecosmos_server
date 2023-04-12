@@ -4,7 +4,6 @@ pub use crate::{
     operations::*,
     serializers::*,
     errors::CharybdisError,
-    iterator::*,
     cql::types,
     cql::types::*,
 };
