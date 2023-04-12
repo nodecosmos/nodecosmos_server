@@ -1,5 +1,5 @@
 ### 👾 Use Monstrous tandem of Scylla and Charybdis to build your next project
-⚠️ **WIP: This project is currently in an early stage that uses async trait support from rust nightly release**
+⚠️ **WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release**
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
@@ -32,8 +32,6 @@ use super::udts::Address;
 pub struct User {
     pub id: Uuid,
     pub username: Text,
-    pub password: Text,
-    pub hashed_password: Text,
     pub email: Text,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
@@ -93,7 +91,8 @@ It supports following operations:
 - Create UDTs (`src/models/udts`)
 - Create materialized views (`src/models/materialized_views`)
 
-🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir it will leave model as it is.
+🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir it will leave 
+model as it is.
 ```bash
 cargo install charybdis_cmd/migrate
 
@@ -115,14 +114,12 @@ use crate::models::user::*;
 async fn main() {
   let session: &CachingSession = init_session().await;
   
+  // init user
   let id: Uuid = Uuid::new_v4();
-  
   let user: User = User {
     id,
-    email: "test_email".to_string(),
-    username: "test_username".to_string(),
-    password: "test_pass".to_string(),
-    hashed_password: "test_hashed_pass".to_string(),
+    email: "charybdis@nodecosmos.com".to_string(),
+    username: "charybdis".to_string(),
     created_at: DateTime::from(Utc::now()),
     updated_at: DateTime::from(Utc::now()),
     address: Address {
@@ -135,13 +132,11 @@ async fn main() {
   };
 
   // create
-  let res = user.insert(&session).await;
+  user.insert(&session).await;
   
   // find
   let user = User {id, ..Default::default()};
-  let res: User = user.find_by_primary_key(&session).await.unwrap();
-  
-  println!("{:?}", res);
+  let user: User = user.find_by_primary_key(&session).await.unwrap();
   
   // update
   user.username = "new_username".to_string();
@@ -154,50 +149,46 @@ async fn main() {
 ```
 ### Partial Model Operations:
 Use auto generated partial model macro to run operations on subset of the model fields.
-This macro will generate a new struct with same structure as the original model, but with only subset of the fields.
+This macro generates a new struct with same structure as the original model, but only with provided fields.
 
 <p style="color: #e4a47c">
 Note: Partition key fields are required!
 </p>
 
 ```rust
-#[tokio::main]
-async fn main() {
+// auto-generated macro - available in user model
+partial_user!(OpsUser, id, username);
 
-  // auto-generated macro - available in user model
-  partial_user!(OpsUser, id, username);
+let id = Uuid::new_v4();
+let user: OpsUser = OpsUser { id, username: "scylla".to_string() };
 
-  let new_id = Uuid::new_v4();
-  let user: OpsUser = OpsUser {
-    id: new_id,
-    username: "test_ops_user_username".to_string(),
-  };
+// insert
+user.insert(&session).await;
 
-  user.insert(&session).await;
-
-  let user = User {id, ..Default::default()};
-  let res: User = user.find_by_primary_key(&session).await.unwrap();
-}
+// get whole user
+let user = User {id, ..Default::default()};
+let res: User = user.find_by_primary_key(&session).await.unwrap();
 ```
 
 
 ### Future Plans:
-- Add auto query builder and dervies for many possible query variations on primary_key fields:`Like`, `Contains`, `In`, `NotIn`, `Between`, `NotBetween`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual`, `NotEqual`, `Equal`, `NotLike`, `NotContains`, `NotIn`, `NotBetween`, `NotGreaterThan`, `NotLessThan`, `NotGreaterThanOrEqual`, `NotLessThanOrEqual`...
-    ```rust
-      #[partial_model_generator]
-      #[charybdis_model(table_name = "posts", 
-                        partition_keys = ["created_at_day"], 
-                        clustering_keys = ["tags", "title"],
-                        secondary_indexes = ["id"])]
-      pub struct Post {
-        pub id: Uuid,
-        pub title: Text,
-        pub description: Text,
-        pub tags: Vec<Text>,
-        pub created_at_day: Date,
-        pub created_at: Timestamp,
-        pub updated_at: Timestamp,
-      }
-      
-      let posts: TypedRowIter<Post> = Post::created_at_day(&today).and().tags_contains(&tag).find(&session).await;
-    ```
+ Add auto query builder and dervies for many possible query variations on primary_key fields:`Like`, `Contains`, `In`, `NotIn`, `Between`, `NotBetween`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual`, `NotEqual`, `Equal`, `NotLike`, `NotContains`, `NotIn`, `NotBetween`, `NotGreaterThan`, `NotLessThan`, `NotGreaterThanOrEqual`, `NotLessThanOrEqual`...
+  ```rust 
+    #[partial_model_generator]
+    #[charybdis_model(table_name = "posts", 
+                      partition_keys = ["created_at_day"], 
+                      clustering_keys = ["tags", "title"],
+                      secondary_indexes = ["id"])]
+    pub struct Post {
+      pub id: Uuid,
+      pub title: Text,
+      pub description: Text,
+      pub tags: Vec<Text>,
+      pub created_at_day: Date,
+      pub created_at: Timestamp,
+      pub updated_at: Timestamp,
+    }
+    
+    let posts: TypedRowIter<Post> = Post::created_at_day(&today).and().tags_contains(&tag)
+      .and().title_like(&param).find(&session).await;
+  ```
