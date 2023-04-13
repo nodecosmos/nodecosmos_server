@@ -13,7 +13,7 @@
 
 ### Performance consideration:
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
-- It uses prepared statements (shard/token aware)
+- It uses prepared statements (shard/token aware) -> bind values
 - It expects CachingSession as a session type for operations
 - Basic CRUD queries are macro generated constants
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
@@ -104,6 +104,8 @@ and secondary indexes so you don't alter structure accidentally. If structure is
 
 ### Basic Operations:
 
+#### Create:
+
 ```rust
 mod models;
 
@@ -133,20 +135,34 @@ async fn main() {
 
   // create
   user.insert(&session).await;
-  
-  // find
+}
+```
+
+#### Find:
+```rust
   let user = User {id, ..Default::default()};
   let user: User = user.find_by_primary_key(&session).await.unwrap();
-  
-  // update
-  user.username = "new_username".to_string();
-  user.update(&session).await;
-  
-  // delete
-  user.delete(&session).await;
-}
-
+  let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
 ```
+
+#### Update:
+```rust
+let user = User::from_json(json);
+
+user.username = "scylla".to_string();
+user.email = "some@email.com";
+
+user.update(&session).await;
+```
+
+#### Delete:
+```rust 
+  let user = User::from_json(json);
+
+  user.delete(&session).await;
+```
+
+
 ### Partial Model Operations:
 Use auto generated partial model macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
