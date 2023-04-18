@@ -2,15 +2,16 @@
   "tables": {
     "users": {
       "fields": {
-        "created_at": "timestamp",
-        "password": "text",
         "first_name": "text",
-        "hashed_password": "text",
-        "username": "text",
+        "email": "text",
+        "id": "uuid",
         "updated_at": "timestamp",
         "address": "address",
-        "email": "text",
-        "id": "uuid"
+        "created_at": "timestamp",
+        "hashed_password": "text",
+        "password": "text",
+        "username": "text",
+        "last_name": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -25,11 +26,11 @@
   "udts": {
     "address": {
       "fields": {
-        "country": "text",
+        "zip": "text",
         "street": "text",
-        "city": "text",
+        "country": "text",
         "state": "text",
-        "zip": "text"
+        "city": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -40,30 +41,11 @@
     }
   },
   "materialized_views": {
-    "users_by_email": {
-      "fields": {
-        "username": "text",
-        "created_at": "timestamp",
-        "email": "text",
-        "updated_at": "timestamp",
-        "id": "uuid"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "email"
-      ],
-      "clustering_keys": [
-        "id"
-      ],
-      "secondary_indexes": []
-    },
     "users_by_username": {
       "fields": {
         "username": "text",
-        "created_at": "timestamp",
         "id": "uuid",
+        "created_at": "timestamp",
         "email": "text",
         "updated_at": "timestamp"
       },
@@ -72,6 +54,25 @@
       "base_table": "",
       "partition_keys": [
         "username"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    },
+    "users_by_email": {
+      "fields": {
+        "created_at": "timestamp",
+        "email": "text",
+        "updated_at": "timestamp",
+        "id": "uuid",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
       ],
       "clustering_keys": [
         "id"

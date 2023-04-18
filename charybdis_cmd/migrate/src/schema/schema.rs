@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use colored::Colorize;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SchemaObject {
@@ -39,12 +39,14 @@ impl SchemaObjectTrait for SchemaObject {
         let mut sorted_fields: Vec<(&String, &String)> = self.fields.iter().collect();
         sorted_fields.sort();
 
-
         for (field_name, field_type) in sorted_fields.iter() {
-            cql_fields.push_str(&format!("    {} {},\n", field_name.bright_cyan().bold(), field_type.bright_yellow()));
+            cql_fields.push_str(&format!(
+                "    {} {},\n",
+                field_name.bright_cyan().bold(),
+                field_type.bright_yellow()
+            ));
         }
 
-        println!("cql_fields: {}", cql_fields);
         cql_fields.pop();
         cql_fields.pop();
         cql_fields

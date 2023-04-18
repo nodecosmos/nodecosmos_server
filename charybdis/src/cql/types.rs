@@ -1,18 +1,18 @@
 #![allow(unused)]
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::IpAddr;
-use chrono::Utc;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::net::IpAddr;
 
 pub use scylla::frame::response::result::CqlValue;
 
 pub type Ascii = String;
 pub type Boolean = bool;
 pub type Blob = Vec<u8>;
-pub type Date = chrono::DateTime<Utc>;
+pub type Date = i32; // tmp until from_cql_val is implemented for u 32
 pub type Double = f64;
 pub type Duration = CqlDuration;
 pub type Empty = ();
@@ -36,6 +36,6 @@ pub type Timeuuid = Uuid;
 pub type Tuple = Vec<Option<CqlValue>>;
 pub type Varint = BigInt;
 
-pub use uuid::Uuid;
 pub use scylla::frame::value::{Counter, CqlDuration};
 pub use std::collections::HashMap as Map;
+pub use uuid::Uuid;

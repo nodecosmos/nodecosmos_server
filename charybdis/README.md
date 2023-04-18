@@ -179,14 +179,15 @@ user.update(&session).await;
   user.delete(&session).await;
 ```
 
+📝 Each of operations will do filtering based on primary key fields that will be taken from the model struct.
 
 ### Partial Model Operations:
 Use auto generated partial model macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
+It can be used to run operations on records based on mandatory partition keys and provided clustering keys,N so you can
+update or delete multiple records at once.
 
-<p style="color: #e4a47c">
-Note: Partition key fields are required!
-</p>
+📝 **Partition key fields are required!**
 
 ```rust
 // auto-generated macro - available in user model
