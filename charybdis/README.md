@@ -237,7 +237,7 @@ for user in users_by_username {
 }
 ```
 
-### Custom queries:
+### Custom filtering:
 Let's say we have a model:
 ```rust 
 #[partial_model_generator]
@@ -256,19 +256,21 @@ pub struct Post {
 }
 ```
 
-If we want to query records by some other field, we can use combination of find_by_<struct_name> and find method:
+If we want to query records by some fields other than partition_keys and sec indexes,
+we can use combination of automatically generated macro rule: `find_<struct_name>_query` and `find` method:
+
 ```rust
 let created_at_day = chrono::Utc::now().day();
 let title = "some title";
 
-// automatically generated macro
+// automatically generated macro rule that follows convention find_
 let query = find_post_query!("created_at_day = ? AND title = ?");
 
-Post::find(&session, query, (created_at, updated_at)).await.unwrap();
+let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at, updated_at)).await.unwrap();
 ```
 
-Also if we are working with partial models, we can use `find_by_<struct_name>` and `find` method:
-Note that struct_name will be snake_case of the struct name.
+Also if we are working with partial models, we can use `find_<struct_name>_query` and `find` method:
+Note that <struct_name> will be snake_case of the struct name.
 ```rust
 partial_post!(OpsPost, id, title, created_at_day);
 
@@ -278,8 +280,10 @@ let query = find_ops_post_query!("created_at_day = ? AND title = ?");
 OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 ```
 
-**find_by_<struct_name>** macro comes with some benefits like correct fields order in select clause,
-we don't do string interpolation at runtime as it's static string, easy of use.
+**find_<struct_name>_query!** macro comes with some benefits like:
+- correct fields order in select clause
+- we don't do string interpolation at runtime as it's static string
+- easy of use.
 
 ### Limitations:
 - Fields that can be null have to be defined within `Option` or it will raise an error when parsing queries
