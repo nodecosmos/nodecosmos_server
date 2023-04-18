@@ -1,10 +1,10 @@
+use crate::prelude::SerializedValues;
 use scylla::FromRow;
-use crate::prelude::{SerializedValues, CharybdisError};
 
 ///
 /// Model is a trait that defines the basic structure of a table in the database.
 /// It is used to generate the necessary code for the charybdis orm.
-/// The trait is implemented by the user and the macro generates the necessary code.
+/// Macro 'charybdis_model` generates the necessary code for implementation so you don't have to write it manually.
 /// The macro is used in the following way:
 /// ```rust
 /// use charybdis::prelude::*;
@@ -16,6 +16,8 @@ use crate::prelude::{SerializedValues, CharybdisError};
 ///     pub password: Text,
 ///     pub hashed_password: Text,
 ///     pub email: Text,
+///     pub first_name: Option<Text>,
+///     pub last_name: Option<Text>,
 ///     pub created_at: Timestamp,
 ///     pub updated_at: Timestamp,
 /// }
@@ -27,44 +29,34 @@ use crate::prelude::{SerializedValues, CharybdisError};
 /// If you have migration package installed, you can run the `migrate` command to automatically
 /// migrate the database schema without having to write any CQL queries.
 ///
-pub trait Model: FromRow + Sized + Default {
+pub trait BaseModel: FromRow + Sized + Default {
     const DB_MODEL_NAME: &'static str;
 
     const PARTITION_KEYS: &'static [&'static str];
     const CLUSTERING_KEYS: &'static [&'static str];
     const PRIMARY_KEY: &'static [&'static str];
+
+    const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
+    const FIND_BY_PARTITION_KEY_QUERY: &'static str;
+
+    const SELECT_FIELDS_CLAUSE: &'static str;
+
+    fn get_primary_key_values(&self) -> SerializedValues;
+    fn get_partition_key_values(&self) -> SerializedValues;
+    fn get_clustering_key_values(&self) -> SerializedValues;
+}
+
+pub trait Model: BaseModel {
     const SECONDARY_INDEXES: &'static [&'static str];
 
     const INSERT_QUERY: &'static str;
-
-    const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
-    const FIND_BY_PARTITION_KEY_QUERY: &'static str;
-
     const UPDATE_QUERY: &'static str;
-
     const DELETE_QUERY: &'static str;
 
-    // methods
-    fn get_primary_key_values(&self) -> SerializedValues;
-    fn get_partition_key_values(&self) -> SerializedValues;
-    fn get_clustering_key_values(&self) -> SerializedValues;
     fn get_update_values(&self) -> SerializedValues;
 }
 
-pub trait MaterializedView: FromRow + Sized + Default {
-    const DB_MODEL_NAME: &'static str;
-
-    const PARTITION_KEYS: &'static [&'static str];
-    const CLUSTERING_KEYS: &'static [&'static str];
-    const PRIMARY_KEY: &'static [&'static str];
-
-    const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
-    const FIND_BY_PARTITION_KEY_QUERY: &'static str;
-
-    fn get_primary_key_values(&self) -> SerializedValues;
-    fn get_partition_key_values(&self) -> SerializedValues;
-    fn get_clustering_key_values(&self) -> SerializedValues;
-}
+pub trait MaterializedView: BaseModel {}
 
 pub trait Udt: FromRow + Sized {
     const DB_MODEL_NAME: &'static str;

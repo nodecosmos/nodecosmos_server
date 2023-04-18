@@ -5,9 +5,8 @@ mod cql;
 mod operations;
 mod serializers;
 mod model;
-
-pub(crate) mod errors;
+mod query_builder;
+mod errors;
 
 // all the public stuff
 pub mod prelude;
-mod query_builder;

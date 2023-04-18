@@ -1,102 +1,77 @@
 #![allow(unused)]
 #![feature(const_option)]
 
-use scylla::{CachingSession, Session, SessionBuilder};
-use std::time::Duration;
 use dotenv::dotenv;
 use scylla::_macro_internal::ValueList;
+use scylla::{CachingSession, Session, SessionBuilder};
+use std::time::Duration;
 mod db;
 mod models;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
+use scylla::transport::session::TypedRowIter;
 
 use charybdis::prelude::*;
 use models::*;
 
 use crate::db::*;
 
-
-
 #[tokio::main]
 async fn main() {
-    // partial_user!(OpsUser, id, username);
-    //
-    // let json = r#"
-    //
-    // "#;
-    //
-    // let user: OpsUser = OpsUser::from_json(json);
+    partial_user!(OpsUser, id, username);
+
+    let mut ops_user: OpsUser = OpsUser::new();
+    ops_user.id = Uuid::new_v4();
 
     let session: &CachingSession = init_session().await;
-
     let id: Uuid = Uuid::new_v4();
-
-    let user: User = User {
-        id,
-        email: "test_email".to_string(),
-        username: "test_username".to_string(),
-        password: "test_pass".to_string(),
-        hashed_password: "test_hashed_pass".to_string(),
-        created_at: DateTime::from(Utc::now()),
-        updated_at: DateTime::from(Utc::now()),
-        address: Address {
-            street: "street".to_string(),
-            state: "state".to_string(),
-            zip: "zip".to_string(),
-            country: "country".to_string(),
-            city: "city".to_string(),
-        },
-    };
+    let user: User = User::new();
 
     let res = user.insert(&session).await;
 
-    let mut user = User::new();
-    user.id = id;
-    let res: User = user.find_by_primary_key(&session).await.unwrap();
-
-    println!("{:?}", res);
-
-    let new_id = Uuid::new_v4();
-
-    partial_user!(OpsUser, id, username);
-
-    let user: OpsUser = OpsUser {
-        id: new_id,
-        username: "test_ops_user_username".to_string(),
-    };
-
-    user.insert(&session).await;
-
-    let res: OpsUser = user.find_by_primary_key(&session).await.unwrap();
-
-    println!("{:?}", res);
-
-    let user = User {id, ..Default::default()};
-    let mut user: User = user.find_by_primary_key(&session).await.unwrap();
+    let user: User = user.find_by_primary_key(&session).await.unwrap();
 
     println!("{:?}", user);
 
-    user.username = "charybdis_username".to_string();
-    user.email = "goran@nodecosmos.com".to_string();
+    println!("{:?}", user.to_json());
 
-    user.update(&session).await.unwrap();
+    let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
 
-    let res: User = user.find_by_primary_key(&session).await.unwrap();
+    let created_at = chrono::Utc::now().day().to_string();
+    let updated_at = chrono::Utc::now();
 
-    println!("{:?}", res);
+    let user: User = User::new();
 
-    let user_json: &str = r#"
-        {
-            "email": "test_email",
-            "username": "username"
-        }
-    "#;
+    let query = find_user_query!("email = ? ALLOW FILTERING");
+    let email = "test_email";
 
+    let users: TypedRowIter<User> = User::find(&session, query, (email,)).await.unwrap();
 
-    let mut user = User::from_json(user_json);
-    user.id = Uuid::new_v4();
-    user.insert(&session).await;
+    for user in users {
+        println!("{:?}", user);
+    }
 
-    user = user.find_by_primary_key(&session).await.unwrap();
+    let mut user_by_username: UsersByUsername = UsersByUsername::new();
+    user_by_username.username = "test_username".to_string();
 
-    println!("{:?}", user);
+    let users_by_username: TypedRowIter<UsersByUsername> = user_by_username
+        .find_by_partition_key(&session)
+        .await
+        .unwrap();
+
+    for user in users_by_username {
+        println!("{:?}", user);
+    }
+
+    let mut users_by_username: UsersByUsername = UsersByUsername::new();
+
+    let query = find_users_by_username_query!("username = ?");
+
+    let users_by_username: TypedRowIter<UsersByUsername> =
+        UsersByUsername::find(&session, query, ("test_username",))
+            .await
+            .unwrap();
+
+    for user in users_by_username {
+        println!("{:?}", user);
+    }
 }

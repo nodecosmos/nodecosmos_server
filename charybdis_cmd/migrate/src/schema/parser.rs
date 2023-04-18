@@ -1,11 +1,11 @@
+use crate::schema::SchemaObject;
+use charybdis_parser::CharybdisArgs;
+use colored::Colorize;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use colored::Colorize;
-use syn::{Field, Fields, Item};
+use syn::{Field, Fields, GenericArgument, Item, PathArguments};
 use walkdir::WalkDir;
-use charybdis_parser::CharybdisArgs;
-use crate::schema::SchemaObject;
 
 // returns models dir if nested in src/models
 pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
@@ -14,7 +14,10 @@ pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
         if entry.file_type().is_dir() && entry.file_name().to_string_lossy() == "models" {
             let parent_dir = entry.path().parent()?;
             if parent_dir.file_name().unwrap().to_string_lossy() == "src" {
-                println!("{}\n", "Detected 'src/models' directory".bright_green().bold());
+                println!(
+                    "{}\n",
+                    "Detected 'src/models' directory".bright_green().bold()
+                );
                 return Some(entry.into_path());
             }
         }
@@ -22,7 +25,7 @@ pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
     None
 }
 
-pub(crate)fn parse_file_as_string(path: &Path) -> String {
+pub(crate) fn parse_file_as_string(path: &Path) -> String {
     let mut file_content = String::new();
     File::open(path)
         .unwrap()
@@ -31,8 +34,7 @@ pub(crate)fn parse_file_as_string(path: &Path) -> String {
     file_content
 }
 
-pub(crate)fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
-    -> SchemaObject {
+pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str) -> SchemaObject {
     let ast: syn::File = syn::parse_file(&file_content).unwrap();
     let mut schema_object: SchemaObject = SchemaObject::new();
 
@@ -49,7 +51,24 @@ pub(crate)fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
                         {
                             let field_name = ident.to_string();
                             let field_type = type_path.path.segments[0].ident.to_string();
-                            schema_object.fields.insert(field_name, field_type);
+
+                            // if field_type is option then get the type inside the option
+                            if field_type == "Option" {
+                                if let PathArguments::AngleBracketed(args) =
+                                    &type_path.path.segments[0].arguments
+                                {
+                                    if let GenericArgument::Type(syn::Type::Path(type_path)) =
+                                        &args.args[0]
+                                    {
+                                        let field_type =
+                                            type_path.path.segments[0].ident.to_string();
+                                        schema_object.fields.insert(field_name, field_type);
+                                    }
+                                }
+                                // schema_object.fields.insert(field_name, field_type);
+                            } else {
+                                schema_object.fields.insert(field_name, field_type);
+                            }
                         }
                     }
                 }

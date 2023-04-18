@@ -19,10 +19,17 @@ impl CharybdisArgs {
             .iter()
             .find(|attr| attr.path().is_ident("charybdis_model"))
             .unwrap_or_else(|| panic!("Missing charybdis_model attribute"));
-        let args = charybdis_model_attr
+        let args: CharybdisArgs = charybdis_model_attr
             .parse_args::<CharybdisArgs>()
             .unwrap();
         args
+    }
+
+    pub fn get_primary_key(&self) -> Vec<String> {
+        let mut primary_key: Vec<String> = self.partition_keys.clone().unwrap();
+        let mut clustering_keys: Vec<String> = self.clustering_keys.clone().unwrap();
+        primary_key.append(clustering_keys.as_mut());
+        primary_key
     }
 }
 
@@ -89,10 +96,10 @@ impl Parse for CharybdisArgs {
 impl From<TokenStream> for CharybdisArgs {
     fn from(tokens: TokenStream) -> Self {
         // Convert the input tokens to a ParseStream
-        let parse_stream = syn::parse2(tokens).unwrap();
+        let parse_stream: TokenStream = syn::parse2(tokens).unwrap();
 
         // Parse the ParseStream into a MyStruct instance
-        let my_struct = syn::parse2(parse_stream).unwrap();
+        let my_struct: CharybdisArgs = syn::parse2(parse_stream).unwrap();
 
         // Return the parsed MyStruct instance
         my_struct

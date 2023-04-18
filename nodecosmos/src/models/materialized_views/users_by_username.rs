@@ -5,6 +5,6 @@ pub struct UsersByUsername {
     pub username: Text,
     pub id: Uuid,
     pub email: Text,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
+    pub created_at: Option<Timestamp>,
+    pub updated_at: Option<Timestamp>,
 }

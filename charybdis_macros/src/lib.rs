@@ -1,24 +1,21 @@
 extern crate proc_macro;
 
 use charybdis_parser;
-mod model_impl;
-mod macro_rules;
 mod helpers;
+mod macro_rules;
+mod model_impl;
 
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
-use syn::{DeriveInput, Field, FieldsNamed, ImplItem};
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
+use syn::{DeriveInput, Field, FieldsNamed, ImplItem};
 
-use crate::model_impl::*;
 use crate::macro_rules::*;
-use charybdis_parser::{
-    CharybdisArgs,
-    parse_named_fields
-};
+use crate::model_impl::*;
+use charybdis_parser::{parse_named_fields, CharybdisArgs};
 
 /// This macro generates the implementation of the `Model` trait for the given struct.
 #[proc_macro_attribute]
@@ -35,10 +32,13 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let clustering_keys_const: ImplItem = clustering_keys_const(&args);
     let primary_key_const: ImplItem = primary_key_const(&args);
     let secondary_indexes_const: ImplItem = secondary_indexes_const(&args);
+    let select_fields_clause: ImplItem = select_fields_clause(&args, fields_named);
 
     // operation consts
-    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args, fields_named);
-    let find_by_partition_key_query_const: ImplItem = find_by_partition_key_query_const(&args);
+    let find_by_primary_key_query_const: ImplItem =
+        find_by_primary_key_query_const(&args, fields_named);
+    let find_by_partition_key_query_const: ImplItem =
+        find_by_partition_key_query_const(&args, fields_named);
     let insert_query_const: ImplItem = insert_query_const(&args, fields_named);
     let update_query_const: ImplItem = update_query_const(&args, fields_named);
     let delete_query_const: ImplItem = delete_query_const(&args, fields_named);
@@ -49,37 +49,48 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let get_clustering_key_values: ImplItem = get_clustering_key_values(&args);
     let get_update_values: ImplItem = get_update_values(&args, fields_named);
 
+    // rules
+    let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
+
     let expanded = quote! {
         #[derive(
             charybdis::prelude::Serialize,
             charybdis::prelude::Deserialize,
-            charybdis::prelude::FromRow,
             charybdis::prelude::ValueList,
+            charybdis::prelude::FromRow,
             Default,
             Debug
         )]
-        #[serde(default)]
         #input
 
-        impl charybdis::prelude::Model for #struct_name {
+       impl charybdis::prelude::BaseModel for #struct_name {
             // consts
             #db_model_name_const
             #clustering_keys_const
             #partition_keys_const
             #primary_key_const
-            #secondary_indexes_const
-            // operation consts
             #find_by_primary_key_query_const
             #find_by_partition_key_query_const
-            #insert_query_const
-            #update_query_const
-            #delete_query_const
+            #select_fields_clause
             // methods
             #get_primary_key_values
             #get_partition_key_values
             #get_clustering_key_values
+        }
+
+
+        impl charybdis::prelude::Model for #struct_name {
+            // consts
+            #secondary_indexes_const
+            // operation consts
+            #insert_query_const
+            #update_query_const
+            #delete_query_const
+            // methods
             #get_update_values
         }
+
+        #find_model_query_rule
     };
 
     TokenStream::from(expanded)
@@ -110,26 +121,32 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let partition_keys_const: ImplItem = partition_keys_const(&args);
     let clustering_keys_const: ImplItem = clustering_keys_const(&args);
     let primary_key_const: ImplItem = primary_key_const(&args);
-    let find_by_primary_key_query_const: ImplItem = find_by_primary_key_query_const(&args, fields_named);
-    let find_by_partition_key_query_const: ImplItem = find_by_partition_key_query_const(&args);
+    let find_by_primary_key_query_const: ImplItem =
+        find_by_primary_key_query_const(&args, fields_named);
+    let find_by_partition_key_query_const: ImplItem =
+        find_by_partition_key_query_const(&args, fields_named);
+    let select_fields_clause: ImplItem = select_fields_clause(&args, fields_named);
 
     // methods
     let get_primary_key_values: ImplItem = get_primary_key_values(&args);
-    let get_partition_key_values: ImplItem= get_partition_key_values(&args);
+    let get_partition_key_values: ImplItem = get_partition_key_values(&args);
     let get_clustering_key_values: ImplItem = get_clustering_key_values(&args);
+
+    // rules
+    let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
             charybdis::prelude::Serialize,
             charybdis::prelude::Deserialize,
-            charybdis::prelude::FromRow,
             charybdis::prelude::ValueList,
+            charybdis::prelude::FromRow,
             Default,
             Debug
         )]
         #input
 
-        impl charybdis::prelude::MaterializedView for #struct_name {
+        impl charybdis::prelude::BaseModel for #struct_name {
             // consts
             #db_model_name_const
             #clustering_keys_const
@@ -137,11 +154,16 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
             #primary_key_const
             #find_by_primary_key_query_const
             #find_by_partition_key_query_const
+            #select_fields_clause
             // methods
             #get_primary_key_values
             #get_partition_key_values
             #get_clustering_key_values
         }
+
+        impl charybdis::prelude::MaterializedView for #struct_name {}
+
+        #find_model_query_rule
     };
 
     TokenStream::from(expanded)
@@ -174,8 +196,6 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
             #(#sorted_fields),*
         }
     };
-
-    print!("{}", gen.to_string());
 
     gen.into()
 }

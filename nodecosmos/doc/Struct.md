@@ -1,19 +1,17 @@
-use scylla::{CachingSession, IntoTypedRows, QueryResult};
-use scylla::transport::session::TypedRowIter;
 
-use crate::errors::CharybdisError;
-use crate::model::Model;
-use crate::prelude::SerializedValues;
+Phantom data is used to hold the type information for the model even though the model is not used in the struct fields.
+However, it is used in `impl <T: Model>QueryBuilder<T>`that returns db result casted into the model type.
 
-pub struct CharybdisQuery<T: Model> {
-    pub query: &'static str,
+```rust
+pub struct QueryBuilder<T: Model> {
+    pub fields: Vec<String>,
     pub values: SerializedValues,
-    pub phantom_data: std::marker::PhantomData<T>,
+    pub phantom_data: std::marker::PhantomData<T>
 }
 
-impl <T: Model>CharybdisQuery<T> {
+impl <T: Model>QueryBuilder<T> {
     pub async fn execute(&self, session: &CachingSession) -> Result<TypedRowIter<T>, CharybdisError> {
-        let result: QueryResult = session.execute(self.query, &self.values)
+        let result: QueryResult = session.execute(self.fields.join(" "), &self.values)
             .await.map_err(|e| CharybdisError::QueryError(e))?;
 
         match result.rows {
@@ -27,3 +25,4 @@ impl <T: Model>CharybdisQuery<T> {
         }
     }
 }
+```

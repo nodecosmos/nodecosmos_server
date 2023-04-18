@@ -1,11 +1,12 @@
-mod new;
-mod insert;
-mod find;
-mod update;
 mod delete;
+mod execute;
+mod find;
+mod insert;
+mod new;
+mod update;
 
-pub use new::*;
-pub use insert::*;
-pub use find::*;
-pub use update::*;
 pub use delete::*;
+pub use find::*;
+pub use insert::*;
+pub use new::*;
+pub use update::*;
