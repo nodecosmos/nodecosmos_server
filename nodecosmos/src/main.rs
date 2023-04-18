@@ -18,6 +18,7 @@ use crate::db::*;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+
     let session = init_session().await;
 
     let posts = Post::find(
@@ -27,9 +28,7 @@ async fn main() {
     )
     .await
     .unwrap();
-
     let now = std::time::Instant::now();
-
     let mut posts_vec = vec![];
 
     for post in posts {

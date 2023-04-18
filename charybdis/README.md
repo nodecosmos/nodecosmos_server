@@ -108,9 +108,10 @@ cargo install charybdis_cmd/migrate
 
 migrate --host 172.22.0.4 --keyspace nodecosmos
 ```
-⚠️ If you are working with **existing** datasets, before running migration you need to make sure that your **model** definitions structure
-matches the database in respect to table names, column names, column types, partition keys, clustering keys
-and secondary indexes so you don't alter structure accidentally. If structure is matched, it will not run any migrations.
+⚠️ If you are working with **existing** datasets, before running migration you need to make sure that your **model** 
+definitions structure matches the database in respect to table names, column names, column types, partition keys, 
+clustering keys and secondary indexes so you don't alter structure accidentally.
+If structure is matched, it will not run any migrations.
 
 ### Basic Operations:
 
@@ -153,8 +154,8 @@ async fn main() {
 #### Find:
 ```rust
   let user = User {id, ..Default::default()};
-  // primary_key results in single row
   let user: User = user.find_by_primary_key(&session).await.unwrap();
+
   // partition_key results in multiple rows
   let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
 
@@ -274,14 +275,15 @@ Or if you prefer:
 ```rust
 let posts = Post::find(
     &session,
-    find_post_query!("created_at_day = ?"),
-    (Utc::now().date_naive(),),
+    find_post_query!("created_at_day = ? AND title = ?"),
+    (Utc::now().date_naive(), "some title"),
 )
 .await
 .unwrap();
 ```
 
-Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial models:
+Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial 
+models:
 ```rust
 partial_post!(OpsPost, id, title, created_at_day);
 
@@ -296,10 +298,10 @@ OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 - we don't do string interpolation at runtime as it's static string
 - easy of use.
 
-### Some of the important limitations:
+### Limitations:
 - Fields that can be null have to be defined within `Option` or it will raise an error when parsing queries
-- Batch operations are not supported yet meaning that currently we can only do `insert`, `update`, and `delete` 
-operations on single row at a time.
+- Batch operations are not supported yet by the driver meaning that currently we can only do `insert`, `update`,
+and `delete` operations on single row at a time.
 
 
 ### Future plans:
