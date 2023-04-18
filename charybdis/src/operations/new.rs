@@ -1,4 +1,4 @@
-use crate::model::{BaseModel, Model};
+use crate::model::BaseModel;
 
 pub trait New<T: Default + BaseModel> {
     fn new() -> T;

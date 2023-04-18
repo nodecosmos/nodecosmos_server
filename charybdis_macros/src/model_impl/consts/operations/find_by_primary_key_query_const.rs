@@ -51,22 +51,3 @@ pub(crate) fn find_by_partition_key_query_const(
 
     syn::parse_quote!(#generated)
 }
-
-pub(crate) fn find_by_primary_key_base_query_const(ch_args: &CharybdisArgs) -> ImplItem {
-    let primary_key = ch_args.get_primary_key();
-    let table_name = ch_args.table_name.clone().unwrap();
-
-    let primary_key_where_clause: String = primary_key.join(" = ? AND ");
-
-    let query_str = format!(
-        "SELECT * FROM {} WHERE {} = ?",
-        table_name.to_string(),
-        primary_key_where_clause
-    );
-
-    let generated = quote! {
-        const FIND_BY_PRIMARY_KEY_BASE: &'static str = #query_str;
-    };
-
-    syn::parse_quote!(#generated)
-}
