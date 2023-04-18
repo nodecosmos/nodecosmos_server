@@ -188,7 +188,7 @@ Use auto generated `partial_<model>!` macro to run operations on subset of the m
 This macro generates a new struct with same structure as the original model, but only with provided fields.
 It can be used to run **find** operations on records based on mandatory partition keys and provided clustering keys.
 
-📝 Partition key fields are required for **read** operations, while whole primary key fields are required for 
+📝 Partition key fields are required for **read** operations while whole primary key fields are required for 
 **update**, **insert** and **delete** operations!
 
 ```rust
@@ -270,15 +270,15 @@ let title = "some title";
 let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, title)).await.unwrap();
 ```
 
-Or if you prefer single line:
+Or if you prefer:
 ```rust
-    let posts = Post::find(
-            &session,
-            find_post_query!("created_at_day = ?"),
-            (Utc::now().date_naive(),),
-        )
-        .await
-        .unwrap();
+let posts = Post::find(
+    &session,
+    find_post_query!("created_at_day = ?"),
+    (Utc::now().date_naive(),),
+)
+.await
+.unwrap();
 ```
 
 Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial models:
@@ -298,11 +298,12 @@ OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 
 ### Some of the important limitations:
 - Fields that can be null have to be defined within `Option` or it will raise an error when parsing queries
-- Batch operations are not supported yet
+- Batch operations are not supported yet meaning that currently we can only do `insert`, `update`, and `delete` 
+operations on single row at a time.
 
 
 ### Future plans:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database
 - [ ] Add --drop flag to migrate command to drop tables, types and UDTs if they are not defined in `src/models`
-- [ ] Add support for batch operations e.g. `insert_all`, `update_all`, etc...
+- [ ] Add support for batch operations e.g. `insert_all`, `update_all`, `delete_all`
