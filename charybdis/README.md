@@ -29,7 +29,10 @@ use charybdis::prelude::*;
 use super::udts::Address;
 
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
-#[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [], secondary_indexes = [])]
+#[charybdis_model(table_name = "users", 
+                  partition_keys = ["id"], 
+                  clustering_keys = [], 
+                  secondary_indexes = [])]
 pub struct User {
     pub id: Uuid,
     pub username: Text,
@@ -61,14 +64,18 @@ Declare view model as a struct within `src/models/materialized_views` dir:
 ```rust
 use charybdis::prelude::*;
 
-#[charybdis_view_model(table_name="users_by_username", base_table="users", partition_keys=["username"], clustering_keys=["id"])]
+#[charybdis_view_model(table_name="users_by_username",
+                       base_table="users",
+                       partition_keys=["username"],
+                       clustering_keys=["id"])]
 pub struct UsersByUsername {
     pub username: Text,
     pub id: Uuid,
     pub email: Text,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
+    pub created_at: Option<Timestamp>,
+    pub updated_at: Option<Timestamp>,
 }
+
 ```
 Resulting auto-generated migration query will be:
 ```sql
@@ -144,8 +151,15 @@ async fn main() {
 #### Find:
 ```rust
   let user = User {id, ..Default::default()};
+  // primary_key results in single row
   let user: User = user.find_by_primary_key(&session).await.unwrap();
+  // partition_key results in multiple rows
   let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
+
+  // or
+  let query = find_user_query!("id = ?");
+  let users: TypedRowIter<User> = User::find(&session, query, (id,)).await.unwrap();
+
 ```
 
 #### Update:
