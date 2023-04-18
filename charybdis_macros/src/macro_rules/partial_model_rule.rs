@@ -129,17 +129,19 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         parse_str::<proc_macro2::TokenStream>(&macro_name_str).unwrap();
 
     let field_type_macro_name_str: String = format!("{}_field_type", macro_name_str);
-    let filter_ck_macro_name: String = format!("filter_cks_present_in_{}", macro_name_str);
+    // let filter_ck_macro_name: String = format!("filter_cks_present_in_{}", macro_name_str);
 
     let field_type_macro_name: Ident =
         Ident::new(&field_type_macro_name_str, proc_macro2::Span::call_site());
-    let filter_ck_macro_name: Ident =
-        Ident::new(&filter_ck_macro_name, proc_macro2::Span::call_site());
+    // let filter_ck_macro_name: Ident =
+    //     Ident::new(&filter_ck_macro_name, proc_macro2::Span::call_site());
 
     // macro that generates field types
     let field_type_macro_body: proc_macro2::TokenStream = build_field_type_macro_body(fields_named);
 
     let char_args: CharybdisArgs = CharybdisArgs::from_derive(&input);
+
+    let table_name = char_args.table_name.unwrap();
 
     let cks: Vec<String> = char_args.clustering_keys.unwrap_or(vec![]);
     let pks: Vec<String> = char_args.partition_keys.unwrap_or(vec![]);
@@ -155,9 +157,9 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         #[macro_export]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
-                #[charybdis_model(table_name="users",
+                #[charybdis_model(table_name=#table_name,
                                   partition_keys=#pks,
-                                  clustering_keys=[#filter_ck_macro_name!($($field),*)],
+                                  clustering_keys=#cks,
                                   secondary_indexes=#sec_idxes)]
                 pub struct $struct_name {
                     $(pub $field: #field_type_macro_name!($field),)*
@@ -169,24 +171,6 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         #[macro_export]
         macro_rules! #field_type_macro_name {
             #field_type_macro_body
-        }
-
-        // Used by partial_model! macro from above to populate clustering keys in `charybdis_model` macro declaration.
-        // It takes a list of original clustering keys, provided in charybdis_model macro declaration,
-        // and returns a list of clustering keys that are present in fields provided to partial_<model_name>! macro.
-        // Future me (or anyone involved): good luck! 🤯
-        #[macro_export]
-        macro_rules! #filter_ck_macro_name {
-            ($($field:ident),*) => {
-                let cks = #cks;
-                let mut filtered_cks = vec![];
-                for ck in cks {
-                    if vec![$($field),*].contains(&ck) {
-                        filtered_cks.push(ck);
-                    }
-                }
-                filtered_cks
-            }
         }
     };
 

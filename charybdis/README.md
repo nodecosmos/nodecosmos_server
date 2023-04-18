@@ -7,7 +7,8 @@
 
 ### Usage considerations:
 - Provide and expressive API for CRUD & Complex Query operations on model as a whole
-- Provide easy way to manipulate model partially by using partial_model! macro
+- Provide easy way to manipulate model partially by using automatically generated `partial_<model>!` macro
+- Provide easy way to write complex queries by using automatically generated `find_<model>_query!` macro
 - Automatic migration tool that analyzes the `src/model/*.rs` files and runs migrations according to differences between the model definition and database
 - It works well with optional fields, and it's possible to use `Option<T>` as a field type, automatic migration
 tool will detect type within option and create column with that type
@@ -17,6 +18,7 @@ tool will detect type within option and create column with that type
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects CachingSession as a session type for operations
 - Basic CRUD queries are macro generated constants
+- By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
 ### Usage:
@@ -182,12 +184,12 @@ user.update(&session).await;
 📝 Each of operations will do filtering based on primary key fields that will be taken from the model struct.
 
 ### Partial Model Operations:
-Use auto generated partial model macro to run operations on subset of the model fields.
+Use auto generated `partial_<model>!` macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
-It can be used to run operations on records based on mandatory partition keys and provided clustering keys,N so you can
-update or delete multiple records at once.
+It can be used to run **find** operations on records based on mandatory partition keys and provided clustering keys.
 
-📝 **Partition key fields are required!**
+📝 Partition key fields are required for **read** operations, while whole primary key fields are required for 
+**update**, **insert** and **delete** operations!
 
 ```rust
 // auto-generated macro - available in user model
@@ -200,7 +202,6 @@ let user: OpsUser = OpsUser { id, username: "scylla".to_string() };
 user.insert(&session).await;
 user.update(&session).await;
 
-// for deletion note that provided cols will be deleted rather than whole row as per scylla rule
 user.delete(&session).await;
 
 // get partial user
@@ -284,11 +285,13 @@ OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 - we don't do string interpolation at runtime as it's static string
 - easy of use.
 
-### Limitations:
+### Some of the important limitations:
 - Fields that can be null have to be defined within `Option` or it will raise an error when parsing queries
+- Batch operations are not supported yet
 
 
 ### Future plans:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database
 - [ ] Add --drop flag to migrate command to drop tables, types and UDTs if they are not defined in `src/models`
+- [ ] Add support for batch operations e.g. `insert_all`, `update_all`, etc...

@@ -41,7 +41,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         find_by_partition_key_query_const(&args, fields_named);
     let insert_query_const: ImplItem = insert_query_const(&args, fields_named);
     let update_query_const: ImplItem = update_query_const(&args, fields_named);
-    let delete_query_const: ImplItem = delete_query_const(&args, fields_named);
+    let delete_query_const: ImplItem = delete_query_const(&args);
 
     // methods
     let get_primary_key_values: ImplItem = get_primary_key_values(&args);

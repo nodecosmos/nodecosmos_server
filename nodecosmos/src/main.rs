@@ -30,4 +30,14 @@ async fn main() {
     };
 
     post.insert(&session).await.unwrap();
+
+    // Ops
+
+    let mut post = Post::new();
+
+    post.title = "Hello World".into();
+    post.description = "This is a test 2".into();
+    post.created_at_day = Utc::now().day() as i32;
+
+    post.delete(&session).await.unwrap();
 }
