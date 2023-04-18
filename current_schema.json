@@ -2,15 +2,15 @@
   "tables": {
     "users": {
       "fields": {
+        "created_at": "timestamp",
         "password": "text",
+        "first_name": "text",
         "hashed_password": "text",
         "username": "text",
-        "first_name": "text",
-        "id": "uuid",
+        "updated_at": "timestamp",
         "address": "address",
         "email": "text",
-        "updated_at": "timestamp",
-        "created_at": "timestamp"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -25,11 +25,11 @@
   "udts": {
     "address": {
       "fields": {
-        "street": "text",
-        "state": "text",
-        "zip": "text",
         "country": "text",
-        "city": "text"
+        "street": "text",
+        "city": "text",
+        "state": "text",
+        "zip": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -42,11 +42,11 @@
   "materialized_views": {
     "users_by_email": {
       "fields": {
-        "id": "uuid",
         "username": "text",
         "created_at": "timestamp",
+        "email": "text",
         "updated_at": "timestamp",
-        "email": "text"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -61,11 +61,11 @@
     },
     "users_by_username": {
       "fields": {
-        "updated_at": "timestamp",
-        "created_at": "timestamp",
         "username": "text",
+        "created_at": "timestamp",
+        "id": "uuid",
         "email": "text",
-        "id": "uuid"
+        "updated_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",

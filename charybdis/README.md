@@ -255,9 +255,8 @@ pub struct Post {
   pub updated_at: Timestamp,
 }
 ```
-
-If we want to query records by some fields other than partition_keys and sec indexes,
-we can use combination of automatically generated macro rule: `find_<struct_name>_query` and `find` method:
+We get automatically generated `find_post_query!` macro that follows convention `find_<struct_name>_query!`.
+It can be used to create custom filtering clauses like:
 
 ```rust
 let created_at_day = chrono::Utc::now().day();
@@ -269,8 +268,7 @@ let query = find_post_query!("created_at_day = ? AND title = ?");
 let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at, updated_at)).await.unwrap();
 ```
 
-Also if we are working with partial models, we can use `find_<struct_name>_query` and `find` method:
-Note that <struct_name> will be snake_case of the struct name.
+Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial models:
 ```rust
 partial_post!(OpsPost, id, title, created_at_day);
 
