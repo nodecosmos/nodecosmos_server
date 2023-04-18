@@ -15,12 +15,19 @@ use models::*;
 
 use crate::db::*;
 
-#[tokio::main]
-async fn main() {
-    dotenv().ok();
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
-    let session = init_session().await;
+#[get("/")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello world!")
+}
 
+#[post("/echo")]
+async fn echo(req_body: String) -> impl Responder {
+    HttpResponse::Ok().body(req_body)
+}
+
+async fn manual_hello(session: web::Data<CachingSession>) -> impl Responder {
     let posts = Post::find(
         &session,
         find_post_query!("created_at_day = ?"),
@@ -35,7 +42,22 @@ async fn main() {
         posts_vec.push(post.unwrap());
     }
 
-    posts_vec.to_json();
+    HttpResponse::Ok().json(posts_vec)
+}
 
-    println!("elapsed: {:?}", now.elapsed());
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
+    let session: CachingSession = init_session().await;
+    let session = web::Data::new(session);
+
+    HttpServer::new(move || {
+        App::new()
+            .service(hello)
+            .service(echo)
+            .app_data(session.clone())
+            .route("/hey.json", web::get().to(manual_hello))
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }

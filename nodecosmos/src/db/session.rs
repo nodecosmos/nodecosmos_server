@@ -29,7 +29,5 @@ pub async fn init_session() -> CachingSession {
         .await
         .unwrap();
 
-    let session = CachingSession::from(session, 1000);
-
-    session
+    CachingSession::from(session, 1000)
 }

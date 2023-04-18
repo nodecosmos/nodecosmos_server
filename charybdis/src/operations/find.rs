@@ -20,6 +20,18 @@ pub trait FindByPrimaryKey: BaseModel {
         &self,
         session: &CachingSession,
     ) -> Result<TypedRowIter<Self>, CharybdisError>;
+
+    async fn typed_row_result(result: QueryResult) -> Result<TypedRowIter<Self>, CharybdisError> {
+        match result.rows {
+            Some(rows) => {
+                let typed_rows: TypedRowIter<Self> = rows.into_typed();
+                Ok(typed_rows)
+            }
+            None => Err(CharybdisError::NotFoundError(
+                Self::DB_MODEL_NAME.to_string(),
+            )),
+        }
+    }
 }
 
 impl<T: BaseModel> FindByPrimaryKey for T {
@@ -33,15 +45,7 @@ impl<T: BaseModel> FindByPrimaryKey for T {
             .await
             .map_err(|e| CharybdisError::QueryError(e))?;
 
-        match result.rows {
-            Some(rows) => {
-                let typed_rows: TypedRowIter<Self> = rows.into_typed();
-                Ok(typed_rows)
-            }
-            None => Err(CharybdisError::NotFoundError(
-                Self::DB_MODEL_NAME.to_string(),
-            )),
-        }
+        Self::typed_row_result(result).await
     }
 
     // methods
@@ -70,14 +74,6 @@ impl<T: BaseModel> FindByPrimaryKey for T {
             .await
             .map_err(|e| CharybdisError::QueryError(e))?;
 
-        match result.rows {
-            Some(rows) => {
-                let typed_rows: TypedRowIter<Self> = rows.into_typed();
-                Ok(typed_rows)
-            }
-            None => Err(CharybdisError::NotFoundError(
-                Self::DB_MODEL_NAME.to_string(),
-            )),
-        }
+        Self::typed_row_result(result).await
     }
 }
