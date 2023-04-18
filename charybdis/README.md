@@ -3,8 +3,7 @@
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
-* Scylla: NoSQL DB focused on performance
-* Charybdis: Thin ORM layer on top of `scylla_rust_driver` focused on easy of use and performance
+#### 👾  Charybdis is a thin ORM layer on top of `scylla_rust_driver` focused on easy of use and performance
 
 ### Usage considerations:
 - Provide and expressive API for CRUD & Complex Query operations on model as a whole
@@ -12,6 +11,7 @@
 - Automatic migration tool that analyzes the `src/model/*.rs` files and runs migrations according to differences between the model definition and database
 - It works well with optional fields, and it's possible to use `Option<T>` as a field type, automatic migration
 tool will detect type within option and create column with that type
+
 ### Performance consideration:
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
