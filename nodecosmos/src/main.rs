@@ -7,7 +7,7 @@ use scylla::{CachingSession, Session, SessionBuilder};
 use std::time::Duration;
 mod db;
 mod models;
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Datelike, Local, Utc};
 use scylla::transport::session::TypedRowIter;
 
 use charybdis::prelude::*;
@@ -20,24 +20,23 @@ async fn main() {
     dotenv().ok();
     let session = init_session().await;
 
-    let post = Post {
-        id: Uuid::new_v4(),
-        created_at_day: Utc::now().day() as i32,
-        title: "Hello World".into(),
-        description: "This is a test".into(),
-        created_at: Timestamp::from(Utc::now()),
-        updated_at: Timestamp::from(Utc::now()),
-    };
+    let posts = Post::find(
+        &session,
+        find_post_query!("created_at_day = ?"),
+        (Utc::now().date_naive(),),
+    )
+    .await
+    .unwrap();
 
-    post.insert(&session).await.unwrap();
+    let now = std::time::Instant::now();
 
-    // Ops
+    let mut posts_vec = vec![];
 
-    let mut post = Post::new();
+    for post in posts {
+        posts_vec.push(post.unwrap());
+    }
 
-    post.title = "Hello World".into();
-    post.description = "This is a test 2".into();
-    post.created_at_day = Utc::now().day() as i32;
+    posts_vec.to_json();
 
-    post.delete(&session).await.unwrap();
+    println!("elapsed: {:?}", now.elapsed());
 }

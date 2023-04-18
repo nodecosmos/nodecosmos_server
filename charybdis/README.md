@@ -261,13 +261,24 @@ We get automatically generated `find_post_query!` macro that follows convention 
 It can be used to create custom filtering clauses like:
 
 ```rust
-let created_at_day = chrono::Utc::now().day();
-let title = "some title";
-
 // automatically generated macro rule that follows convention find_
 let query = find_post_query!("created_at_day = ? AND title = ?");
 
-let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at, updated_at)).await.unwrap();
+let created_at_day = Utc::now().date_naive();
+let title = "some title";
+
+let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, title)).await.unwrap();
+```
+
+Or if you prefer single line:
+```rust
+    let posts = Post::find(
+            &session,
+            find_post_query!("created_at_day = ?"),
+            (Utc::now().date_naive(),),
+        )
+        .await
+        .unwrap();
 ```
 
 Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial models:

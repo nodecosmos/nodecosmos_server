@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -12,7 +12,7 @@ pub use scylla::frame::response::result::CqlValue;
 pub type Ascii = String;
 pub type Boolean = bool;
 pub type Blob = Vec<u8>;
-pub type Date = i32; // tmp until from_cql_val is implemented for u 32
+pub type Date = NaiveDate;
 pub type Double = f64;
 pub type Duration = CqlDuration;
 pub type Empty = ();
