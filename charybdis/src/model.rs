@@ -1,5 +1,6 @@
 use crate::prelude::SerializedValues;
 use scylla::FromRow;
+use std::any::Any;
 
 ///
 /// Model is a trait that defines the basic structure of a table in the database.

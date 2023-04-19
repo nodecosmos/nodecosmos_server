@@ -1,11 +1,11 @@
-### 👾 Use Monstrous tandem of Scylla and Charybdis to build your next project
+## 👾 Use Monstrous tandem of Scylla and Charybdis to build your next project
 ⚠️ **WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release**
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
 #### 👾  Charybdis is a thin ORM layer on top of `scylla_rust_driver` focused on easy of use and performance
 
-### Usage considerations:
+## Usage considerations:
 - Provide and expressive API for CRUD & Complex Query operations on model as a whole
 - Provide easy way to manipulate model partially by using automatically generated `partial_<model>!` macro
 - Provide easy way to write complex queries by using automatically generated `find_<model>_query!` macro
@@ -13,7 +13,7 @@
 - It works well with optional fields, and it's possible to use `Option<T>` as a field type, automatic migration
 tool will detect type within option and create column with that type
 
-### Performance consideration:
+## Performance consideration:
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects CachingSession as a session type for operations
@@ -21,9 +21,27 @@ tool will detect type within option and create column with that type
 - By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
-### Usage:
+## Table of Contents
+- [Charybdis Models](#charybdis-models)
+  - [Define Tables](#define-tables)
+  - [Define UDTs](#For-UDTs)
+  - [Define Materialized Views](#For-Materialized-Views)
+- [Automatic migration tool with `charybdis_cmd/migrate`](#automatic-migration)
+- [Basic Operations](#basic-operations)
+  - [Create](#create)
+  - [Find](#find)
+  - [Update](#update)
+  - [Delete](#delete)
+- [Partial Model Operations](#partial-model-operations)
+- [View Operations](#view-operations)
+- [Custom filtering](#custom-filtering)
+- [Callbacks](#callbacks)
+- [Future plans](#future-plans)
 
-#### Define Tables
+## Charybdis Models
+
+### Define Tables
+
 Declare model as a struct within `src/models` dir: (Note we use `src/models` as migration tool expects that dir)
 ```rust
 // src/modles/user.rs
@@ -45,7 +63,7 @@ pub struct User {
 }
 ```
 
-#### For UDTs
+### Define UDT
 Declare udt model as a struct within `src/models/udts` dir:
 ```rust
 // src/models/udts/address.rs
@@ -60,7 +78,7 @@ pub struct Address {
     pub country: Text,
 }
 ```
-#### For Materialized Views
+### Define Materialized Views
 Declare view model as a struct within `src/models/materialized_views` dir:
 
 ```rust
@@ -88,7 +106,8 @@ WHERE email IS NOT NULL AND id IS NOT NULL
 PRIMARY KEY (email, id)
   ```
 
-### Automatic migration with `charybdis_cmd/migrate`:
+## Automatic migration with `charybdis_cmd/migrate`:
+<a name="automatic-migration"></a>
 Smart migration tool that enables you to migrate your models to database without need to write migrations by hand.
 It expects `src/models` files and generates migrations based on differences between model definitions and database.
 
@@ -113,9 +132,9 @@ definitions structure matches the database in respect to table names, column nam
 clustering keys and secondary indexes so you don't alter structure accidentally.
 If structure is matched, it will not run any migrations.
 
-### Basic Operations:
+## Basic Operations:
 
-#### Create:
+### Create
 
 ```rust
 mod models;
@@ -151,7 +170,7 @@ async fn main() {
 }
 ```
 
-#### Find:
+### Find
 ```rust
   let user = User {id, ..Default::default()};
   let user: User = user.find_by_primary_key(&session).await.unwrap();
@@ -165,7 +184,7 @@ async fn main() {
 
 ```
 
-#### Update:
+### Update
 ```rust
 let user = User::from_json(json);
 
@@ -175,7 +194,7 @@ user.email = "some@email.com";
 user.update(&session).await;
 ```
 
-#### Delete:
+### Delete
 ```rust 
   let user = User::from_json(json);
 
@@ -184,7 +203,7 @@ user.update(&session).await;
 
 📝 Each of operations will do filtering based on primary key fields that will be taken from the model struct.
 
-### Partial Model Operations:
+## Partial Model Operations:
 Use auto generated `partial_<model>!` macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
 It can be used to run **find** operations on records based on mandatory partition keys and provided clustering keys.
@@ -213,7 +232,7 @@ let user = User {id, ..Default::default()};
 let res: User = user.find_by_primary_key(&session).await.unwrap();
 ```
 
-### View Operations:
+## View Operations:
 ```rust
 let mut user_by_username: UsersByUsername = UsersByUsername::new();
 user_by_username.username = "test_username".to_string();
@@ -240,7 +259,7 @@ for user in users_by_username {
 }
 ```
 
-### Custom filtering:
+## Custom filtering:
 Let's say we have a model:
 ```rust 
 #[partial_model_generator]
@@ -278,6 +297,7 @@ let posts = Post::find(
     find_post_query!("created_at_day = ? AND title = ?"),
     (Utc::now().date_naive(), "some title"),
 )
+
 .await
 .unwrap();
 ```
@@ -298,13 +318,50 @@ OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 - we don't do string interpolation at runtime as it's static string
 - easy of use.
 
-### Limitations:
+
+## Callbacks
+We can define callbacks that will be executed before and after certain operations.
+```rust
+use charybdis::prelude::*;
+
+#[charybdis_model(table_name = "posts", 
+                  partition_keys = ["created_at_day"], 
+                  clustering_keys = ["title"],
+                  secondary_indexes = ["id"])]
+pub struct Post {
+    ...
+}
+
+impl Callbacks for Post {
+  async fn before_insert(&self, session: &Session) -> Result<(), CharybdisError> {
+    // do something before insert
+    Ok(())
+  }
+}
+```
+
+In order to trigger callback, instead of calling `insert` method on model, we can call `insert_cb`:
+```rust
+let post = Post::from_json(json);
+let res = post.insert_cb(&session).await;
+match res {
+        Ok(_) => println!("success"),
+        Err(e) => match e {
+            CharybdisError::ValidationError((field, reason)) => {
+                println!("validation error: {} {}", field, reason)
+            }
+            _ => println!("error: {:?}", e),
+        },
+    }
+```
+
+## Limitations:
 - Fields that can be null have to be defined within `Option` or it will raise an error when parsing queries
 - Batch operations are not supported yet by the driver meaning that currently we can only do `insert`, `update`,
 and `delete` operations on single row at a time.
 
 
-### Future plans:
+## Future plans:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database
 - [ ] Add --drop flag to migrate command to drop tables, types and UDTs if they are not defined in `src/models`

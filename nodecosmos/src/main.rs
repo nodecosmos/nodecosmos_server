@@ -1,3 +1,4 @@
+#![feature(async_fn_in_trait)]
 #![allow(unused)]
 #![feature(const_option)]
 
@@ -46,18 +47,30 @@ async fn manual_hello(session: web::Data<CachingSession>) -> impl Responder {
 }
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn main() {
     let session: CachingSession = init_session().await;
-    let session = web::Data::new(session);
-
-    HttpServer::new(move || {
-        App::new()
-            .service(hello)
-            .service(echo)
-            .app_data(session.clone())
-            .route("/hey.json", web::get().to(manual_hello))
-    })
-    .bind(("127.0.0.1", 8080))?
-    .run()
-    .await
+    // let session = web::Data::new(session);
+    //
+    // HttpServer::new(move || {
+    //     App::new()
+    //         .service(hello)
+    //         .service(echo)
+    //         .app_data(session.clone())
+    //         .route("/hey.json", web::get().to(manual_hello))
+    // })
+    // .bind(("127.0.0.1", 8080))?
+    // .run()
+    // .await;
+    //
+    let user = User::new();
+    let res = user.insert_cb(&session).await;
+    match res {
+        Ok(_) => println!("success"),
+        Err(e) => match e {
+            CharybdisError::ValidationError((field, reason)) => {
+                println!("validation error: {} {}", field, reason)
+            }
+            _ => println!("error: {:?}", e),
+        },
+    }
 }

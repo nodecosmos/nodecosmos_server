@@ -11,8 +11,7 @@ pub enum CharybdisError {
     SingleRowTypedError(SingleRowTypedError, String),
     // charybdis
     NotFoundError(String),
-    // query builder errors
-    CannotParseSelectClause(String),
+    ValidationError((String, String)),
 }
 
 impl fmt::Display for CharybdisError {
@@ -33,11 +32,9 @@ impl fmt::Display for CharybdisError {
                 ),
                 SingleRowTypedError::FromRowError(e) => write!(f, "DeserializationError: {}", e),
             },
-            // internal
+            // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for {}", e),
-            CharybdisError::CannotParseSelectClause(e) => {
-                write!(f, "Cannot parse select clause: {}", e)
-            }
+            CharybdisError::ValidationError(e) => write!(f, "Validation Error: {} {}", e.0, e.1),
         }
     }
 }
@@ -48,7 +45,7 @@ impl Error for CharybdisError {
             CharybdisError::QueryError(e) => Some(e),
             CharybdisError::NotFoundError(_) => None,
             CharybdisError::SingleRowTypedError(e, _) => Some(e),
-            CharybdisError::CannotParseSelectClause(_) => None,
+            CharybdisError::ValidationError(_) => None,
         }
     }
 }

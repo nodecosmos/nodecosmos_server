@@ -1,7 +1,7 @@
 // orm
 pub use crate::{
-    cql::types::*, errors::CharybdisError, model::*, operations::*, query_builder::CharybdisQuery,
-    query_builder::*, serializers::*,
+    callbacks::*, cql::types::*, errors::CharybdisError, model::*, operations::*,
+    query_builder::CharybdisQuery, query_builder::*, serializers::*,
 };
 
 // orm macros
@@ -14,7 +14,7 @@ pub use scylla::{
     cql_to_rust::{FromCqlVal, FromRow, FromRowError},
     frame::{
         response::result::Row,
-        value::{SerializedResult, SerializedValues},
+        value::{SerializedResult, SerializedValues, ValueList},
     },
     transport::errors::QueryError,
     CachingSession, Session,
