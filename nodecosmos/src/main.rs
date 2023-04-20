@@ -17,6 +17,7 @@ use models::*;
 use crate::db::*;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use scylla::batch::Batch;
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -73,4 +74,38 @@ async fn main() {
             _ => println!("error: {:?}", e),
         },
     }
+
+    let id = Uuid::new_v4();
+    let mut user = User {
+        id,
+        username: "initial_username".to_string(),
+        email: "test@nodecosmos.com".to_string(),
+        password: "test".to_string(),
+        hashed_password: "test".to_string(),
+        first_name: "test".to_string(),
+        last_name: "test".to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        address: None,
+    };
+
+    partial_user!(PrtUser, id, username);
+
+    let mut user2 = PrtUser {
+        id,
+        username: "updated_username".to_string(),
+    };
+
+    let mut batch: Batch = Default::default();
+
+    batch.append_statement(User::INSERT_QUERY);
+    batch.append_statement(PrtUser::UPDATE_QUERY);
+
+    let batch_res = session
+        .batch(&batch, (&user, &user2.get_update_values()))
+        .await
+        .unwrap();
+    let user = user.find_by_primary_key(&session).await.unwrap();
+
+    assert_eq!(user.username, "updated_username".to_string());
 }

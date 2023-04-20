@@ -129,12 +129,9 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         parse_str::<proc_macro2::TokenStream>(&macro_name_str).unwrap();
 
     let field_type_macro_name_str: String = format!("{}_field_type", macro_name_str);
-    // let filter_ck_macro_name: String = format!("filter_cks_present_in_{}", macro_name_str);
 
     let field_type_macro_name: Ident =
         Ident::new(&field_type_macro_name_str, proc_macro2::Span::call_site());
-    // let filter_ck_macro_name: Ident =
-    //     Ident::new(&filter_ck_macro_name, proc_macro2::Span::call_site());
 
     // macro that generates field types
     let field_type_macro_body: proc_macro2::TokenStream = build_field_type_macro_body(fields_named);
