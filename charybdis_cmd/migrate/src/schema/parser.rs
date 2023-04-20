@@ -50,25 +50,9 @@ pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
                         } = field
                         {
                             let field_name = ident.to_string();
-                            let field_type = type_path.path.segments[0].ident.to_string();
+                            let field_type = type_with_arguments(&type_path);
 
-                            // if field_type is option then get the type inside the option
-                            if field_type == "Option" {
-                                if let PathArguments::AngleBracketed(args) =
-                                    &type_path.path.segments[0].arguments
-                                {
-                                    if let GenericArgument::Type(syn::Type::Path(type_path)) =
-                                        &args.args[0]
-                                    {
-                                        let field_type =
-                                            type_path.path.segments[0].ident.to_string();
-                                        schema_object.fields.insert(field_name, field_type);
-                                    }
-                                }
-                                // schema_object.fields.insert(field_name, field_type);
-                            } else {
-                                schema_object.fields.insert(field_name, field_type);
-                            }
+                            schema_object.fields.insert(field_name, field_type);
                         }
                     }
                 }
@@ -93,4 +77,21 @@ pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
     }
 
     schema_object
+}
+
+fn type_with_arguments(type_path: &syn::TypePath) -> String {
+    let first_segment = &type_path.path.segments[0];
+
+    // Check if the type is an Option<T>
+    if first_segment.ident == "Option" {
+        if let PathArguments::AngleBracketed(angle_bracketed_args) = &first_segment.arguments {
+            if let Some(GenericArgument::Type(inner_type)) = angle_bracketed_args.args.first() {
+                // Return the inner type of Option<T>
+                return quote::quote! { #inner_type }.to_string();
+            }
+        }
+    }
+
+    // If not an Option<T>, return the type with arguments as a string
+    return quote::quote! { #type_path }.to_string();
 }

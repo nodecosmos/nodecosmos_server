@@ -21,12 +21,14 @@ pub(crate) struct Migration<'a> {
     pub(crate) session: &'a Session,
 }
 
-impl <'a> Migration<'a>  {
-    pub(crate) fn new(migration_object_name: &'a String,
-               migration_object_type: MigrationObjectType,
-               current_code_schema: &'a SchemaObject,
-               current_db_schema: &'a SchemaObject,
-               session: &'a Session) -> Self {
+impl<'a> Migration<'a> {
+    pub(crate) fn new(
+        migration_object_name: &'a String,
+        migration_object_type: MigrationObjectType,
+        current_code_schema: &'a SchemaObject,
+        current_db_schema: &'a SchemaObject,
+        session: &'a Session,
+    ) -> Self {
         Self {
             migration_object_name,
             migration_object_type,
@@ -37,14 +39,14 @@ impl <'a> Migration<'a>  {
         }
     }
 
-    pub(crate) async fn run (&self) {
+    pub(crate) async fn run(&self) {
         if self.is_first_migration_run {
             self.run_first_migration().await;
             return;
         }
 
         if self.field_type_changed() {
-            panic!("Field type changed is not supported yet!");
+            panic!("Field type changed is not supported!");
 
             // TODO: implement question to user if he wants to continue.
             //  Notify user that this will drop and recreate the column!
@@ -53,19 +55,23 @@ impl <'a> Migration<'a>  {
 
         if self.migration_object_type != MigrationObjectType::UDT {
             if self.partition_key_changed() {
-                panic!("\n\n{}\n{} {} {}\n\n",
-                       "Partition key change is not allowed!".bright_red(),
-                       "Illegal change in:".bright_red(),
-                       self.migration_object_name.bright_yellow(),
-                       self.migration_obj_type_str().bright_magenta());
+                panic!(
+                    "\n\n{}\n{} {} {}\n\n",
+                    "Partition key change is not allowed!".bright_red(),
+                    "Illegal change in:".bright_red(),
+                    self.migration_object_name.bright_yellow(),
+                    self.migration_obj_type_str().bright_magenta()
+                );
             }
 
             if self.clustering_key_changed() {
-                panic!("\n\n{}\n{} {} {}\n\n",
-                       "Clustering key change is not allowed!".bright_red(),
-                       "Illegal change in:".bright_red(),
-                       self.migration_object_name.bright_yellow(),
-                       self.migration_obj_type_str().bright_magenta());
+                panic!(
+                    "\n\n{}\n{} {} {}\n\n",
+                    "Clustering key change is not allowed!".bright_red(),
+                    "Illegal change in:".bright_red(),
+                    self.migration_object_name.bright_yellow(),
+                    self.migration_obj_type_str().bright_magenta()
+                );
             }
         }
 
@@ -106,7 +112,6 @@ impl <'a> Migration<'a>  {
                 self.migration_obj_type_str().bright_magenta()
             );
         }
-
     }
 
     pub(crate) fn migration_obj_type_str(&self) -> String {
@@ -141,17 +146,23 @@ impl <'a> Migration<'a>  {
         removed_fields
     }
 
-
     pub(crate) fn new_secondary_indexes(&self) -> Vec<String> {
         let mut new_indexes: Vec<String> = vec![];
 
-        self.current_code_schema.secondary_indexes.iter().for_each(|sec_index_column| {
-            let index_name: String = self.construct_index_name(sec_index_column);
+        self.current_code_schema
+            .secondary_indexes
+            .iter()
+            .for_each(|sec_index_column| {
+                let index_name: String = self.construct_index_name(sec_index_column);
 
-            if !self.current_db_schema.secondary_indexes.contains(&index_name) {
-                new_indexes.push(sec_index_column.clone());
-            }
-        });
+                if !self
+                    .current_db_schema
+                    .secondary_indexes
+                    .contains(&index_name)
+                {
+                    new_indexes.push(sec_index_column.clone());
+                }
+            });
 
         new_indexes
     }
@@ -159,29 +170,40 @@ impl <'a> Migration<'a>  {
     pub(crate) fn removed_secondary_indexes(&self) -> Vec<String> {
         let mut removed_indexes: Vec<String> = vec![];
 
-        let code_sec_indexes: Vec<String> = self.current_code_schema.secondary_indexes
+        let code_sec_indexes: Vec<String> = self
+            .current_code_schema
+            .secondary_indexes
             .iter()
             .map(|sec_idx_col| self.construct_index_name(sec_idx_col))
             .collect();
 
-        self.current_db_schema.secondary_indexes.iter().for_each(|index| {
-            if !code_sec_indexes.contains(&index) {
-                removed_indexes.push(index.clone());
-            }
-        });
+        self.current_db_schema
+            .secondary_indexes
+            .iter()
+            .for_each(|index| {
+                if !code_sec_indexes.contains(&index) {
+                    removed_indexes.push(index.clone());
+                }
+            });
 
         removed_indexes
     }
 
     pub(crate) fn construct_index_name(&self, column_name: &String) -> String {
-        format!("{}_{}_{}", self.migration_object_name, column_name, INDEX_SUFFIX)
+        format!(
+            "{}_{}_{}",
+            self.migration_object_name, column_name, INDEX_SUFFIX
+        )
     }
 
     // private
     fn field_type_changed(&self) -> bool {
         for (field_name, field_type) in self.current_code_schema.fields.iter() {
             if let Some(db_field_type) = self.current_db_schema.fields.get(field_name) {
-                if field_type.to_lowercase() != db_field_type.to_lowercase() {
+                let code_field_type = field_type.to_lowercase().replace(" ", "");
+                let db_field_type = db_field_type.to_lowercase().replace(" ", "");
+
+                if code_field_type != db_field_type {
                     return true;
                 }
             }
@@ -193,14 +215,22 @@ impl <'a> Migration<'a>  {
     fn panic_on_udt_fields_removal(&self) {
         if self.migration_object_type == MigrationObjectType::UDT {
             if self.removed_fields().len() > 0 {
-                panic!("\n{}\n", "UDT fields removal is not allowed!".bold().bright_red());
+                panic!(
+                    "\n{}\n",
+                    "UDT fields removal is not allowed!".bold().bright_red()
+                );
             }
         }
     }
 
     fn panic_on_mv_fields_change(&self) {
         if self.migration_object_type == MigrationObjectType::MaterializedView {
-            panic!("\n{}\n", "Materialized view fields change is not allowed!".bold().bright_red());
+            panic!(
+                "\n{}\n",
+                "Materialized view fields change is not allowed!"
+                    .bold()
+                    .bright_red()
+            );
         }
     }
 
@@ -210,7 +240,6 @@ impl <'a> Migration<'a>  {
 
         code_partition_keys.sort();
         db_partition_keys.sort();
-
 
         code_partition_keys != db_partition_keys
     }
@@ -224,5 +253,4 @@ impl <'a> Migration<'a>  {
 
         code_clustering_keys != db_clustering_keys
     }
-
 }

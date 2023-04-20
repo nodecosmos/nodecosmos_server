@@ -1,7 +1,7 @@
-use colored::Colorize;
-use scylla::Session;
 use crate::migration::migration::{Migration, MigrationObjectType};
 use crate::schema::{CurrentCodeSchema, CurrentDbSchema, SchemaObject};
+use colored::Colorize;
+use scylla::Session;
 
 pub(crate) struct MigrationPlan<'a> {
     current_db_schema: &'a CurrentDbSchema,
@@ -9,10 +9,12 @@ pub(crate) struct MigrationPlan<'a> {
     session: &'a Session,
 }
 
-impl <'a>MigrationPlan<'a> {
-    pub(crate) fn new(current_db_schema: &'a CurrentDbSchema,
-                      current_code_schema: &'a CurrentCodeSchema,
-                      session: &'a Session) -> Self {
+impl<'a> MigrationPlan<'a> {
+    pub(crate) fn new(
+        current_db_schema: &'a CurrentDbSchema,
+        current_code_schema: &'a CurrentCodeSchema,
+        session: &'a Session,
+    ) -> Self {
         MigrationPlan {
             current_db_schema,
             current_code_schema,
@@ -24,7 +26,6 @@ impl <'a>MigrationPlan<'a> {
         self.run_udts().await.unwrap();
         self.run_tables().await.unwrap();
         self.run_materialized_views().await.unwrap();
-
 
         println!("\n{}", "Migration plan ran successfully!".bright_green());
     }
@@ -47,7 +48,7 @@ impl <'a>MigrationPlan<'a> {
         Ok(())
     }
 
-    async fn run_tables(&self) -> Result<(), ()>  {
+    async fn run_tables(&self) -> Result<(), ()> {
         let empty_udt = SchemaObject::new();
 
         for (name, table) in self.current_code_schema.tables.iter() {
@@ -55,7 +56,10 @@ impl <'a>MigrationPlan<'a> {
                 name,
                 MigrationObjectType::Table,
                 table,
-                self.current_db_schema.tables.get(name).unwrap_or(&empty_udt),
+                self.current_db_schema
+                    .tables
+                    .get(name)
+                    .unwrap_or(&empty_udt),
                 &self.session,
             );
 
@@ -65,7 +69,7 @@ impl <'a>MigrationPlan<'a> {
         Ok(())
     }
 
-    async fn run_materialized_views(&self) -> Result<(), ()>  {
+    async fn run_materialized_views(&self) -> Result<(), ()> {
         let empty_udt = SchemaObject::new();
 
         for (name, materialized_view) in self.current_code_schema.materialized_views.iter() {
@@ -73,7 +77,10 @@ impl <'a>MigrationPlan<'a> {
                 name,
                 MigrationObjectType::MaterializedView,
                 materialized_view,
-                self.current_db_schema.materialized_views.get(name).unwrap_or(&empty_udt),
+                self.current_db_schema
+                    .materialized_views
+                    .get(name)
+                    .unwrap_or(&empty_udt),
                 &self.session,
             );
 

@@ -1,9 +1,9 @@
+use crate::schema::{SchemaObject, SchemaObjects};
+use scylla::Session;
+use serde::{Deserialize, Serialize};
+use serde_json::to_string_pretty;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
-use scylla::Session;
-use serde_json::to_string_pretty;
-use crate::schema::{SchemaObject, SchemaObjects};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CurrentDbSchema {
@@ -19,8 +19,10 @@ pub struct CurrentDbSchema {
  * It is used to compare the current state to the desired state of the database schema.
  */
 impl CurrentDbSchema {
-    pub(crate) async fn new(session: &Session, keyspace_name: String)
-        -> Result<CurrentDbSchema, Box<dyn std::error::Error>> {
+    pub(crate) async fn new(
+        session: &Session,
+        keyspace_name: String,
+    ) -> Result<CurrentDbSchema, Box<dyn std::error::Error>> {
         let mut current_schema = CurrentDbSchema {
             tables: HashMap::new(),
             udts: HashMap::new(),
@@ -28,15 +30,21 @@ impl CurrentDbSchema {
             keyspace_name,
         };
 
-        current_schema.get_tables_from_system_schema(session).await?;
+        current_schema
+            .get_tables_from_system_schema(session)
+            .await?;
         current_schema.get_udts_from_system_schema(session).await?;
-        current_schema.get_materialized_views_from_system_schema(session).await?;
+        current_schema
+            .get_materialized_views_from_system_schema(session)
+            .await?;
 
         return Ok(current_schema);
     }
 
-    async fn get_tables_from_system_schema(&mut self, session: &Session)
-                                           -> Result<(), Box<dyn std::error::Error>> {
+    async fn get_tables_from_system_schema(
+        &mut self,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -46,22 +54,32 @@ impl CurrentDbSchema {
             ALLOW FILTERING
         "#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(),))
+            .await?
+            .rows
+        {
             for row in rows {
                 let table_name: (String,) = row.into_typed::<(String,)>()?;
-                self.tables.insert(table_name.0.clone(), SchemaObject::new());
+                self.tables
+                    .insert(table_name.0.clone(), SchemaObject::new());
                 self.populate_table_columns(&table_name.0, session).await?;
-                self.populate_table_partition_keys(&table_name.0, session).await?;
-                self.populate_table_clustering_keys(&table_name.0, session).await?;
-                self.populate_table_secondary_indexes(&table_name.0, session).await?;
+                self.populate_table_partition_keys(&table_name.0, session)
+                    .await?;
+                self.populate_table_clustering_keys(&table_name.0, session)
+                    .await?;
+                self.populate_table_secondary_indexes(&table_name.0, session)
+                    .await?;
             }
         }
         return Ok(());
     }
 
-    async fn populate_table_columns(&mut self, table_name: &String, session: &Session)
-                                    -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_table_columns(
+        &mut self,
+        table_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get columns and types for provided table
         let cql = r#"
             SELECT
@@ -71,19 +89,29 @@ impl CurrentDbSchema {
             AND table_name = ?
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &table_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &table_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String, String) = row.into_typed::<(String, String)>()?;
-                self.tables.get_mut(table_name).unwrap().fields.insert(str_value.0, str_value.1);
+                self.tables
+                    .get_mut(table_name)
+                    .unwrap()
+                    .fields
+                    .insert(str_value.0, str_value.1);
             }
         }
 
         return Ok(());
     }
 
-    async fn populate_table_partition_keys(&mut self, table_name: &String, session: &Session)
-                                           -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_table_partition_keys(
+        &mut self,
+        table_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -93,19 +121,29 @@ impl CurrentDbSchema {
             AND kind = 'partition_key'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &table_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &table_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.tables.get_mut(table_name).unwrap().partition_keys.push(str_value.0);
+                self.tables
+                    .get_mut(table_name)
+                    .unwrap()
+                    .partition_keys
+                    .push(str_value.0);
             }
         }
 
         return Ok(());
     }
 
-    async fn populate_table_clustering_keys(&mut self, table_name: &String, session: &Session)
-        -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_table_clustering_keys(
+        &mut self,
+        table_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -115,19 +153,29 @@ impl CurrentDbSchema {
             AND kind = 'clustering'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &table_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &table_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.tables.get_mut(table_name).unwrap().clustering_keys.push(str_value.0);
+                self.tables
+                    .get_mut(table_name)
+                    .unwrap()
+                    .clustering_keys
+                    .push(str_value.0);
             }
         }
 
         return Ok(());
     }
 
-    async fn populate_table_secondary_indexes(&mut self, table_name: &String, session: &Session)
-        -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_table_secondary_indexes(
+        &mut self,
+        table_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get partition keys for provided table
         let cql = r#"
             SELECT index_name
@@ -136,19 +184,28 @@ impl CurrentDbSchema {
             AND table_name = ?
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &table_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &table_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.tables.get_mut(table_name).unwrap().secondary_indexes.push(str_value.0);
+                self.tables
+                    .get_mut(table_name)
+                    .unwrap()
+                    .secondary_indexes
+                    .push(str_value.0);
             }
         }
 
         return Ok(());
     }
 
-    async fn get_udts_from_system_schema(&mut self, session: &Session)
-                                         -> Result<(), Box<dyn std::error::Error>> {
+    async fn get_udts_from_system_schema(
+        &mut self,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -159,16 +216,21 @@ impl CurrentDbSchema {
             FROM system_schema.types
             WHERE keyspace_name = ?"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(),))
+            .await?
+            .rows
+        {
             for row in rows {
-                let (type_name, field_names, field_types)
-                    = row.into_typed::<(String, Vec<String>, Vec<String>)>()?;
+                let (type_name, field_names, field_types) =
+                    row.into_typed::<(String, Vec<String>, Vec<String>)>()?;
 
                 let mut schema_object = SchemaObject::new();
 
                 for (index, field_name) in field_names.iter().enumerate() {
-                    schema_object.fields.insert(field_name.clone(), field_types[index].clone());
+                    schema_object
+                        .fields
+                        .insert(field_name.clone(), field_types[index].clone());
                 }
 
                 self.udts.insert(type_name, schema_object);
@@ -177,29 +239,41 @@ impl CurrentDbSchema {
         return Ok(());
     }
 
-    async fn get_materialized_views_from_system_schema(&mut self, session: &Session)
-                                                       -> Result<(), Box<dyn std::error::Error>> {
+    async fn get_materialized_views_from_system_schema(
+        &mut self,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get tables as a HashMap of column_name => column_type
         let cql = r#"
             SELECT view_name
             FROM system_schema.views
             WHERE keyspace_name = ?
             ALLOW FILTERING"#;
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(),))
+            .await?
+            .rows
+        {
             for row in rows {
                 let view_name: (String,) = row.into_typed::<(String,)>()?;
-                self.materialized_views.insert(view_name.0.clone(), SchemaObject::new());
-                self.populate_materialized_view_columns(&view_name.0, session).await?;
-                self.populate_materialized_view_partition_key(&view_name.0, session).await?;
-                self.populate_materialized_view_clustering_keys(&view_name.0, session).await?;
+                self.materialized_views
+                    .insert(view_name.0.clone(), SchemaObject::new());
+                self.populate_materialized_view_columns(&view_name.0, session)
+                    .await?;
+                self.populate_materialized_view_partition_key(&view_name.0, session)
+                    .await?;
+                self.populate_materialized_view_clustering_keys(&view_name.0, session)
+                    .await?;
             }
         }
         return Ok(());
     }
 
-    async fn populate_materialized_view_columns(&mut self, view_name: &String, session: &Session)
-        -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_materialized_view_columns(
+        &mut self,
+        view_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // get columns and types for views
         let cql = r#"
             SELECT column_name, type
@@ -207,20 +281,29 @@ impl CurrentDbSchema {
             WHERE keyspace_name = ?
             AND table_name = ?
             ALLOW FILTERING"#;
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &view_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String, String) = row.into_typed::<(String, String)>()?;
-                self.materialized_views.get_mut(view_name).unwrap()
-                    .fields.insert(str_value.0, str_value.1);
+                self.materialized_views
+                    .get_mut(view_name)
+                    .unwrap()
+                    .fields
+                    .insert(str_value.0, str_value.1);
             }
         }
 
         return Ok(());
     }
 
-    async fn populate_materialized_view_partition_key(&mut self, view_name: &String, session: &Session)
-        -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_materialized_view_partition_key(
+        &mut self,
+        view_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -229,20 +312,29 @@ impl CurrentDbSchema {
             AND kind = 'partition_key'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &view_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.materialized_views.get_mut(view_name).unwrap().partition_keys.push(str_value.0);
+                self.materialized_views
+                    .get_mut(view_name)
+                    .unwrap()
+                    .partition_keys
+                    .push(str_value.0);
             }
         }
 
         return Ok(());
-
     }
 
-    async fn populate_materialized_view_clustering_keys(&mut self, view_name: &String, session: &Session)
-        -> Result<(), Box<dyn std::error::Error>> {
+    async fn populate_materialized_view_clustering_keys(
+        &mut self,
+        view_name: &String,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -251,25 +343,38 @@ impl CurrentDbSchema {
             AND kind = 'clustering'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?.rows {
+        if let Some(rows) = session
+            .query(cql, (self.keyspace_name.clone(), &view_name))
+            .await?
+            .rows
+        {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.materialized_views.get_mut(view_name).unwrap()
-                    .clustering_keys.push(str_value.0);
+                self.materialized_views
+                    .get_mut(view_name)
+                    .unwrap()
+                    .clustering_keys
+                    .push(str_value.0);
             }
         }
 
         return Ok(());
     }
 
-    pub(crate) async fn get_current_schema_as_json(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub(crate) async fn get_current_schema_as_json(
+        &self,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let json = to_string_pretty(&self)?;
         return Ok(json);
     }
 
-    pub(crate) async fn write_schema_to_json(&self, project_root: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-        let json = self.get_current_schema_as_json().await?;
+    pub(crate) async fn write_schema_to_json(
+        &self,
+        project_root: PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let json = self.get_current_schema_as_json().await.unwrap_or_else(|e| {
+            panic!("Error serializing schema to json: {}", e);
+        });
 
         let path = project_root.to_str().unwrap().to_string() + "/current_schema.json";
 

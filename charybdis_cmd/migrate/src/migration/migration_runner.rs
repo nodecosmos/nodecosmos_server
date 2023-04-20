@@ -1,7 +1,6 @@
 use super::migration::{Migration, MigrationObjectType};
 use crate::schema::SchemaObjectTrait;
 use colored::*;
-use futures::TryFutureExt;
 use strip_ansi_escapes::strip;
 
 pub(crate) const INDEX_SUFFIX: &str = "idx";
@@ -18,20 +17,21 @@ impl<'a> Migration<'a> {
         let stripped = strip(cql.as_bytes()).unwrap();
         let cql: String = String::from_utf8(stripped).unwrap();
 
-        let _ = self
-            .session
-            .query(cql.clone(), ())
-            .unwrap_or_else(|err| {
-                panic!(
-                    "\n\n{} {}: \n\n{}\n\n",
-                    "Error running CQL:".on_red().black(),
-                    cql.magenta(),
-                    err.to_string().bright_red()
-                );
-            })
-            .await;
+        let res = self.session.query(cql.clone(), ()).await;
 
-        println!("{}\n", "Migration unit completed!".bright_green());
+        match res {
+            Ok(_) => println!(
+                "{} {}",
+                "CQL executed successfully!".bright_green(),
+                "✅".bright_green()
+            ),
+            Err(e) => println!(
+                "{} {} {}",
+                "CQL execution failed!".bright_red(),
+                "❌".bright_red(),
+                e
+            ),
+        }
     }
 
     pub(crate) async fn run_first_migration(&self) {

@@ -9,7 +9,7 @@ pub trait Execute {
         &self,
         session: &CachingSession,
         query: &'static str,
-        values: Vec<CqlValue>,
+        values: Vec<_>,
     ) -> Result<QueryResult, QueryError>;
 }
 
@@ -18,7 +18,7 @@ impl<T: Model + ValueList> Execute for T {
         &self,
         session: &CachingSession,
         query: &'static str,
-        values: Vec<CqlValue>,
+        values: Vec<_>,
     ) -> Result<QueryResult, QueryError> {
         session.execute(query, values).await
     }

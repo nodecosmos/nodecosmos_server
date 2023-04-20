@@ -23,7 +23,7 @@ pub type Text = String;
 pub type Timestamp = chrono::DateTime<Utc>;
 pub type Inet = IpAddr;
 pub type List<T> = Vec<T>;
-pub type Set = Vec<CqlValue>;
+pub type Set<T> = Vec<T>;
 pub struct UserDefinedType {
     keyspace: String,
     type_name: String,

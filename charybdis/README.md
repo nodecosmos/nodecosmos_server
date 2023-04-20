@@ -36,7 +36,7 @@ tool will detect type within option and create column with that type
 - [View Operations](#view-operations)
 - [Custom filtering](#custom-filtering)
 - [Callbacks](#callbacks)
-- [Batched Operations](#batch-operations)
+- [Batch Operations](#batch-operations)
 - [Future plans](#future-plans)
 
 ## Charybdis Models
@@ -327,17 +327,46 @@ We can define callbacks that will be executed before and after certain operation
 ```rust
 use charybdis::prelude::*;
 
-#[charybdis_model(table_name = "posts", 
-                  partition_keys = ["created_at_day"], 
-                  clustering_keys = ["title"],
-                  secondary_indexes = ["id"])]
-pub struct Post {
+#[charybdis_model(table_name = "users", 
+                  partition_keys = ["id"], 
+                  clustering_keys = [""],
+                  secondary_indexes = ["username", "email"])]
+pub struct User {
     ...
 }
 
-impl Callbacks for Post {
+impl User {
+  async fn find_by_username(session: &CachingSession, username: &str) -> TypedRowIter<User> {
+    let query = find_user_query!("username = ?");
+    Self::find(session, query, (username,)).await?
+  }
+
+  async fn find_by_email(session: &CachingSession, email: &str) -> TypedRowIter<User> {
+    let query = find_user_query!("email = ?");
+    Self::find(session, query, (email,)).await?
+  }
+}
+
+impl Callbacks for User {
   async fn before_insert(&self, session: &CachingSession) -> Result<(), CharybdisError> {
-    // do something before insert
+    let user_by_username = self.find_by_username(session, &self.username).await;
+    let user_by_email = self.find_by_email(session, &self.email).await;
+
+    if user_by_username.is_some() {
+      return Err(CharybdisError::ValidationError((
+        "username".to_string(),
+        "is taken".to_string(),
+      )));
+    }
+
+    if user_by_email.is_some() {
+      return Err(CharybdisError::ValidationError((
+        "email".to_string(),
+        "is taken".to_string(),
+      )));
+    }
+
+
     Ok(())
   }
 }
