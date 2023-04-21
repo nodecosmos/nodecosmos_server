@@ -3,7 +3,7 @@ use charybdis::prelude::*;
 #[partial_model_generator]
 #[charybdis_model(table_name = "nodes",
                   partition_keys = ["root_id"],
-                  clustering_keys = [id],
+                  clustering_keys = ["id"],
                   secondary_indexes = [])]
 pub struct Node {
     pub id: Uuid,

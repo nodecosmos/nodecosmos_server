@@ -22,7 +22,7 @@ pub struct User {
     pub created_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
     pub address: Option<Address>,
-    pub email_verified: Option<bool>,
+    pub email_verified: Option<Boolean>,
 }
 
 impl User {
@@ -105,3 +105,14 @@ impl Callbacks for User {
         Ok(())
     }
 }
+
+partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+
+impl Callbacks for UpdateUser {
+    async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
+        self.updated_at = Some(Utc::now());
+        Ok(())
+    }
+}
+
+partial_user!(DeleteUser, id);

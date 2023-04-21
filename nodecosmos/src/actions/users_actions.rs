@@ -42,17 +42,13 @@ pub async fn create_user(
     }
 }
 
-partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-
 #[put("")]
 pub async fn update_user(
     session: web::Data<CachingSession>,
     user: web::Json<UpdateUser>,
 ) -> impl Responder {
     let mut user = user.into_inner();
-    user.updated_at = Some(Utc::now());
-
-    let res = user.update(&session).await;
+    let res = user.update_cb(&session).await;
 
     match res {
         Ok(_) => HttpResponse::Ok().json(json!({"message": "User updated"})),
@@ -65,8 +61,6 @@ pub async fn delete_user(
     session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
 ) -> impl Responder {
-    partial_user!(DeleteUser, id);
-
     let user = DeleteUser {
         id: Some(id.into_inner()),
     };

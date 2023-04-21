@@ -1,37 +1,16 @@
 {
   "tables": {
-    "posts": {
-      "fields": {
-        "created_at_day": "date",
-        "title": "text",
-        "description": "text",
-        "id": "uuid",
-        "updated_at": "timestamp",
-        "created_at": "timestamp"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "created_at_day"
-      ],
-      "clustering_keys": [
-        "title"
-      ],
-      "secondary_indexes": []
-    },
     "users": {
       "fields": {
-        "email": "text",
-        "first_name": "text",
-        "id": "uuid",
         "last_name": "text",
-        "updated_at": "timestamp",
-        "hashed_password": "text",
+        "id": "uuid",
+        "email": "text",
         "password": "text",
-        "created_at": "timestamp",
         "username": "text",
-        "address": "address"
+        "first_name": "text",
+        "address": "address",
+        "updated_at": "timestamp",
+        "created_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -47,14 +26,14 @@
     },
     "nodes": {
       "fields": {
-        "root_id": "uuid",
-        "id": "uuid",
         "descendant_ids": "list<uuid>",
         "created_at": "timestamp",
-        "title": "text",
-        "updated_at": "timestamp",
+        "description": "text",
         "parent_id": "uuid",
-        "description": "text"
+        "id": "uuid",
+        "root_id": "uuid",
+        "title": "text",
+        "updated_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -62,18 +41,40 @@
       "partition_keys": [
         "root_id"
       ],
-      "clustering_keys": [],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
+    },
+    "posts": {
+      "fields": {
+        "updated_at": "timestamp",
+        "id": "uuid",
+        "description": "text",
+        "title": "text",
+        "created_at_day": "date",
+        "created_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "created_at_day"
+      ],
+      "clustering_keys": [
+        "title"
+      ],
       "secondary_indexes": []
     }
   },
   "udts": {
     "address": {
       "fields": {
-        "country": "text",
         "street": "text",
+        "state": "text",
         "zip": "text",
         "city": "text",
-        "state": "text"
+        "country": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -86,9 +87,9 @@
   "materialized_views": {
     "users_username_idx_index": {
       "fields": {
-        "id": "uuid",
+        "username": "text",
         "idx_token": "bigint",
-        "username": "text"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -104,9 +105,9 @@
     },
     "users_email_idx_index": {
       "fields": {
+        "id": "uuid",
         "idx_token": "bigint",
-        "email": "text",
-        "id": "uuid"
+        "email": "text"
       },
       "type_name": "",
       "table_name": "",
