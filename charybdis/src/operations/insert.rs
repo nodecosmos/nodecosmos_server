@@ -18,11 +18,11 @@ impl<T: Model + ValueList> Insert for T {
 }
 
 pub trait InsertWithCallbacks {
-    async fn insert_cb(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
+    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
 }
 
 impl<T: Model + ValueList + Callbacks + Insert> InsertWithCallbacks for T {
-    async fn insert_cb(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
+    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
         self.before_insert(session).await?;
         let res = self.insert(session).await;
         self.after_insert(session).await?;

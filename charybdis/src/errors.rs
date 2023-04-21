@@ -1,4 +1,5 @@
 use colored::Colorize;
+use scylla::frame::value::SerializeValuesError;
 use scylla::transport::errors::QueryError;
 use scylla::transport::query_result::SingleRowTypedError;
 use std::error::Error;
@@ -9,6 +10,7 @@ pub enum CharybdisError {
     // scylla
     QueryError(QueryError),
     SingleRowTypedError(SingleRowTypedError, String),
+    SerializeValuesError(SerializeValuesError, String),
     // charybdis
     NotFoundError(String),
     ValidationError((String, String)),
@@ -32,6 +34,9 @@ impl fmt::Display for CharybdisError {
                 ),
                 SingleRowTypedError::FromRowError(e) => write!(f, "DeserializationError: {}", e),
             },
+            CharybdisError::SerializeValuesError(e, model) => {
+                write!(f, "SerializeValuesError: {}\n{}", e, model)
+            }
             // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for {}", e),
             CharybdisError::ValidationError(e) => write!(f, "Validation Error: {} {}", e.0, e.1),
@@ -45,6 +50,7 @@ impl Error for CharybdisError {
             CharybdisError::QueryError(e) => Some(e),
             CharybdisError::NotFoundError(_) => None,
             CharybdisError::SingleRowTypedError(e, _) => Some(e),
+            CharybdisError::SerializeValuesError(e, _) => Some(e),
             CharybdisError::ValidationError(_) => None,
         }
     }

@@ -1,4 +1,4 @@
-use crate::prelude::SerializedValues;
+use crate::prelude::{SerializedResult, SerializedValues};
 use scylla::FromRow;
 
 ///
@@ -41,9 +41,9 @@ pub trait BaseModel: FromRow + Sized + Default {
 
     const SELECT_FIELDS_CLAUSE: &'static str;
 
-    fn get_primary_key_values(&self) -> SerializedValues;
-    fn get_partition_key_values(&self) -> SerializedValues;
-    fn get_clustering_key_values(&self) -> SerializedValues;
+    fn get_primary_key_values(&self) -> SerializedResult;
+    fn get_partition_key_values(&self) -> SerializedResult;
+    fn get_clustering_key_values(&self) -> SerializedResult;
 }
 
 pub trait Model: BaseModel {
@@ -53,7 +53,7 @@ pub trait Model: BaseModel {
     const UPDATE_QUERY: &'static str;
     const DELETE_QUERY: &'static str;
 
-    fn get_update_values(&self) -> SerializedValues;
+    fn get_update_values(&self) -> SerializedResult;
 }
 
 pub trait MaterializedView: BaseModel {}

@@ -1,6 +1,4 @@
-use super::udts::Address;
 use charybdis::prelude::*;
-use scylla::_macro_internal::FromRowError;
 
 #[partial_model_generator]
 #[charybdis_model(table_name = "posts",

@@ -11,7 +11,9 @@ pub trait Delete {
 
 impl<T: Model + ValueList> Delete for T {
     async fn delete(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
-        let primary_key_values: SerializedValues = self.get_primary_key_values();
+        let primary_key_values = self.get_primary_key_values().map_err(|e| {
+            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
+        })?;
 
         session
             .execute(T::DELETE_QUERY, primary_key_values)

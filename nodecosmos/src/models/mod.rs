@@ -1,10 +1,5 @@
-mod materialized_views;
-mod node;
-mod post;
-mod udts;
-mod user;
-
-pub use node::Node;
-pub use post::Post;
-pub use udts::Address;
-pub use user::User;
+pub mod materialized_views;
+pub mod node;
+pub mod post;
+pub mod udts;
+pub mod user;

@@ -1,8 +1,8 @@
-use quote::quote;
-use syn::{FieldsNamed, ImplItem};
 use crate::helpers::serialized_values_fields_adder;
 use charybdis_parser::CharybdisArgs;
 use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{FieldsNamed, ImplItem};
 
 /// (check update_query_const.rs)
 ///
@@ -26,12 +26,12 @@ pub(crate) fn get_update_values(ch_args: &CharybdisArgs, fields_named: &FieldsNa
     let serialized_values_fields_adder: TokenStream = serialized_values_fields_adder(update_values);
 
     let generated = quote! {
-        fn get_update_values(&self) -> SerializedValues {
+        fn get_update_values(&self) -> charybdis::prelude::SerializedResult {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
             #serialized_values_fields_adder
 
-            serialized
+            ::std::result::Result::Ok(::std::borrow::Cow::Owned(serialized))
         }
     };
 

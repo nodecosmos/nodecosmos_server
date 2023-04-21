@@ -151,7 +151,7 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
     let expanded: proc_macro2::TokenStream = quote! {
         #input
 
-        #[macro_export]
+        // #[macro_export]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
                 #[charybdis_model(table_name=#table_name,
@@ -164,11 +164,14 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
             };
         }
 
-        // used by partial_<model_name>! macro from above to get field types
-        #[macro_export]
+        pub(crate) use #macro_name;
+
+        // #[macro_export]
         macro_rules! #field_type_macro_name {
             #field_type_macro_body
         }
+
+        pub(crate) use #field_type_macro_name;
     };
 
     TokenStream::from(expanded)
