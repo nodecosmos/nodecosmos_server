@@ -2,14 +2,11 @@ use crate::models::user::*;
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::prelude::*;
-use chrono::Utc;
 use scylla::CachingSession;
 use serde_json::json;
 
 #[get("/{id}")]
 pub async fn get_user(session: web::Data<CachingSession>, id: web::Path<Uuid>) -> impl Responder {
-    partial_user!(GetUser, id, username, email, created_at, updated_at);
-
     let user = GetUser {
         id: Some(id.into_inner()),
         ..Default::default()

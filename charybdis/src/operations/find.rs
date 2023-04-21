@@ -5,7 +5,7 @@ use scylla::{CachingSession, QueryResult};
 
 use crate::errors::CharybdisError;
 use crate::model::BaseModel;
-use crate::prelude::{SerializedResult, SerializedValues};
+use crate::prelude::SerializedValues;
 
 pub trait Find: BaseModel {
     async fn find(

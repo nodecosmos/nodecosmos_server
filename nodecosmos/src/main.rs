@@ -6,38 +6,33 @@ mod models;
 mod nodecosmos;
 
 use actions::*;
-use actix_cors::Cors;
-use actix_web::{http, web, App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use nodecosmos::Nodecosmos;
+
+use crate::nodecosmos::{get_cors, get_db_session, get_port, get_session_middleware};
 
 #[tokio::main]
 async fn main() {
     let nodecosmos = Nodecosmos::new();
-
-    let session = nodecosmos.get_db_session().await;
-    let allowed_origin = nodecosmos.get_allowed_origin();
-
-    let session = web::Data::new(session);
+    let session = get_db_session(&nodecosmos).await;
+    let port = get_port(&nodecosmos);
 
     HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin(allowed_origin.as_str())
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
-            .allowed_header(http::header::CONTENT_TYPE)
-            .max_age(3600);
-
-        App::new().wrap(cors).app_data(session.clone()).service(
-            web::scope("/users")
-                .service(get_user)
-                .service(create_user)
-                .service(update_user)
-                .service(delete_user),
-        )
+        App::new()
+            .wrap(get_cors(&nodecosmos))
+            .wrap(get_session_middleware(&nodecosmos))
+            .app_data(session.clone())
+            .service(
+                web::scope("/users")
+                    .service(get_user)
+                    .service(create_user)
+                    .service(update_user)
+                    .service(delete_user),
+            )
     })
-    .bind(("127.0.0.1", 3000))
-    .unwrap_or_else(|_| panic!("Could not bind to port {}.", 3000))
+    .bind(("127.0.0.1", port))
+    .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
     .run()
     .await
-    .unwrap_or_else(|_| panic!("Could not run server on port {}.", 3000));
+    .unwrap_or_else(|e| panic!("Could not run server to port {}.\n{}", port, e))
 }

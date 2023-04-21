@@ -61,3 +61,7 @@ pub trait MaterializedView: BaseModel {}
 pub trait Udt: FromRow + Sized {
     const DB_MODEL_NAME: &'static str;
 }
+
+pub trait TableOptions {
+    const TABLE_OPTIONS: &'static str;
+}

@@ -106,8 +106,9 @@ impl Callbacks for User {
     }
 }
 
-partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+partial_user!(GetUser, id, username, email, created_at, updated_at);
 
+partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 impl Callbacks for UpdateUser {
     async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
         self.updated_at = Some(Utc::now());

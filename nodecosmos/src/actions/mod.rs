@@ -1,6 +1,6 @@
-mod authentication;
-mod nodes_actions;
-mod users_actions;
+mod node_actions;
+mod session_actions;
+mod user_actions;
 
-pub(crate) use authentication::*;
-pub(crate) use users_actions::*;
+pub(crate) use session_actions::*;
+pub(crate) use user_actions::*;
