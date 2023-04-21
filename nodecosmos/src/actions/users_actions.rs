@@ -2,6 +2,7 @@ use crate::models::user::*;
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::prelude::*;
+use chrono::Utc;
 use scylla::CachingSession;
 use serde_json::json;
 
@@ -10,7 +11,7 @@ pub async fn get_user(session: web::Data<CachingSession>, id: web::Path<Uuid>) -
     partial_user!(GetUser, id, username, email, created_at, updated_at);
 
     let user = GetUser {
-        id: id.into_inner(),
+        id: Some(id.into_inner()),
         ..Default::default()
     };
 
@@ -18,11 +19,11 @@ pub async fn get_user(session: web::Data<CachingSession>, id: web::Path<Uuid>) -
 
     match user {
         Ok(user) => HttpResponse::Ok().json(user),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Err(e) => HttpResponse::NotFound().body(e.to_string()),
     }
 }
 
-#[post("/")]
+#[post("")]
 pub async fn create_user(
     session: web::Data<CachingSession>,
     user: web::Json<User>,
@@ -34,18 +35,23 @@ pub async fn create_user(
         Ok(_) => HttpResponse::Ok().json(json!({"message": "User created"})),
         Err(e) => match e {
             CharybdisError::ValidationError((field, message)) => {
-                HttpResponse::BadRequest().json(json!({ field: message }))
+                HttpResponse::Conflict().json(json!({ "error": {field: message} }))
             }
             _ => HttpResponse::InternalServerError().body(e.to_string()),
         },
     }
 }
 
-#[put("/")]
+partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+
+#[put("")]
 pub async fn update_user(
     session: web::Data<CachingSession>,
-    user: web::Json<User>,
+    user: web::Json<UpdateUser>,
 ) -> impl Responder {
+    let mut user = user.into_inner();
+    user.updated_at = Some(Utc::now());
+
     let res = user.update(&session).await;
 
     match res {
@@ -62,8 +68,9 @@ pub async fn delete_user(
     partial_user!(DeleteUser, id);
 
     let user = DeleteUser {
-        id: id.into_inner(),
+        id: Some(id.into_inner()),
     };
+
     let res = user.delete(&session).await;
 
     match res {

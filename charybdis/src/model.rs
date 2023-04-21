@@ -1,4 +1,4 @@
-use crate::prelude::{SerializedResult, SerializedValues};
+use crate::prelude::SerializedResult;
 use scylla::FromRow;
 
 ///

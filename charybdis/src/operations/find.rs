@@ -5,6 +5,7 @@ use scylla::{CachingSession, QueryResult};
 
 use crate::errors::CharybdisError;
 use crate::model::BaseModel;
+use crate::prelude::{SerializedResult, SerializedValues};
 
 pub trait Find: BaseModel {
     async fn find(
@@ -34,6 +35,10 @@ impl<T: BaseModel> Find for T {
 
         match result.rows {
             Some(rows) => {
+                if rows.is_empty() {
+                    return Ok(None);
+                }
+
                 let typed_rows: TypedRowIter<Self> = rows.into_typed();
                 Ok(Some(typed_rows))
             }
