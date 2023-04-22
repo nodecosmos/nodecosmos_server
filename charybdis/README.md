@@ -127,8 +127,11 @@ db structure as it is.
 ```bash
 cargo install charybdis_cmd/migrate
 
-migrate --host 172.22.0.4 --keyspace nodecosmos
+migrate --hosts ✗ cargo run --bin migrate -- --hosts 172.22.0.4,172.22.0.3,172.22.0.2 --keyspace nodecosmos --keyspace nodecosmos
 ```
+`migrate` expects list of hosts separated by comma without spaces, and keyspace name.
+
+
 ⚠️ If you are working with **existing** datasets, before running migration you need to make sure that your **model** 
 definitions structure matches the database in respect to table names, column names, column types, partition keys, 
 clustering keys and secondary indexes so you don't alter structure accidentally.

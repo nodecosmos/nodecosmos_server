@@ -6,12 +6,18 @@ use charybdis::prelude::*;
                   clustering_keys = ["id"],
                   secondary_indexes = [])]
 pub struct Node {
+    // descendable
     pub id: Uuid,
     pub root_id: Uuid,
     pub parent_id: Option<Uuid>,
+    pub descendant_ids: Option<List<Uuid>>,
+    pub ancestor_ids: Option<List<Uuid>>,
     pub title: Text,
     pub description: Text,
-    pub descendant_ids: Option<List<Uuid>>,
+    pub description_markdown: Text,
+    // owners
+    pub owner_id: Option<Uuid>,
+    pub editor_ids: Option<List<Uuid>>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }

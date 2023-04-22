@@ -1,19 +1,19 @@
 use actix_cors::Cors;
+use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
-use actix_web::{http, web};
+use actix_web::{cookie, http, web};
 use scylla::{CachingSession, Session, SessionBuilder};
 use std::{env, fs, time::Duration};
 use toml::Value;
 
 #[derive(Clone)]
-pub struct Nodecosmos {
+pub struct App {
     config: Value,
-    env: String,
 }
 
-impl Nodecosmos {
+impl App {
     pub fn new() -> Self {
         dotenv::dotenv().ok();
 
@@ -23,11 +23,11 @@ impl Nodecosmos {
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let value = contents.parse::<Value>().expect("Unable to parse TOML");
 
-        Self { config: value, env }
+        Self { config: value }
     }
 }
 
-pub async fn get_db_session(app: &Nodecosmos) -> web::Data<CachingSession> {
+pub async fn get_db_session(app: &App) -> web::Data<CachingSession> {
     let hosts = app.config["scylla"]["hosts"]
         .as_array()
         .expect("Missing hosts");
@@ -51,7 +51,7 @@ pub async fn get_db_session(app: &Nodecosmos) -> web::Data<CachingSession> {
     web::Data::new(session)
 }
 
-pub fn get_cors(app: &Nodecosmos) -> Cors {
+pub fn get_cors(app: &App) -> Cors {
     let allowed_origin = app.config["allowed_origin"]
         .as_str()
         .expect("Missing allowed_origin")
@@ -59,17 +59,29 @@ pub fn get_cors(app: &Nodecosmos) -> Cors {
 
     Cors::default()
         .allowed_origin(allowed_origin.as_str())
-        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-        .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
-        .allowed_header(http::header::CONTENT_TYPE)
-        .max_age(3600)
+        .supports_credentials()
+        .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        .allowed_headers(vec![
+            http::header::AUTHORIZATION,
+            http::header::ACCEPT,
+            http::header::ORIGIN,
+            http::header::USER_AGENT,
+            http::header::DNT,
+            http::header::CONTENT_TYPE,
+            http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        ])
+        .expose_headers(vec![
+            http::header::LOCATION,
+            http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        ])
+        .max_age(86400)
 }
 
-pub fn get_port(app: &Nodecosmos) -> u16 {
+pub fn get_port(app: &App) -> u16 {
     app.config["port"].as_integer().expect("Missing port") as u16
 }
 
-pub fn get_secret_key(app: &Nodecosmos) -> Key {
+pub fn get_secret_key(app: &App) -> Key {
     let secret_key = app.config["secret_key"]
         .as_str()
         .expect("Missing secret_key")
@@ -78,7 +90,7 @@ pub fn get_secret_key(app: &Nodecosmos) -> Key {
     Key::from(secret_key.as_ref())
 }
 
-pub fn get_redis_actor_session_store(app: &Nodecosmos) -> RedisActorSessionStore {
+pub fn get_redis_actor_session_store(app: &App) -> RedisActorSessionStore {
     let redis_host = app.config["redis"]["host"]
         .as_str()
         .expect("Missing redis url");
@@ -86,9 +98,15 @@ pub fn get_redis_actor_session_store(app: &Nodecosmos) -> RedisActorSessionStore
     RedisActorSessionStore::new(redis_host)
 }
 
-pub fn get_session_middleware(app: &Nodecosmos) -> SessionMiddleware<RedisActorSessionStore> {
+pub fn get_session_middleware(app: &App) -> SessionMiddleware<RedisActorSessionStore> {
     let secret_key = get_secret_key(app);
     let redis_actor_session_store = get_redis_actor_session_store(app);
-    let store = SessionMiddleware::new(redis_actor_session_store, secret_key);
-    store
+    let expiration = app.config["session_expiration_in_days"]
+        .as_integer()
+        .expect("Missing session_expiration");
+    let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
+
+    SessionMiddleware::builder(redis_actor_session_store, secret_key)
+        .session_lifecycle(ttl)
+        .build()
 }

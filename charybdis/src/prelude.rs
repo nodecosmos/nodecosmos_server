@@ -16,7 +16,7 @@ pub use scylla::{
         response::result::Row,
         value::{SerializedResult, SerializedValues, ValueList},
     },
-    transport::errors::QueryError,
+    transport::{errors::QueryError, session::TypedRowIter},
     CachingSession, Session,
 };
 

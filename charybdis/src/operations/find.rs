@@ -5,14 +5,13 @@ use scylla::{CachingSession, QueryResult};
 
 use crate::errors::CharybdisError;
 use crate::model::BaseModel;
-use crate::prelude::SerializedValues;
 
 pub trait Find: BaseModel {
     async fn find(
         session: &CachingSession,
         clause: &'static str,
         values: impl ValueList,
-    ) -> Result<Option<TypedRowIter<Self>>, CharybdisError>;
+    ) -> Result<TypedRowIter<Self>, CharybdisError>;
 
     // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
@@ -27,22 +26,18 @@ impl<T: BaseModel> Find for T {
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<Option<TypedRowIter<Self>>, CharybdisError> {
+    ) -> Result<TypedRowIter<Self>, CharybdisError> {
         let result: QueryResult = session
             .execute(query, values)
             .await
             .map_err(|e| CharybdisError::QueryError(e))?;
 
-        match result.rows {
-            Some(rows) => {
-                if rows.is_empty() {
-                    return Ok(None);
-                }
-
+        match result.rows() {
+            Ok(rows) => {
                 let typed_rows: TypedRowIter<Self> = rows.into_typed();
-                Ok(Some(typed_rows))
+                Ok(typed_rows)
             }
-            None => Ok(None),
+            Err(e) => Err(CharybdisError::RowsExpectedError(e)),
         }
     }
 
@@ -83,7 +78,7 @@ impl<T: BaseModel> Find for T {
                 Ok(typed_rows)
             }
             None => Err(CharybdisError::NotFoundError(
-                Self::DB_MODEL_NAME.to_string(),
+                Self::FIND_BY_PARTITION_KEY_QUERY,
             )),
         }
     }

@@ -1,7 +1,6 @@
 use crate::callbacks::Callbacks;
 use crate::errors::CharybdisError;
 use crate::model::Model;
-use crate::prelude::SerializedValues;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
 

@@ -1,7 +1,7 @@
 use colored::Colorize;
 use scylla::frame::value::SerializeValuesError;
 use scylla::transport::errors::QueryError;
-use scylla::transport::query_result::SingleRowTypedError;
+use scylla::transport::query_result::{RowsExpectedError, SingleRowTypedError};
 use std::error::Error;
 use std::fmt;
 
@@ -9,11 +9,13 @@ use std::fmt;
 pub enum CharybdisError {
     // scylla
     QueryError(QueryError),
+    RowsExpectedError(RowsExpectedError),
     SingleRowTypedError(SingleRowTypedError, String),
     SerializeValuesError(SerializeValuesError, String),
     // charybdis
-    NotFoundError(String),
+    NotFoundError(&'static str),
     ValidationError((String, String)),
+    SessionError(String),
 }
 
 impl fmt::Display for CharybdisError {
@@ -21,6 +23,7 @@ impl fmt::Display for CharybdisError {
         match self {
             // scylla errors
             CharybdisError::QueryError(e) => write!(f, "QueryError: {}", e),
+            CharybdisError::RowsExpectedError(e) => write!(f, "RowsExpectedError: {:?}", e),
             CharybdisError::SingleRowTypedError(e, model_name) => match e {
                 SingleRowTypedError::RowsExpected(_) => {
                     write!(f, "Records not found for {}", model_name)
@@ -38,8 +41,9 @@ impl fmt::Display for CharybdisError {
                 write!(f, "SerializeValuesError: {}\n{}", e, model)
             }
             // charybdis
-            CharybdisError::NotFoundError(e) => write!(f, "Records not found for {}", e),
+            CharybdisError::NotFoundError(e) => write!(f, "Records not found for query: {}", e),
             CharybdisError::ValidationError(e) => write!(f, "Validation Error: {} {}", e.0, e.1),
+            CharybdisError::SessionError(e) => write!(f, "Session Error: {}", e),
         }
     }
 }
@@ -48,10 +52,12 @@ impl Error for CharybdisError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             CharybdisError::QueryError(e) => Some(e),
+            CharybdisError::RowsExpectedError(e) => Some(e),
             CharybdisError::NotFoundError(_) => None,
             CharybdisError::SingleRowTypedError(e, _) => Some(e),
             CharybdisError::SerializeValuesError(e, _) => Some(e),
             CharybdisError::ValidationError(_) => None,
+            CharybdisError::SessionError(_) => None,
         }
     }
 }

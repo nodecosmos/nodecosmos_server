@@ -23,12 +23,13 @@ pub fn find_model_query_rule(
     );
 
     let expanded = quote! {
-        #[macro_export]
         macro_rules! #macro_name {
             ($query: literal) => {
                 concat!(#query_str, $query)
             }
         }
+
+        pub(crate) use #macro_name;
     };
 
     TokenStream::from(expanded)

@@ -1,0 +1,11 @@
+port = 443
+allowed_origin = "https://nodecosmos.com"
+secret_key = "${SECRET_KEY}"
+session_expiration_in_days = 30
+
+[scylla]
+hosts = ["${SCYLLA_HOST_1}", "${SCYLLA_HOST_2}", "${SCYLLA_HOST_3}"]
+keyspace = "nodecosmos"
+
+[redis]
+host = "127.0.0.1:6379"
