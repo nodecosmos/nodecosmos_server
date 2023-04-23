@@ -2,7 +2,7 @@ use crate::client_session::{get_current_user, set_current_user};
 use crate::models::user::*;
 
 use actix_session::Session;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use charybdis::prelude::CharybdisError;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -62,7 +62,7 @@ pub async fn sync(client_session: Session) -> impl Responder {
     }
 }
 
-#[post("/logout")]
+#[delete("/logout")]
 pub async fn logout(client_session: Session) -> impl Responder {
     client_session.clear();
     HttpResponse::Ok().json(json!({"success": true}))

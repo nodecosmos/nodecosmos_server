@@ -22,9 +22,7 @@ async fn main() {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(Logger::new(
-                "%a %r %s %b %{Referer}i %{User-Agent}i %{Cookie}i %T",
-            ))
+            .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(get_cors(&nodecosmos))
             .wrap(get_session_middleware(&nodecosmos))
             .app_data(session.clone())
@@ -35,7 +33,12 @@ async fn main() {
                     .service(update_user)
                     .service(delete_user),
             )
-            .service(web::scope("/sessions").service(login).service(sync))
+            .service(
+                web::scope("/sessions")
+                    .service(login)
+                    .service(sync)
+                    .service(logout),
+            )
     })
     .bind(("127.0.0.1", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

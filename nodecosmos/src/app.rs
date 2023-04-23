@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_session::config::{CookieContentSecurity, PersistentSession};
+use actix_session::config::PersistentSession;
 use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;

@@ -23,6 +23,7 @@ pub fn find_model_query_rule(
     );
 
     let expanded = quote! {
+        #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($query: literal) => {
                 concat!(#query_str, $query)
