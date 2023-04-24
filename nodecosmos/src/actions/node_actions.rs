@@ -1,7 +1,12 @@
-use crate::models::node::*;
+use crate::models::node::Node;
+use actix_session::Session;
 
+use crate::actions::client_session::get_current_user;
+use crate::authorize::{auth_node_creation, auth_node_update};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
-use charybdis::prelude::*;
+use charybdis::prelude::{
+    DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks, Uuid,
+};
 use scylla::CachingSession;
 use serde_json::json;
 
@@ -32,6 +37,7 @@ pub async fn get_node(
                 DEFAULT_PAGE_SIZE,
             )
             .await;
+
             match descendants {
                 Ok(descendants) => {
                     let mut nodes = vec![node];
@@ -49,9 +55,17 @@ pub async fn get_node(
 #[post("")]
 pub async fn create_node(
     db_session: web::Data<CachingSession>,
+    client_session: Session,
     node: web::Json<Node>,
 ) -> impl Responder {
     let mut node = node.into_inner();
+    let parent = node.get_descendable_parent(&db_session).await;
+    let current_user = get_current_user(&client_session);
+
+    match auth_node_creation(&node, &parent, &db_session, &current_user).await {
+        Ok(_) => (),
+        Err(e) => return HttpResponse::Unauthorized().body(e.to_string()),
+    }
 
     let res = node.insert_cb(&db_session).await;
 
@@ -67,8 +81,35 @@ pub async fn update_node(
     node: web::Json<Node>,
 ) -> impl Responder {
     let mut node = node.into_inner();
+    let current_user = get_current_user(&client_session);
+
+    match auth_node_update(&node, &db_session, &current_user).await {
+        Ok(_) => (),
+        Err(e) => return HttpResponse::Unauthorized().body(e.to_string()),
+    }
 
     let res = node.update_cb(&db_session).await;
+
+    match res {
+        Ok(_) => HttpResponse::Ok().json(node),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+#[delete("")]
+pub async fn delete_node(
+    db_session: web::Data<CachingSession>,
+    node: web::Json<Node>,
+) -> impl Responder {
+    let mut node = node.into_inner();
+    let current_user = get_current_user(&client_session);
+
+    match auth_node_update(&node, &db_session, &current_user).await {
+        Ok(_) => (),
+        Err(e) => return HttpResponse::Unauthorized().body(e.to_string()),
+    }
+
+    let res = node.delete_cb(&db_session).await;
 
     match res {
         Ok(_) => HttpResponse::Ok().json(node),

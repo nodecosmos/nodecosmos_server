@@ -5,6 +5,7 @@ mod actions;
 mod app;
 mod errors;
 mod models;
+mod authorize;
 
 use actions::*;
 // use actix_web::middleware::Logger;

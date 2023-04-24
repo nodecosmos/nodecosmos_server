@@ -3,9 +3,9 @@ use scylla::batch::Batch;
 
 #[partial_model_generator]
 #[charybdis_model(table_name = "nodes",
-partition_keys = ["root_id"],
-clustering_keys = ["id"],
-secondary_indexes = [])]
+                  partition_keys = ["root_id"],
+                  clustering_keys = ["id"],
+                  secondary_indexes = [])]
 pub struct Node {
     // descendable
     pub id: Uuid,
@@ -25,11 +25,39 @@ pub struct Node {
     pub updated_at: Option<Timestamp>,
 }
 
+partial_node!(GetNode, id, root_id, descendant_ids);
+partial_node!(AuthorizationNode, id, root_id, editor_ids);
+
 impl Node {
+    pub async fn get_descendable_parent(
+        &self,
+        db_session: &CachingSession,
+    ) -> Option<DescendableNode> {
+        match self.parent_id {
+            Some(parent_id) => {
+                let mut parent = DescendableNode::new();
+                parent.id = parent_id;
+                parent.root_id = node.root_id;
+
+                let parent = parent.find_by_primary_key(&db_session).await;
+
+                match parent {
+                    Ok(parent) => Some(parent),
+                    Err(_) => None,
+                }
+            }
+            None => None,
+        }
+    }
+
     pub fn set_defaults(&mut self) {
         self.id = Uuid::new_v4();
         self.created_at = Some(Timestamp::now());
         self.updated_at = Some(Timestamp::now());
+    }
+
+    pub fn set_editor_ids(&mut self, editor_ids: Set<Uuid>) {
+        self.editor_ids = Some(editor_ids);
     }
 
     pub async fn append_to_parent_children(
@@ -70,6 +98,45 @@ impl Node {
             None => Ok(()),
         }
     }
+
+    pub async fn pull_from_parent_children(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<(), CharybdisError> {
+        match &self.parent_id {
+            Some(parent_id) => {
+                let query = Node::PULL_FROM_CHILD_IDS_QUERY;
+                db_session
+                    .query(query, (self.id, self.root_id, parent_id))
+                    .await?;
+
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
+    pub async fn pull_from_ancestors(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<(), CharybdisError> {
+        match &self.ancestor_ids {
+            Some(ancestor_ids) => {
+                let mut batch: Batch = Default::default();
+                let mut values: Vec<Uuid> = Vec::with_capacity(ancestor_ids.len());
+
+                for ancestor_id in ancestor_ids {
+                    let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
+                    batch.append_statement(query);
+                    values.push(*ancestor_id);
+                }
+
+                batch.execute(&db_session).await?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 impl Callbacks for Node {
@@ -92,9 +159,10 @@ impl Callbacks for Node {
         Ok(())
     }
 
-    async fn before_delete(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+        self.pull_from_parent_children(db_session).await?;
+        self.pull_from_ancestors(db_session).await?;
+
         Ok(())
     }
 }
-
-partial_node!(GetNode, id, root_id, descendant_ids);
