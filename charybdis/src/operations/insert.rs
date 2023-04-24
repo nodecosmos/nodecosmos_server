@@ -10,10 +10,7 @@ pub trait Insert {
 
 impl<T: Model + ValueList> Insert for T {
     async fn insert(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
-        session
-            .execute(T::INSERT_QUERY, self)
-            .await
-            .map_err(|e| CharybdisError::QueryError(e))
+        Ok(session.execute(T::INSERT_QUERY, self).await?)
     }
 }
 

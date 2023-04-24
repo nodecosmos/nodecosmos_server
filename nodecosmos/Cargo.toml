@@ -19,5 +19,6 @@ chrono = "0.4.24"
 actix-web = {version = "4.3.1", features = ["cookies"]}
 actix-session = { version = "0.7.2", features = ["redis-actor-session"] }
 actix-cors = "0.6.4"
-argon2 = "0.5.0"
 env_logger = "0.10.0"
+bcrypt = "0.14.0"
+colored = "2.0.0"

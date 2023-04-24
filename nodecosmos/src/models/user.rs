@@ -1,10 +1,11 @@
 pub use super::udts::Address;
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2, PasswordHash, PasswordVerifier,
-};
+
 use charybdis::prelude::*;
 use chrono::Utc;
+
+use bcrypt::{hash, verify};
+
+const BCRYPT_COST: u32 = 6;
 
 #[partial_model_generator]
 #[charybdis_model(table_name = "users",
@@ -55,17 +56,14 @@ impl User {
         &self,
         session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        let user_by_username = self.find_by_username(session).await;
-        let user_by_email = self.find_by_email(session).await;
-
-        if user_by_username.is_some() {
+        if self.find_by_username(session).await.is_some() {
             return Err(CharybdisError::ValidationError((
                 "username".to_string(),
                 "is taken".to_string(),
             )));
         }
 
-        if user_by_email.is_some() {
+        if self.find_by_email(session).await.is_some() {
             return Err(CharybdisError::ValidationError((
                 "email".to_string(),
                 "is taken".to_string(),
@@ -76,19 +74,17 @@ impl User {
     }
 
     pub async fn verify_password(&self, password: &String) -> Result<(), CharybdisError> {
-        let argon2 = Argon2::default();
-        let password_hash = PasswordHash::new(self.password.as_ref()).map_err(|e| {
-            CharybdisError::ValidationError(("password".to_string(), e.to_string()))
+        let password_hash = hash(&self.password, BCRYPT_COST).map_err(|e| {
+            // TODO: log error here
+
+            CharybdisError::CustomError(
+                "There was an error processing your request. Please try again later.".to_string(),
+            )
         })?;
 
-        argon2
-            .verify_password(password.as_ref(), &password_hash)
-            .map_err(|_e| {
-                CharybdisError::ValidationError((
-                    "password".to_string(),
-                    "is incorrect".to_string(),
-                ))
-            })?;
+        verify(password, &password_hash).map_err(|_e| {
+            CharybdisError::ValidationError(("password".to_string(), "is incorrect".to_string()))
+        })?;
 
         Ok(())
     }
@@ -103,16 +99,13 @@ impl User {
     }
 
     fn set_password(&mut self) -> Result<(), CharybdisError> {
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
+        self.password = hash(&self.password, BCRYPT_COST).map_err(|e| {
+            // TODO: log error here
 
-        let password_hash = argon2
-            .hash_password(self.password.as_ref(), &salt)
-            .map_err(|e| {
-                CharybdisError::ValidationError(("password".to_string(), e.to_string()))
-            })?;
-
-        self.password = password_hash.to_string();
+            CharybdisError::CustomError(
+                "There was an error processing your request. Please try again later.".to_string(),
+            )
+        })?;
 
         Ok(())
     }

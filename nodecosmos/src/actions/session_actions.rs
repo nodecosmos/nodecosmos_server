@@ -1,9 +1,8 @@
-use crate::client_session::{get_current_user, set_current_user};
+use super::client_session::{get_current_user, set_current_user};
+use crate::errors::NodecosmosError;
 use crate::models::user::*;
-
 use actix_session::Session;
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
-use charybdis::prelude::CharybdisError;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
@@ -37,7 +36,7 @@ pub async fn login(
             .json(json!({"error": {"username_or_email": "is not found"}}));
     }
 
-    if let Err(_e) = user.verify_password(&login_form.password).await {
+    if let Err(_) = user.verify_password(&login_form.password).await {
         return HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}}));
     }
 
@@ -49,12 +48,12 @@ pub async fn login(
 
 #[get("/sync")]
 pub async fn sync(client_session: Session) -> impl Responder {
-    let current_user: Result<CurrentUser, CharybdisError> = get_current_user(&client_session);
+    let current_user: Result<CurrentUser, NodecosmosError> = get_current_user(&client_session);
 
     match current_user {
         Ok(current_user) => HttpResponse::Ok().json(json!({"success": true, "user": current_user})),
         Err(e) => match e {
-            CharybdisError::SessionError(_) => {
+            NodecosmosError::ClientSessionError(_) => {
                 HttpResponse::Ok().json(json!({"success": false, "user": null}))
             }
             _ => HttpResponse::InternalServerError().body(e.to_string()),

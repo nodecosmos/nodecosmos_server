@@ -1,4 +1,5 @@
 use crate::prelude::SerializedResult;
+use scylla::query::Query;
 use scylla::FromRow;
 
 ///
@@ -36,8 +37,8 @@ pub trait BaseModel: FromRow + Sized + Default {
     const CLUSTERING_KEYS: &'static [&'static str];
     const PRIMARY_KEY: &'static [&'static str];
 
-    const FIND_BY_PRIMARY_KEY_QUERY: &'static str;
-    const FIND_BY_PARTITION_KEY_QUERY: &'static str;
+    const FIND_BY_PRIMARY_KEY_QUERY: Query;
+    const FIND_BY_PARTITION_KEY_QUERY: Query;
 
     const SELECT_FIELDS_CLAUSE: &'static str;
 
@@ -49,9 +50,9 @@ pub trait BaseModel: FromRow + Sized + Default {
 pub trait Model: BaseModel {
     const SECONDARY_INDEXES: &'static [&'static str];
 
-    const INSERT_QUERY: &'static str;
-    const UPDATE_QUERY: &'static str;
-    const DELETE_QUERY: &'static str;
+    const INSERT_QUERY: Query;
+    const UPDATE_QUERY: Query;
+    const DELETE_QUERY: Query;
 
     fn get_update_values(&self) -> SerializedResult;
 }

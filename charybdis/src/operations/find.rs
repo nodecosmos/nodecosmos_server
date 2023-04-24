@@ -1,4 +1,6 @@
 use scylla::frame::value::ValueList;
+use scylla::query::Query;
+use scylla::transport::iterator::TypedRowIterator;
 use scylla::transport::session::TypedRowIter;
 use scylla::IntoTypedRows;
 use scylla::{CachingSession, QueryResult};
@@ -9,9 +11,15 @@ use crate::model::BaseModel;
 pub trait Find: BaseModel {
     async fn find(
         session: &CachingSession,
-        clause: &'static str,
+        query: Query,
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError>;
+    async fn find_iter(
+        session: &CachingSession,
+        query: Query,
+        values: impl ValueList,
+        page_size: i32,
+    ) -> Result<TypedRowIterator<Self>, CharybdisError>;
 
     // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
@@ -24,21 +32,28 @@ pub trait Find: BaseModel {
 impl<T: BaseModel> Find for T {
     async fn find(
         session: &CachingSession,
-        query: &'static str,
+        query: Query,
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError> {
-        let result: QueryResult = session
-            .execute(query, values)
-            .await
-            .map_err(|e| CharybdisError::QueryError(e))?;
+        let result: QueryResult = session.execute(query, values).await?;
+        let rows = result.rows()?;
+        let typed_rows: TypedRowIter<Self> = rows.into_typed();
 
-        match result.rows() {
-            Ok(rows) => {
-                let typed_rows: TypedRowIter<Self> = rows.into_typed();
-                Ok(typed_rows)
-            }
-            Err(e) => Err(CharybdisError::RowsExpectedError(e)),
-        }
+        Ok(typed_rows)
+    }
+    // find iter
+    async fn find_iter(
+        session: &CachingSession,
+        mut query: Query,
+        values: impl ValueList,
+        page_size: i32,
+    ) -> Result<TypedRowIterator<Self>, CharybdisError> {
+        query.set_page_size(page_size);
+
+        let res = session.execute_iter(query, values).await?;
+        let typed_rows: TypedRowIterator<Self> = res.into_typed();
+
+        Ok(typed_rows)
     }
 
     // methods
@@ -49,8 +64,7 @@ impl<T: BaseModel> Find for T {
 
         let result: QueryResult = session
             .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, &primary_key_values)
-            .await
-            .map_err(|e| CharybdisError::QueryError(e))?;
+            .await?;
 
         let res = result
             .single_row_typed::<Self>()
@@ -69,8 +83,7 @@ impl<T: BaseModel> Find for T {
 
         let result: QueryResult = session
             .execute(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
-            .await
-            .map_err(|e| CharybdisError::QueryError(e))?;
+            .await?;
 
         match result.rows {
             Some(rows) => {
@@ -78,7 +91,7 @@ impl<T: BaseModel> Find for T {
                 Ok(typed_rows)
             }
             None => Err(CharybdisError::NotFoundError(
-                Self::FIND_BY_PARTITION_KEY_QUERY,
+                Self::FIND_BY_PARTITION_KEY_QUERY.contents,
             )),
         }
     }

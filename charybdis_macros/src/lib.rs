@@ -4,6 +4,7 @@ use charybdis_parser;
 mod helpers;
 mod macro_rules;
 mod model_impl;
+mod native;
 
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
@@ -15,6 +16,7 @@ use syn::{DeriveInput, Field, FieldsNamed, ImplItem};
 
 use crate::macro_rules::*;
 use crate::model_impl::*;
+use crate::native::{pull_from_set_fields_query_consts, push_to_set_fields_query_consts};
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 
 /// This macro generates the implementation of the `Model` trait for the given struct.
@@ -42,6 +44,11 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let insert_query_const: ImplItem = insert_query_const(&args, fields_named);
     let update_query_const: ImplItem = update_query_const(&args, fields_named);
     let delete_query_const: ImplItem = delete_query_const(&args);
+    // model specific operation consts
+    let push_to_set_fields_query_consts: ImplItem =
+        push_to_set_fields_query_consts(&args, fields_named);
+    let pull_from_set_fields_query_consts: ImplItem =
+        pull_from_set_fields_query_consts(&args, fields_named);
 
     // methods
     let get_primary_key_values: ImplItem = get_primary_key_values(&args);
@@ -51,6 +58,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
+    let find_model_iter_query_rule = find_model_iter_query_rule(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -62,6 +70,11 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             Debug
         )]
         #input
+
+        impl #struct_name {
+            #push_to_set_fields_query_consts
+            #pull_from_set_fields_query_consts
+        }
 
        impl charybdis::prelude::BaseModel for #struct_name {
             // consts
@@ -91,6 +104,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #find_model_query_rule
+        #find_model_iter_query_rule
     };
 
     TokenStream::from(expanded)
@@ -134,6 +148,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
 
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
+    let find_model_iter_query_rule = find_model_iter_query_rule(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -164,6 +179,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
         impl charybdis::prelude::MaterializedView for #struct_name {}
 
         #find_model_query_rule
+        #find_model_iter_query_rule
     };
 
     TokenStream::from(expanded)

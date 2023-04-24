@@ -19,7 +19,7 @@ pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsN
     );
 
     let generated = quote! {
-        const INSERT_QUERY: &'static str = #query_str;
+        const INSERT_QUERY: charybdis::prelude::Query = charybdis::prelude::Query::new(#query_str);
     };
 
     syn::parse_quote!(#generated)

@@ -1,38 +1,13 @@
 {
   "tables": {
-    "nodes": {
-      "fields": {
-        "root_id": "uuid",
-        "parent_id": "uuid",
-        "editor_ids": "list<uuid>",
-        "id": "uuid",
-        "updated_at": "timestamp",
-        "created_at": "timestamp",
-        "descendant_ids": "list<uuid>",
-        "owner_id": "uuid",
-        "title": "text",
-        "ancestor_ids": "list<uuid>",
-        "description": "text"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "root_id"
-      ],
-      "clustering_keys": [
-        "id"
-      ],
-      "secondary_indexes": []
-    },
     "posts": {
       "fields": {
-        "description": "text",
-        "created_at_day": "date",
-        "created_at": "timestamp",
-        "id": "uuid",
         "title": "text",
-        "updated_at": "timestamp"
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+        "id": "uuid",
+        "created_at_day": "date",
+        "description": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -47,16 +22,16 @@
     },
     "users": {
       "fields": {
-        "first_name": "text",
-        "address": "address",
-        "last_name": "text",
-        "email": "text",
         "password": "text",
-        "created_at": "timestamp",
-        "username": "text",
-        "email_verified": "boolean",
+        "last_name": "text",
+        "first_name": "text",
         "id": "uuid",
-        "updated_at": "timestamp"
+        "updated_at": "timestamp",
+        "username": "text",
+        "email": "text",
+        "email_verified": "boolean",
+        "address": "address",
+        "created_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -74,11 +49,11 @@
   "udts": {
     "address": {
       "fields": {
-        "city": "text",
-        "country": "text",
-        "state": "text",
         "street": "text",
-        "zip": "text"
+        "state": "text",
+        "zip": "text",
+        "country": "text",
+        "city": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -89,24 +64,6 @@
     }
   },
   "materialized_views": {
-    "users_email_idx_index": {
-      "fields": {
-        "email": "text",
-        "id": "uuid",
-        "idx_token": "bigint"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "email"
-      ],
-      "clustering_keys": [
-        "id",
-        "idx_token"
-      ],
-      "secondary_indexes": []
-    },
     "users_username_idx_index": {
       "fields": {
         "username": "text",
@@ -118,6 +75,24 @@
       "base_table": "",
       "partition_keys": [
         "username"
+      ],
+      "clustering_keys": [
+        "id",
+        "idx_token"
+      ],
+      "secondary_indexes": []
+    },
+    "users_email_idx_index": {
+      "fields": {
+        "id": "uuid",
+        "idx_token": "bigint",
+        "email": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
       ],
       "clustering_keys": [
         "id",

@@ -1,4 +1,4 @@
-use crate::client_session::set_current_user;
+use super::client_session::set_current_user;
 use crate::models::user::*;
 
 use actix_session::Session;

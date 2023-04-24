@@ -13,9 +13,9 @@ pub enum CharybdisError {
     SingleRowTypedError(SingleRowTypedError, String),
     SerializeValuesError(SerializeValuesError, String),
     // charybdis
-    NotFoundError(&'static str),
+    NotFoundError(String),
     ValidationError((String, String)),
-    SessionError(String),
+    CustomError(String),
 }
 
 impl fmt::Display for CharybdisError {
@@ -30,7 +30,7 @@ impl fmt::Display for CharybdisError {
                 }
                 SingleRowTypedError::BadNumberOfRows(e) => write!(
                     f,
-                    "\n\nToo many rows found for find_by_primary_key for {}. {}{}\n\n",
+                    "\n\nBad number of rows for find_by_primary_key for {}. {}{}\n\n",
                     model_name,
                     "Expected 1, got: ".red(),
                     e
@@ -42,8 +42,8 @@ impl fmt::Display for CharybdisError {
             }
             // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for query: {}", e),
-            CharybdisError::ValidationError(e) => write!(f, "Validation Error: {} {}", e.0, e.1),
-            CharybdisError::SessionError(e) => write!(f, "Session Error: {}", e),
+            CharybdisError::ValidationError(e) => write!(f, "ValidationError: {} {}", e.0, e.1),
+            CharybdisError::CustomError(e) => write!(f, "CustomError: {}", e),
         }
     }
 }
@@ -57,7 +57,25 @@ impl Error for CharybdisError {
             CharybdisError::SingleRowTypedError(e, _) => Some(e),
             CharybdisError::SerializeValuesError(e, _) => Some(e),
             CharybdisError::ValidationError(_) => None,
-            CharybdisError::SessionError(_) => None,
+            CharybdisError::CustomError(_) => None,
         }
+    }
+}
+
+impl From<QueryError> for CharybdisError {
+    fn from(e: QueryError) -> Self {
+        CharybdisError::QueryError(e)
+    }
+}
+
+impl From<RowsExpectedError> for CharybdisError {
+    fn from(e: RowsExpectedError) -> Self {
+        CharybdisError::RowsExpectedError(e)
+    }
+}
+
+impl From<SingleRowTypedError> for CharybdisError {
+    fn from(e: SingleRowTypedError) -> Self {
+        CharybdisError::SingleRowTypedError(e, "model".to_string())
     }
 }

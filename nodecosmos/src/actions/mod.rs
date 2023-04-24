@@ -1,3 +1,4 @@
+mod client_session;
 mod node_actions;
 mod session_actions;
 mod user_actions;
