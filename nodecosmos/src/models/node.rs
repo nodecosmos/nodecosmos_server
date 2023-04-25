@@ -10,27 +10,36 @@ use scylla::batch::Batch;
                   secondary_indexes = [])]
 pub struct Node {
     // descendable
+    #[serde(default)]
     pub id: Uuid,
+    #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
+    #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
+    #[serde(rename = "childIds")]
     pub child_ids: Option<Set<Uuid>>,
+    #[serde(rename = "descendantIds")]
     pub descendant_ids: Option<Set<Uuid>>,
+    #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
     // node
     pub title: Option<Text>,
     pub description: Option<Text>,
+    #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
     // owners
+    #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
+    #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
     pub owner: Option<Owner>,
     pub creator: Option<Creator>,
     // timestamps
+    #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 }
-
-partial_node!(GetNode, id, root_id, descendant_ids);
 
 impl Callbacks for Node {
     async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
@@ -83,6 +92,10 @@ impl Node {
         self.id = Uuid::new_v4();
         self.created_at = Some(Utc::now());
         self.updated_at = Some(Utc::now());
+
+        if self.root_id == Uuid::nil() {
+            self.root_id = self.id;
+        }
     }
 
     pub fn set_owner_id(&mut self, owner_id: Uuid) {
@@ -91,6 +104,10 @@ impl Node {
 
     pub fn set_editor_ids(&mut self, editor_ids: Option<Set<Uuid>>) {
         self.editor_ids = editor_ids;
+    }
+
+    pub fn set_ancestor_ids(&mut self, ancestor_ids: Set<Uuid>) {
+        self.ancestor_ids = Some(ancestor_ids);
     }
 
     pub async fn append_to_parent_children(
@@ -170,6 +187,8 @@ impl Node {
         }
     }
 }
+
+partial_node!(GetNode, id, root_id, descendant_ids);
 
 partial_node!(UpdateNodeTitle, id, root_id, title, updated_at);
 

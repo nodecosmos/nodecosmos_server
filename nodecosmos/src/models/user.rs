@@ -13,6 +13,7 @@ const BCRYPT_COST: u32 = 6;
                   clustering_keys = [],
                   secondary_indexes = ["username", "email"])]
 pub struct User {
+    #[serde(default)]
     pub id: Uuid,
     pub username: Text,
     pub email: Text,

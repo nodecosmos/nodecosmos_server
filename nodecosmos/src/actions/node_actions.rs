@@ -4,21 +4,28 @@ use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::prelude::{
-    AsNative, DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid,
+    AsNative, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
+    UpdateWithCallbacks, Uuid,
 };
 use futures::StreamExt;
 use scylla::CachingSession;
 const DEFAULT_PAGE_SIZE: i32 = 100;
 
+#[derive(Debug, Deserialize)]
+pub struct GetParams {
+    pub root_id: Uuid,
+    pub id: Uuid,
+}
+
 #[get("/{root_id}/{id}")]
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
-    root_id: web::Path<Uuid>,
-    id: web::Path<Uuid>,
+    params: web::Path<GetParams>,
 ) -> impl Responder {
+    let params = params.into_inner();
     let mut node = Node::new();
-    node.root_id = root_id.into_inner();
-    node.id = id.into_inner();
+    node.root_id = params.root_id;
+    node.id = params.id;
 
     let node = node.find_by_primary_key(&db_session).await;
 
@@ -27,7 +34,8 @@ pub async fn get_node(
             let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
             all_node_ids.push(node.id);
 
-            let descendants_q = find_node_query!("root_id = ?, id IN (?)");
+            let descendants_q = find_node_query!("root_id = ? AND id IN ?");
+            println!("descendants_q: {}", descendants_q);
             let descendants = Node::find_iter(
                 &db_session,
                 descendants_q,
@@ -38,7 +46,7 @@ pub async fn get_node(
 
             match descendants {
                 Ok(mut descendants) => {
-                    let mut nodes = vec![node];
+                    let mut nodes = vec![];
 
                     while let Some(descendant) = descendants.next().await {
                         if let Ok(descendant) = descendant {
@@ -71,6 +79,11 @@ pub async fn create_node(
     match parent {
         Some(parent) => {
             node.set_editor_ids(parent.editor_ids);
+
+            let mut ancestor_ids = parent.ancestor_ids.unwrap_or_else(|| vec![]);
+            ancestor_ids.push(parent.id);
+
+            node.set_ancestor_ids(ancestor_ids);
         }
         None => {
             node.set_editor_ids(Some(vec![current_user.id]));
