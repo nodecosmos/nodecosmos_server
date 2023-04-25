@@ -74,15 +74,14 @@ impl User {
     }
 
     pub async fn verify_password(&self, password: &String) -> Result<(), CharybdisError> {
-        let password_hash = hash(&self.password, BCRYPT_COST).map_err(|e| {
+        let password_hash = hash(&self.password, BCRYPT_COST).map_err(|_| {
             // TODO: log error here
-
             CharybdisError::CustomError(
                 "There was an error processing your request. Please try again later.".to_string(),
             )
         })?;
 
-        verify(password, &password_hash).map_err(|_e| {
+        verify(password, &password_hash).map_err(|_| {
             CharybdisError::ValidationError(("password".to_string(), "is incorrect".to_string()))
         })?;
 
@@ -99,7 +98,7 @@ impl User {
     }
 
     fn set_password(&mut self) -> Result<(), CharybdisError> {
-        self.password = hash(&self.password, BCRYPT_COST).map_err(|e| {
+        self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
             // TODO: log error here
 
             CharybdisError::CustomError(

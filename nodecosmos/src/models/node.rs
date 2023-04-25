@@ -85,8 +85,12 @@ impl Node {
         self.updated_at = Some(Utc::now());
     }
 
-    pub fn set_editor_ids(&mut self, editor_ids: Set<Uuid>) {
-        self.editor_ids = Some(editor_ids);
+    pub fn set_owner_id(&mut self, owner_id: Uuid) {
+        self.owner_id = Some(owner_id);
+    }
+
+    pub fn set_editor_ids(&mut self, editor_ids: Option<Set<Uuid>>) {
+        self.editor_ids = editor_ids;
     }
 
     pub async fn append_to_parent_children(

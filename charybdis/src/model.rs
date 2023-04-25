@@ -1,5 +1,4 @@
 use crate::prelude::SerializedResult;
-use scylla::query::Query;
 use scylla::FromRow;
 
 ///

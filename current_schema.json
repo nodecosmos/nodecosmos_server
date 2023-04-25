@@ -1,37 +1,17 @@
 {
   "tables": {
-    "posts": {
-      "fields": {
-        "title": "text",
-        "created_at": "timestamp",
-        "updated_at": "timestamp",
-        "id": "uuid",
-        "created_at_day": "date",
-        "description": "text"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "created_at_day"
-      ],
-      "clustering_keys": [
-        "title"
-      ],
-      "secondary_indexes": []
-    },
     "users": {
       "fields": {
-        "password": "text",
-        "last_name": "text",
-        "first_name": "text",
-        "id": "uuid",
-        "updated_at": "timestamp",
-        "username": "text",
-        "email": "text",
         "email_verified": "boolean",
+        "first_name": "text",
+        "created_at": "timestamp",
+        "password": "text",
+        "username": "text",
         "address": "address",
-        "created_at": "timestamp"
+        "last_name": "text",
+        "email": "text",
+        "id": "uuid",
+        "updated_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -44,16 +24,89 @@
         "users_email_idx",
         "users_username_idx"
       ]
+    },
+    "posts": {
+      "fields": {
+        "created_at": "timestamp",
+        "description": "text",
+        "updated_at": "timestamp",
+        "title": "text",
+        "id": "uuid",
+        "created_at_day": "date"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "created_at_day"
+      ],
+      "clustering_keys": [
+        "title"
+      ],
+      "secondary_indexes": []
+    },
+    "nodes": {
+      "fields": {
+        "description": "text",
+        "ancestor_ids": "set<uuid>",
+        "owner": "owner",
+        "parent_id": "uuid",
+        "title": "text",
+        "descendant_ids": "set<uuid>",
+        "child_ids": "set<uuid>",
+        "creator": "creator",
+        "owner_id": "uuid",
+        "root_id": "uuid",
+        "id": "uuid",
+        "editor_ids": "set<uuid>",
+        "created_at": "timestamp",
+        "description_markdown": "text",
+        "updated_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "root_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": []
     }
   },
   "udts": {
     "address": {
       "fields": {
+        "country": "text",
+        "zip": "text",
         "street": "text",
         "state": "text",
-        "zip": "text",
-        "country": "text",
         "city": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    },
+    "creator": {
+      "fields": {
+        "id": "uuid",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    },
+    "owner": {
+      "fields": {
+        "id": "uuid",
+        "username": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -64,9 +117,9 @@
     }
   },
   "materialized_views": {
-    "users_username_idx_index": {
+    "users_email_idx_index": {
       "fields": {
-        "username": "text",
+        "email": "text",
         "id": "uuid",
         "idx_token": "bigint"
       },
@@ -74,7 +127,7 @@
       "table_name": "",
       "base_table": "",
       "partition_keys": [
-        "username"
+        "email"
       ],
       "clustering_keys": [
         "id",
@@ -82,17 +135,17 @@
       ],
       "secondary_indexes": []
     },
-    "users_email_idx_index": {
+    "users_username_idx_index": {
       "fields": {
-        "id": "uuid",
         "idx_token": "bigint",
-        "email": "text"
+        "id": "uuid",
+        "username": "text"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
       "partition_keys": [
-        "email"
+        "username"
       ],
       "clustering_keys": [
         "id",

@@ -66,14 +66,14 @@ pub async fn create_node(
 
     auth_node_creation(&parent, &current_user).await?;
 
-    node.owner_id = Some(current_user.id);
+    node.set_owner_id(current_user.id);
 
     match parent {
         Some(parent) => {
-            node.editor_ids = parent.editor_ids;
+            node.set_editor_ids(parent.editor_ids);
         }
         None => {
-            node.editor_ids = Some(vec![current_user.id]);
+            node.set_editor_ids(Some(vec![current_user.id]));
         }
     }
 
