@@ -11,12 +11,12 @@ use crate::model::BaseModel;
 pub trait Find: BaseModel {
     async fn find(
         session: &CachingSession,
-        query: Query,
+        query: &'static str,
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError>;
     async fn find_iter(
         session: &CachingSession,
-        query: Query,
+        query: &'static str,
         values: impl ValueList,
         page_size: i32,
     ) -> Result<TypedRowIterator<Self>, CharybdisError>;
@@ -32,7 +32,7 @@ pub trait Find: BaseModel {
 impl<T: BaseModel> Find for T {
     async fn find(
         session: &CachingSession,
-        query: Query,
+        query: &'static str,
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError> {
         let result: QueryResult = session.execute(query, values).await?;
@@ -44,11 +44,11 @@ impl<T: BaseModel> Find for T {
     // find iter
     async fn find_iter(
         session: &CachingSession,
-        mut query: Query,
+        query: &'static str,
         values: impl ValueList,
         page_size: i32,
     ) -> Result<TypedRowIterator<Self>, CharybdisError> {
-        query.set_page_size(page_size);
+        let query = Query::new(query).with_page_size(page_size);
 
         let res = session.execute_iter(query, values).await?;
         let typed_rows: TypedRowIterator<Self> = res.into_typed();
@@ -91,7 +91,7 @@ impl<T: BaseModel> Find for T {
                 Ok(typed_rows)
             }
             None => Err(CharybdisError::NotFoundError(
-                Self::FIND_BY_PARTITION_KEY_QUERY.contents,
+                Self::FIND_BY_PARTITION_KEY_QUERY.to_string(),
             )),
         }
     }

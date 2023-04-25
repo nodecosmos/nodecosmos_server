@@ -3,9 +3,9 @@
 
 mod actions;
 mod app;
+mod authorize;
 mod errors;
 mod models;
-mod authorize;
 
 use actions::*;
 // use actix_web::middleware::Logger;
@@ -39,6 +39,14 @@ async fn main() {
                     .service(login)
                     .service(sync)
                     .service(logout),
+            )
+            .service(
+                web::scope("/nodes")
+                    .service(get_node)
+                    .service(create_node)
+                    .service(update_node_title)
+                    .service(update_node_description)
+                    .service(delete_node),
             )
     })
     .bind(("127.0.0.1", port))

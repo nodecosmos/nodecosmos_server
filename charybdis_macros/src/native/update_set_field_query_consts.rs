@@ -2,12 +2,12 @@ use crate::helpers::camel_to_snake_case;
 use charybdis_parser::CharybdisArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse_str, FieldsNamed, ImplItem};
+use syn::{parse_str, FieldsNamed};
 
 pub(crate) fn push_to_set_fields_query_consts(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
-) -> ImplItem {
+) -> TokenStream {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
     let mut primary_key = ch_args.partition_keys.clone().unwrap();
@@ -40,8 +40,7 @@ pub(crate) fn push_to_set_fields_query_consts(
                 let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
                 let expanded = quote! {
-                    const #const_name: charybdis::prelude::Query =
-                        charybdis::prelude::Query::new(#query_str);
+                    const #const_name: &'static str = #query_str;
                 };
 
                 Some(TokenStream::from(expanded))
@@ -51,17 +50,17 @@ pub(crate) fn push_to_set_fields_query_consts(
         })
         .collect();
 
-    let generated = quote! {
+    let expanded = quote! {
         #(#queries)*
     };
 
-    syn::parse_quote!(#generated)
+    TokenStream::from(expanded)
 }
 
 pub(crate) fn pull_from_set_fields_query_consts(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
-) -> ImplItem {
+) -> TokenStream {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
     let mut primary_key = ch_args.partition_keys.clone().unwrap();
@@ -94,8 +93,7 @@ pub(crate) fn pull_from_set_fields_query_consts(
                 let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
                 let expanded = quote! {
-                    const #const_name: charybdis::prelude::Query =
-                        charybdis::prelude::Query::new(#query_str);
+                    const #const_name: &'static str = #query_str;
                 };
 
                 Some(TokenStream::from(expanded))
@@ -105,9 +103,9 @@ pub(crate) fn pull_from_set_fields_query_consts(
         })
         .collect();
 
-    let generated = quote! {
+    let expanded = quote! {
         #(#queries)*
     };
 
-    syn::parse_quote!(#generated)
+    TokenStream::from(expanded)
 }

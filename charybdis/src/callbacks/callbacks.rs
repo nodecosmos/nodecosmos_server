@@ -14,10 +14,10 @@ pub trait Callbacks {
     async fn after_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
         Ok(())
     }
-    async fn before_delete(&self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn before_delete(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
         Ok(())
     }
-    async fn after_delete(&self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
         Ok(())
     }
 }

@@ -13,7 +13,7 @@ const BCRYPT_COST: u32 = 6;
                   clustering_keys = [],
                   secondary_indexes = ["username", "email"])]
 pub struct User {
-    pub id: Option<Uuid>,
+    pub id: Uuid,
     pub username: Text,
     pub email: Text,
     pub password: Text,
@@ -92,7 +92,7 @@ impl User {
     fn set_defaults(&mut self) {
         let now = Utc::now();
 
-        self.id = Some(Uuid::new_v4());
+        self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
         self.email_verified = Some(false);
@@ -138,5 +138,3 @@ impl Callbacks for UpdateUser {
 }
 
 partial_user!(DeleteUser, id);
-
-partial_user!(CurrentUser, id, username, email, email_verified);

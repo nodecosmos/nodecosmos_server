@@ -1,7 +1,6 @@
+use charybdis_parser::CharybdisArgs;
 use quote::quote;
 use syn::{FieldsNamed, ImplItem};
-use charybdis_parser::CharybdisArgs;
-
 
 pub(crate) fn update_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
@@ -25,13 +24,11 @@ pub(crate) fn update_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsN
 
     let query_str: String = format!(
         "UPDATE {} SET {} WHERE {} = ?",
-        table_name,
-        set_fields_clause,
-        primary_key_where_clause,
+        table_name, set_fields_clause, primary_key_where_clause,
     );
 
     let generated = quote! {
-        const UPDATE_QUERY: charybdis::prelude::Query = charybdis::prelude::Query::new(#query_str);
+        const UPDATE_QUERY: &'static str = #query_str;
     };
 
     syn::parse_quote!(#generated)

@@ -1,6 +1,6 @@
 use super::client_session::set_current_user;
-use crate::models::user::*;
 
+use crate::models::user::{DeleteUser, GetUser, UpdateUser, User};
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::prelude::*;
@@ -13,7 +13,7 @@ pub async fn get_user(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let user = GetUser {
-        id: Some(id.into_inner()),
+        id: id.into_inner(),
         ..Default::default()
     };
 
@@ -74,7 +74,7 @@ pub async fn delete_user(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let user = DeleteUser {
-        id: Some(id.into_inner()),
+        id: id.into_inner(),
     };
 
     let res = user.delete(&db_session).await;

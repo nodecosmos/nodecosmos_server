@@ -22,8 +22,7 @@ pub(crate) fn find_by_primary_key_query_const(
     );
 
     let generated = quote! {
-        const FIND_BY_PRIMARY_KEY_QUERY: charybdis::prelude::Query =
-            charybdis::prelude::Query::new(#query_str);
+        const FIND_BY_PRIMARY_KEY_QUERY: &'static str = #query_str;
     };
 
     syn::parse_quote!(#generated)
@@ -47,8 +46,7 @@ pub(crate) fn find_by_partition_key_query_const(
     );
 
     let generated = quote! {
-        const FIND_BY_PARTITION_KEY_QUERY: charybdis::prelude::Query =
-            charybdis::prelude::Query::new(#query_str);
+        const FIND_BY_PARTITION_KEY_QUERY: &'static str = #query_str;
     };
 
     syn::parse_quote!(#generated)

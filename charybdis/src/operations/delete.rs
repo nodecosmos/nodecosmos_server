@@ -22,11 +22,11 @@ impl<T: Model + ValueList> Delete for T {
 }
 
 pub trait DeleteWithCallbacks {
-    async fn delete_cb(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
+    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
 }
 
 impl<T: Model + ValueList + Delete + Callbacks> DeleteWithCallbacks for T {
-    async fn delete_cb(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
+    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
         self.before_delete(session).await?;
         let res = self.delete(session).await;
         self.after_delete(session).await?;

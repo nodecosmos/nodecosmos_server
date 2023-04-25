@@ -26,7 +26,7 @@ impl<T: Model> CharybdisQuery<T> {
                 let typed_rows: TypedRowIter<T> = rows.into_typed();
                 Ok(typed_rows)
             }
-            None => Err(CharybdisError::NotFoundError(T::DB_MODEL_NAME)),
+            None => Err(CharybdisError::NotFoundError(T::DB_MODEL_NAME.to_string())),
         }
     }
 }

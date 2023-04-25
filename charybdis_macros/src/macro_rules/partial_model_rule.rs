@@ -124,7 +124,8 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
     //       nested macros when they panic.
 
     // macro names (avoiding name collisions)
-    let macro_name_str: String = format!("partial_{}", input.ident.to_string().to_lowercase());
+    let native_struct = &input.ident;
+    let macro_name_str: String = format!("partial_{}", native_struct.to_string().to_lowercase());
     let macro_name: proc_macro2::TokenStream =
         parse_str::<proc_macro2::TokenStream>(&macro_name_str).unwrap();
 
@@ -151,6 +152,7 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
     let expanded: proc_macro2::TokenStream = quote! {
         #input
 
+
          #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
@@ -160,6 +162,15 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
                                   secondary_indexes=#sec_idxes)]
                 pub struct $struct_name {
                     $(pub $field: #field_type_macro_name!($field),)*
+                }
+
+                impl charybdis::prelude::AsNative<#native_struct> for $struct_name {
+                    fn as_native(&self) -> #native_struct {
+                        #native_struct {
+                            $($field: self.$field.clone(),)*
+                            ..Default::default()
+                        }
+                    }
                 }
             };
         }

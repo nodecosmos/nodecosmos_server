@@ -45,9 +45,9 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let update_query_const: ImplItem = update_query_const(&args, fields_named);
     let delete_query_const: ImplItem = delete_query_const(&args);
     // model specific operation consts
-    let push_to_set_fields_query_consts: ImplItem =
+    let push_to_set_fields_query_consts: proc_macro2::TokenStream =
         push_to_set_fields_query_consts(&args, fields_named);
-    let pull_from_set_fields_query_consts: ImplItem =
+    let pull_from_set_fields_query_consts: proc_macro2::TokenStream =
         pull_from_set_fields_query_consts(&args, fields_named);
 
     // methods
@@ -58,7 +58,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
-    let find_model_iter_query_rule = find_model_iter_query_rule(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -91,7 +90,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #get_clustering_key_values
         }
 
-
         impl charybdis::prelude::Model for #struct_name {
             // consts
             #secondary_indexes_const
@@ -104,7 +102,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #find_model_query_rule
-        #find_model_iter_query_rule
     };
 
     TokenStream::from(expanded)
@@ -148,7 +145,6 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
 
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
-    let find_model_iter_query_rule = find_model_iter_query_rule(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -179,7 +175,6 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
         impl charybdis::prelude::MaterializedView for #struct_name {}
 
         #find_model_query_rule
-        #find_model_iter_query_rule
     };
 
     TokenStream::from(expanded)
@@ -204,6 +199,7 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
             charybdis::prelude::Deserialize,
             charybdis::prelude::FromUserType,
             charybdis::prelude::IntoUserType,
+            Clone,
             PartialEq,
             Default,
             Debug,
