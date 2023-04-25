@@ -2,19 +2,43 @@ use crate::actions::client_session::*;
 use crate::authorize::{auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
+use crate::models::udts::Owner;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::prelude::{
-    AsNative, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
+    AsNative, BaseModel, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
     UpdateWithCallbacks, Uuid,
 };
 use futures::StreamExt;
 use scylla::CachingSession;
+
 const DEFAULT_PAGE_SIZE: i32 = 100;
 
 #[derive(Debug, Deserialize)]
 pub struct GetParams {
     pub root_id: Uuid,
     pub id: Uuid,
+}
+
+#[get("")]
+pub async fn get_nodes(db_session: web::Data<CachingSession>) -> impl Responder {
+    let nodes_q = Node::SELECT_FIELDS_CLAUSE;
+
+    let all_nodes = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await;
+
+    match all_nodes {
+        Ok(mut node) => {
+            let mut nodes = vec![];
+
+            while let Some(node) = node.next().await {
+                if let Ok(node) = node {
+                    nodes.push(node);
+                }
+            }
+
+            HttpResponse::Ok().json(nodes)
+        }
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
 }
 
 #[get("/{root_id}/{id}")]
@@ -35,7 +59,6 @@ pub async fn get_node(
             all_node_ids.push(node.id);
 
             let descendants_q = find_node_query!("root_id = ? AND id IN ?");
-            println!("descendants_q: {}", descendants_q);
             let descendants = Node::find_iter(
                 &db_session,
                 descendants_q,
@@ -75,6 +98,10 @@ pub async fn create_node(
     auth_node_creation(&parent, &current_user).await?;
 
     node.set_owner_id(current_user.id);
+    node.set_owner(Owner {
+        id: current_user.id,
+        username: current_user.username,
+    });
 
     match parent {
         Some(parent) => {

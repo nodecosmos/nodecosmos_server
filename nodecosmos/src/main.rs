@@ -9,7 +9,7 @@ mod errors;
 mod models;
 
 use actions::*;
-use actix_web::middleware::Logger;
+// use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use app::App as NodecosmosApp;
 
@@ -17,7 +17,7 @@ use crate::app::{get_cors, get_db_session, get_port, get_session_middleware};
 
 #[tokio::main]
 async fn main() {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    // env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     let nodecosmos = NodecosmosApp::new();
     let session = get_db_session(&nodecosmos).await;
@@ -25,7 +25,7 @@ async fn main() {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
+            // .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(get_cors(&nodecosmos))
             .wrap(get_session_middleware(&nodecosmos))
             .app_data(session.clone())
@@ -44,6 +44,7 @@ async fn main() {
             )
             .service(
                 web::scope("/nodes")
+                    .service(get_nodes)
                     .service(get_node)
                     .service(create_node)
                     .service(update_node_title)

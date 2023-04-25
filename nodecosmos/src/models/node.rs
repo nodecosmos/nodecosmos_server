@@ -98,6 +98,10 @@ impl Node {
         }
     }
 
+    pub fn set_owner(&mut self, owner: Owner) {
+        self.owner = Some(owner);
+    }
+
     pub fn set_owner_id(&mut self, owner_id: Uuid) {
         self.owner_id = Some(owner_id);
     }
