@@ -9,7 +9,7 @@ use scylla::FromRow;
 /// ```rust
 /// use charybdis::prelude::*;
 ///
-/// #[charybdis_model(table_name = "users", partition_keys = ["id"], clustering_keys = [], secondary_indexes=[])]
+/// #[charybdis_model(table_name = "users", prt_keys = ["id"], clustering_keys = [], secondary_indexes=[])]
 /// pub struct User {
 ///     pub id: Uuid,
 ///     pub username: Text,

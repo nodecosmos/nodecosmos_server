@@ -22,14 +22,39 @@ pub struct GetParams {
 #[get("")]
 pub async fn get_nodes(db_session: web::Data<CachingSession>) -> impl Responder {
     let nodes_q = Node::SELECT_FIELDS_CLAUSE;
+    let nodes = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await;
 
-    let all_nodes = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await;
-
-    match all_nodes {
+    match nodes {
         Ok(mut node) => {
             let mut nodes = vec![];
 
             while let Some(node) = node.next().await {
+                if let Ok(node) = node {
+                    nodes.push(node);
+                }
+            }
+
+            HttpResponse::Ok().json(nodes)
+        }
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+#[get("/{root_id}")]
+pub async fn get_root_node(
+    db_session: web::Data<CachingSession>,
+    root_id: web::Path<Uuid>,
+) -> impl Responder {
+    let mut node = Node::new();
+    node.root_id = root_id.into_inner();
+
+    let nodes = node.find_by_partition_key(&db_session).await;
+
+    match nodes {
+        Ok(mut node) => {
+            let mut nodes = vec![];
+
+            while let Some(node) = node.next() {
                 if let Ok(node) = node {
                     nodes.push(node);
                 }

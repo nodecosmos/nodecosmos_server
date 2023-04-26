@@ -52,10 +52,12 @@ use charybdis::prelude::*;
 use super::udts::Address;
 
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
-#[charybdis_model(table_name = "users", 
-                  partition_keys = ["id"], 
-                  clustering_keys = [], 
-                  secondary_indexes = [])]
+#[charybdis_model(
+    table_name = "users", 
+    partition_keys = ["id"], 
+    clustering_keys = [], 
+    secondary_indexes = []
+)]
 pub struct User {
     pub id: Uuid,
     pub username: Text,
@@ -88,10 +90,12 @@ Declare view model as a struct within `src/models/materialized_views` dir:
 ```rust
 use charybdis::prelude::*;
 
-#[charybdis_view_model(table_name="users_by_username",
-                       base_table="users",
-                       partition_keys=["username"],
-                       clustering_keys=["id"])]
+#[charybdis_view_model(
+    table_name="users_by_username",
+    base_table="users",
+    partition_keys=["username"],
+    clustering_keys=["id"]
+)]
 pub struct UsersByUsername {
     pub username: Text,
     pub id: Uuid,
@@ -188,6 +192,10 @@ async fn main() {
   let query = find_user_query!("id = ?");
   let users: TypedRowIter<User> = User::find(&session, query, (id,)).await.unwrap();
 
+  // or
+  let query = find_user_query!("id = ?");
+  let user: User = User::find_one(&session, query, (id,)).await.unwrap();
+
 ```
 
 ### Update
@@ -212,7 +220,7 @@ user.update(&session).await;
 ## Partial Model Operations:
 Use auto generated `partial_<model_name>!` macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
-It can be used to run operations on records based on mandatory partition keys and provided clustering keys.
+Limitation is that it requires whole primary key.
 
 📝 Partition key fields are required for **read** operations while whole primary key fields are required for 
 **update**, **insert** and **delete** operations!
@@ -269,10 +277,12 @@ for user in users_by_username {
 Let's say we have a model:
 ```rust 
 #[partial_model_generator]
-#[charybdis_model(table_name = "posts", 
-                  partition_keys = ["created_at_day"], 
-                  clustering_keys = ["title"],
-                  secondary_indexes = ["id"])]
+#[charybdis_model(
+    table_name = "posts", 
+    partition_keys = ["created_at_day"], 
+    clustering_keys = ["title"],
+    secondary_indexes = ["id"]
+)]
 pub struct Post {
   pub id: Uuid,
   pub title: Text,
@@ -331,10 +341,12 @@ We can define callbacks that will be executed before and after certain operation
 ```rust
 use charybdis::prelude::*;
 
-#[charybdis_model(table_name = "users", 
-                  partition_keys = ["id"], 
-                  clustering_keys = [""],
-                  secondary_indexes = ["username", "email"])]
+#[charybdis_model(
+    table_name = "users", 
+    partition_keys = ["id"], 
+    clustering_keys = [""],
+    secondary_indexes = ["username", "email"]
+)]
 pub struct User {
     ...
 }
@@ -343,29 +355,14 @@ impl User {
   pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
     let query = find_user_query!("username = ?");
 
-    let res = Self::find(session, query, (&self.username,)).await;
-    match res {
-      Ok(mut res) => match res.next() {
-        Some(Ok(user)) => Some(user),
-        _ => None,
-      },
-      Err(_) => None,
-    }
+    Self::find_one(session, query, (&self.username,)).await.ok()
   }
 
   pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
     let query = find_user_query!("email = ?");
 
-    let res = Self::find(session, query, (&self.email,)).await;
-    match res {
-      Ok(mut res) => match res.next() {
-        Some(Ok(user)) => Some(user),
-        _ => None,
-      },
-      Err(_) => None,
-    }
+    Self::find_one(session, query, (&self.email,)).await.ok()
   }
-
 }
 
 impl Callbacks for User {
@@ -484,7 +481,19 @@ impl Callbacks for UpdateUser {
     }
 }
 ```
-
+- `partial_models` require complete primary key. To address this you can define struct for particular operation
+with `charybdis_model` macro e.g.
+```rust
+#[charybdis_model(
+    table_name = "posts", 
+    partition_keys = ["created_at_day"], 
+    clustering_keys = [""],
+    secondary_indexes = [""]
+)]
+pub struct FindPost {
+    pub created_at_day: String,
+}
+```
 ## Roadmap:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database

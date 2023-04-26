@@ -8,10 +8,12 @@ use bcrypt::{hash, verify};
 const BCRYPT_COST: u32 = 6;
 
 #[partial_model_generator]
-#[charybdis_model(table_name = "users",
-                  partition_keys = ["id"],
-                  clustering_keys = [],
-                  secondary_indexes = ["username", "email"])]
+#[charybdis_model(
+    table_name = "users",
+    partition_keys = ["id"],
+    clustering_keys = [],
+    secondary_indexes = ["username", "email"]
+)]
 pub struct User {
     #[serde(default)]
     pub id: Uuid,
@@ -30,27 +32,13 @@ impl User {
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
         let query = find_user_query!("username = ?");
 
-        let res = Self::find(session, query, (&self.username,)).await;
-        match res {
-            Ok(mut res) => match res.next() {
-                Some(Ok(user)) => Some(user),
-                _ => None,
-            },
-            Err(_) => None,
-        }
+        Self::find_one(session, query, (&self.username,)).await.ok()
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
         let query = find_user_query!("email = ?");
 
-        let res = Self::find(session, query, (&self.email,)).await;
-        match res {
-            Ok(mut res) => match res.next() {
-                Some(Ok(user)) => Some(user),
-                _ => None,
-            },
-            Err(_) => None,
-        }
+        Self::find_one(session, query, (&self.email,)).await.ok()
     }
 
     pub async fn check_existing_user(

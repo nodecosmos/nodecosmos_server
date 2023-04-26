@@ -18,10 +18,11 @@ use syn::{parse_macro_input, parse_str, DeriveInput, FieldsNamed, Type};
 /// use charybdis::prelude::*;
 /// use super::Address;
 /// #[partial_model_generator]
-/// #[charybdis_model(table_name = "users",
-///                   partition_keys = ["id"],
-///                   clustering_keys = []
-///                   secondary_indexes = [])]
+/// #[charybdis_model(
+///     table_name = "users",
+///     partition_keys = ["id"],
+///     clustering_keys = []
+///     secondary_indexes = [])]
 /// pub struct User {
 ///     pub id: Uuid,
 ///     pub username: Text,
@@ -41,10 +42,11 @@ use syn::{parse_macro_input, parse_str, DeriveInput, FieldsNamed, Type};
 /// ```
 /// It will generate a struct with only those fields:
 /// ```ignore
-/// #[charybdis_model(table_name = "users",
-///                   partition_keys = ["id"],
-///                   clustering_keys = []
-///                   secondary_indexes = [])]
+/// #[charybdis_model(
+///     table_name = "users",
+///     partition_keys = ["id"],
+///     clustering_keys = []
+///     secondary_indexes = [])]
 /// pub struct PartialUser {
 ///    pub id: Uuid,
 ///    pub username: Text,
@@ -79,12 +81,14 @@ use syn::{parse_macro_input, parse_str, DeriveInput, FieldsNamed, Type};
 /// based on fields that are provided in partial_model struct.
 ///
 /// E.g. if we have model:
-/// ```ignore
+/// ```rust
 /// #[partial_model_generator]
-/// #[charybdis_model(table_name = "users",
-///                   partition_keys = ["id"],
-///                   clustering_keys = ["created_at", "updated_at"],
-///                   secondary_indexes = [])]
+/// #[charybdis_model(
+///     table_name = "users",
+///     partition_keys = ["id"],
+///     clustering_keys = ["created_at", "updated_at"],
+///     secondary_indexes = []
+/// )]
 /// pub struct User {
 ///     pub id: Uuid,
 ///     pub username: Text,
@@ -103,10 +107,11 @@ use syn::{parse_macro_input, parse_str, DeriveInput, FieldsNamed, Type};
 /// it will generate a struct with `#[charybdis_model(...)]` declaration:
 ///
 /// ```ignore
-/// #[charybdis_model(table_name = "users",
-///                   partition_keys = ["id"],
-///                   clustering_keys = ["created_at"],
-///                   secondary_indexes = [])]
+/// #[charybdis_model(
+///     table_name = "users",
+///     partition_keys = ["id"],
+///     clustering_keys = ["created_at"],
+///     secondary_indexes = [])]
 /// pub struct UserOps {...}
 /// ```
 /// Note that `updated_at` is not present in generated declaration.
@@ -153,13 +158,15 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         #input
 
 
-         #[allow(unused_macros)]
+        #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
-                #[charybdis_model(table_name=#table_name,
-                                  partition_keys=#pks,
-                                  clustering_keys=#cks,
-                                  secondary_indexes=#sec_idxes)]
+                #[charybdis_model(
+                    table_name=#table_name,
+                    partition_keys=#pks,
+                    clustering_keys=#cks,
+                    secondary_indexes=#sec_idxes
+                )]
                 pub struct $struct_name {
                     $(pub $field: #field_type_macro_name!($field),)*
                 }

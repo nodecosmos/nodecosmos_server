@@ -4,16 +4,20 @@ use chrono::Utc;
 use scylla::batch::Batch;
 
 #[partial_model_generator]
-#[charybdis_model(table_name = "nodes",
-                  partition_keys = ["root_id"],
-                  clustering_keys = ["id"],
-                  secondary_indexes = [])]
+#[charybdis_model(
+    table_name = "nodes",
+    partition_keys = ["root_id"],
+    clustering_keys = ["id", "order_number"],
+    secondary_indexes = []
+)]
 pub struct Node {
     // descendable
     #[serde(default)]
     pub id: Uuid,
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
+    #[serde(rename = "OrderNumber")]
+    pub order_number: Double,
     #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
     #[serde(rename = "childIds")]
@@ -64,6 +68,7 @@ impl Callbacks for Node {
     async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         self.pull_from_parent_children(db_session).await?;
         self.pull_from_ancestors(db_session).await?;
+        self.delete_descendants(db_session).await?;
 
         Ok(())
     }
@@ -190,11 +195,41 @@ impl Node {
             None => Ok(()),
         }
     }
+
+    pub async fn delete_descendants(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<(), CharybdisError> {
+        match &self.descendant_ids {
+            Some(descendant_ids) => {
+                let mut batch: Batch = Default::default();
+                let mut values = Vec::with_capacity(descendant_ids.len());
+
+                for descendant_id in descendant_ids {
+                    let query = Node::DELETE_QUERY;
+                    batch.append_statement(query);
+                    values.push((self.root_id, descendant_id));
+                }
+
+                db_session.batch(&batch, values).await?;
+
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
 }
 
-partial_node!(GetNode, id, root_id, descendant_ids);
+partial_node!(GetNode, root_id, id, order_number, descendant_ids);
 
-partial_node!(UpdateNodeTitle, id, root_id, title, updated_at);
+partial_node!(
+    UpdateNodeTitle,
+    root_id,
+    id,
+    order_number,
+    title,
+    updated_at
+);
 
 impl Callbacks for UpdateNodeTitle {
     async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
@@ -206,8 +241,9 @@ impl Callbacks for UpdateNodeTitle {
 
 partial_node!(
     UpdateNodeDescription,
-    id,
     root_id,
+    id,
+    order_number,
     description,
     description_markdown,
     updated_at
@@ -221,7 +257,14 @@ impl Callbacks for UpdateNodeDescription {
     }
 }
 
-partial_node!(UpdateNodeOwner, id, root_id, owner_id, updated_at);
+partial_node!(
+    UpdateNodeOwner,
+    root_id,
+    id,
+    order_number,
+    owner_id,
+    updated_at
+);
 
 impl Callbacks for UpdateNodeOwner {
     async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {

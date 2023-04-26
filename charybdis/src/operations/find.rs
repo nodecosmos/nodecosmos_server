@@ -14,6 +14,13 @@ pub trait Find: BaseModel {
         query: &'static str,
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError>;
+
+    async fn find_one(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+    ) -> Result<Self, CharybdisError>;
+
     async fn find_iter(
         session: &CachingSession,
         query: &'static str,
@@ -23,6 +30,7 @@ pub trait Find: BaseModel {
 
     // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
+
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
@@ -41,6 +49,20 @@ impl<T: BaseModel> Find for T {
 
         Ok(typed_rows)
     }
+
+    async fn find_one(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+    ) -> Result<Self, CharybdisError> {
+        let result: QueryResult = session.execute(query, values).await?;
+        let typed_row: Self = result
+            .first_row_typed()
+            .map_err(|e| CharybdisError::FirstRowTypedError(e, Self::DB_MODEL_NAME.to_string()))?;
+
+        Ok(typed_row)
+    }
+
     // find iter
     async fn find_iter(
         session: &CachingSession,
