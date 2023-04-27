@@ -18,7 +18,7 @@ tool will detect type within option and create column with that type
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects CachingSession as a session type for operations
 - Basic CRUD queries are macro generated constants
-- By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time
+- By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time as `&'static str`
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
 ## Table of Contents
@@ -38,6 +38,7 @@ tool will detect type within option and create column with that type
 - [Callbacks](#callbacks)
 - [Batch Operations](#batch-operations)
 - [As Native](#as-native)
+- [Collection queries](#collection-queries)
 - [Roadmap](#Roadmap)
 
 ## Charybdis Models
@@ -222,9 +223,6 @@ Use auto generated `partial_<model_name>!` macro to run operations on subset of 
 This macro generates a new struct with same structure as the original model, but only with provided fields.
 Limitation is that it requires whole primary key.
 
-📝 Partition key fields are required for **read** operations while whole primary key fields are required for 
-**update**, **insert** and **delete** operations!
-
 ```rust
 // auto-generated macro - available in user model
 partial_user!(OpsUser, id, username);
@@ -245,6 +243,32 @@ let user: OpsUser = user.find_by_primary_key(&:session).await.unwrap();
 let user = User {id, ..Default::default()};
 let res: User = user.find_by_primary_key(&session).await.unwrap();
 ```
+
+Note that if you have custom attributes on your model fields,
+they will be automatically added to partial fields.
+
+```rust
+#[partial_model_generator]
+#[charybdis_model(
+    table_name = "nodes",
+    partition_keys = ["root_id"],
+    clustering_keys = ["id"],
+    secondary_indexes = []
+)]
+pub struct Node {
+    // descendable
+    #[serde(default)]
+    pub id: Uuid,
+
+    #[serde(default, rename = "rootId")]
+    pub root_id: Uuid, 
+  pub title: String,
+}
+
+partial_node!(PartialNode, id, root_id);
+```
+
+`PartialNode` will include serde attributes from `Node` model.
 
 ## View Operations:
 ```rust
@@ -461,14 +485,41 @@ let mut user = UpdateUser {
     username: "updated_username".to_string(),
 };
 
-let native_user = user.as_native();
+let native_user = user.as_native().find_by_primary_key(&session).await.unwrap();
 
 // action that requires native model
 authorize_user(&native_user);
 
 ```
+
+## Collection queries
+For every field that is defined with `List<T> `type or `Set<T>`, we have macro generated queries:
+- `PUSH_TO_<field_name>_QUERY`
+- `PULL_FROM_<field_name>_QUERY`
+that can be used to push or pull elements from collection.
+
+```rust
+#[charybdis_model(
+    table_name = "users", 
+    partition_keys = ["id"], 
+    clustering_keys = [""],
+    secondary_indexes = ["username", "email"]
+)]
+pub struct User {
+    ...
+    pub tags: Set<String>,
+}
+
+impl Callbacks for User {
+  async fn after_insert(&self, session: &CachingSession) -> Result<(), CharybdisError> {
+    let query = User::PUSH_TO_TAGS_QUERY;
+    self.execute(query, ("new_tag", &user.id)).await;
+  }
+}
+
+```
 ## Limitations:
-- partial_models don't implement same callbacks defined on base model so 
+- `partial_models` don't implement same callbacks defined on base model so 
 `insert_cb`, `update_cb`, `delete_cb` will not work on partial models unless callbacks are
 manually implemented for partial models e.g.
 ```rust
@@ -481,19 +532,8 @@ impl Callbacks for UpdateUser {
     }
 }
 ```
-- `partial_models` require complete primary key. To address this you can define struct for particular operation
-with `charybdis_model` macro e.g.
-```rust
-#[charybdis_model(
-    table_name = "posts", 
-    partition_keys = ["created_at_day"], 
-    clustering_keys = [""],
-    secondary_indexes = [""]
-)]
-pub struct FindPost {
-    pub created_at_day: String,
-}
-```
+- `partial_models` require complete primary key
+
 ## Roadmap:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database

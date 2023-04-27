@@ -26,27 +26,40 @@ pub(crate) fn push_to_set_fields_query_consts(
             let field_name_snake_case = camel_to_snake_case(&field_name);
             let field_type = field.ty.to_token_stream().to_string();
 
-            if field_type.contains("Set") || field_type.contains("Map") {
-                let query_str = format!(
+            let is_list = field_type.contains("List");
+            let is_set = field_type.contains("Set");
+
+            if !is_list && !is_set {
+                return None;
+            }
+
+            let query_str = if is_list {
+                format!(
+                    "UPDATE {} SET {} = {} + [?] WHERE {} = ?",
+                    table_name.to_string(),
+                    field_name_snake_case,
+                    field_name_snake_case,
+                    primary_key_where_clause,
+                )
+            } else {
+                format!(
                     "UPDATE {} SET {} = {} + {{?}} WHERE {} = ?",
                     table_name.to_string(),
                     field_name_snake_case,
                     field_name_snake_case,
                     primary_key_where_clause,
-                );
+                )
+            };
 
-                let field_name_upper = field_name.to_uppercase();
-                let const_name = format!("PUSH_TO_{}_QUERY", field_name_upper);
-                let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
+            let field_name_upper = field_name.to_uppercase();
+            let const_name = format!("PUSH_TO_{}_QUERY", field_name_upper);
+            let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
-                let expanded = quote! {
-                    const #const_name: &'static str = #query_str;
-                };
+            let expanded = quote! {
+                const #const_name: &'static str = #query_str;
+            };
 
-                Some(TokenStream::from(expanded))
-            } else {
-                None
-            }
+            Some(TokenStream::from(expanded))
         })
         .collect();
 
@@ -79,27 +92,40 @@ pub(crate) fn pull_from_set_fields_query_consts(
             let field_name_snake_case = camel_to_snake_case(&field_name);
             let field_type = field.ty.to_token_stream().to_string();
 
-            if field_type.contains("Set") || field_type.contains("Map") {
-                let query_str = format!(
+            let is_list = field_type.contains("List");
+            let is_set = field_type.contains("Set");
+
+            if !is_list && !is_set {
+                return None;
+            }
+
+            let query_str = if is_list {
+                format!(
+                    "UPDATE {} SET {} = {} - [?] WHERE {} = ?",
+                    table_name.to_string(),
+                    field_name_snake_case,
+                    field_name_snake_case,
+                    primary_key_where_clause,
+                )
+            } else {
+                format!(
                     "UPDATE {} SET {} = {} - {{?}} WHERE {} = ?",
                     table_name.to_string(),
                     field_name_snake_case,
                     field_name_snake_case,
                     primary_key_where_clause,
-                );
+                )
+            };
 
-                let field_name_upper = field_name.to_uppercase();
-                let const_name = format!("PULL_FROM_{}_QUERY", field_name_upper);
-                let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
+            let field_name_upper = field_name.to_uppercase();
+            let const_name = format!("PULL_FROM_{}_QUERY", field_name_upper);
+            let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
-                let expanded = quote! {
-                    const #const_name: &'static str = #query_str;
-                };
+            let expanded = quote! {
+                const #const_name: &'static str = #query_str;
+            };
 
-                Some(TokenStream::from(expanded))
-            } else {
-                None
-            }
+            Some(TokenStream::from(expanded))
         })
         .collect();
 

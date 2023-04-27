@@ -6,7 +6,8 @@ pub use crate::{
 
 // orm macros
 pub use charybdis_macros::{
-    charybdis_model, charybdis_udt_model, charybdis_view_model, partial_model_generator,
+    char_model_field_attrs_gen, charybdis_model, charybdis_udt_model, charybdis_view_model,
+    partial_model_generator,
 };
 
 // scylla

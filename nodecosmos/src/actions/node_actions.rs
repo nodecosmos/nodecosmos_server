@@ -3,7 +3,7 @@ use crate::authorize::{auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::Owner;
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::prelude::{
     AsNative, BaseModel, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
     UpdateWithCallbacks, Uuid,
@@ -20,95 +20,76 @@ pub struct GetParams {
 }
 
 #[get("")]
-pub async fn get_nodes(db_session: web::Data<CachingSession>) -> impl Responder {
+pub async fn get_nodes(
+    db_session: web::Data<CachingSession>,
+) -> Result<HttpResponse, NodecosmosError> {
     let nodes_q = Node::SELECT_FIELDS_CLAUSE;
-    let nodes = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await;
+    let mut nodes_iter = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await?;
 
-    match nodes {
-        Ok(mut node) => {
-            let mut nodes = vec![];
+    let mut nodes = vec![];
 
-            while let Some(node) = node.next().await {
-                if let Ok(node) = node {
-                    nodes.push(node);
-                }
-            }
-
-            HttpResponse::Ok().json(nodes)
+    while let Some(node) = nodes_iter.next().await {
+        if let Ok(node) = node {
+            nodes.push(node);
         }
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
+
+    Ok(HttpResponse::Ok().json(nodes))
 }
 
 #[get("/{root_id}")]
 pub async fn get_root_node(
     db_session: web::Data<CachingSession>,
     root_id: web::Path<Uuid>,
-) -> impl Responder {
+) -> Result<HttpResponse, NodecosmosError> {
     let mut node = Node::new();
     node.root_id = root_id.into_inner();
 
-    let nodes = node.find_by_partition_key(&db_session).await;
+    let mut nodes_iter = node.find_by_partition_key(&db_session).await?;
 
-    match nodes {
-        Ok(mut node) => {
-            let mut nodes = vec![];
-
-            while let Some(node) = node.next() {
-                if let Ok(node) = node {
-                    nodes.push(node);
-                }
-            }
-
-            HttpResponse::Ok().json(nodes)
+    let mut nodes = vec![];
+    while let Some(node) = nodes_iter.next() {
+        if let Ok(node) = node {
+            nodes.push(node);
         }
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
+
+    Ok(HttpResponse::Ok().json(nodes))
 }
 
 #[get("/{root_id}/{id}")]
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
     params: web::Path<GetParams>,
-) -> impl Responder {
+) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
     let mut node = Node::new();
     node.root_id = params.root_id;
     node.id = params.id;
 
-    let node = node.find_by_primary_key(&db_session).await;
+    let node = node.find_by_primary_key(&db_session).await?;
 
-    match node {
-        Ok(node) => {
-            let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
-            all_node_ids.push(node.id);
+    let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
+    all_node_ids.push(node.id);
 
-            let descendants_q = find_node_query!("root_id = ? AND id IN ?");
-            let descendants = Node::find_iter(
-                &db_session,
-                descendants_q,
-                (node.root_id, all_node_ids),
-                DEFAULT_PAGE_SIZE,
-            )
-            .await;
+    let descendants_q = find_node_query!("root_id = ? AND id IN ?");
+    let mut descendants = Node::find_iter(
+        &db_session,
+        descendants_q,
+        (node.root_id, all_node_ids),
+        DEFAULT_PAGE_SIZE,
+    )
+    .await?;
 
-            match descendants {
-                Ok(mut descendants) => {
-                    let mut nodes = vec![];
+    let mut nodes = vec![];
 
-                    while let Some(descendant) = descendants.next().await {
-                        if let Ok(descendant) = descendant {
-                            nodes.push(descendant);
-                        }
-                    }
-
-                    HttpResponse::Ok().json(nodes)
-                }
-                Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-            }
+    while let Some(descendant) = descendants.next().await {
+        if let Ok(descendant) = descendant {
+            nodes.push(descendant);
         }
-        Err(e) => HttpResponse::NotFound().body(e.to_string()),
     }
+
+    Ok(HttpResponse::Ok().json(nodes))
 }
 
 #[post("")]
@@ -142,12 +123,9 @@ pub async fn create_node(
         }
     }
 
-    let res = node.insert_cb(&db_session).await;
+    node.insert_cb(&db_session).await?;
 
-    match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(node)),
-        Err(e) => Ok(HttpResponse::InternalServerError().body(e.to_string())),
-    }
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[put("/title")]
@@ -157,16 +135,13 @@ pub async fn update_node_title(
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
-    let native_node = node.as_native();
+
+    let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
+    node.update_cb(&db_session).await?;
 
-    let res = node.update_cb(&db_session).await;
-
-    match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(node)),
-        Err(e) => Ok(HttpResponse::InternalServerError().body(e.to_string())),
-    }
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[put("/description")]
@@ -176,16 +151,13 @@ pub async fn update_node_description(
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
-    let native_node = node.as_native();
+
+    let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
+    node.update_cb(&db_session).await?;
 
-    let res = node.update_cb(&db_session).await;
-
-    match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(node)),
-        Err(e) => Ok(HttpResponse::InternalServerError().body(e.to_string())),
-    }
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[delete("")]
@@ -195,13 +167,8 @@ pub async fn delete_node(
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
-
     auth_node_update(&node, &current_user).await?;
 
-    let res = node.delete_cb(&db_session).await;
-
-    match res {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(e) => Ok(HttpResponse::InternalServerError().body(e.to_string())),
-    }
+    node.delete_cb(&db_session).await?;
+    Ok(HttpResponse::Ok().finish())
 }

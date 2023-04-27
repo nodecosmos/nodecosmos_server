@@ -216,3 +216,8 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
 pub fn partial_model_generator(_: TokenStream, input: TokenStream) -> TokenStream {
     partial_model_macro_generator(input)
 }
+
+#[proc_macro_attribute]
+pub fn char_model_field_attrs_gen(args: TokenStream, input: TokenStream) -> TokenStream {
+    char_model_field_attrs_macro_gen(args, input)
+}

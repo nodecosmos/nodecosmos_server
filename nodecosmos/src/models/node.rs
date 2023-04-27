@@ -7,40 +7,47 @@ use scylla::batch::Batch;
 #[charybdis_model(
     table_name = "nodes",
     partition_keys = ["root_id"],
-    clustering_keys = ["id", "order_number"],
+    clustering_keys = ["id"],
     secondary_indexes = []
 )]
 pub struct Node {
     // descendable
     #[serde(default)]
     pub id: Uuid,
+
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
-    #[serde(rename = "OrderNumber")]
-    pub order_number: Double,
+
     #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
+
     #[serde(rename = "childIds")]
-    pub child_ids: Option<Set<Uuid>>,
+    pub child_ids: Option<List<Uuid>>,
+
     #[serde(rename = "descendantIds")]
     pub descendant_ids: Option<Set<Uuid>>,
+
     #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
     // node
     pub title: Option<Text>,
     pub description: Option<Text>,
+
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
     // owners
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
+
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
+
     pub owner: Option<Owner>,
     pub creator: Option<Creator>,
     // timestamps
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
+
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 }
@@ -220,16 +227,9 @@ impl Node {
     }
 }
 
-partial_node!(GetNode, root_id, id, order_number, descendant_ids);
+partial_node!(GetNode, root_id, id, descendant_ids);
 
-partial_node!(
-    UpdateNodeTitle,
-    root_id,
-    id,
-    order_number,
-    title,
-    updated_at
-);
+partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
 
 impl Callbacks for UpdateNodeTitle {
     async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
@@ -243,7 +243,6 @@ partial_node!(
     UpdateNodeDescription,
     root_id,
     id,
-    order_number,
     description,
     description_markdown,
     updated_at
@@ -257,14 +256,7 @@ impl Callbacks for UpdateNodeDescription {
     }
 }
 
-partial_node!(
-    UpdateNodeOwner,
-    root_id,
-    id,
-    order_number,
-    owner_id,
-    updated_at
-);
+partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
 
 impl Callbacks for UpdateNodeOwner {
     async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {

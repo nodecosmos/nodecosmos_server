@@ -31,7 +31,7 @@ pub async fn auth_node_update(
     } else {
         Err(NodecosmosError::Unauthorized(json!({
             "error": "Unauthorized",
-            "message": "Not authorized to create node for provided parent!"
+            "message": "Not authorized to update node!"
         })))
     }
 }

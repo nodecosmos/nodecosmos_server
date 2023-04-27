@@ -1,4 +1,3 @@
-use colored::Colorize;
 use scylla::frame::value::SerializeValuesError;
 use scylla::transport::errors::QueryError;
 use scylla::transport::query_result::{
