@@ -16,7 +16,7 @@ tool will detect type within option and create column with that type
 ## Performance consideration:
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
-- It expects CachingSession as a session type for operations
+- It expects `CachingSession` as a session arg for operations
 - Basic CRUD queries are macro generated constants
 - By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time as `&'static str`
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
@@ -24,8 +24,8 @@ tool will detect type within option and create column with that type
 ## Table of Contents
 - [Charybdis Models](#charybdis-models)
   - [Define Tables](#define-tables)
-  - [Define UDTs](#For-UDTs)
-  - [Define Materialized Views](#For-Materialized-Views)
+  - [Define UDTs](#Define-UDT)
+  - [Define Materialized Views](#Define-Materialized-Views)
 - [Automatic migration tool with `charybdis_cmd/migrate`](#automatic-migration)
 - [Basic Operations](#basic-operations)
   - [Create](#create)
@@ -499,42 +499,64 @@ For every field that is defined with `List<T> `type or `Set<T>`, we have macro g
 that can be used to push or pull elements from collection.
 
 ```rust
-#[charybdis_model(
-    table_name = "users", 
-    partition_keys = ["id"], 
-    clustering_keys = [""],
-    secondary_indexes = ["username", "email"]
-)]
 pub struct User {
-    ...
-    pub tags: Set<String>,
+    id: Uuid,
+    tags: Set<String>,
+    edited_posts: List<Uuid>,
 }
 
-impl Callbacks for User {
-  async fn after_insert(&self, session: &CachingSession) -> Result<(), CharybdisError> {
-    let query = User::PUSH_TO_TAGS_QUERY;
-    self.execute(query, ("new_tag", &user.id)).await;
-  }
-}
+let query = User::PUSH_TO_TAGS_QUERY;
+self.execute(query, ("new_tag", &user.id)).await;
 
+let query = User::PULL_FROM_EDITED_POSTS_QUERY;
+self.execute(query, (uuid, &user.id)).await;
 ```
+
 ## Limitations:
-- `partial_models` don't implement same callbacks defined on base model so 
-`insert_cb`, `update_cb`, `delete_cb` will not work on partial models unless callbacks are
-manually implemented for partial models e.g.
-```rust
-partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-
-impl Callbacks for UpdateUser {
-    async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-        Ok(())
+1) `partial_models` don't implement same callbacks defined on base model so 
+    `insert_cb`, `update_cb`, `delete_cb` will not work on partial models unless callbacks are
+    manually implemented for partial models e.g.
+    ```rust
+    partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+    
+    impl Callbacks for UpdateUser {
+        async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
+            self.updated_at = Some(Utc::now());
+            Ok(())
+        }
     }
-}
-```
-- `partial_models` require complete primary key
+    ```
+    or you can always implement macro helper for this use case
+    ```rust
+    macro_rules! set_updated_at_cb {
+        ($struct_name:ident) => {
+            impl Callbacks for $struct_name {
+                async fn before_update(
+                    &mut self,
+                    _session: &CachingSession,
+                ) -> Result<(), CharybdisError> {
+                    self.updated_at = Some(Utc::now());
+                    Ok(())
+                }
+            }
+        };
+    }
+    
+    pub(crate) use set_updated_at_cb;
+    ```
+    and then only use it in partial model definition:
+    ```rust
+    partial_user!(UpdateUserFirstName, id, first_name);
+    set_updated_at_cb!(UpdateUser);
+    
+    partial_user!(UpdateUserLastName, id, last_name);
+    set_updated_at_cb!(UpdateUser);
+    ```
+
+2) `partial_models` require complete primary key
 
 ## Roadmap:
 - [ ] Add tests
 - [ ] Write `modelize` command to generate `src/models/*` structs from existing database
-- [ ] Add --drop flag to migrate command to drop tables, types and UDTs if they are not defined in `src/models`
+- [ ] Add --drop flag to migrate command to drop tables, types and UDTs if they are not defined in 
+`src/models`

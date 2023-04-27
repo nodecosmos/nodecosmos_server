@@ -64,6 +64,7 @@ pub async fn get_node(
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
     let mut node = Node::new();
+
     node.root_id = params.root_id;
     node.id = params.id;
 

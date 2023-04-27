@@ -19,7 +19,7 @@ use crate::model_impl::*;
 use crate::native::{pull_from_set_fields_query_consts, push_to_set_fields_query_consts};
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 
-/// This macro generates the implementation of the `Model` trait for the given struct.
+/// This macro generates the implementation of the [Model] trait for the given struct.
 #[proc_macro_attribute]
 pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let args: CharybdisArgs = parse_macro_input!(args);
@@ -44,6 +44,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let insert_query_const: ImplItem = insert_query_const(&args, fields_named);
     let update_query_const: ImplItem = update_query_const(&args, fields_named);
     let delete_query_const: ImplItem = delete_query_const(&args);
+
     // model specific operation consts
     let push_to_set_fields_query_consts: proc_macro2::TokenStream =
         push_to_set_fields_query_consts(&args, fields_named);
@@ -107,18 +108,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// This macro generates the following constants:
-/// - `DB_MODEL_NAME`
-/// - `PARTITION_KEYS`
-/// - `CLUSTERING_KEYS`
-/// - `PRIMARY_KEY`
-/// - `FIND_BY_PRIMARY_KEY_QUERY`
-/// - `FIND_BY_PARTITION_KEY_QUERY`
-///
-/// This macro generates the following methods:
-/// - `get_primary_key_values`
-/// - `get_partition_key_values`
-/// - `get_clustering_key_values`
+/// Generates the implementation of the MaterializedView trait
+/// for the given struct.
 #[proc_macro_attribute]
 pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let args: CharybdisArgs = parse_macro_input!(args);

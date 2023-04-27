@@ -1,3 +1,4 @@
+use crate::models::helpers::set_updated_at_cb;
 use crate::models::udts::{Creator, Owner};
 use charybdis::prelude::*;
 use chrono::Utc;
@@ -29,12 +30,14 @@ pub struct Node {
 
     #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
+
     // node
     pub title: Option<Text>,
     pub description: Option<Text>,
 
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
+
     // owners
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
@@ -44,6 +47,7 @@ pub struct Node {
 
     pub owner: Option<Owner>,
     pub creator: Option<Creator>,
+
     // timestamps
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -130,77 +134,66 @@ impl Node {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        match &self.parent_id {
-            Some(parent_id) => {
-                let query = Node::PUSH_TO_CHILD_IDS_QUERY;
-                self.execute(db_session, query, (self.id, self.root_id, parent_id))
-                    .await?;
-
-                Ok(())
-            }
-            None => Ok(()),
+        if let Some(parent_id) = &self.parent_id {
+            let query = Node::PUSH_TO_CHILD_IDS_QUERY;
+            self.execute(db_session, query, (self.id, self.root_id, parent_id))
+                .await?;
         }
+
+        Ok(())
     }
 
     pub async fn push_to_ancestors(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        match &self.ancestor_ids {
-            Some(ancestor_ids) => {
-                let mut batch: Batch = Default::default();
-                let mut values = Vec::with_capacity(ancestor_ids.len());
+        if let Some(ancestor_ids) = &self.ancestor_ids {
+            let mut batch: Batch = Default::default();
+            let mut values = Vec::with_capacity(ancestor_ids.len());
 
-                for ancestor_id in ancestor_ids {
-                    let query = Node::PUSH_TO_DESCENDANT_IDS_QUERY;
-                    batch.append_statement(query);
-                    values.push((self.id, self.root_id, ancestor_id));
-                }
-
-                db_session.batch(&batch, values).await?;
-                Ok(())
+            for ancestor_id in ancestor_ids {
+                let query = Node::PUSH_TO_DESCENDANT_IDS_QUERY;
+                batch.append_statement(query);
+                values.push((self.id, self.root_id, ancestor_id));
             }
-            None => Ok(()),
+
+            db_session.batch(&batch, values).await?;
         }
+
+        Ok(())
     }
 
     pub async fn pull_from_parent_children(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        match &self.parent_id {
-            Some(parent_id) => {
-                let query = Node::PULL_FROM_CHILD_IDS_QUERY;
-                self.execute(db_session, query, (self.id, self.root_id, parent_id))
-                    .await?;
-
-                Ok(())
-            }
-            None => Ok(()),
+        if let Some(parent_id) = &self.parent_id {
+            let query = Node::PULL_FROM_CHILD_IDS_QUERY;
+            self.execute(db_session, query, (self.id, self.root_id, parent_id))
+                .await?;
         }
+
+        Ok(())
     }
 
     pub async fn pull_from_ancestors(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        match &self.ancestor_ids {
-            Some(ancestor_ids) => {
-                let mut batch: Batch = Default::default();
-                let mut values = Vec::with_capacity(ancestor_ids.len());
+        if let Some(ancestor_ids) = &self.ancestor_ids {
+            let mut batch: Batch = Default::default();
+            let mut values = Vec::with_capacity(ancestor_ids.len());
 
-                for ancestor_id in ancestor_ids {
-                    let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
-                    batch.append_statement(query);
-                    values.push((self.id, self.root_id, ancestor_id));
-                }
-
-                db_session.batch(&batch, values).await?;
-
-                Ok(())
+            for ancestor_id in ancestor_ids {
+                let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
+                batch.append_statement(query);
+                values.push((self.id, self.root_id, ancestor_id));
             }
-            None => Ok(()),
+
+            db_session.batch(&batch, values).await?;
         }
+
+        Ok(())
     }
 
     pub async fn delete_descendants(
@@ -230,14 +223,7 @@ impl Node {
 partial_node!(GetNode, root_id, id, descendant_ids);
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
-
-impl Callbacks for UpdateNodeTitle {
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-
-        Ok(())
-    }
-}
+set_updated_at_cb!(UpdateNodeTitle);
 
 partial_node!(
     UpdateNodeDescription,
@@ -247,21 +233,7 @@ partial_node!(
     description_markdown,
     updated_at
 );
-
-impl Callbacks for UpdateNodeDescription {
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-
-        Ok(())
-    }
-}
+set_updated_at_cb!(UpdateNodeDescription);
 
 partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
-
-impl Callbacks for UpdateNodeOwner {
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-
-        Ok(())
-    }
-}
+set_updated_at_cb!(UpdateNodeOwner);

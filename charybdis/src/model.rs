@@ -46,6 +46,8 @@ pub trait BaseModel: FromRow + Sized + Default {
     fn get_clustering_key_values(&self) -> SerializedResult;
 }
 
+/// Implemented by [`charybdis_model`]
+/// [`charybdis_model`]: charybdis_macros::charybdis_model
 pub trait Model: BaseModel {
     const SECONDARY_INDEXES: &'static [&'static str];
 
@@ -56,6 +58,9 @@ pub trait Model: BaseModel {
     fn get_update_values(&self) -> SerializedResult;
 }
 
+/// Implemented by [`charybdis_view_model`]
+///
+/// [`charybdis_view_model`]: charybdis_macros::charybdis_view_model
 pub trait MaterializedView: BaseModel {}
 
 pub trait Udt: FromRow + Sized {
