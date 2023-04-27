@@ -14,7 +14,7 @@ use scylla::CachingSession;
 const DEFAULT_PAGE_SIZE: i32 = 100;
 
 #[derive(Debug, Deserialize)]
-pub struct GetParams {
+pub struct PrimaryKeyParams {
     pub root_id: Uuid,
     pub id: Uuid,
 }
@@ -23,8 +23,13 @@ pub struct GetParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let nodes_q = Node::SELECT_FIELDS_CLAUSE;
-    let mut nodes_iter = Node::find_iter(&db_session, nodes_q, (), DEFAULT_PAGE_SIZE).await?;
+    let mut nodes_iter = Node::find_iter(
+        &db_session,
+        Node::SELECT_FIELDS_CLAUSE,
+        (),
+        DEFAULT_PAGE_SIZE,
+    )
+    .await?;
 
     let mut nodes = vec![];
 
@@ -60,7 +65,7 @@ pub async fn get_root_node(
 #[get("/{root_id}/{id}")]
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
-    params: web::Path<GetParams>,
+    params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
     let mut node = Node::new();
@@ -136,7 +141,6 @@ pub async fn update_node_title(
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
-
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
@@ -152,7 +156,6 @@ pub async fn update_node_description(
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
-
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
@@ -161,15 +164,22 @@ pub async fn update_node_description(
     Ok(HttpResponse::Ok().json(node))
 }
 
-#[delete("")]
+#[delete("/{root_id}/{id}")]
 pub async fn delete_node(
     db_session: web::Data<CachingSession>,
-    node: web::Json<Node>,
+    params: web::Path<PrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = node.into_inner();
-    auth_node_update(&node, &current_user).await?;
+    let params = params.into_inner();
+    let mut node = Node::new();
 
+    node.root_id = params.root_id;
+    node.id = params.id;
+
+    let mut node = node.find_by_primary_key(&db_session).await?;
+
+    auth_node_update(&node, &current_user).await?;
     node.delete_cb(&db_session).await?;
+
     Ok(HttpResponse::Ok().finish())
 }

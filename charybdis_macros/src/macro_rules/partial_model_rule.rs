@@ -6,9 +6,7 @@ use std::collections::HashMap;
 use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed, Type};
 
 ///
-/// ## Generates two declarative macros for partial model usage:
-/// - one is used to generate a partial model struct
-/// - second one is used by the first one to get field types of provided fields
+/// ## Generates macro rule for partial model generation
 ///
 /// E.g.: if we have a model User with some fields, it will append partial_<model_name>! macro that
 /// can be used to generate a partial model struct with only some fields that can be used for ORM.
