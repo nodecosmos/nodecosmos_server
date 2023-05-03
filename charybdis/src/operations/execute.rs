@@ -23,3 +23,11 @@ impl<T: Model + ValueList> Execute for T {
         session.execute(query, values).await
     }
 }
+
+pub async fn execute(
+    session: &CachingSession,
+    query: impl Into<Query>,
+    values: impl ValueList,
+) -> Result<QueryResult, QueryError> {
+    session.execute(query, values).await
+}

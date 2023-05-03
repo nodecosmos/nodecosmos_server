@@ -11,7 +11,7 @@ pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
     let primary_key_accessors_tokens: TokenStream = serialized_values_fields_adder(primary_key);
 
     let generated = quote! {
-        fn get_primary_key_values(&self) -> charybdis::prelude::SerializedResult {
+        fn get_primary_key_values(&self) -> charybdis::SerializedResult {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
             #primary_key_accessors_tokens
@@ -31,7 +31,7 @@ pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         serialized_values_fields_adder(partition_keys);
 
     let generated: TokenStream = quote! {
-        fn get_partition_key_values(&self) -> charybdis::prelude::SerializedResult {
+        fn get_partition_key_values(&self) -> charybdis::SerializedResult {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
             #partition_key_accessors_tokens
@@ -51,7 +51,7 @@ pub(crate) fn get_clustering_key_values(ch_args: &CharybdisArgs) -> ImplItem {
         serialized_values_fields_adder(clustering_keys);
 
     let generated = quote! {
-        fn get_clustering_key_values(&self) -> charybdis::prelude::SerializedResult {
+        fn get_clustering_key_values(&self) -> charybdis::SerializedResult {
             let mut serialized = SerializedValues::with_capacity(#capacity);
 
             #clustering_key_accessors_tokens

@@ -1,6 +1,6 @@
 pub use super::udts::Address;
 
-use charybdis::prelude::*;
+use charybdis::*;
 use chrono::Utc;
 
 use bcrypt::{hash, verify};

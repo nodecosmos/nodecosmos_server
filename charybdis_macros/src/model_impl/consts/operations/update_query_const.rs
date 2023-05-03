@@ -4,11 +4,7 @@ use syn::{FieldsNamed, ImplItem};
 
 pub(crate) fn update_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
-
-    let mut primary_key = ch_args.partition_keys.clone().unwrap();
-    let mut clustering_keys = ch_args.clustering_keys.clone().unwrap();
-
-    primary_key.append(clustering_keys.as_mut());
+    let primary_key = ch_args.get_primary_key();
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 

@@ -1,10 +1,11 @@
-use walkdir::{DirEntry, WalkDir};
+// use colored::Colorize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
+use walkdir::{DirEntry, WalkDir};
 
+use super::parser::*;
 use super::schema::SchemaObject;
 use super::schema::SchemaObjects;
-use super::parser::*;
 
 const MODEL_MACRO_NAME: &str = "charybdis_model";
 const MATERIALIZED_VIEW_MACRO_NAME: &str = "charybdis_view_model";
@@ -18,7 +19,7 @@ pub struct CurrentCodeSchema {
 }
 
 impl CurrentCodeSchema {
-    pub fn new (project_root: &PathBuf) -> CurrentCodeSchema {
+    pub fn new(project_root: &PathBuf) -> CurrentCodeSchema {
         let mut current_code_schema = CurrentCodeSchema {
             tables: SchemaObjects::new(),
             udts: SchemaObjects::new(),
@@ -39,7 +40,12 @@ impl CurrentCodeSchema {
                         continue;
                     }
 
-                    if entry.path().to_str().unwrap().contains("materialized_views") {
+                    if entry
+                        .path()
+                        .to_str()
+                        .unwrap()
+                        .contains("materialized_views")
+                    {
                         self.populate_materialized_views(entry);
                     } else if entry.path().to_str().unwrap().contains("udts") {
                         self.populate_udts(entry);
@@ -88,15 +94,20 @@ impl CurrentCodeSchema {
 
     pub fn populate_tables(&mut self, entry: DirEntry) {
         let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
+        let schema_object: SchemaObject =
+            parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {
-            panic!(
-                "Could not find {} macro for file: {}",
-                MODEL_MACRO_NAME,
-                entry.path().to_str().unwrap()
-            );
+            // println!(
+            //     "{} {} {} {}",
+            //     "Could not find".yellow(),
+            //     MODEL_MACRO_NAME,
+            //     "macro for file:".yellow(),
+            //     entry.path().to_str().unwrap()
+            // );
+
+            return;
         }
 
         self.tables.insert(table_name, schema_object);

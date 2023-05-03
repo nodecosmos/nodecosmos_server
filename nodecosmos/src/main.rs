@@ -52,6 +52,12 @@ async fn main() {
                     .service(update_node_description)
                     .service(delete_node),
             )
+            .service(
+                web::scope("/likes")
+                    .service(get_likes_count)
+                    .service(create_like)
+                    .service(delete_like),
+            )
     })
     .bind(("127.0.0.1", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

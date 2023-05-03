@@ -1,4 +1,4 @@
-use crate::prelude::SerializedResult;
+use crate::SerializedResult;
 use scylla::FromRow;
 
 ///
@@ -7,7 +7,7 @@ use scylla::FromRow;
 /// Macro 'charybdis_model` generates the necessary code for implementation so you don't have to write it manually.
 /// The macro is used in the following way:
 /// ```rust
-/// use charybdis::prelude::*;
+/// use charybdis::*;
 ///
 /// #[charybdis_model(table_name = "users", prt_keys = ["id"], clustering_keys = [], secondary_indexes=[])]
 /// pub struct User {

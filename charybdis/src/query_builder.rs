@@ -3,7 +3,7 @@ use scylla::{CachingSession, IntoTypedRows, QueryResult};
 
 use crate::errors::CharybdisError;
 use crate::model::Model;
-use crate::prelude::SerializedValues;
+use crate::SerializedValues;
 
 pub struct CharybdisQuery<T: Model> {
     pub query: &'static str,

@@ -55,6 +55,8 @@ impl<T: BaseModel> Find for T {
         query: &'static str,
         values: impl ValueList,
     ) -> Result<Self, CharybdisError> {
+        println!("{}", query);
+
         let result: QueryResult = session.execute(query, values).await?;
         let typed_row: Self = result
             .first_row_typed()

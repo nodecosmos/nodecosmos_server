@@ -3,7 +3,7 @@ use crate::models::user::*;
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
-use charybdis::prelude::*;
+use charybdis::*;
 use futures::future::{ready, Ready};
 use serde_json::json;
 
@@ -57,6 +57,21 @@ impl FromRequest for CurrentUser {
                 }));
                 ready(Err(error_response))
             }
+        }
+    }
+}
+
+pub struct OptCurrentUser(pub Option<CurrentUser>);
+
+impl FromRequest for OptCurrentUser {
+    type Error = NodecosmosError;
+    type Future = Ready<Result<Self, NodecosmosError>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let client_session = req.get_session();
+        match get_current_user(&client_session) {
+            Some(user) => ready(Ok(OptCurrentUser(Some(user)))),
+            None => ready(Ok(OptCurrentUser(None))),
         }
     }
 }

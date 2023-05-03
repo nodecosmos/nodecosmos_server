@@ -49,7 +49,7 @@ tool will detect type within option and create column with that type
 Declare model as a struct within `src/models` dir:
 ```rust
 // src/modles/user.rs
-use charybdis::prelude::*;
+use charybdis::*;
 use super::udts::Address;
 
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
@@ -74,7 +74,7 @@ pub struct User {
 Declare udt model as a struct within `src/models/udts` dir:
 ```rust
 // src/models/udts/address.rs
-use charybdis::prelude::*;
+use charybdis::*;
 
 #[charybdis_udt_model(type_name = "address")]
 pub struct Address {
@@ -89,7 +89,7 @@ pub struct Address {
 Declare view model as a struct within `src/models/materialized_views` dir:
 
 ```rust
-use charybdis::prelude::*;
+use charybdis::*;
 
 #[charybdis_view_model(
     table_name="users_by_username",
@@ -150,7 +150,7 @@ in case there is no model definition for table, it will **not** drop it.
 ```rust
 mod models;
 
-use charybdis::prelude::*;
+use charybdis::*;
 use crate::models::user::*;
 
 #[tokio::main]
@@ -228,20 +228,23 @@ Limitation is that it requires whole primary key.
 partial_user!(OpsUser, id, username);
 
 let id = Uuid::new_v4();
-let user: OpsUser = OpsUser { id, username: "scylla".to_string() };
+let op_user: OpsUser = OpsUser { id, username: "scylla".to_string() };
 
 // we can have same operations as on base model
-user.insert(&session).await;
-user.update(&session).await;
+// INSERT into users (id, username) VALUES (?, ?)
+op_user.insert(&session).await;
 
-user.delete(&session).await;
+// UPDATE users SET username = ? WHERE id = ?
+op_user.update(&session).await;
+
+// DELETE FROM users WHERE id = ?
+op_user.delete(&session).await;
 
 // get partial user
-let user: OpsUser = user.find_by_primary_key(&:session).await.unwrap();
+let op_user: OpsUser = user.find_by_primary_key(&:session).await.unwrap();
 
-// get whole user by primary key from primary_key
-let user = User {id, ..Default::default()};
-let res: User = user.find_by_primary_key(&session).await.unwrap();
+// get whole user by primary key
+let user = op_user.as_native().find_by_primary_key(&session).await.unwrap();
 ```
 
 Note that if you have custom attributes on your model fields,
@@ -330,27 +333,28 @@ let title = "some title";
 let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, title)).await.unwrap();
 ```
 
-Or if you prefer:
+For Custom update queries we have `update_<struct_name>_query!` macro:
+For value list we first pass the values that we want to update, 
+and then we provide primary key values.
 ```rust
-let posts = Post::find(
-    &session,
-    find_post_query!("created_at_day = ? AND title = ?"),
-    (Utc::now().date_naive(), "some title"),
-)
-
-.await
-.unwrap();
+let query = update_post_query!("description = ?");
+let res = execute(&session, query, (new_desc, created_at_day, title))
+    .await
+    .unwrap();
 ```
 
-Also if we are working with **partial** models, we can use `find_<struct_name>_query` and `find` methods on partial 
+Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and `update_<struct_name>_query!`,
+rules
+
 models:
 ```rust
 partial_post!(OpsPost, id, title, created_at_day);
 
 // automatically generated macro
 let query = find_ops_post_query!("created_at_day = ? AND title = ?");
-
-OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
+let posts: TypedRowIter<OpsPost> = OpsPost::find(&session, query, (created_at, updated_at))
+    .await
+    .unwrap();
 ```
 
 **find_<struct_name>_query!** macro comes with some benefits like:
@@ -363,7 +367,7 @@ OpsPost::find(&session, query, (created_at, updated_at)).await.unwrap();
 We can define callbacks that will be executed before and after certain operations.
 
 ```rust
-use charybdis::prelude::*;
+use charybdis::*;
 
 #[charybdis_model(
     table_name = "users", 
@@ -506,10 +510,10 @@ pub struct User {
 }
 
 let query = User::PUSH_TO_TAGS_QUERY;
-self.execute(query, ("new_tag", &user.id)).await;
+execute(query, ("new_tag", &user.id)).await;
 
 let query = User::PULL_FROM_EDITED_POSTS_QUERY;
-self.execute(query, (uuid, &user.id)).await;
+execute(query, (uuid, &user.id)).await;
 ```
 
 ## Limitations:

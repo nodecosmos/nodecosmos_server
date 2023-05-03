@@ -4,7 +4,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::Owner;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::prelude::{
+use charybdis::{
     AsNative, BaseModel, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
     UpdateWithCallbacks, Uuid,
 };

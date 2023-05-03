@@ -4,14 +4,14 @@
       "fields": {
         "password": "text",
         "last_name": "text",
+        "first_name": "text",
+        "address": "address",
         "email_verified": "boolean",
         "updated_at": "timestamp",
-        "address": "address",
-        "created_at": "timestamp",
-        "first_name": "text",
-        "email": "text",
+        "username": "text",
         "id": "uuid",
-        "username": "text"
+        "email": "text",
+        "created_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -25,23 +25,44 @@
         "users_username_idx"
       ]
     },
+    "posts": {
+      "fields": {
+        "created_at_day": "date",
+        "created_at": "timestamp",
+        "id": "uuid",
+        "title": "text",
+        "updated_at": "timestamp",
+        "description": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "created_at_day"
+      ],
+      "clustering_keys": [
+        "title"
+      ],
+      "secondary_indexes": []
+    },
     "nodes": {
       "fields": {
-        "descendant_ids": "set<uuid>",
-        "root_id": "uuid",
-        "created_at": "timestamp",
-        "ancestor_ids": "set<uuid>",
-        "child_ids": "list<uuid>",
-        "parent_id": "uuid",
-        "description": "text",
-        "title": "text",
         "description_markdown": "text",
-        "creator": "creator",
-        "id": "uuid",
-        "editor_ids": "set<uuid>",
-        "owner": "owner",
         "owner_id": "uuid",
-        "updated_at": "timestamp"
+        "root_id": "uuid",
+        "id": "uuid",
+        "descendant_ids": "set<uuid>",
+        "editor_ids": "set<uuid>",
+        "created_at": "timestamp",
+        "owner": "owner",
+        "updated_at": "timestamp",
+        "title": "text",
+        "ancestor_ids": "set<uuid>",
+        "liked_by_ids": "set<uuid>",
+        "creator": "creator",
+        "description": "text",
+        "parent_id": "uuid",
+        "child_ids": "list<uuid>"
       },
       "type_name": "",
       "table_name": "",
@@ -54,47 +75,46 @@
       ],
       "secondary_indexes": []
     },
-    "posts": {
+    "likes": {
       "fields": {
-        "title": "text",
-        "description": "text",
-        "id": "uuid",
         "updated_at": "timestamp",
-        "created_at": "timestamp",
-        "created_at_day": "date"
+        "object_id": "uuid",
+        "object_type": "text",
+        "user_id": "uuid",
+        "username": "text",
+        "created_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
       "partition_keys": [
-        "created_at_day"
+        "object_id"
       ],
       "clustering_keys": [
-        "title"
+        "user_id"
       ],
       "secondary_indexes": []
-    }
-  },
-  "udts": {
-    "address": {
+    },
+    "likes_count": {
       "fields": {
-        "city": "text",
-        "country": "text",
-        "zip": "text",
-        "state": "text",
-        "street": "text"
+        "count": "counter",
+        "object_id": "uuid"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
-      "partition_keys": [],
+      "partition_keys": [
+        "object_id"
+      ],
       "clustering_keys": [],
       "secondary_indexes": []
-    },
+    }
+  },
+  "udts": {
     "creator": {
       "fields": {
-        "id": "uuid",
-        "username": "text"
+        "username": "text",
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -105,8 +125,23 @@
     },
     "owner": {
       "fields": {
-        "id": "uuid",
-        "username": "text"
+        "username": "text",
+        "id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": []
+    },
+    "address": {
+      "fields": {
+        "country": "text",
+        "city": "text",
+        "street": "text",
+        "zip": "text",
+        "state": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -119,9 +154,9 @@
   "materialized_views": {
     "users_username_idx_index": {
       "fields": {
+        "username": "text",
         "idx_token": "bigint",
-        "id": "uuid",
-        "username": "text"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -137,9 +172,9 @@
     },
     "users_email_idx_index": {
       "fields": {
+        "id": "uuid",
         "idx_token": "bigint",
-        "email": "text",
-        "id": "uuid"
+        "email": "text"
       },
       "type_name": "",
       "table_name": "",

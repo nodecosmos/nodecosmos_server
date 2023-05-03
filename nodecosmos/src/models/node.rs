@@ -1,6 +1,6 @@
 use crate::models::helpers::set_updated_at_cb;
 use crate::models::udts::{Creator, Owner};
-use charybdis::prelude::*;
+use charybdis::*;
 use chrono::Utc;
 use scylla::batch::Batch;
 
@@ -9,7 +9,7 @@ use scylla::batch::Batch;
     table_name = "nodes",
     partition_keys = ["root_id"],
     clustering_keys = ["id"],
-    secondary_indexes = []
+    secondary_indexes = ["id"]
 )]
 pub struct Node {
     // descendable
@@ -54,6 +54,9 @@ pub struct Node {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[serde(rename = "LikesCount")]
+    pub likes_count: Option<Set<Uuid>>,
 }
 
 impl Callbacks for Node {
@@ -136,8 +139,7 @@ impl Node {
     ) -> Result<(), CharybdisError> {
         if let Some(parent_id) = &self.parent_id {
             let query = Node::PUSH_TO_CHILD_IDS_QUERY;
-            self.execute(db_session, query, (self.id, self.root_id, parent_id))
-                .await?;
+            execute(db_session, query, (self.id, self.root_id, parent_id)).await?;
         }
 
         Ok(())
@@ -169,8 +171,7 @@ impl Node {
     ) -> Result<(), CharybdisError> {
         if let Some(parent_id) = &self.parent_id {
             let query = Node::PULL_FROM_CHILD_IDS_QUERY;
-            self.execute(db_session, query, (self.id, self.root_id, parent_id))
-                .await?;
+            execute(db_session, query, (self.id, self.root_id, parent_id)).await?;
         }
 
         Ok(())

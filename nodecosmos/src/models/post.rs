@@ -1,4 +1,4 @@
-use charybdis::prelude::*;
+use charybdis::*;
 
 #[partial_model_generator]
 #[charybdis_model(

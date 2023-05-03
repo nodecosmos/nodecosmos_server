@@ -1,4 +1,4 @@
-use charybdis::prelude::*;
+use charybdis::*;
 
 #[charybdis_udt_model(type_name = "owner")]
 pub struct Owner {

@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, ResponseError};
-use charybdis::prelude::CharybdisError;
+use charybdis::CharybdisError;
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
@@ -9,6 +9,7 @@ pub enum NodecosmosError {
     ClientSessionError(String),
     Unauthorized(serde_json::Value),
     CharybdisError(CharybdisError),
+    // InternalServerError(String),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -17,6 +18,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ClientSessionError(e) => write!(f, "Session Error: {}", e),
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: \n{}", e),
+            // NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
         }
     }
 }
@@ -27,6 +29,7 @@ impl Error for NodecosmosError {
             NodecosmosError::ClientSessionError(_) => None,
             NodecosmosError::Unauthorized(_) => None,
             NodecosmosError::CharybdisError(_) => None,
+            // NodecosmosError::InternalServerError(_) => None,
         }
     }
 }
@@ -35,6 +38,10 @@ impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
             NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
+            NodecosmosError::CharybdisError(e) => HttpResponse::InternalServerError().json(json!({
+                "error": "Internal Server Error",
+                "message": e.to_string()
+            })),
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
                 "message": "Something went wrong"
