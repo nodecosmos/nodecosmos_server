@@ -2,6 +2,7 @@ use crate::actions::client_session::{CurrentUser, OptCurrentUser};
 use crate::errors::NodecosmosError;
 use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;
+use crate::models::user::LikedObjectIdsUser;
 use actix_web::{delete, get, post, web, HttpResponse};
 use charybdis::{DeleteWithCallbacks, Find, New, Uuid};
 use scylla::CachingSession;
@@ -24,6 +25,9 @@ pub async fn get_likes_count(
 
     let mut liked_by_current_user = false;
 
+    // TODO: store liked ids in user model (or user_likes) so we check
+    //  everything that is liked by user on client side.
+    //  it should be more efficient than this.
     if let Some(opt_current_user) = opt_current_user.0 {
         let mut cu_like = Like::new();
         cu_like.object_id = object_id;
@@ -81,6 +85,7 @@ pub async fn create_like(
         object_id: params.object_id,
         ..Default::default()
     };
+
     let likes_count = likes_count.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
@@ -90,16 +95,24 @@ pub async fn create_like(
     })))
 }
 
-#[delete("/{id}")]
+#[derive(Deserialize)]
+pub struct DeleteParams {
+    id: Uuid,
+    object_type: String,
+}
+
+#[delete("/{object_type}/{id}")]
 pub async fn delete_like(
     db_session: web::Data<CachingSession>,
-    id: web::Path<Uuid>,
+    params: web::Path<DeleteParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let object_id = id.into_inner();
+    let params = params.into_inner();
+    let object_id = params.id;
 
     let mut like: Like = Like {
-        object_id,
+        object_id: params.id,
+        object_type: params.object_type,
         user_id: current_user.id,
         ..Default::default()
     };
@@ -116,5 +129,22 @@ pub async fn delete_like(
         "id": object_id,
         "likedByCurrentUser": false,
         "likesCount": likes_count.count,
+    })))
+}
+
+#[get("/liked_object_ids")]
+pub async fn liked_object_ids(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut user = LikedObjectIdsUser::new();
+    user.id = current_user.id;
+
+    let user = user.find_by_primary_key(&db_session).await?;
+    let liked_object_ids = user.liked_object_ids.unwrap_or(vec![]);
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "likedObjectIds": liked_object_ids,
     })))
 }

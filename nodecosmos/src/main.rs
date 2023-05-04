@@ -54,6 +54,7 @@ async fn main() {
             )
             .service(
                 web::scope("/likes")
+                    .service(liked_object_ids)
                     .service(get_likes_count)
                     .service(create_like)
                     .service(delete_like),

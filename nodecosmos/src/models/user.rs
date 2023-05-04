@@ -3,6 +3,7 @@ pub use super::udts::Address;
 use charybdis::*;
 use chrono::Utc;
 
+use crate::models::helpers::set_updated_at_cb;
 use bcrypt::{hash, verify};
 
 const BCRYPT_COST: u32 = 6;
@@ -26,6 +27,7 @@ pub struct User {
     pub updated_at: Option<Timestamp>,
     pub address: Option<Address>,
     pub email_verified: Option<Boolean>,
+    pub liked_object_ids: Option<Set<Uuid>>,
 }
 
 impl User {
@@ -118,11 +120,8 @@ impl Callbacks for User {
 partial_user!(GetUser, id, username, email, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-impl Callbacks for UpdateUser {
-    async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-        Ok(())
-    }
-}
+set_updated_at_cb!(UpdateUser);
 
 partial_user!(DeleteUser, id);
+
+partial_user!(LikedObjectIdsUser, id, liked_object_ids);

@@ -55,8 +55,8 @@ pub struct Node {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
-    #[serde(rename = "LikesCount")]
-    pub likes_count: Option<Set<Uuid>>,
+    #[serde(rename = "likesCount")]
+    pub likes_count: Option<BigInt>,
 }
 
 impl Callbacks for Node {
@@ -238,3 +238,6 @@ set_updated_at_cb!(UpdateNodeDescription);
 
 partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
 set_updated_at_cb!(UpdateNodeOwner);
+
+partial_node!(UpdateNodeLikesCount, root_id, id, likes_count, updated_at);
+set_updated_at_cb!(UpdateNodeLikesCount);

@@ -56,7 +56,7 @@ pub(crate) fn push_to_set_fields_query_consts(
             let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
             let expanded = quote! {
-                const #const_name: &'static str = #query_str;
+                pub const #const_name: &'static str = #query_str;
             };
 
             Some(TokenStream::from(expanded))
@@ -122,7 +122,7 @@ pub(crate) fn pull_from_set_fields_query_consts(
             let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
             let expanded = quote! {
-                const #const_name: &'static str = #query_str;
+                pub const #const_name: &'static str = #query_str;
             };
 
             Some(TokenStream::from(expanded))

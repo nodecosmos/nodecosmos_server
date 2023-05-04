@@ -38,10 +38,19 @@ impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
             NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
-            NodecosmosError::CharybdisError(e) => HttpResponse::InternalServerError().json(json!({
-                "error": "Internal Server Error",
-                "message": e.to_string()
-            })),
+            NodecosmosError::CharybdisError(e) => match e {
+                CharybdisError::NotFoundError(e) => HttpResponse::NotFound().json(json!({
+                    "error": "Not Found",
+                    "message": e.to_string()
+                })),
+                CharybdisError::ValidationError((field, message)) => {
+                    HttpResponse::Conflict().json(json!({ "error": {field: message} }))
+                }
+                _ => HttpResponse::InternalServerError().json(json!({
+                    "error": "Internal Server Error",
+                    "message": e.to_string()
+                })),
+            },
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
                 "message": "Something went wrong"
@@ -53,7 +62,7 @@ impl ResponseError for NodecosmosError {
 // TODO: Map CharybdisError to HTTP errors accordingly
 //  ATM, we just return InternalServerError.
 //  We should make clear distinction between user errors (validation, etc.)
-//  and internal errors and log internal errors accordingly.
+//  and internal errors.
 impl From<CharybdisError> for NodecosmosError {
     fn from(e: CharybdisError) -> Self {
         NodecosmosError::CharybdisError(e)

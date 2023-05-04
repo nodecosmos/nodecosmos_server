@@ -36,7 +36,7 @@ pub type Set<T> = Vec<T>;
 pub type Tuple = Vec<Option<CqlValue>>;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub struct Counter(i64);
+pub struct Counter(pub i64);
 
 impl FromCqlVal<CqlValue> for Counter {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
