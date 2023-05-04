@@ -59,35 +59,6 @@ pub struct Node {
     pub likes_count: Option<BigInt>,
 }
 
-impl Callbacks for Node {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.set_defaults();
-
-        Ok(())
-    }
-
-    async fn after_insert(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
-        self.append_to_parent_children(db_session).await?;
-        self.push_to_ancestors(db_session).await?;
-
-        Ok(())
-    }
-
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
-
-        Ok(())
-    }
-
-    async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
-        self.pull_from_parent_children(db_session).await?;
-        self.pull_from_ancestors(db_session).await?;
-        self.delete_descendants(db_session).await?;
-
-        Ok(())
-    }
-}
-
 impl Node {
     pub async fn parent(&self, db_session: &CachingSession) -> Option<Node> {
         match self.parent_id {
@@ -218,6 +189,35 @@ impl Node {
             }
             None => Ok(()),
         }
+    }
+}
+
+impl Callbacks for Node {
+    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+        self.set_defaults();
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+        self.append_to_parent_children(db_session).await?;
+        self.push_to_ancestors(db_session).await?;
+
+        Ok(())
+    }
+
+    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+        self.updated_at = Some(Utc::now());
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+        self.pull_from_parent_children(db_session).await?;
+        self.pull_from_ancestors(db_session).await?;
+        self.delete_descendants(db_session).await?;
+
+        Ok(())
     }
 }
 

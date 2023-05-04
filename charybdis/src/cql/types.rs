@@ -35,6 +35,8 @@ pub type List<T> = Vec<T>;
 pub type Set<T> = Vec<T>;
 pub type Tuple = Vec<Option<CqlValue>>;
 
+pub type Frozen<T> = T;
+
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Counter(pub i64);
 

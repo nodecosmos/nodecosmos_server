@@ -1,4 +1,4 @@
-pub mod address;
+mod address;
 mod creator;
 mod owner;
 
