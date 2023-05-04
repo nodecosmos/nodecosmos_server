@@ -15,14 +15,15 @@ pub struct WorkflowStep {
     pub id: Uuid,
     pub title: Text,
     pub description: Text,
+
+    #[serde(rename = "nodeId")]
+    pub node_id: Uuid,
+
     #[serde(rename = "inputIds")]
     pub input_ids: Option<Set<Uuid>>,
 
     #[serde(rename = "outputIds")]
     pub output_ids: Option<Set<Uuid>>,
-
-    #[serde(rename = "nodeId")]
-    pub node_id: Option<Uuid>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,

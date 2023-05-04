@@ -68,15 +68,7 @@ pub async fn update_workflow_step(
             workflow_step.workflow_id = params.workflow_id;
             workflow_step.id = params.id;
 
-            let node = Node::find_one(
-                &db_session,
-                find_node_query!("id = ?"),
-                (workflow_step.node_id,),
-            )
-            .await?;
-
-            auth_node_update(&node, &current_user).await?;
-
+            authorize(&db_session, &workflow_step.node_id, current_user).await?;
             workflow_step.update_cb(&db_session).await?;
 
             Ok(HttpResponse::Ok().json(json!({
@@ -91,15 +83,7 @@ pub async fn update_workflow_step(
             workflow_step.workflow_id = params.workflow_id;
             workflow_step.id = params.id;
 
-            let node = Node::find_one(
-                &db_session,
-                find_node_query!("id = ?"),
-                (workflow_step.node_id,),
-            )
-            .await?;
-
-            auth_node_update(&node, &current_user).await?;
-
+            authorize(&db_session, &workflow_step.node_id, current_user).await?;
             workflow_step.update_cb(&db_session).await?;
 
             Ok(HttpResponse::Ok().json(json!({
@@ -114,15 +98,7 @@ pub async fn update_workflow_step(
             workflow_step.workflow_id = params.workflow_id;
             workflow_step.id = params.id;
 
-            let node = Node::find_one(
-                &db_session,
-                find_node_query!("id = ?"),
-                (workflow_step.node_id,),
-            )
-            .await?;
-
-            auth_node_update(&node, &current_user).await?;
-
+            authorize(&db_session, &workflow_step.node_id, current_user).await?;
             workflow_step.update_cb(&db_session).await?;
 
             Ok(HttpResponse::Ok().json(json!({
@@ -137,15 +113,7 @@ pub async fn update_workflow_step(
             workflow_step.workflow_id = params.workflow_id;
             workflow_step.id = params.id;
 
-            let node = Node::find_one(
-                &db_session,
-                find_node_query!("id = ?"),
-                (workflow_step.node_id,),
-            )
-            .await?;
-
-            auth_node_update(&node, &current_user).await?;
-
+            authorize(&db_session, &workflow_step.node_id, current_user).await?;
             workflow_step.update_cb(&db_session).await?;
 
             Ok(HttpResponse::Ok().json(json!({
@@ -174,15 +142,7 @@ pub async fn delete_workflow_step(
     workflow_step.id = params.id;
 
     let workflow_step = workflow_step.find_by_primary_key(&db_session).await?;
-
-    let node = Node::find_one(
-        &db_session,
-        find_node_query!("id = ?"),
-        (workflow_step.node_id,),
-    )
-    .await?;
-
-    auth_node_update(&node, &current_user).await?;
+    authorize(&db_session, &workflow_step.node_id, current_user).await?;
 
     let mut workflow_step = WorkflowStep::new();
     workflow_step.workflow_id = params.workflow_id;
@@ -191,4 +151,16 @@ pub async fn delete_workflow_step(
     workflow_step.delete_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+async fn authorize(
+    db_session: &CachingSession,
+    node_id: &Uuid,
+    current_user: CurrentUser,
+) -> Result<(), NodecosmosError> {
+    let node = Node::find_one(&db_session, find_node_query!("id = ?"), (node_id,)).await?;
+
+    auth_node_update(&node, &current_user).await?;
+
+    Ok(())
 }

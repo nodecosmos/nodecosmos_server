@@ -59,6 +59,18 @@ async fn main() {
                     .service(create_like)
                     .service(delete_like),
             )
+            .service(
+                web::scope("/workflows")
+                    .service(get_workflow)
+                    .service(create_workflow),
+            )
+            .service(
+                web::scope("workflow_steps")
+                    .service(create_workflow_step)
+                    .service(update_workflow_step)
+                    .service(delete_workflow_step),
+            )
+            .service(web::scope("input_outputs").service(create_io))
     })
     .bind(("127.0.0.1", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
