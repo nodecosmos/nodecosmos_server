@@ -4,11 +4,12 @@ use serde_json::json;
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum NodecosmosError {
     ClientSessionError(String),
     Unauthorized(serde_json::Value),
     CharybdisError(CharybdisError),
+    SerdeError(serde_json::Error),
     // InternalServerError(String),
 }
 
@@ -18,6 +19,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ClientSessionError(e) => write!(f, "Session Error: {}", e),
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: \n{}", e),
+            NodecosmosError::SerdeError(e) => write!(f, "Serde Error: \n{}", e),
             // NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
         }
     }
@@ -29,6 +31,7 @@ impl Error for NodecosmosError {
             NodecosmosError::ClientSessionError(_) => None,
             NodecosmosError::Unauthorized(_) => None,
             NodecosmosError::CharybdisError(_) => None,
+            NodecosmosError::SerdeError(_) => None,
             // NodecosmosError::InternalServerError(_) => None,
         }
     }
@@ -66,5 +69,11 @@ impl ResponseError for NodecosmosError {
 impl From<CharybdisError> for NodecosmosError {
     fn from(e: CharybdisError) -> Self {
         NodecosmosError::CharybdisError(e)
+    }
+}
+
+impl From<serde_json::Error> for NodecosmosError {
+    fn from(e: serde_json::Error) -> Self {
+        NodecosmosError::SerdeError(e)
     }
 }

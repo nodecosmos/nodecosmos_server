@@ -1,3 +1,4 @@
+use crate::helpers::camel_to_snake_case;
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
 use quote::quote;
@@ -129,7 +130,9 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
 
     // macro names (avoiding name collisions)
     let native_struct = &input.ident;
-    let macro_name_str = format!("partial_{}", native_struct.to_string().to_lowercase());
+    let struct_name_str = camel_to_snake_case(&native_struct.to_string());
+
+    let macro_name_str = format!("partial_{}", struct_name_str);
     let macro_name = parse_str::<proc_macro2::TokenStream>(&macro_name_str).unwrap();
 
     let field_types_hash = build_field_types_hash(fields_named);

@@ -19,5 +19,7 @@ pub struct InputOutput {
     pub created_at: Option<Timestamp>,
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+    #[serde(rename = "usedByWorkflowSteps")]
+    pub used_by_workflow_steps: Option<Uuid>,
 }
-impl_default_callbacks!(WorkflowStep);
+impl_default_callbacks!(InputOutput);

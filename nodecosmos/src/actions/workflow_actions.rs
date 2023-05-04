@@ -84,12 +84,3 @@ pub async fn create_workflow(
         "success": true,
     })))
 }
-
-#[post("/input_output")]
-pub async fn create_io(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    workflow: web::Json<Workflow>,
-) -> Result<HttpResponse, NodecosmosError> {
-    unimplemented!()
-}
