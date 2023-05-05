@@ -17,7 +17,7 @@ tool will detect type within option and create column with that type
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects `CachingSession` as a session arg for operations
-- Basic CRUD queries are macro generated constants
+- Basic CRUD queries are macro generated str constants
 - By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time as `&'static str`
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
@@ -182,21 +182,25 @@ async fn main() {
 ```
 
 ### Find
+
+#### `find_by_primary_key`
 ```rust
   let user = User {id, ..Default::default()};
   let user: User = user.find_by_primary_key(&session).await.unwrap();
-
+```
+`find_by_partition_key`
+```rust
   // partition_key results in multiple rows
   let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
-
-  // or
+```
+`find_model_query!` & `find`
+```rust
   let query = find_user_query!("id = ?");
   let users: TypedRowIter<User> = User::find(&session, query, (id,)).await.unwrap();
-
-  // or
-  let query = find_user_query!("id = ?");
-  let user: User = User::find_one(&session, query, (id,)).await.unwrap();
-
+```
+`find_one`
+```rust
+let user = User::find_one(&session, find_user_query!("id = ?"), (id,)).await?;
 ```
 
 ### Update
@@ -221,10 +225,10 @@ user.update(&session).await;
 ## Partial Model Operations:
 Use auto generated `partial_<model_name>!` macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
-Limitation is that it requires whole primary key.
-
+Limitation is that it requires whole primary key fields to be added.
+Macro is defined by using `#[partial_model_generator]`.
 ```rust
-// auto-generated macro - available in user model
+// auto-generated macro - available in crate::models::user
 partial_user!(OpsUser, id, username);
 
 let id = Uuid::new_v4();
@@ -260,18 +264,17 @@ they will be automatically added to partial fields.
 )]
 pub struct Node {
     // descendable
-    #[serde(default)]
     pub id: Uuid,
 
-    #[serde(default, rename = "rootId")]
+    #[serde(rename = "rootId")]
     pub root_id: Uuid, 
-  pub title: String,
+    pub title: String,
 }
 
 partial_node!(PartialNode, id, root_id);
 ```
 
-`PartialNode` will include serde attributes from `Node` model.
+`PartialNode` will include serde attributes `#[serde(rename = "rootId")]` from `Node` model.
 
 ## View Operations:
 ```rust

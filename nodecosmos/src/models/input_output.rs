@@ -15,6 +15,7 @@ pub struct InputOutput {
     #[serde(rename = "dataType")]
     pub data_type: Text,
     pub value: Text,
+
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
     #[serde(rename = "updatedAt")]
@@ -22,4 +23,23 @@ pub struct InputOutput {
     #[serde(rename = "usedByWorkflowSteps")]
     pub used_by_workflow_steps: Option<Uuid>,
 }
-impl_default_callbacks!(InputOutput);
+
+impl Callbacks for InputOutput {
+    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+        let now = Utc::now();
+
+        self.id = Uuid::new_v4();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+
+        Ok(())
+    }
+
+    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+        let now = Utc::now();
+
+        self.updated_at = Some(now);
+
+        Ok(())
+    }
+}
