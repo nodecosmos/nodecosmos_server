@@ -30,7 +30,11 @@ pub struct WorkflowStep {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[serde(rename = "nextWorkflowStepByOutputId")]
+    pub next_workflow_step: Option<Map<Uuid, Uuid>>,
 }
+
 impl_default_callbacks!(WorkflowStep);
 
 partial_workflow_step!(

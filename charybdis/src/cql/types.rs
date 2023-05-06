@@ -30,7 +30,7 @@ pub type Uuid = uuid::Uuid;
 pub type Varchar = String;
 pub type Varint = BigInt;
 
-pub type Map = HashMap<String, Option<CqlValue>>;
+pub type Map<K, V> = HashMap<K, V>;
 pub type List<T> = Vec<T>;
 pub type Set<T> = Vec<T>;
 pub type Tuple = Vec<Option<CqlValue>>;

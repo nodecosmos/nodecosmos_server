@@ -1,4 +1,3 @@
-use crate::models::helpers::impl_default_callbacks;
 use charybdis::*;
 use chrono::Utc;
 

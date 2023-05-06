@@ -48,7 +48,8 @@ impl<'a> Migration<'a> {
         if self.field_type_changed() {
             panic!("Field type changed is not supported!");
 
-            // TODO: implement question to user if he wants to continue.
+            // TODO: implement migration flag so on type change
+            //  we drop existing column and create new one.
             //  Notify user that this will drop and recreate the column!
             // self.run_field_type_changed_migration();
         }
@@ -107,7 +108,7 @@ impl<'a> Migration<'a> {
         if !is_any_field_changed {
             println!(
                 "{} {} {}",
-                "No changes detected for ".bright_green(),
+                "No changes detected for".bright_green(),
                 self.migration_object_name.bright_yellow(),
                 self.migration_obj_type_str().bright_magenta()
             );

@@ -4,7 +4,7 @@ use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;
 use crate::models::user::LikedObjectIdsUser;
 use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::{DeleteWithCallbacks, Find, New, Uuid};
+use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, Uuid};
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
@@ -25,9 +25,6 @@ pub async fn get_likes_count(
 
     let mut liked_by_current_user = false;
 
-    // TODO: store liked ids in user model (or user_likes) so we check
-    //  everything that is liked by user on client side.
-    //  it should be more efficient than this.
     if let Some(opt_current_user) = opt_current_user.0 {
         let mut cu_like = Like::new();
         cu_like.object_id = object_id;
@@ -72,14 +69,15 @@ pub async fn create_like(
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
 
-    Like::like(
-        &db_session,
-        params.object_id,
-        params.object_type,
-        current_user.id,
-        current_user.username,
-    )
-    .await?;
+    let mut like = Like {
+        object_id: params.object_id,
+        object_type: params.object_type.to_string(),
+        user_id: current_user.id,
+        username: current_user.username,
+        ..Default::default()
+    };
+
+    like.insert_cb(&db_session).await?;
 
     let likes_count = LikesCount {
         object_id: params.object_id,
@@ -95,27 +93,21 @@ pub async fn create_like(
     })))
 }
 
-#[derive(Deserialize)]
-pub struct DeleteParams {
-    id: Uuid,
-    object_type: String,
-}
-
-#[delete("/{object_type}/{id}")]
+#[delete("/{id}")]
 pub async fn delete_like(
     db_session: web::Data<CachingSession>,
-    params: web::Path<DeleteParams>,
+    id: web::Path<Uuid>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-    let object_id = params.id;
+    let object_id = id.into_inner();
 
-    let mut like: Like = Like {
-        object_id: params.id,
-        object_type: params.object_type,
+    let like: Like = Like {
+        object_id,
         user_id: current_user.id,
         ..Default::default()
     };
+
+    let mut like = like.find_by_primary_key(&db_session).await?;
 
     like.delete_cb(&db_session).await?;
 

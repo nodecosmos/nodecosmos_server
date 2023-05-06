@@ -44,30 +44,6 @@ impl ObjectTypes {
 }
 
 impl Like {
-    pub async fn like(
-        session: &CachingSession,
-        object_id: Uuid,
-        object_type: ObjectTypes,
-        user_id: Uuid,
-        username: String,
-    ) -> Result<(), CharybdisError> {
-        let object_type = object_type.to_string();
-
-        let mut like = Like {
-            object_id,
-            object_type,
-            user_id,
-            username,
-            ..Default::default()
-        };
-
-        LikesCount::increment(&session, object_id).await?;
-
-        like.insert_cb(session).await?;
-
-        Ok(())
-    }
-
     pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), CharybdisError> {
         let existing_like_query = find_like_query!("object_id = ? AND user_id = ?");
         let existing_like =
@@ -151,6 +127,8 @@ impl Like {
 
 impl Callbacks for Like {
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        LikesCount::increment(&session, self.object_id).await?;
+
         self.set_defaults();
         self.validate_not_liked(session).await?;
 
