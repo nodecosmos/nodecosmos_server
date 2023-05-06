@@ -17,7 +17,6 @@ pub(crate) struct Migration<'a> {
     pub(crate) current_code_schema: &'a SchemaObject,
     pub(crate) current_db_schema: &'a SchemaObject,
     pub(crate) is_first_migration_run: bool,
-
     pub(crate) session: &'a Session,
 }
 

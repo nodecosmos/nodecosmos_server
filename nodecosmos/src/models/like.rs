@@ -127,10 +127,10 @@ impl Like {
 
 impl Callbacks for Like {
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        LikesCount::increment(&session, self.object_id).await?;
-
-        self.set_defaults();
         self.validate_not_liked(session).await?;
+        self.set_defaults();
+
+        LikesCount::increment(&session, self.object_id).await?;
 
         Ok(())
     }
