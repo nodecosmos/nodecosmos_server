@@ -156,12 +156,12 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
-                #[char_model_field_attrs_gen(
+                #[charybdis::char_model_field_attrs_gen(
                     fields_names=[$($field),*],
                     field_types_hash=#field_types_hash,
                     field_attributes_hash=#field_attributes_hash
                 )]
-                #[charybdis_model(
+                #[charybdis::charybdis_model(
                     table_name=#table_name,
                     partition_keys=#pks,
                     clustering_keys=#cks,

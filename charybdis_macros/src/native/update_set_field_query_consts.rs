@@ -1,4 +1,3 @@
-use crate::helpers::camel_to_snake_case;
 use charybdis_parser::CharybdisArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -23,7 +22,6 @@ pub(crate) fn push_to_set_fields_query_consts(
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();
-            let field_name_snake_case = camel_to_snake_case(&field_name);
             let field_type = field.ty.to_token_stream().to_string();
 
             let is_list = field_type.contains("List");
@@ -37,16 +35,16 @@ pub(crate) fn push_to_set_fields_query_consts(
                 format!(
                     "UPDATE {} SET {} = {} + [?] WHERE {} = ?",
                     table_name.to_string(),
-                    field_name_snake_case,
-                    field_name_snake_case,
+                    field_name,
+                    field_name,
                     primary_key_where_clause,
                 )
             } else {
                 format!(
                     "UPDATE {} SET {} = {} + {{?}} WHERE {} = ?",
                     table_name.to_string(),
-                    field_name_snake_case,
-                    field_name_snake_case,
+                    field_name,
+                    field_name,
                     primary_key_where_clause,
                 )
             };
@@ -89,7 +87,6 @@ pub(crate) fn pull_from_set_fields_query_consts(
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();
-            let field_name_snake_case = camel_to_snake_case(&field_name);
             let field_type = field.ty.to_token_stream().to_string();
 
             let is_list = field_type.contains("List");
@@ -103,16 +100,16 @@ pub(crate) fn pull_from_set_fields_query_consts(
                 format!(
                     "UPDATE {} SET {} = {} - [?] WHERE {} = ?",
                     table_name.to_string(),
-                    field_name_snake_case,
-                    field_name_snake_case,
+                    field_name,
+                    field_name,
                     primary_key_where_clause,
                 )
             } else {
                 format!(
                     "UPDATE {} SET {} = {} - {{?}} WHERE {} = ?",
                     table_name.to_string(),
-                    field_name_snake_case,
-                    field_name_snake_case,
+                    field_name,
+                    field_name,
                     primary_key_where_clause,
                 )
             };

@@ -1,10 +1,10 @@
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
-        impl Callbacks for $struct_name {
+        impl charybdis::Callbacks for $struct_name {
             async fn before_insert(
                 &mut self,
-                _session: &CachingSession,
-            ) -> Result<(), CharybdisError> {
+                _session: &charybdis::CachingSession,
+            ) -> Result<(), charybdis::CharybdisError> {
                 let now = Utc::now();
 
                 self.id = Uuid::new_v4();
@@ -16,8 +16,8 @@ macro_rules! impl_default_callbacks {
 
             async fn before_update(
                 &mut self,
-                _session: &CachingSession,
-            ) -> Result<(), CharybdisError> {
+                _session: &charybdis::CachingSession,
+            ) -> Result<(), charybdis::CharybdisError> {
                 let now = Utc::now();
 
                 self.updated_at = Some(now);

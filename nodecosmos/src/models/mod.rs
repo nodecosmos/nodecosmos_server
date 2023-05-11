@@ -1,5 +1,8 @@
+pub mod flow;
+pub mod flow_step;
 mod helpers;
 pub mod input_output;
+pub mod input_output_template;
 pub mod like;
 pub mod likes_count;
 pub mod materialized_views;
@@ -8,4 +11,3 @@ pub mod post;
 pub mod udts;
 pub mod user;
 pub mod workflow;
-pub mod workflow_step;

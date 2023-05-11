@@ -65,10 +65,16 @@ async fn main() {
                     .service(create_workflow),
             )
             .service(
-                web::scope("workflow_steps")
-                    .service(create_workflow_step)
-                    .service(update_workflow_step)
-                    .service(delete_workflow_step),
+                web::scope("/flows")
+                    .service(create_flow)
+                    .service(update_flow)
+                    .service(delete_flow),
+            )
+            .service(
+                web::scope("/flow_steps")
+                    .service(create_flow_step)
+                    .service(update_flow_step)
+                    .service(delete_flow_step),
             )
             .service(web::scope("input_outputs").service(create_io))
     })

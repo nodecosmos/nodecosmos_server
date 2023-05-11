@@ -7,11 +7,12 @@ use chrono::Utc;
     table_name = "workflows",
     partition_keys = ["node_id"],
     clustering_keys = [],
-    secondary_indexes = []
+    secondary_indexes = ["id"]
 )]
 pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
     pub id: Uuid,
     pub title: Text,
     pub description: Text,

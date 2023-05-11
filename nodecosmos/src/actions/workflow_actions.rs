@@ -1,10 +1,10 @@
 use crate::actions::client_session::CurrentUser;
-use crate::authorize::auth_node_update;
+use crate::authorize::auth_workflow_creation;
 use crate::errors::NodecosmosError;
+use crate::models::flow::Flow;
+use crate::models::flow_step::FlowStep;
 use crate::models::input_output::{find_input_output_query, InputOutput};
-use crate::models::node::{find_node_query, Node};
 use crate::models::workflow::Workflow;
-use crate::models::workflow_step::WorkflowStep;
 
 use actix_web::{get, post, web, HttpResponse};
 use charybdis::*;
@@ -23,27 +23,41 @@ pub async fn get_workflow(
 
     let workflow = workflow.find_by_primary_key(&db_session).await?;
 
-    let mut workflow_step = WorkflowStep::new();
-    workflow_step.workflow_id = workflow.id;
+    let mut flow = Flow::new();
+    flow.node_id = node_id;
+    flow.workflow_id = workflow.id;
 
-    let mut workflow_steps = workflow_step.find_by_partition_key(&db_session).await?;
+    let mut flows = flow.find_by_partition_key(&db_session).await?;
 
-    let mut steps = vec![];
+    let mut flow_step = FlowStep::new();
+    flow_step.node_id = node_id;
+    flow_step.workflow_id = workflow.id;
+
+    let mut flow_steps = flow_step.find_by_partition_key(&db_session).await?;
+
     let mut input_output_ids = vec![];
+    let mut flows_vec = vec![];
+    let mut flow_steps_vec = vec![];
     let mut input_outputs = vec![];
 
-    while let Some(step) = workflow_steps.next() {
-        if let Ok(step) = step {
-            step.input_ids
-                .iter()
-                .cloned()
-                .for_each(|io| input_output_ids.push(io));
-            step.output_ids
-                .iter()
-                .cloned()
-                .for_each(|io| input_output_ids.push(io));
+    while let Some(flow) = flows.next() {
+        if let Ok(flow) = flow {
+            flows_vec.push(flow);
+        }
+    }
 
-            steps.push(step);
+    while let Some(step) = flow_steps.next() {
+        if let Ok(step) = step {
+            step.input_ids_by_node_id.iter().cloned().for_each(|io| {
+                let ids: Vec<Vec<Uuid>> = io.values().cloned().collect();
+                input_output_ids.extend(ids);
+            });
+            step.output_ids_by_node_id.iter().cloned().for_each(|io| {
+                let ids: Vec<Vec<Uuid>> = io.values().cloned().collect();
+                input_output_ids.extend(ids);
+            });
+
+            flow_steps_vec.push(step);
         }
     }
 
@@ -62,8 +76,9 @@ pub async fn get_workflow(
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
-        "workflow_steps": steps,
-        "input_outputs": input_outputs,
+        "flows": flows_vec,
+        "flowSteps": flow_steps_vec,
+        "inputOutputs": input_outputs,
     })))
 }
 
@@ -74,9 +89,8 @@ pub async fn create_workflow(
     workflow: web::Json<Workflow>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut workflow = workflow.into_inner();
-    let node = Node::find_one(&db_session, find_node_query!("id = ?"), (workflow.node_id,)).await?;
 
-    auth_node_update(&node, &current_user).await?;
+    auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
 
     workflow.insert_cb(&db_session).await?;
 

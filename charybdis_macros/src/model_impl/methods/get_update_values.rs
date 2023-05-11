@@ -27,7 +27,7 @@ pub(crate) fn get_update_values(ch_args: &CharybdisArgs, fields_named: &FieldsNa
 
     let generated = quote! {
         fn get_update_values(&self) -> charybdis::SerializedResult {
-            let mut serialized = SerializedValues::with_capacity(#capacity);
+            let mut serialized = charybdis::SerializedValues::with_capacity(#capacity);
 
             #serialized_values_fields_adder
 

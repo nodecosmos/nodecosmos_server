@@ -20,24 +20,15 @@ impl<'a> Migration<'a> {
         let res = self.session.query(cql.clone(), ()).await;
 
         match res {
-            Ok(_) => println!(
-                "{} {}",
-                "CQL executed successfully!".bright_green(),
-                "✅".bright_green()
-            ),
-            Err(e) => println!(
-                "{} {} {}",
-                "CQL execution failed!".bright_red(),
-                "❌".bright_red(),
-                e
-            ),
+            Ok(_) => println!("{}\n", "CQL executed successfully! ✅".bright_green(),),
+            Err(e) => println!("{} {}\n", "CQL execution failed! ❌".bright_red(), e),
         }
     }
 
     pub(crate) async fn run_first_migration(&self) {
         println!(
             "\n{} {} {}!",
-            "Detected first migration run for:".bright_cyan(),
+            "Detected first migration for:".bright_cyan(),
             self.migration_object_name.bright_yellow(),
             self.migration_obj_type_str().bright_magenta()
         );
@@ -45,7 +36,7 @@ impl<'a> Migration<'a> {
         match self.migration_object_type {
             MigrationObjectType::UDT => {
                 let cql = format!(
-                    "CREATE TYPE IF NOT EXISTS {}\n(\n{}\n);",
+                    "CREATE TYPE IF NOT EXISTS {}\n(\n{}\n);\n",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields()
                 );
@@ -61,7 +52,7 @@ impl<'a> Migration<'a> {
                 };
 
                 let cql = format!(
-                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n);",
+                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n);\n",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields(),
                     self.current_code_schema.partition_keys.join(", "),
@@ -100,7 +91,7 @@ impl<'a> Migration<'a> {
                 let primary_key_clause = format!("PRIMARY KEY ({})", primary_key.join(", "));
 
                 let cql = format!(
-                    "CREATE MATERIALIZED VIEW IF NOT EXISTS {}\nAS {} {}",
+                    "CREATE MATERIALIZED VIEW IF NOT EXISTS {}\nAS {} {}\n",
                     self.migration_object_name, materialized_view_select_clause, primary_key_clause,
                 );
 
@@ -112,7 +103,7 @@ impl<'a> Migration<'a> {
     pub(crate) async fn run_field_added_migration(&self) {
         println!(
             "\n{} {} {}",
-            "Detected new fields for ".bright_cyan(),
+            "Detected new fields in".bright_cyan(),
             self.migration_object_name.bright_yellow(),
             self.migration_obj_type_str().bright_yellow()
         );
@@ -156,7 +147,7 @@ impl<'a> Migration<'a> {
     pub(crate) async fn run_field_removed_migration(&self) {
         println!(
             "\n{} {} {}",
-            "Detected removed fields for ".bright_cyan(),
+            "Detected removed fields in".bright_cyan(),
             self.migration_object_name.bright_yellow(),
             self.migration_obj_type_str().bright_yellow()
         );
@@ -176,7 +167,7 @@ impl<'a> Migration<'a> {
     pub(crate) async fn run_index_added_migration(&self) {
         println!(
             "\n{} {} {}",
-            "Detected new indexes for ".bright_cyan(),
+            "Detected new indexes in ".bright_cyan(),
             self.migration_object_name.bright_yellow(),
             self.migration_obj_type_str().bright_yellow()
         );

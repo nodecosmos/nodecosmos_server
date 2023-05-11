@@ -16,7 +16,6 @@ const BCRYPT_COST: u32 = 6;
     secondary_indexes = ["username", "email"]
 )]
 pub struct User {
-    #[serde()]
     pub id: Uuid,
     pub username: Text,
     pub email: Text,

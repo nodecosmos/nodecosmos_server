@@ -7,7 +7,7 @@
 
 ## Usage considerations:
 - Provide and expressive API for CRUD & Complex Query operations on model as a whole
-- Provide easy way to manipulate model partially by using automatically generated `partial_<model>!` macro
+- Provide easy way to manipulate subset of model fields by using automatically generated `partial_<model>!` macro
 - Provide easy way to write complex queries by using automatically generated `find_<model>_query!` macro
 - Automatic migration tool that analyzes the `src/model/*.rs` files and runs migrations according to differences between the model definition and database
 - It works well with optional fields, and it's possible to use `Option<T>` as a field type, automatic migration
@@ -49,14 +49,14 @@ tool will detect type within option and create column with that type
 Declare model as a struct within `src/models` dir:
 ```rust
 // src/modles/user.rs
-use charybdis::*;
 use super::udts::Address;
+use charybdis::{charybdis_model, partial_model_generator, Text, Timestamp, Uuid};
 
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
 #[charybdis_model(
-    table_name = "users", 
-    partition_keys = ["id"], 
-    clustering_keys = [], 
+    table_name = "users",
+    partition_keys = ["id"],
+    clustering_keys = [],
     secondary_indexes = []
 )]
 pub struct User {
@@ -336,7 +336,8 @@ let title = "some title";
 let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, title)).await.unwrap();
 ```
 
-For Custom update queries we have `update_<struct_name>_query!` macro:
+For Custom update queries we have `update_<struct_name>_query!` macro.
+
 For value list we first pass the values that we want to update, 
 and then we provide primary key values.
 ```rust
@@ -346,8 +347,8 @@ let res = execute(&session, query, (new_desc, created_at_day, title))
     .unwrap();
 ```
 
-Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and `update_<struct_name>_query!`,
-rules
+Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and
+`update_<struct_name>_query!`, rules
 
 models:
 ```rust
@@ -362,8 +363,8 @@ let posts: TypedRowIter<OpsPost> = OpsPost::find(&session, query, (created_at, u
 
 **find_<struct_name>_query!** macro comes with some benefits like:
 - correct fields order in select clause
-- we don't do string interpolation at runtime as it's static string
-- easy of use.
+- it builds query as `&'static str`
+- easy of use
 
 
 ## Callbacks

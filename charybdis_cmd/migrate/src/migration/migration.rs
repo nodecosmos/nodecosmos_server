@@ -41,10 +41,9 @@ impl<'a> Migration<'a> {
     pub(crate) async fn run(&self) {
         if self.is_first_migration_run {
             self.run_first_migration().await;
-            return;
         }
 
-        if self.field_type_changed() {
+        if !self.is_first_migration_run && self.field_type_changed() {
             panic!("Field type changed is not supported!");
 
             // TODO: implement migration flag so on type change
@@ -53,38 +52,38 @@ impl<'a> Migration<'a> {
             // self.run_field_type_changed_migration();
         }
 
-        if self.migration_object_type != MigrationObjectType::UDT {
+        if !self.is_first_migration_run && self.migration_object_type != MigrationObjectType::UDT {
             if self.partition_key_changed() {
                 panic!(
-                    "\n\n{}\n{} {} {}\n\n",
-                    "Partition key change is not allowed!".bright_red(),
-                    "Illegal change in:".bright_red(),
+                    "\n\n{} {} {}\n{}\n\n",
+                    "Illegal change in".bright_red(),
                     self.migration_object_name.bright_yellow(),
-                    self.migration_obj_type_str().bright_magenta()
+                    self.migration_obj_type_str().bright_magenta(),
+                    "Partition key change is not allowed!".bright_red(),
                 );
             }
 
             if self.clustering_key_changed() {
                 panic!(
-                    "\n\n{}\n{} {} {}\n\n",
-                    "Clustering key change is not allowed!".bright_red(),
-                    "Illegal change in:".bright_red(),
+                    "\n\n{} {} {}\n{}\n\n",
+                    "Illegal change in".bright_red(),
                     self.migration_object_name.bright_yellow(),
-                    self.migration_obj_type_str().bright_magenta()
+                    self.migration_obj_type_str().bright_magenta(),
+                    "Clustering key change is not allowed!".bright_red(),
                 );
             }
         }
 
         let mut is_any_field_changed = false;
 
-        if self.new_fields().len() > 0 {
+        if !self.is_first_migration_run && self.new_fields().len() > 0 {
             self.panic_on_mv_fields_change();
 
             self.run_field_added_migration().await;
             is_any_field_changed = true;
         }
 
-        if self.removed_fields().len() > 0 {
+        if !self.is_first_migration_run && self.removed_fields().len() > 0 {
             self.panic_on_mv_fields_change();
             self.panic_on_udt_fields_removal();
 
@@ -98,16 +97,16 @@ impl<'a> Migration<'a> {
                 self.run_index_added_migration().await;
             }
 
-            if self.removed_secondary_indexes().len() > 0 {
+            if !self.is_first_migration_run && self.removed_secondary_indexes().len() > 0 {
                 is_any_field_changed = true;
                 self.run_index_removed_migration().await;
             }
         }
 
-        if !is_any_field_changed {
+        if !self.is_first_migration_run && !is_any_field_changed {
             println!(
                 "{} {} {}",
-                "No changes detected for".bright_green(),
+                "No changes detected in".bright_green(),
                 self.migration_object_name.bright_yellow(),
                 self.migration_obj_type_str().bright_magenta()
             );
