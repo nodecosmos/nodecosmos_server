@@ -1,4 +1,4 @@
-use crate::models::helpers::set_updated_at_cb;
+use crate::models::helpers::impl_updated_at_cb;
 use crate::models::udts::{Creator, Owner};
 use charybdis::*;
 use chrono::Utc;
@@ -227,7 +227,7 @@ impl Callbacks for Node {
 partial_node!(GetNode, root_id, id, descendant_ids);
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
-set_updated_at_cb!(UpdateNodeTitle);
+impl_updated_at_cb!(UpdateNodeTitle);
 
 partial_node!(
     UpdateNodeDescription,
@@ -237,10 +237,10 @@ partial_node!(
     description_markdown,
     updated_at
 );
-set_updated_at_cb!(UpdateNodeDescription);
+impl_updated_at_cb!(UpdateNodeDescription);
 
 partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
-set_updated_at_cb!(UpdateNodeOwner);
+impl_updated_at_cb!(UpdateNodeOwner);
 
 partial_node!(UpdateNodeLikesCount, root_id, id, likes_count, updated_at);
-set_updated_at_cb!(UpdateNodeLikesCount);
+impl_updated_at_cb!(UpdateNodeLikesCount);

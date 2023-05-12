@@ -3,7 +3,7 @@ pub use super::udts::Address;
 use charybdis::*;
 use chrono::Utc;
 
-use crate::models::helpers::set_updated_at_cb;
+use crate::models::helpers::impl_updated_at_cb;
 use bcrypt::{hash, verify};
 
 const BCRYPT_COST: u32 = 6;
@@ -119,7 +119,7 @@ impl Callbacks for User {
 partial_user!(GetUser, id, username, email, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-set_updated_at_cb!(UpdateUser);
+impl_updated_at_cb!(UpdateUser);
 
 partial_user!(DeleteUser, id);
 

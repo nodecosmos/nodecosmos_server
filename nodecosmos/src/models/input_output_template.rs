@@ -1,4 +1,4 @@
-use crate::models::helpers::set_updated_at_cb_fn;
+use crate::models::helpers::updated_at_cb_fn;
 use crate::models::input_output::InputOutput;
 use charybdis::*;
 use chrono::Utc;
@@ -102,5 +102,5 @@ impl Callbacks for InputOutputTemplate {
         Ok(())
     }
 
-    set_updated_at_cb_fn!();
+    updated_at_cb_fn!();
 }

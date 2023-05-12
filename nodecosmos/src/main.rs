@@ -73,7 +73,8 @@ async fn main() {
             .service(
                 web::scope("/flow_steps")
                     .service(create_flow_step)
-                    .service(update_flow_step)
+                    .service(update_flow_step_inputs)
+                    .service(update_flow_step_outputs)
                     .service(delete_flow_step),
             )
             .service(web::scope("input_outputs").service(create_io))
