@@ -21,7 +21,7 @@ pub trait Find: BaseModel {
         values: impl ValueList,
     ) -> Result<Self, CharybdisError>;
 
-    async fn find_iter(
+    async fn find_paged(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
@@ -64,7 +64,7 @@ impl<T: BaseModel> Find for T {
     }
 
     // find iter
-    async fn find_iter(
+    async fn find_paged(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,

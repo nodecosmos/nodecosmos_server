@@ -1,3 +1,4 @@
+#[allow(unused_macros)]
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
         impl charybdis::Callbacks for $struct_name {
@@ -27,6 +28,8 @@ macro_rules! impl_default_callbacks {
         }
     };
 }
+
+#[allow(unused_imports)]
 pub(crate) use impl_default_callbacks;
 
 macro_rules! created_at_cb_fn {

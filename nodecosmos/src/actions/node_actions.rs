@@ -23,7 +23,7 @@ pub struct PrimaryKeyParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut nodes_iter = Node::find_iter(
+    let mut nodes_iter = Node::find_paged(
         &db_session,
         Node::SELECT_FIELDS_CLAUSE,
         (),
@@ -79,7 +79,7 @@ pub async fn get_node(
     all_node_ids.push(node.id);
 
     let descendants_q = find_node_query!("root_id = ? AND id IN ?");
-    let mut descendants = Node::find_iter(
+    let mut descendants = Node::find_paged(
         &db_session,
         descendants_q,
         (node.root_id, all_node_ids),

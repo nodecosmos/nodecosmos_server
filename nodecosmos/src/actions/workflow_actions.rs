@@ -4,7 +4,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::{find_input_output_query, InputOutput};
-use crate::models::workflow::Workflow;
+use crate::models::workflow::{find_workflow_query, Workflow};
 
 use actix_web::{get, post, web, HttpResponse};
 use charybdis::*;
@@ -18,10 +18,10 @@ pub async fn get_workflow(
 ) -> Result<HttpResponse, NodecosmosError> {
     let node_id = node_id.into_inner();
 
-    let mut workflow = Workflow::new();
-    workflow.node_id = node_id;
-
-    let workflow = workflow.find_by_primary_key(&db_session).await?;
+    // Currently we only support one workflow per node, in future we will support multiple 
+    // workflows per node.
+    let workflow =
+        Workflow::find_one(&db_session, find_workflow_query!("node_id = ?"), (node_id,)).await?;
 
     let mut flow = Flow::new();
     flow.node_id = node_id;
