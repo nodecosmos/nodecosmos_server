@@ -33,8 +33,8 @@ tool will detect type within option and create column with that type
   - [Update](#update)
   - [Delete](#delete)
 - [Partial Model Operations](#partial-model-operations)
-- [View Operations](#view-operations)
 - [Custom filtering](#custom-filtering)
+- [View Operations](#view-operations)
 - [Callbacks](#callbacks)
 - [Batch Operations](#batch-operations)
 - [As Native](#as-native)
@@ -107,7 +107,7 @@ pub struct UsersByUsername {
 
 ```
 Resulting auto-generated migration query will be:
-```sql
+```cassandraql
 CREATE MATERIALIZED VIEW IF NOT EXISTS users_by_email
 AS SELECT created_at, updated_at, username, email, id
 FROM users
@@ -150,12 +150,12 @@ in case there is no model definition for table, it will **not** drop it.
 ```rust
 mod models;
 
-use charybdis::*;
+use charybdis::{CachingSession, Insert};
 use crate::models::user::*;
 
 #[tokio::main]
 async fn main() {
-  let session: &CachingSession = init_session().await;
+  let session: &CachingSession; // init session
   
   // init user
   let id: Uuid = Uuid::new_v4();
@@ -193,7 +193,9 @@ async fn main() {
   // partition_key results in multiple rows
   let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
 ```
-`find_model_query!` & `find`
+
+`find_<model>_query` & `find`
+
 ```rust
   let query = find_user_query!("id = ?");
   let users: TypedRowIter<User> = User::find(&session, query, (id,)).await.unwrap();
@@ -276,32 +278,6 @@ partial_node!(PartialNode, id, root_id);
 
 `PartialNode` will include serde attributes `#[serde(rename = "rootId")]` from `Node` model.
 
-## View Operations:
-```rust
-let mut user_by_username: UsersByUsername = UsersByUsername::new();
-user_by_username.username = "test_username".to_string();
-
-let users_by_username: TypedRowIter<UsersByUsername> = user_by_username
-    .find_by_partition_key(&session)
-    .await
-    .unwrap();
-
-for user in users_by_username {
-    println!("{:?}", user);
-}
-
-// custom queries
-let query = find_users_by_username_query!("username = ?");
-
-let users_by_username: TypedRowIter<UsersByUsername> =
-    UsersByUsername::find(&session, query, ("test_username",))
-        .await
-        .unwrap();
-
-for user in users_by_username {
-    println!("{:?}", user);
-}
-```
 
 ## Custom filtering:
 Let's say we have a model:
@@ -338,7 +314,7 @@ let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, tit
 
 For Custom update queries we have `update_<struct_name>_query!` macro.
 
-For value list we first pass the values that we want to update, 
+For value list we first pass the values that we want to update,
 and then we provide primary key values.
 ```rust
 let query = update_post_query!("description = ?");
@@ -366,6 +342,32 @@ let posts: TypedRowIter<OpsPost> = OpsPost::find(&session, query, (created_at, u
 - it builds query as `&'static str`
 - easy of use
 
+## View Operations:
+```rust
+let mut user_by_username: UsersByUsername = UsersByUsername::new();
+user_by_username.username = "test_username".to_string();
+
+let users_by_username: TypedRowIter<UsersByUsername> = user_by_username
+    .find_by_partition_key(&session)
+    .await
+    .unwrap();
+
+for user in users_by_username {
+    println!("{:?}", user);
+}
+
+// custom queries
+let query = find_users_by_username_query!("username = ?");
+
+let users_by_username: TypedRowIter<UsersByUsername> =
+    UsersByUsername::find(&session, query, ("test_username",))
+        .await
+        .unwrap();
+
+for user in users_by_username {
+    println!("{:?}", user);
+}
+```
 
 ## Callbacks
 We can define callbacks that will be executed before and after certain operations.
