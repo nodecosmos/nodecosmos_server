@@ -106,7 +106,7 @@ impl<'a> Migration<'a> {
         if !self.is_first_migration_run && !is_any_field_changed {
             println!(
                 "{} {} {}",
-                "No changes detected in".bright_green(),
+                "No changes detected in".green(),
                 self.migration_object_name.bright_yellow(),
                 self.migration_obj_type_str().bright_magenta()
             );

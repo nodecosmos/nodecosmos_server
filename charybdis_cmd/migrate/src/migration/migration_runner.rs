@@ -52,7 +52,7 @@ impl<'a> Migration<'a> {
                 };
 
                 let cql = format!(
-                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n);\n",
+                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n)",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields(),
                     self.current_code_schema.partition_keys.join(", "),

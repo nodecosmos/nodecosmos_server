@@ -54,8 +54,8 @@ use charybdis::{charybdis_model, partial_model_generator, Text, Timestamp, Uuid}
 
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
 #[charybdis_model(
-    table_name = "users",
-    partition_keys = ["id"],
+    table_name = users,
+    partition_keys = [id],
     clustering_keys = [],
     secondary_indexes = []
 )]
@@ -76,7 +76,7 @@ Declare udt model as a struct within `src/models/udts` dir:
 // src/models/udts/address.rs
 use charybdis::*;
 
-#[charybdis_udt_model(type_name = "address")]
+#[charybdis_udt_model(type_name = address)]
 pub struct Address {
     pub street: Text,
     pub city: Text,
@@ -92,10 +92,10 @@ Declare view model as a struct within `src/models/materialized_views` dir:
 use charybdis::*;
 
 #[charybdis_view_model(
-    table_name="users_by_username",
-    base_table="users",
-    partition_keys=["username"],
-    clustering_keys=["id"]
+    table_name=users_by_username,
+    base_table=users,
+    partition_keys=[username],
+    clustering_keys=[id]
 )]
 pub struct UsersByUsername {
     pub username: Text,
@@ -259,9 +259,9 @@ they will be automatically added to partial fields.
 ```rust
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "nodes",
-    partition_keys = ["root_id"],
-    clustering_keys = ["id"],
+    table_name = nodes,
+    partition_keys = [root_id],
+    clustering_keys = [id],
     secondary_indexes = []
 )]
 pub struct Node {
@@ -284,10 +284,10 @@ Let's say we have a model:
 ```rust 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "posts", 
-    partition_keys = ["created_at_day"], 
-    clustering_keys = ["title"],
-    secondary_indexes = ["id"]
+    table_name = posts, 
+    partition_keys = [created_at_day], 
+    clustering_keys = [title],
+    secondary_indexes = [id]
 )]
 pub struct Post {
   pub id: Uuid,
@@ -349,7 +349,7 @@ user_by_username.username = "test_username".to_string();
 
 let users_by_username: TypedRowIter<UsersByUsername> = user_by_username
     .find_by_partition_key(&session)
-    .await
+    .awaite
     .unwrap();
 
 for user in users_by_username {
@@ -376,10 +376,10 @@ We can define callbacks that will be executed before and after certain operation
 use charybdis::*;
 
 #[charybdis_model(
-    table_name = "users", 
-    partition_keys = ["id"], 
-    clustering_keys = [""],
-    secondary_indexes = ["username", "email"]
+    table_name = users, 
+    partition_keys = [id], 
+    clustering_keys = [],
+    secondary_indexes = [username, email]
 )]
 pub struct User {
     ...

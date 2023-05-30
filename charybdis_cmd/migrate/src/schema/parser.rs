@@ -60,7 +60,7 @@ pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
                 // parse charybdis macro content
                 for attr in &item_struct.attrs {
                     if attr.path().is_ident(macro_name) {
-                        let args = attr.parse_args::<CharybdisArgs>().unwrap();
+                        let args: CharybdisArgs = attr.parse_args().unwrap();
 
                         schema_object.table_name = args.table_name.unwrap_or("".to_string());
                         schema_object.type_name = args.type_name.unwrap_or("".to_string());

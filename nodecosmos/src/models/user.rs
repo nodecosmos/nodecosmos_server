@@ -10,10 +10,10 @@ const BCRYPT_COST: u32 = 6;
 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "users",
-    partition_keys = ["id"],
+    table_name = users,
+    partition_keys = [id],
     clustering_keys = [],
-    secondary_indexes = ["username", "email"]
+    secondary_indexes = [username, email]
 )]
 pub struct User {
     pub id: Uuid,

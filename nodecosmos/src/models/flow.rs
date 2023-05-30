@@ -1,5 +1,6 @@
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::helpers::{impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::workflow::Workflow;
 use charybdis::{
     charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, List,
     New, Text, Timestamp, Uuid,
@@ -9,9 +10,9 @@ use scylla::CachingSession;
 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "flows",
-    partition_keys = ["node_id", "workflow_id"],
-    clustering_keys = ["id"],
+    table_name = flows,
+    partition_keys = [node_id, workflow_id],
+    clustering_keys = [id],
     secondary_indexes = []
 )]
 pub struct Flow {
@@ -38,6 +39,15 @@ pub struct Flow {
 }
 
 impl Flow {
+    fn workflow(&self) -> Workflow {
+        let mut workflow = Workflow::new();
+
+        workflow.node_id = self.node_id;
+        workflow.id = self.workflow_id;
+
+        workflow
+    }
+
     pub async fn append_step(
         &mut self,
         session: &CachingSession,
@@ -70,11 +80,21 @@ impl Flow {
 }
 
 impl Callbacks for Flow {
-    created_at_cb_fn!();
+    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        let now = Utc::now();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+
+        self.workflow().append_flow_id(session, self.id).await?;
+
+        Ok(())
+    }
 
     updated_at_cb_fn!();
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        self.workflow().pull_flow_id(session, self.id).await?;
+
         for step_id in self.step_ids.as_ref().unwrap() {
             let mut step = FlowStep::new();
 

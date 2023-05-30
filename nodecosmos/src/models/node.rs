@@ -6,10 +6,10 @@ use scylla::batch::Batch;
 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "nodes",
-    partition_keys = ["root_id"],
-    clustering_keys = ["id"],
-    secondary_indexes = ["id"]
+    table_name = nodes,
+    partition_keys = [root_id],
+    clustering_keys = [id],
+    secondary_indexes = [id]
 )]
 pub struct Node {
     // descendable
@@ -26,10 +26,10 @@ pub struct Node {
     pub child_ids: Option<List<Uuid>>,
 
     #[serde(rename = "descendantIds")]
-    pub descendant_ids: Option<Set<Uuid>>,
+    pub descendant_ids: Option<List<Uuid>>,
 
     #[serde(rename = "ancestorIds")]
-    pub ancestor_ids: Option<Set<Uuid>>,
+    pub ancestor_ids: Option<List<Uuid>>,
 
     // node
     pub title: Option<Text>,

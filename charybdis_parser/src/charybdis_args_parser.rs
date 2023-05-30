@@ -1,6 +1,6 @@
 use crate::parse_arr_expr_from_literals;
-use crate::parse_fields_from_array::parse_array_expr;
 use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, DeriveInput};
@@ -93,30 +93,33 @@ impl Parse for CharybdisArgs {
 
             match key.to_string().as_str() {
                 "type_name" => {
-                    let value: syn::LitStr = input.parse()?;
-                    type_name = Some(value.value());
+                    let value: syn::Expr = input.parse()?;
+                    type_name = Option::from(value.to_token_stream().to_string());
                 }
                 "table_name" => {
-                    let value: syn::LitStr = input.parse()?;
-                    table_name = Some(value.value());
+                    let value: syn::Expr = input.parse()?;
+                    table_name = Option::from(value.to_token_stream().to_string());
                 }
                 "base_table" => {
-                    let value: syn::LitStr = input.parse()?;
-                    base_table = Some(value.value());
+                    let value: syn::Expr = input.parse()?;
+                    base_table = Option::from(value.to_token_stream().to_string());
                 }
                 "partition_keys" => {
                     let array: syn::ExprArray = input.parse()?;
-                    let parsed = parse_array_expr(array);
+                    let parsed = parse_arr_expr_from_literals(array);
+
                     partition_keys = Some(parsed)
                 }
                 "clustering_keys" => {
                     let array: syn::ExprArray = input.parse()?;
-                    let parsed = parse_array_expr(array);
+                    let parsed = parse_arr_expr_from_literals(array);
+
                     clustering_keys = Some(parsed)
                 }
                 "secondary_indexes" => {
                     let array: syn::ExprArray = input.parse()?;
-                    let parsed = parse_array_expr(array);
+                    let parsed = parse_arr_expr_from_literals(array);
+
                     secondary_indexes = Some(parsed)
                 }
                 "fields_names" => {

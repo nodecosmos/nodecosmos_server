@@ -1,7 +1,7 @@
 use crate::helpers::camel_to_snake_case;
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use std::collections::HashMap;
 use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
 
@@ -83,9 +83,9 @@ use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
 /// ```rust
 /// #[partial_model_generator]
 /// #[charybdis_model(
-///     table_name = "users",
-///     partition_keys = ["id"],
-///     clustering_keys = ["created_at", "updated_at"],
+///     table_name = users,
+///     partition_keys = [id],
+///     clustering_keys = [created_at, updated_at],
 ///     secondary_indexes = []
 /// )]
 /// pub struct User {
@@ -107,9 +107,9 @@ use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
 ///
 /// ```ignore
 /// #[charybdis_model(
-///     table_name = "users",
-///     partition_keys = ["id"],
-///     clustering_keys = ["created_at"],
+///     table_name = users,
+///     partition_keys = [id],
+///     clustering_keys = [created_at],
 ///     secondary_indexes = [])]
 /// pub struct UserOps {...}
 /// ```
@@ -140,15 +140,26 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
 
     let char_args = CharybdisArgs::from_derive(&input);
 
-    let table_name = char_args.table_name.unwrap();
+    let table_name = char_args.table_name.unwrap().to_token_stream();
 
     let cks = char_args.clustering_keys.unwrap_or(vec![]);
     let pks = char_args.partition_keys.unwrap_or(vec![]);
     let sec_idxes = char_args.secondary_indexes.unwrap_or(vec![]);
 
-    let cks: proc_macro2::TokenStream = parse_str(&format!("{:?}", cks)).unwrap();
-    let pks: proc_macro2::TokenStream = parse_str(&format!("{:?}", pks)).unwrap();
-    let sec_idxes: proc_macro2::TokenStream = parse_str(&format!("{:?}", sec_idxes)).unwrap();
+    let cks: Vec<syn::Ident> = cks
+        .into_iter()
+        .map(|s| syn::Ident::new(&s, proc_macro2::Span::call_site()))
+        .collect();
+
+    let pks: Vec<syn::Ident> = pks
+        .into_iter()
+        .map(|s| syn::Ident::new(&s, proc_macro2::Span::call_site()))
+        .collect();
+
+    let sec_idxes: Vec<syn::Ident> = sec_idxes
+        .into_iter()
+        .map(|s| syn::Ident::new(&s, proc_macro2::Span::call_site()))
+        .collect();
 
     let expanded: proc_macro2::TokenStream = quote! {
         #input
@@ -163,9 +174,9 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
                 )]
                 #[charybdis::charybdis_model(
                     table_name=#table_name,
-                    partition_keys=#pks,
-                    clustering_keys=#cks,
-                    secondary_indexes=#sec_idxes
+                    partition_keys=[ #(#pks),* ],
+                    clustering_keys=[ #(#cks),* ],
+                    secondary_indexes=[ #(#sec_idxes),* ]
                 )]
                 pub struct $struct_name {}
 

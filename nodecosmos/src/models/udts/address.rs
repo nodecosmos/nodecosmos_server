@@ -1,6 +1,6 @@
 use charybdis::*;
 
-#[charybdis_udt_model(type_name = "address")]
+#[charybdis_udt_model(type_name = address)]
 pub struct Address {
     pub street: Text,
     pub city: Text,

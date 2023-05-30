@@ -19,9 +19,9 @@ use chrono::Utc;
 /// Reasoning is that we want to allow users to describe multiple processes.
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "workflows",
-    partition_keys = ["node_id"],
-    clustering_keys = ["id"],
+    table_name = workflows,
+    partition_keys = [node_id],
+    clustering_keys = [id],
     secondary_indexes = []
 )]
 pub struct Workflow {
@@ -40,6 +40,41 @@ pub struct Workflow {
 
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
+
+    #[serde(rename = "flowIds")]
+    pub flow_ids: Option<List<Uuid>>,
+}
+
+impl Workflow {
+    pub async fn append_flow_id(
+        &mut self,
+        session: &CachingSession,
+        flow_id: Uuid,
+    ) -> Result<(), CharybdisError> {
+        execute(
+            session,
+            Workflow::PUSH_TO_FLOW_IDS_QUERY,
+            (flow_id, self.node_id, self.id),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn pull_flow_id(
+        &mut self,
+        session: &CachingSession,
+        flow_id: Uuid,
+    ) -> Result<(), CharybdisError> {
+        execute(
+            session,
+            Workflow::PULL_FROM_FLOW_IDS_QUERY,
+            (flow_id, self.node_id, self.id),
+        )
+        .await?;
+
+        Ok(())
+    }
 }
 
 impl Callbacks for Workflow {

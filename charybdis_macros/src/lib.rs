@@ -1,25 +1,21 @@
 extern crate proc_macro;
-
-use charybdis_parser;
 mod helpers;
 mod macro_rules;
 mod model_impl;
 mod native;
-
+use crate::macro_rules::*;
+use crate::model_impl::*;
+use crate::native::{pull_from_set_fields_query_consts, push_to_set_fields_query_consts};
+use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 
-use crate::macro_rules::*;
-use crate::model_impl::*;
-use crate::native::{pull_from_set_fields_query_consts, push_to_set_fields_query_consts};
-use charybdis_parser::parse_named_fields;
-
 /// This macro generates the implementation of the [Model] trait for the given struct.
 #[proc_macro_attribute]
 pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args);
+    let args: CharybdisArgs = parse_macro_input!(args);
     let input: DeriveInput = parse_macro_input!(input);
 
     let struct_name = &input.ident;
@@ -107,7 +103,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 /// for the given struct.
 #[proc_macro_attribute]
 pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args);
+    let args: CharybdisArgs = parse_macro_input!(args);
     let input: DeriveInput = parse_macro_input!(input);
 
     let struct_name = &input.ident;

@@ -6,9 +6,9 @@ use chrono::Utc;
 // TODO: to-be used for suggesting IOs
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "input_output_templates",
-    partition_keys = ["title"],
-    clustering_keys = ["unit"],
+    table_name = input_output_templates,
+    partition_keys = [title],
+    clustering_keys = [unit],
     secondary_indexes = []
 )]
 pub struct InputOutputTemplate {

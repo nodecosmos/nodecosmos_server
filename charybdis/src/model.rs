@@ -27,8 +27,8 @@ pub trait BaseModel: FromRow + Sized + Default {
 /// use charybdis::*;
 ///
 /// #[charybdis_model(
-///     table_name = "users",
-///     partition_keys = ["id"],
+///     table_name = users,
+///     partition_keys = [id],
 ///     clustering_keys = [],
 ///     secondary_indexes = []
 /// )]
@@ -71,10 +71,10 @@ pub trait Model: BaseModel {
 /// use charybdis::*;
 ///
 /// #[charybdis_view_model(
-///     table_name="users_by_username",
-///     base_table="users",
-///     partition_keys=["username"],
-///     clustering_keys=["id"]
+///     table_name=users_by_username,
+///     base_table=users,
+///     partition_keys=[username],
+///     clustering_keys=[id]
 /// )]
 /// pub struct UsersByUsername {
 ///     pub username: Text,
@@ -100,7 +100,7 @@ pub trait MaterializedView: BaseModel {}
 /// ```rust
 /// use charybdis::{charybdis_udt_model, Text};
 ///
-/// #[charybdis_udt_model(type_name = "address")]
+/// #[charybdis_udt_model(type_name = address)]
 /// pub struct Address {
 ///     pub street: Text,
 ///     pub city: Text,

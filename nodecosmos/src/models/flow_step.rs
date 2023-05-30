@@ -11,10 +11,10 @@ use scylla::CachingSession;
 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "flow_steps",
-    partition_keys = ["node_id", "workflow_id"],
-    clustering_keys = ["id"],
-    secondary_indexes = ["id"]
+    table_name = flow_steps,
+    partition_keys = [node_id, workflow_id],
+    clustering_keys = [id],
+    secondary_indexes = []
 )]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]

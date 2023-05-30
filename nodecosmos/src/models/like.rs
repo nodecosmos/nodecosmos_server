@@ -9,9 +9,9 @@ use charybdis::*;
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "likes",
-    partition_keys = ["object_id"],
-    clustering_keys = ["user_id"],
+    table_name = likes,
+    partition_keys = [object_id],
+    clustering_keys = [user_id],
     secondary_indexes = []
 )]
 pub struct Like {

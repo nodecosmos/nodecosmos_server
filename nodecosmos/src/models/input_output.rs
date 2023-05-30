@@ -5,9 +5,9 @@ use chrono::Utc;
 #[derive(Clone)]
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = "input_outputs",
-    partition_keys = ["workflow_id"],
-    clustering_keys = ["id"],
+    table_name = input_outputs,
+    partition_keys = [workflow_id],
+    clustering_keys = [id],
     secondary_indexes = []
 )]
 pub struct InputOutput {
