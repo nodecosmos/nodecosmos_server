@@ -2,8 +2,8 @@ use crate::models::flow_step::FlowStep;
 use crate::models::helpers::{impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::workflow::Workflow;
 use charybdis::{
-    charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, List,
-    New, Text, Timestamp, Uuid,
+    charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, Int,
+    List, New, Text, Timestamp, Uuid,
 };
 use chrono::Utc;
 use scylla::CachingSession;
@@ -28,6 +28,9 @@ pub struct Flow {
     pub title: Text,
     pub description: Text,
 
+    #[serde(rename = "descriptionMarkdown")]
+    pub description_markdown: Text,
+
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
@@ -36,6 +39,9 @@ pub struct Flow {
 
     #[serde(rename = "stepIds")]
     pub step_ids: Option<List<Uuid>>,
+
+    #[serde(rename = "startIndex")]
+    pub start_index: Option<Int>,
 }
 
 impl Flow {
@@ -118,6 +124,7 @@ partial_flow!(
     workflow_id,
     id,
     description,
+    description_markdown,
     updated_at
 );
 impl_updated_at_cb!(UpdateFlowDescription);

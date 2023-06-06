@@ -1,6 +1,6 @@
 use crate::parse_arr_expr_from_literals;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::ToTokens;
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, DeriveInput};

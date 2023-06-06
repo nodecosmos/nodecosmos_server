@@ -4,9 +4,9 @@ use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::{find_input_output_query, InputOutput};
-use crate::models::workflow::{find_workflow_query, Workflow};
+use crate::models::workflow::{find_workflow_query, UpdateInitialInputsWorkflow, Workflow};
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, put, web, HttpResponse};
 use charybdis::*;
 use scylla::CachingSession;
 use serde_json::json;
@@ -18,7 +18,7 @@ pub async fn get_workflow(
 ) -> Result<HttpResponse, NodecosmosError> {
     let node_id = node_id.into_inner();
 
-    // Currently we only support one workflow per node, in future we will support multiple 
+    // Currently we only support one workflow per node, in future we will support multiple
     // workflows per node.
     let workflow =
         Workflow::find_one(&db_session, find_workflow_query!("node_id = ?"), (node_id,)).await?;
@@ -40,6 +40,10 @@ pub async fn get_workflow(
     let mut flow_steps_vec = vec![];
     let mut input_outputs = vec![];
 
+    if let Some(initial_input_ids) = &workflow.initial_input_ids {
+        input_output_ids.extend(initial_input_ids.iter().cloned());
+    }
+
     while let Some(flow) = flows.next() {
         if let Ok(flow) = flow {
             flows_vec.push(flow);
@@ -48,29 +52,33 @@ pub async fn get_workflow(
 
     while let Some(step) = flow_steps.next() {
         if let Ok(step) = step {
-            step.input_ids_by_node_id.iter().cloned().for_each(|io| {
-                let ids: Vec<Vec<Uuid>> = io.values().cloned().collect();
-                input_output_ids.extend(ids);
+            step.input_ids_by_node_id.iter().for_each(|io| {
+                io.values().for_each(|ids| {
+                    input_output_ids.extend(ids);
+                });
             });
-            step.output_ids_by_node_id.iter().cloned().for_each(|io| {
-                let ids: Vec<Vec<Uuid>> = io.values().cloned().collect();
-                input_output_ids.extend(ids);
+            step.output_ids_by_node_id.iter().for_each(|io| {
+                io.values().for_each(|ids| {
+                    input_output_ids.extend(ids);
+                });
             });
 
             flow_steps_vec.push(step);
         }
     }
 
-    let mut input_outputs_res = InputOutput::find(
-        &db_session,
-        find_input_output_query!("id in (?)"),
-        input_output_ids,
-    )
-    .await?;
+    if !input_output_ids.is_empty() {
+        let mut input_outputs_res = InputOutput::find(
+            &db_session,
+            find_input_output_query!("workflow_id = ? AND id IN ?"),
+            (workflow.id, input_output_ids),
+        )
+        .await?;
 
-    while let Some(input_output) = input_outputs_res.next() {
-        if let Ok(input_output) = input_output {
-            input_outputs.push(input_output);
+        while let Some(input_output) = input_outputs_res.next() {
+            if let Ok(input_output) = input_output {
+                input_outputs.push(input_output);
+            }
         }
     }
 
@@ -96,5 +104,24 @@ pub async fn create_workflow(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
+        "workflow": workflow,
+    })))
+}
+
+#[put("/initial_input_ids")]
+pub async fn update_initial_inputs(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    workflow: web::Json<UpdateInitialInputsWorkflow>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut workflow = workflow.into_inner();
+
+    auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
+
+    workflow.update_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "workflow": workflow,
     })))
 }

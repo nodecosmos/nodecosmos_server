@@ -11,16 +11,19 @@ use chrono::Utc;
     secondary_indexes = []
 )]
 pub struct InputOutput {
+    #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
+
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    pub title: Text,
-    pub unit: Text,
+    pub title: Option<Text>,
+    pub unit: Option<Text>,
 
     #[serde(rename = "dataType")]
-    pub data_type: Text,
+    pub data_type: Option<Text>,
 
-    pub value: Text,
+    pub value: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,

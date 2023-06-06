@@ -1,5 +1,5 @@
 use crate::models::flow::Flow;
-use crate::models::helpers::{created_at_cb_fn, updated_at_cb_fn};
+use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use charybdis::*;
 use chrono::Utc;
 ///
@@ -28,9 +28,11 @@ pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
-    pub title: Text,
-    pub description: Text,
+    pub title: Option<Text>,
+    pub description: Option<Text>,
+    pub description_markdown: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -107,3 +109,12 @@ impl Callbacks for Workflow {
         Ok(())
     }
 }
+
+partial_workflow!(
+    UpdateInitialInputsWorkflow,
+    node_id,
+    id,
+    initial_input_ids,
+    updated_at
+);
+impl_updated_at_cb!(UpdateInitialInputsWorkflow);

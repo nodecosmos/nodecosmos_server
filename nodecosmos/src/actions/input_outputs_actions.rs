@@ -19,6 +19,6 @@ pub async fn create_io(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
-        "input_output": input_output,
+        "inputOutput": input_output,
     })))
 }
