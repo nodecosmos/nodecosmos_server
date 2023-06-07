@@ -78,6 +78,7 @@ pub async fn delete_flow(
     let params = params.into_inner();
     let mut flow = Flow::new();
 
+    flow.node_id = params.node_id;
     flow.workflow_id = params.workflow_id;
     flow.id = params.id;
 
@@ -92,5 +93,8 @@ pub async fn delete_flow(
 
     flow.delete_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "flow": flow,
+    })))
 }

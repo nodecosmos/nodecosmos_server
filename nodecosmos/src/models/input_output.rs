@@ -1,3 +1,4 @@
+use crate::models::helpers::{created_at_cb_fn, updated_at_cb_fn};
 use crate::models::input_output_template::InputOutputTemplate;
 use charybdis::*;
 use chrono::Utc;
@@ -33,15 +34,7 @@ pub struct InputOutput {
 }
 
 impl Callbacks for InputOutput {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        let now = Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
-        Ok(())
-    }
+    created_at_cb_fn!();
 
     async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         // TODO: handle this async once we build logic
@@ -51,13 +44,7 @@ impl Callbacks for InputOutput {
         Ok(())
     }
 
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        let now = Utc::now();
-
-        self.updated_at = Some(now);
-
-        Ok(())
-    }
+    updated_at_cb_fn!();
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         InputOutputTemplate::remove_io_temp_if_not_used(session, self.clone()).await;

@@ -3,8 +3,8 @@ use crate::models::helpers::{
     created_at_cb_fn, impl_empty_cb, impl_updated_at_cb, updated_at_cb_fn,
 };
 use charybdis::{
-    charybdis_model, partial_model_generator, Callbacks, CharybdisError, Find, Frozen, Int, List,
-    Map, New, Timestamp, UpdateWithCallbacks, Uuid,
+    charybdis_model, partial_model_generator, Callbacks, CharybdisError, Find, Frozen, List, Map,
+    New, Timestamp, UpdateWithCallbacks, Uuid,
 };
 use chrono::Utc;
 use scylla::CachingSession;
@@ -26,7 +26,7 @@ pub struct FlowStep {
     #[serde(rename = "flowId")]
     pub flow_id: Uuid,
 
-    pub step: Int,
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
     #[serde(rename = "nodeIds")]

@@ -1,5 +1,5 @@
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::workflow::Workflow;
 use charybdis::{
     charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, Int,
@@ -13,23 +13,23 @@ use scylla::CachingSession;
     table_name = flows,
     partition_keys = [node_id, workflow_id],
     clustering_keys = [id],
-    secondary_indexes = []
+    secondary_indexes = [id]
 )]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
-    #[serde(rename = "id")]
-    pub id: Uuid,
-
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
 
-    pub title: Text,
-    pub description: Text,
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+
+    pub title: Option<Text>,
+    pub description: Option<Text>,
 
     #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Text,
+    pub description_markdown: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -86,6 +86,8 @@ impl Flow {
 }
 
 impl Callbacks for Flow {
+    created_at_cb_fn!();
+
     async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         let now = Utc::now();
         self.created_at = Some(now);
@@ -101,14 +103,16 @@ impl Callbacks for Flow {
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         self.workflow().pull_flow_id(session, self.id).await?;
 
-        for step_id in self.step_ids.as_ref().unwrap() {
-            let mut step = FlowStep::new();
+        if let Some(step_ids) = self.step_ids.as_ref() {
+            for step_id in step_ids {
+                let mut step = FlowStep::new();
 
-            step.node_id = self.node_id;
-            step.workflow_id = self.workflow_id;
-            step.id = *step_id;
+                step.node_id = self.node_id;
+                step.workflow_id = self.workflow_id;
+                step.id = *step_id;
 
-            step.delete(session).await?; // avoid callbacks that are removing steps from the flow
+                step.delete(session).await?; // avoid callbacks that are removing steps from the flow
+            }
         }
 
         Ok(())
