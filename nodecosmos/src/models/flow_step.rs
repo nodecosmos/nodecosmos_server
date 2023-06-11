@@ -30,7 +30,7 @@ pub struct FlowStep {
     pub id: Uuid,
 
     #[serde(rename = "nodeIds")]
-    pub node_ids: List<Uuid>,
+    pub node_ids: Option<List<Uuid>>,
 
     #[serde(rename = "inputIdsByNodeId")]
     pub input_ids_by_node_id: Option<Map<Uuid, Frozen<List<Uuid>>>>,
@@ -161,3 +161,15 @@ impl_updated_at_cb!(UpdateFlowStepOutputIds);
 
 partial_flow_step!(DeleteFlowStep, node_id, workflow_id, flow_id, id);
 impl_empty_cb!(DeleteFlowStep);
+
+partial_flow_step!(
+    UpdateFlowStepNodeIds,
+    node_id,
+    workflow_id,
+    flow_id,
+    id,
+    node_ids,
+    updated_at
+);
+
+impl_updated_at_cb!(UpdateFlowStepNodeIds);

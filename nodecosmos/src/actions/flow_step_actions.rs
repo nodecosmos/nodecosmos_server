@@ -2,7 +2,8 @@ use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    DeleteFlowStep, FlowStep, UpdateFlowStepInputIds, UpdateFlowStepOutputIds,
+    DeleteFlowStep, FlowStep, UpdateFlowStepInputIds, UpdateFlowStepNodeIds,
+    UpdateFlowStepOutputIds,
 };
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::*;
@@ -29,7 +30,31 @@ pub async fn create_flow_step(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
-        "flow_step": flow_step,
+        "flowStep": flow_step,
+    })))
+}
+
+#[put("/nodes")]
+pub async fn update_flow_step_nodes(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    flow_step: web::Json<UpdateFlowStepNodeIds>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut flow_step = flow_step.into_inner();
+
+    auth_workflow_update(
+        &db_session,
+        flow_step.node_id,
+        flow_step.workflow_id,
+        current_user,
+    )
+    .await?;
+
+    flow_step.update_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "flowStep": flow_step,
     })))
 }
 
@@ -53,7 +78,7 @@ pub async fn update_flow_step_inputs(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
-        "flow_step": flow_step,
+        "flowStep": flow_step,
     })))
 }
 
@@ -77,7 +102,7 @@ pub async fn update_flow_step_outputs(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
-        "flow_step": flow_step,
+        "flowStep": flow_step,
     })))
 }
 
