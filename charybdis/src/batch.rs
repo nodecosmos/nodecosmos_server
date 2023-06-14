@@ -1,6 +1,7 @@
 use crate::{CharybdisError, Model, SerializedValues, ValueList};
 use scylla::CachingSession;
 
+// Simple batch for Charybdis models
 pub struct CharybdisModelBatch {
     batch: scylla::batch::Batch,
     values: Vec<SerializedValues>,
