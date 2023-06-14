@@ -7,7 +7,7 @@ use crate::models::input_output::{find_input_output_query, InputOutput};
 use crate::models::workflow::{find_workflow_query, UpdateInitialInputsWorkflow, Workflow};
 
 use actix_web::{get, post, put, web, HttpResponse};
-use charybdis::*;
+use charybdis::{Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
 use scylla::CachingSession;
 use serde_json::json;
 

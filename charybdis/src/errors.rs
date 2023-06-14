@@ -84,3 +84,9 @@ impl From<SingleRowTypedError> for CharybdisError {
         CharybdisError::SingleRowTypedError(e, "unknown".to_string())
     }
 }
+
+impl From<SerializeValuesError> for CharybdisError {
+    fn from(e: SerializeValuesError) -> Self {
+        CharybdisError::SerializeValuesError(e, "unknown".to_string())
+    }
+}

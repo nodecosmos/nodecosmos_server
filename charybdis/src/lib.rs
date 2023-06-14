@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(async_fn_in_trait)]
 
+mod batch;
 mod callbacks;
 mod cql;
 mod errors;
@@ -11,8 +12,8 @@ mod serializers;
 
 // orm
 pub use crate::{
-    callbacks::*, cql::types::*, errors::CharybdisError, model::*, operations::*,
-    query_builder::CharybdisQuery, query_builder::*, serializers::*,
+    batch::CharybdisModelBatch, callbacks::*, cql::types::*, errors::CharybdisError, model::*,
+    operations::*, query_builder::CharybdisQuery, query_builder::*, serializers::*,
 };
 
 // orm macros

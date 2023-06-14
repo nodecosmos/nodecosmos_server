@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::input_output::InputOutput;
 
 use actix_web::{post, web, HttpResponse};
-use charybdis::*;
+use charybdis::InsertWithCallbacks;
 use scylla::CachingSession;
 use serde_json::json;
 

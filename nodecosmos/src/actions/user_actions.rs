@@ -3,7 +3,7 @@ use super::client_session::set_current_user;
 use crate::models::user::{DeleteUser, GetUser, UpdateUser, User};
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
-use charybdis::*;
+use charybdis::{CharybdisError, Delete, Find, InsertWithCallbacks, UpdateWithCallbacks, Uuid};
 use scylla::CachingSession;
 use serde_json::json;
 
