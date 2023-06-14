@@ -8,7 +8,7 @@ use chrono::Utc;
 #[charybdis_model(
     table_name = input_output_templates,
     partition_keys = [title],
-    clustering_keys = [unit],
+    clustering_keys = [],
     secondary_indexes = []
 )]
 pub struct InputOutputTemplate {
@@ -34,8 +34,8 @@ impl InputOutputTemplate {
             title: io.title.clone(),
             unit: io.unit.clone(),
             data_type: io.data_type.clone(),
-            created_at: None,
-            updated_at: None,
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
             used_by_workflow_ids: Some(vec![io.workflow_id.clone()] as List<Uuid>),
         };
 

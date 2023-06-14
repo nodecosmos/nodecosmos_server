@@ -79,10 +79,3 @@ macro_rules! updated_at_cb_fn {
     };
 }
 pub(crate) use updated_at_cb_fn;
-
-macro_rules! impl_empty_cb {
-    ($struct_name:ident) => {
-        impl charybdis::Callbacks for $struct_name {}
-    };
-}
-pub(crate) use impl_empty_cb;

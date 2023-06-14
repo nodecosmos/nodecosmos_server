@@ -218,7 +218,7 @@ impl Callbacks for Node {
         self.pull_from_ancestors(db_session).await?;
         self.delete_descendants(db_session).await?;
 
-        // TODO: remove likes, workflow & workflow_steps
+        // TODO: remove likes, workflow
 
         Ok(())
     }

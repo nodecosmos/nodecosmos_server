@@ -1,10 +1,9 @@
 use crate::models::flow::Flow;
-use crate::models::helpers::{
-    created_at_cb_fn, impl_empty_cb, impl_updated_at_cb, updated_at_cb_fn,
-};
+use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::input_output::InputOutput;
 use charybdis::{
-    charybdis_model, partial_model_generator, Callbacks, CharybdisError, Find, Frozen, List, Map,
-    New, Timestamp, UpdateWithCallbacks, Uuid,
+    charybdis_model, partial_model_generator, AsNative, Callbacks, CharybdisError,
+    DeleteWithCallbacks, Find, Frozen, List, Map, New, Timestamp, UpdateWithCallbacks, Uuid,
 };
 use chrono::Utc;
 use scylla::CachingSession;
@@ -46,59 +45,88 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    async fn next_flow_step(
-        &self,
-        session: &CachingSession,
-    ) -> Result<Option<UpdateFlowStepOutputIds>, CharybdisError> {
-        let mut flow = Flow::new();
+    async fn delete_outputs(&self, session: &CachingSession) -> Result<(), CharybdisError> {
+        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
+            for (_, output_ids) in output_ids_by_node_id.iter() {
+                for output_id in output_ids.iter() {
+                    let mut output = InputOutput::new();
 
-        flow.node_id = self.node_id;
-        flow.workflow_id = self.workflow_id;
-        flow.id = self.flow_id;
+                    output.workflow_id = self.workflow_id;
+                    output.id = output_id.clone();
 
-        flow = flow.find_by_primary_key(session).await?;
-
-        let next_flow_step_id = match flow.step_ids {
-            Some(ref step_ids) => step_ids.iter().skip_while(|&uuid| uuid == &self.id).next(),
-            None => None,
-        };
-
-        match next_flow_step_id {
-            Some(next_flow_step_id) => {
-                let mut next_flow_step = UpdateFlowStepOutputIds::new();
-
-                next_flow_step.node_id = self.node_id;
-                next_flow_step.workflow_id = self.workflow_id;
-                next_flow_step.flow_id = self.flow_id;
-                next_flow_step.id = next_flow_step_id.clone();
-
-                next_flow_step.find_by_primary_key(session).await?;
-
-                Ok(Some(next_flow_step))
+                    output.find_by_primary_key(session).await?;
+                    output.delete_cb(session).await?;
+                }
             }
-            None => Ok(None),
         }
+
+        Ok(())
     }
 
-    async fn dissociate_outputs_from_next_flow_step(
+    async fn delete_outputs_from_non_existent_nodes(
         &mut self,
         session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        let next_flow_step = self.next_flow_step(session).await?;
+        let output_ids_by_node_id = self.output_ids_by_node_id.as_mut();
+        let node_ids = self.node_ids.as_mut();
 
-        if let Some(mut next_flow_step) = next_flow_step {
-            match next_flow_step.output_ids_by_node_id {
-                Some(ref mut output_ids_by_node_id) => {
-                    for (_, output_ids) in output_ids_by_node_id.iter_mut() {
-                        if let Some(pos) = output_ids.iter().position(|&id| id == self.id) {
-                            output_ids.remove(pos);
+        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
+            if let Some(node_ids) = node_ids {
+                let mut node_ids_to_remove = vec![];
+
+                for (node_id, output_ids) in output_ids_by_node_id.iter() {
+                    if !node_ids.contains(node_id) {
+                        for output_id in output_ids.iter() {
+                            let mut output = InputOutput::new();
+
+                            output.workflow_id = self.workflow_id;
+                            output.id = output_id.clone();
+
+                            output.find_by_primary_key(session).await?;
+                            output.delete_cb(session).await?;
                         }
-                    }
 
-                    next_flow_step.update_cb(session).await?;
+                        node_ids_to_remove.push(node_id.clone());
+                    }
                 }
 
-                None => {}
+                for node_id in node_ids_to_remove {
+                    output_ids_by_node_id.remove(&node_id);
+                }
+
+                self.update_cb(session).await?;
+            } else {
+                self.output_ids_by_node_id = None;
+                self.update_cb(session).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn disassociate_inputs_from_non_existent_nodes(
+        &mut self,
+        session: &CachingSession,
+    ) -> Result<(), CharybdisError> {
+        let input_ids_by_node_id = self.input_ids_by_node_id.as_mut();
+        let node_ids = self.node_ids.as_mut();
+
+        if let Some(input_ids_by_node_id) = input_ids_by_node_id {
+            if let Some(node_ids) = node_ids {
+                let node_ids_to_remove = input_ids_by_node_id
+                    .keys()
+                    .cloned()
+                    .filter(|node_id| !node_ids.contains(node_id))
+                    .collect::<Vec<_>>();
+
+                for node_id in node_ids_to_remove {
+                    input_ids_by_node_id.remove(&node_id);
+                }
+
+                self.update_cb(session).await?;
+            } else {
+                self.input_ids_by_node_id = None;
+                self.update_cb(session).await?;
             }
         }
 
@@ -131,7 +159,7 @@ impl Callbacks for FlowStep {
         flow.id = self.flow_id;
 
         flow.remove_step(session, self.id).await?;
-        self.dissociate_outputs_from_next_flow_step(session).await?;
+        self.delete_outputs(session).await?;
 
         Ok(())
     }
@@ -159,9 +187,6 @@ partial_flow_step!(
 );
 impl_updated_at_cb!(UpdateFlowStepOutputIds);
 
-partial_flow_step!(DeleteFlowStep, node_id, workflow_id, flow_id, id);
-impl_empty_cb!(DeleteFlowStep);
-
 partial_flow_step!(
     UpdateFlowStepNodeIds,
     node_id,
@@ -172,4 +197,20 @@ partial_flow_step!(
     updated_at
 );
 
-impl_updated_at_cb!(UpdateFlowStepNodeIds);
+impl Callbacks for UpdateFlowStepNodeIds {
+    updated_at_cb_fn!();
+
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        let mut flow_step = self.as_native().find_by_primary_key(session).await?;
+
+        flow_step
+            .delete_outputs_from_non_existent_nodes(session)
+            .await?;
+
+        flow_step
+            .disassociate_inputs_from_non_existent_nodes(session)
+            .await?;
+
+        Ok(())
+    }
+}

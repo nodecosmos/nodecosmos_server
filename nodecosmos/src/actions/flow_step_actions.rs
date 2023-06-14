@@ -2,8 +2,7 @@ use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    DeleteFlowStep, FlowStep, UpdateFlowStepInputIds, UpdateFlowStepNodeIds,
-    UpdateFlowStepOutputIds,
+    FlowStep, UpdateFlowStepInputIds, UpdateFlowStepNodeIds, UpdateFlowStepOutputIds,
 };
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::*;
@@ -58,30 +57,6 @@ pub async fn update_flow_step_nodes(
     })))
 }
 
-#[put("/inputs")]
-pub async fn update_flow_step_inputs(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    flow_step: web::Json<UpdateFlowStepInputIds>,
-) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
-
-    flow_step.update_cb(&db_session).await?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "success": true,
-        "flowStep": flow_step,
-    })))
-}
-
 #[put("/outputs")]
 pub async fn update_flow_step_outputs(
     db_session: web::Data<CachingSession>,
@@ -106,11 +81,35 @@ pub async fn update_flow_step_outputs(
     })))
 }
 
-#[delete("{node_id}/{workflow_id}/{flow_id}/{step}")]
+#[put("/inputs")]
+pub async fn update_flow_step_inputs(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    flow_step: web::Json<UpdateFlowStepInputIds>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut flow_step = flow_step.into_inner();
+
+    auth_workflow_update(
+        &db_session,
+        flow_step.node_id,
+        flow_step.workflow_id,
+        current_user,
+    )
+    .await?;
+
+    flow_step.update_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "flowStep": flow_step,
+    })))
+}
+
+#[delete("{nodeId}/{workflowId}/{flowId}/{id}")]
 pub async fn delete_flow_step(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow_step: web::Path<DeleteFlowStep>,
+    flow_step: web::Path<FlowStep>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let flow_step = flow_step.into_inner();
 
@@ -125,5 +124,8 @@ pub async fn delete_flow_step(
 
     flow_step.delete_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "flowStep": flow_step,
+    })))
 }
