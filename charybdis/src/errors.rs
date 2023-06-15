@@ -85,6 +85,15 @@ impl From<SingleRowTypedError> for CharybdisError {
     }
 }
 
+impl From<FirstRowTypedError> for CharybdisError {
+    fn from(e: FirstRowTypedError) -> Self {
+        match e {
+            FirstRowTypedError::RowsEmpty => CharybdisError::NotFoundError(e.to_string()),
+            _ => CharybdisError::FirstRowTypedError(e, "unknown".to_string()),
+        }
+    }
+}
+
 impl From<SerializeValuesError> for CharybdisError {
     fn from(e: SerializeValuesError) -> Self {
         CharybdisError::SerializeValuesError(e, "unknown".to_string())

@@ -56,9 +56,7 @@ impl<T: BaseModel> Find for T {
         values: impl ValueList,
     ) -> Result<Self, CharybdisError> {
         let result: QueryResult = session.execute(query, values).await?;
-        let typed_row: Self = result
-            .first_row_typed()
-            .map_err(|e| CharybdisError::FirstRowTypedError(e, Self::DB_MODEL_NAME.to_string()))?;
+        let typed_row: Self = result.first_row_typed()?;
 
         Ok(typed_row)
     }
