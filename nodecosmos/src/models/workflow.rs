@@ -1,7 +1,9 @@
 use crate::models::flow::Flow;
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::input_output::InputOutput;
 use charybdis::*;
 use chrono::Utc;
+
 ///
 /// Workflow model
 ///
@@ -91,19 +93,18 @@ impl Callbacks for Workflow {
 
         let flows = flow.find_by_partition_key(session).await?;
 
-        for mut flow in flows {
-            match flow {
-                Ok(ref mut flow) => {
-                    flow.delete_cb(session).await?;
-                }
-                Err(e) => {
-                    println!(
-                        "Workflow::Callbacks::after_delete: Error deleting flow: {:?}",
-                        e
-                    );
-                    continue;
-                }
-            }
+        for flow in flows {
+            flow?.delete_cb(session).await?;
+        }
+
+        // delete ios
+        let mut input_output = InputOutput::new();
+        input_output.workflow_id = self.id;
+
+        let input_outputs = input_output.find_by_partition_key(session).await?;
+
+        for input_output in input_outputs {
+            input_output?.delete_cb(session).await?;
         }
 
         Ok(())

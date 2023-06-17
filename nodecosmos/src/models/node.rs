@@ -1,5 +1,6 @@
 use crate::models::helpers::impl_updated_at_cb;
 use crate::models::udts::{Creator, Owner};
+use crate::models::workflow::Workflow;
 use charybdis::*;
 use chrono::Utc;
 use scylla::batch::Batch;
@@ -12,7 +13,6 @@ use scylla::batch::Batch;
     secondary_indexes = [id]
 )]
 pub struct Node {
-    // descendable
     #[serde(default)]
     pub id: Uuid,
 
@@ -38,7 +38,6 @@ pub struct Node {
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
 
-    // owners
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
 
@@ -218,7 +217,14 @@ impl Callbacks for Node {
         self.pull_from_ancestors(db_session).await?;
         self.delete_descendants(db_session).await?;
 
-        // TODO: remove likes, workflow
+        let mut workflow = Workflow::new();
+        workflow.node_id = self.id;
+
+        let workflows = workflow.find_by_partition_key(&db_session).await?;
+
+        for workflow in workflows {
+            workflow?.delete_cb(&db_session).await?;
+        }
 
         Ok(())
     }

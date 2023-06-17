@@ -563,7 +563,7 @@ execute(query, (uuid, &user.id)).await;
     set_updated_at_cb!(UpdateUser);
     ```
 
-2) `partial_models` require complete primary key
+2) `partial_models` require complete primary key in definition
 
 ## Roadmap:
 - [ ] Add tests
