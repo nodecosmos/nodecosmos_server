@@ -50,7 +50,8 @@ async fn main() {
                     .service(create_node)
                     .service(update_node_title)
                     .service(update_node_description)
-                    .service(delete_node),
+                    .service(delete_node)
+                    .service(get_node_description),
             )
             .service(
                 web::scope("/likes")
@@ -80,7 +81,14 @@ async fn main() {
                     .service(update_flow_step_outputs)
                     .service(delete_flow_step),
             )
-            .service(web::scope("input_outputs").service(create_io))
+            .service(
+                web::scope("input_outputs")
+                    .service(create_io)
+                    .service(get_io_description)
+                    .service(update_io_title)
+                    .service(update_io_description)
+                    .service(delete_io),
+            )
     })
     .bind(("127.0.0.1", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

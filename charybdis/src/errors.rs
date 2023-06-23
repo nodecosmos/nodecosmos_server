@@ -33,7 +33,7 @@ impl fmt::Display for CharybdisError {
             }
             CharybdisError::SingleRowTypedError(e, model_name) => write!(
                 f,
-                "SingleRowTypedError: {:?} \n in Model: {}",
+                "SingleRowTypedError: {:?} \n in Model: {}. Did you forget to provide complete primary key?",
                 e, model_name
             ),
             CharybdisError::FirstRowTypedError(e, model) => {

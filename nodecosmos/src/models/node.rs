@@ -230,7 +230,30 @@ impl Callbacks for Node {
     }
 }
 
-partial_node!(GetNode, root_id, id, descendant_ids);
+partial_node!(
+    GetBaseNode,
+    root_id,
+    id,
+    ancestor_ids,
+    child_ids,
+    descendant_ids,
+    title,
+    parent_id,
+    owner_id,
+    editor_ids,
+    likes_count,
+    owner,
+    created_at,
+    updated_at
+);
+
+partial_node!(
+    GetNodeDescription,
+    root_id,
+    id,
+    description,
+    description_markdown
+);
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
 impl_updated_at_cb!(UpdateNodeTitle);

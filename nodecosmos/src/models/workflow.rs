@@ -79,6 +79,21 @@ impl Workflow {
 
         Ok(())
     }
+
+    pub async fn pull_initial_input_id(
+        &mut self,
+        session: &CachingSession,
+        initial_input_id: Uuid,
+    ) -> Result<(), CharybdisError> {
+        execute(
+            session,
+            Workflow::PULL_FROM_INITIAL_INPUT_IDS_QUERY,
+            (initial_input_id, self.node_id, self.id),
+        )
+        .await?;
+
+        Ok(())
+    }
 }
 
 impl Callbacks for Workflow {

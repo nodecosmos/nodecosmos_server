@@ -1,7 +1,7 @@
 use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_workflow_creation;
 use crate::errors::NodecosmosError;
-use crate::models::flow::Flow;
+use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::{find_input_output_query, InputOutput};
 use crate::models::workflow::{find_workflow_query, UpdateInitialInputsWorkflow, Workflow};
@@ -23,7 +23,7 @@ pub async fn get_workflow(
     let workflow =
         Workflow::find_one(&db_session, find_workflow_query!("node_id = ?"), (node_id,)).await?;
 
-    let mut flow = Flow::new();
+    let mut flow = BaseFlow::new();
     flow.node_id = node_id;
     flow.workflow_id = workflow.id;
 
@@ -70,8 +70,8 @@ pub async fn get_workflow(
     if !input_output_ids.is_empty() {
         let mut input_outputs_res = InputOutput::find(
             &db_session,
-            find_input_output_query!("workflow_id = ? AND id IN ?"),
-            (workflow.id, input_output_ids),
+            find_input_output_query!("node_id = ? AND workflow_id = ? AND id IN ?"),
+            (workflow.node_id, workflow.id, input_output_ids),
         )
         .await?;
 

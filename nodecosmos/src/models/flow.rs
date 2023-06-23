@@ -119,6 +119,18 @@ impl Callbacks for Flow {
     }
 }
 
+partial_flow!(
+    BaseFlow,
+    node_id,
+    workflow_id,
+    id,
+    title,
+    step_ids,
+    start_index,
+    created_at,
+    updated_at
+);
+
 partial_flow!(UpdateFlowTitle, node_id, workflow_id, id, title, updated_at);
 impl_updated_at_cb!(UpdateFlowTitle);
 

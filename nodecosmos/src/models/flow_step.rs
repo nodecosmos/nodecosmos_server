@@ -45,12 +45,32 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
+    pub async fn pull_output_id(
+        &mut self,
+        session: &CachingSession,
+        output_id: Uuid,
+    ) -> Result<(), CharybdisError> {
+        // filter out output_id from output_ids_by_node_id
+        let mut output_ids_by_node_id = self.output_ids_by_node_id.clone().unwrap_or_default();
+
+        for (_, output_ids) in output_ids_by_node_id.iter_mut() {
+            output_ids.retain(|id| id != &output_id);
+        }
+
+        self.output_ids_by_node_id = Some(output_ids_by_node_id);
+
+        self.update_cb(session).await?;
+
+        Ok(())
+    }
+
     async fn delete_outputs(&self, session: &CachingSession) -> Result<(), CharybdisError> {
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
             for (_, output_ids) in output_ids_by_node_id.iter() {
                 for output_id in output_ids.iter() {
                     let mut output = InputOutput::new();
 
+                    output.node_id = self.node_id;
                     output.workflow_id = self.workflow_id;
                     output.id = output_id.clone();
 

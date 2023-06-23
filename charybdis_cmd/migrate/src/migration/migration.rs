@@ -203,6 +203,12 @@ impl<'a> Migration<'a> {
                 let db_field_type = db_field_type.to_lowercase().replace(" ", "");
 
                 if code_field_type != db_field_type {
+                    println!(
+                        "\nType Change: {} -> {}",
+                        db_field_type.to_uppercase().yellow().bold(),
+                        code_field_type.to_uppercase().bright_red().bold()
+                    );
+
                     return true;
                 }
             }

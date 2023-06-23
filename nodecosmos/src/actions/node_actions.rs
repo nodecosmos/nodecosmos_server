@@ -10,6 +10,7 @@ use charybdis::{
 };
 use futures::StreamExt;
 use scylla::CachingSession;
+use serde_json::json;
 
 const DEFAULT_PAGE_SIZE: i32 = 100;
 
@@ -23,9 +24,9 @@ pub struct PrimaryKeyParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut nodes_iter = Node::find_paged(
+    let mut nodes_iter = GetBaseNode::find_paged(
         &db_session,
-        Node::SELECT_FIELDS_CLAUSE,
+        GetBaseNode::SELECT_FIELDS_CLAUSE,
         (),
         DEFAULT_PAGE_SIZE,
     )
@@ -47,7 +48,7 @@ pub async fn get_root_node(
     db_session: web::Data<CachingSession>,
     root_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = Node::new();
+    let mut node = GetBaseNode::new();
     node.root_id = root_id.into_inner();
 
     let mut nodes_iter = node.find_by_partition_key(&db_session).await?;
@@ -68,7 +69,7 @@ pub async fn get_node(
     params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
-    let mut node = Node::new();
+    let mut node = GetBaseNode::new();
 
     node.root_id = params.root_id;
     node.id = params.id;
@@ -78,8 +79,9 @@ pub async fn get_node(
     let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
     all_node_ids.push(node.id);
 
-    let descendants_q = find_node_query!("root_id = ? AND id IN ?");
-    let mut descendants = Node::find_paged(
+    let descendants_q = find_get_base_node_query!("root_id = ? AND id IN ?");
+
+    let mut descendants = GetBaseNode::find_paged(
         &db_session,
         descendants_q,
         (node.root_id, all_node_ids),
@@ -96,6 +98,25 @@ pub async fn get_node(
     }
 
     Ok(HttpResponse::Ok().json(nodes))
+}
+
+#[get("/{root_id}/{id}/description")]
+pub async fn get_node_description(
+    db_session: web::Data<CachingSession>,
+    params: web::Path<PrimaryKeyParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+    let mut node = GetNodeDescription::new();
+
+    node.root_id = params.root_id;
+    node.id = params.id;
+
+    let node = node.find_by_primary_key(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "node": node
+    })))
 }
 
 #[post("")]
