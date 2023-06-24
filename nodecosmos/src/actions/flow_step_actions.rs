@@ -2,7 +2,8 @@ use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    FlowStep, UpdateFlowStepInputIds, UpdateFlowStepNodeIds, UpdateFlowStepOutputIds,
+    FlowStep, FlowStepDescription, UpdateFlowStepInputIds, UpdateFlowStepNodeIds,
+    UpdateFlowStepOutputIds,
 };
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -86,6 +87,30 @@ pub async fn update_flow_step_inputs(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
     flow_step: web::Json<UpdateFlowStepInputIds>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut flow_step = flow_step.into_inner();
+
+    auth_workflow_update(
+        &db_session,
+        flow_step.node_id,
+        flow_step.workflow_id,
+        current_user,
+    )
+    .await?;
+
+    flow_step.update_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "flowStep": flow_step,
+    })))
+}
+
+#[put("/description")]
+pub async fn update_flow_step_description(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    flow_step: web::Json<FlowStepDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut flow_step = flow_step.into_inner();
 

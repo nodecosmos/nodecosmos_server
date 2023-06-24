@@ -79,6 +79,7 @@ async fn main() {
                     .service(update_flow_step_nodes)
                     .service(update_flow_step_inputs)
                     .service(update_flow_step_outputs)
+                    .service(update_flow_step_description)
                     .service(delete_flow_step),
             )
             .service(

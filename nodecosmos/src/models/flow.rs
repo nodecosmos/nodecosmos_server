@@ -144,3 +144,14 @@ partial_flow!(
     updated_at
 );
 impl_updated_at_cb!(UpdateFlowDescription);
+
+partial_flow!(
+    FlowDescription,
+    node_id,
+    workflow_id,
+    id,
+    description,
+    description_markdown,
+    updated_at
+);
+impl_updated_at_cb!(FlowDescription);

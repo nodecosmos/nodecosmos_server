@@ -3,7 +3,7 @@ use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb
 use crate::models::input_output::InputOutput;
 use charybdis::{
     charybdis_model, partial_model_generator, AsNative, Callbacks, CharybdisError,
-    DeleteWithCallbacks, Find, Frozen, List, Map, New, Timestamp, UpdateWithCallbacks, Uuid,
+    DeleteWithCallbacks, Find, Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
 };
 use chrono::Utc;
 use scylla::CachingSession;
@@ -31,6 +31,11 @@ pub struct FlowStep {
     #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
 
+    pub description: Option<Text>,
+
+    #[serde(rename = "descriptionMarkdown")]
+    pub description_markdown: Option<Text>,
+
     #[serde(rename = "inputIdsByNodeId")]
     pub input_ids_by_node_id: Option<Map<Uuid, Frozen<List<Uuid>>>>,
 
@@ -45,6 +50,15 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
+    pub async fn flow(&self, session: &CachingSession) -> Result<Flow, CharybdisError> {
+        let mut flow = Flow::new();
+        flow.node_id = self.node_id;
+        flow.workflow_id = self.workflow_id;
+        flow.id = self.flow_id;
+
+        flow.find_by_primary_key(&session).await
+    }
+
     pub async fn pull_output_id(
         &mut self,
         session: &CachingSession,
@@ -58,6 +72,25 @@ impl FlowStep {
         }
 
         self.output_ids_by_node_id = Some(output_ids_by_node_id);
+
+        self.update_cb(session).await?;
+
+        Ok(())
+    }
+
+    pub async fn pull_input_id(
+        &mut self,
+        session: &CachingSession,
+        input_id: Uuid,
+    ) -> Result<(), CharybdisError> {
+        // filter out input_id from input_ids_by_node_id
+        let mut input_ids_by_node_id = self.input_ids_by_node_id.clone().unwrap_or_default();
+
+        for (_, input_ids) in input_ids_by_node_id.iter_mut() {
+            input_ids.retain(|id| id != &input_id);
+        }
+
+        self.input_ids_by_node_id = Some(input_ids_by_node_id);
 
         self.update_cb(session).await?;
 
@@ -234,3 +267,14 @@ impl Callbacks for UpdateFlowStepNodeIds {
         Ok(())
     }
 }
+
+partial_flow_step!(
+    FlowStepDescription,
+    node_id,
+    workflow_id,
+    id,
+    description,
+    description_markdown,
+    updated_at
+);
+impl_updated_at_cb!(FlowStepDescription);

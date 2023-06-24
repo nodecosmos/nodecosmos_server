@@ -76,6 +76,37 @@ impl InputOutput {
 
         Ok(Some(fs))
     }
+
+    async fn next_flow_step(
+        &self,
+        session: &CachingSession,
+    ) -> Result<Option<FlowStep>, CharybdisError> {
+        let flow_step = self.flow_step(session).await?;
+
+        if let Some(fs) = flow_step {
+            let flow = fs.flow(session).await?;
+            let flow_step_ids = flow.step_ids.unwrap_or_default();
+            let flow_step_index = flow_step_ids.iter().position(|&x| x == fs.id);
+
+            if let Some(idx) = flow_step_index {
+                let next_idx = idx + 1;
+                let next_flow_step_id = flow_step_ids.get(next_idx);
+
+                if let Some(id) = next_flow_step_id {
+                    let mut next_flow_step = FlowStep::new();
+                    next_flow_step.node_id = self.node_id;
+                    next_flow_step.workflow_id = self.workflow_id;
+                    next_flow_step.id = *id;
+
+                    let next_fs = next_flow_step.find_by_primary_key(&session).await?;
+
+                    return Ok(Some(next_fs));
+                }
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 impl Callbacks for InputOutput {
@@ -103,6 +134,12 @@ impl Callbacks for InputOutput {
 
         if let Some(mut fs) = flow_step {
             fs.pull_output_id(session, self.id).await?;
+        }
+
+        let next_flow_step = self.next_flow_step(session).await?;
+
+        if let Some(mut next_fs) = next_flow_step {
+            next_fs.pull_input_id(session, self.id).await?;
         }
 
         Ok(())
