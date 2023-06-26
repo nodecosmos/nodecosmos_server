@@ -69,6 +69,7 @@ async fn main() {
             .service(
                 web::scope("/flows")
                     .service(create_flow)
+                    .service(get_flow_description)
                     .service(update_flow_title)
                     .service(update_flow_description)
                     .service(delete_flow),

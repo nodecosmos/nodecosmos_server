@@ -163,8 +163,8 @@ async fn main() {
     id,
     email: "charybdis@nodecosmos.com".to_string(),
     username: "charybdis".to_string(),
-    created_at: DateTime::from(Utc::now()),
-    updated_at: DateTime::from(Utc::now()),
+    created_at: Utc::now(),
+    updated_at: Utc::now(),
     address: Some(
         Address {
             street: "street".to_string(),

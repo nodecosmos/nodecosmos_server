@@ -135,17 +135,6 @@ partial_flow!(UpdateFlowTitle, node_id, workflow_id, id, title, updated_at);
 impl_updated_at_cb!(UpdateFlowTitle);
 
 partial_flow!(
-    UpdateFlowDescription,
-    node_id,
-    workflow_id,
-    id,
-    description,
-    description_markdown,
-    updated_at
-);
-impl_updated_at_cb!(UpdateFlowDescription);
-
-partial_flow!(
     FlowDescription,
     node_id,
     workflow_id,
