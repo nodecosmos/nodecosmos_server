@@ -79,3 +79,26 @@ macro_rules! updated_at_cb_fn {
     };
 }
 pub(crate) use updated_at_cb_fn;
+
+macro_rules! sanitize_description_cb {
+    ($struct_name:ident) => {
+        impl charybdis::Callbacks for $struct_name {
+            async fn before_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+            ) -> Result<(), charybdis::CharybdisError> {
+                use ammonia::clean;
+
+                self.updated_at = Some(Utc::now());
+
+                if let Some(description) = &self.description {
+                    self.description = Some(clean(description));
+                }
+
+                Ok(())
+            }
+        }
+    };
+}
+
+pub(crate) use sanitize_description_cb;

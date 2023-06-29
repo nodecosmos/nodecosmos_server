@@ -64,7 +64,7 @@ impl<T: BaseModel> Find for T {
     // find iter
     async fn find_paged(
         session: &CachingSession,
-        query: &'static str,
+        query: &str,
         values: impl ValueList,
         page_size: i32,
     ) -> Result<TypedRowIterator<Self>, CharybdisError> {

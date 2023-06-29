@@ -1,4 +1,4 @@
-use crate::models::helpers::impl_updated_at_cb;
+use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::{Creator, Owner};
 use crate::models::workflow::Workflow;
 use charybdis::*;
@@ -10,7 +10,7 @@ use scylla::batch::Batch;
     table_name = nodes,
     partition_keys = [root_id],
     clustering_keys = [id],
-    secondary_indexes = [id]
+    secondary_indexes = [public, id]
 )]
 pub struct Node {
     #[serde(default)]
@@ -18,6 +18,9 @@ pub struct Node {
 
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
+
+    #[serde(default = "default_to_true")]
+    pub public: Option<Boolean>,
 
     #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
@@ -56,6 +59,10 @@ pub struct Node {
 
     #[serde(rename = "likesCount")]
     pub likes_count: Option<BigInt>,
+}
+
+fn default_to_true() -> Option<Boolean> {
+    Some(true)
 }
 
 impl Node {
@@ -231,7 +238,7 @@ impl Callbacks for Node {
 }
 
 partial_node!(
-    GetBaseNode,
+    BaseNode,
     root_id,
     id,
     ancestor_ids,
@@ -266,7 +273,7 @@ partial_node!(
     description_markdown,
     updated_at
 );
-impl_updated_at_cb!(UpdateNodeDescription);
+sanitize_description_cb!(UpdateNodeDescription);
 
 partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
 impl_updated_at_cb!(UpdateNodeOwner);

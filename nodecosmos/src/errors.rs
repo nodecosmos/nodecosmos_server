@@ -47,7 +47,7 @@ impl ResponseError for NodecosmosError {
                     "message": e.to_string()
                 })),
                 CharybdisError::ValidationError((field, message)) => {
-                    HttpResponse::Conflict().json(json!({ "error": {field: message} }))
+                    HttpResponse::Forbidden().json(json!({ "error": {field: message} }))
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": "Internal Server Error",

@@ -1,5 +1,7 @@
 use crate::models::flow::Flow;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::helpers::{
+    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
+};
 use crate::models::input_output::InputOutput;
 use charybdis::{
     charybdis_model, partial_model_generator, AsNative, Callbacks, CharybdisError,
@@ -132,6 +134,7 @@ impl FlowStep {
                         for output_id in output_ids.iter() {
                             let mut output = InputOutput::new();
 
+                            output.node_id = self.node_id;
                             output.workflow_id = self.workflow_id;
                             output.id = output_id.clone();
 
@@ -277,4 +280,4 @@ partial_flow_step!(
     description_markdown,
     updated_at
 );
-impl_updated_at_cb!(FlowStepDescription);
+sanitize_description_cb!(FlowStepDescription);

@@ -1,5 +1,7 @@
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::helpers::{
+    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
+};
 use crate::models::input_output_template::InputOutputTemplate;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
@@ -155,7 +157,7 @@ partial_input_output!(
     description_markdown,
     updated_at
 );
-impl_updated_at_cb!(IoDescription);
+sanitize_description_cb!(IoDescription);
 
 partial_input_output!(IoTitle, node_id, workflow_id, id, title, updated_at);
 impl_updated_at_cb!(IoTitle);

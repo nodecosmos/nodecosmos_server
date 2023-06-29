@@ -12,7 +12,7 @@ use futures::StreamExt;
 use scylla::CachingSession;
 use serde_json::json;
 
-const DEFAULT_PAGE_SIZE: i32 = 100;
+const DEFAULT_PAGE_SIZE: i32 = 5;
 
 #[derive(Debug, Deserialize)]
 pub struct PrimaryKeyParams {
@@ -24,9 +24,9 @@ pub struct PrimaryKeyParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut nodes_iter = GetBaseNode::find_paged(
+    let mut nodes_iter = BaseNode::find_paged(
         &db_session,
-        GetBaseNode::SELECT_FIELDS_CLAUSE,
+        &BaseNode::SELECT_FIELDS_CLAUSE,
         (),
         DEFAULT_PAGE_SIZE,
     )
@@ -48,7 +48,7 @@ pub async fn get_root_node(
     db_session: web::Data<CachingSession>,
     root_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetBaseNode::new();
+    let mut node = BaseNode::new();
     node.root_id = root_id.into_inner();
 
     let mut nodes_iter = node.find_by_partition_key(&db_session).await?;
@@ -69,7 +69,7 @@ pub async fn get_node(
     params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
-    let mut node = GetBaseNode::new();
+    let mut node = BaseNode::new();
 
     node.root_id = params.root_id;
     node.id = params.id;
@@ -79,11 +79,11 @@ pub async fn get_node(
     let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
     all_node_ids.push(node.id);
 
-    let descendants_q = find_get_base_node_query!("root_id = ? AND id IN ?");
+    let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
 
-    let mut descendants = GetBaseNode::find_paged(
+    let mut descendants = BaseNode::find_paged(
         &db_session,
-        descendants_q,
+        &descendants_q,
         (node.root_id, all_node_ids),
         DEFAULT_PAGE_SIZE,
     )

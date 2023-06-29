@@ -1,5 +1,7 @@
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::helpers::{
+    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
+};
 use crate::models::workflow::Workflow;
 use charybdis::{
     charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, Int,
@@ -143,4 +145,4 @@ partial_flow!(
     description_markdown,
     updated_at
 );
-impl_updated_at_cb!(FlowDescription);
+sanitize_description_cb!(FlowDescription);
