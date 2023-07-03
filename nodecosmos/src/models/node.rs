@@ -1,4 +1,4 @@
-use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
+use crate::models::helpers::{default_to_true, impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::{Creator, Owner};
 use crate::models::workflow::Workflow;
 use charybdis::*;
@@ -59,10 +59,6 @@ pub struct Node {
 
     #[serde(rename = "likesCount")]
     pub likes_count: Option<BigInt>,
-}
-
-fn default_to_true() -> Option<Boolean> {
-    Some(true)
 }
 
 impl Node {
