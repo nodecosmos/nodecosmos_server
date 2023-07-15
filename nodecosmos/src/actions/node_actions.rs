@@ -5,7 +5,7 @@ use crate::models::node::*;
 use crate::models::udts::Owner;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
-    AsNative, BaseModel, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
+    AsNative, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
     UpdateWithCallbacks, Uuid,
 };
 use futures::StreamExt;
@@ -24,9 +24,12 @@ pub struct PrimaryKeyParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
+
+    let q = find_base_node_query!("public = true");
+
     let mut nodes_iter = BaseNode::find_paged(
         &db_session,
-        &BaseNode::SELECT_FIELDS_CLAUSE,
+        &q,
         (),
         DEFAULT_PAGE_SIZE,
     )

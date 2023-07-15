@@ -7,7 +7,7 @@ use charybdis::*;
 use futures::future::{ready, Ready};
 use serde_json::json;
 
-partial_user!(CurrentUser, id, username, email, email_verified);
+partial_user!(CurrentUser, id, username, email, confirmed);
 
 pub fn set_current_user(
     client_session: &Session,
@@ -17,7 +17,7 @@ pub fn set_current_user(
         id: user.id,
         username: user.username.clone(),
         email: user.email.clone(),
-        email_verified: user.email_verified,
+        confirmed: user.confirmed,
     };
 
     client_session

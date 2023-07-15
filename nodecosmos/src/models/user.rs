@@ -1,8 +1,6 @@
 pub use super::udts::Address;
-
 use charybdis::*;
 use chrono::Utc;
-
 use crate::models::helpers::impl_updated_at_cb;
 use bcrypt::{hash, verify};
 
@@ -16,6 +14,7 @@ const BCRYPT_COST: u32 = 6;
     secondary_indexes = [username, email]
 )]
 pub struct User {
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub username: Text,
     pub email: Text,
@@ -25,7 +24,7 @@ pub struct User {
     pub created_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
     pub address: Option<Address>,
-    pub email_verified: Option<Boolean>,
+    pub confirmed: Option<Boolean>,
     pub liked_object_ids: Option<Set<Uuid>>,
 }
 
@@ -66,6 +65,7 @@ impl User {
     pub async fn verify_password(&self, password: &String) -> Result<(), CharybdisError> {
         let password_hash = hash(&self.password, BCRYPT_COST).map_err(|_| {
             // TODO: log error here
+
             CharybdisError::CustomError(
                 "There was an error processing your request. Please try again later.".to_string(),
             )
@@ -84,7 +84,7 @@ impl User {
         self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
-        self.email_verified = Some(false);
+        self.confirmed = Some(false);
     }
 
     fn set_password(&mut self) -> Result<(), CharybdisError> {
@@ -116,7 +116,7 @@ impl Callbacks for User {
     }
 }
 
-partial_user!(GetUser, id, username, email, created_at, updated_at);
+partial_user!(GetUser, id, username, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 impl_updated_at_cb!(UpdateUser);

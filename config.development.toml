@@ -4,7 +4,7 @@ secret_key = "aSx1aUVGmXkw1moGEVwkq2o7WXsaU6P0kzYbsuDMXLc=zeljazeljazeljazelja"
 session_expiration_in_days = 30
 
 [scylla]
-hosts = ["172.22.0.4", "172.22.0.3", "172.22.0.2"]
+hosts = ["127.0.0.1:9042", "127.0.0.1:9043", "127.0.0.1:9044"]
 keyspace = "nodecosmos"
 
 [redis]
