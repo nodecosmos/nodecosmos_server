@@ -21,3 +21,7 @@ services:
     command: --seeds=scylla1 --smp 20
     ports:
       - "9044:9042"
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
