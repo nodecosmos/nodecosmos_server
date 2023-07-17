@@ -13,8 +13,8 @@ use scylla::CachingSession;
 #[partial_model_generator]
 #[charybdis_model(
     table_name = flows,
-    partition_keys = [node_id, workflow_id],
-    clustering_keys = [id],
+    partition_keys = [node_id],
+    clustering_keys = [workflow_id, id],
     secondary_indexes = [id]
 )]
 pub struct Flow {
@@ -146,3 +146,5 @@ partial_flow!(
     updated_at
 );
 sanitize_description_cb!(FlowDescription);
+
+partial_flow!(FlowDelete, node_id, workflow_id, id);

@@ -3,7 +3,6 @@ pub mod flow;
 pub mod flow_step;
 pub mod helpers;
 pub mod input_output;
-pub mod input_output_template;
 pub mod like;
 pub mod likes_count;
 pub mod materialized_views;

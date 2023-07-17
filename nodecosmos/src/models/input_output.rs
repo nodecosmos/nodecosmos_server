@@ -2,7 +2,6 @@ use crate::models::flow_step::FlowStep;
 use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
 };
-use crate::models::input_output_template::InputOutputTemplate;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::*;
@@ -12,8 +11,8 @@ use chrono::Utc;
 #[partial_model_generator]
 #[charybdis_model(
     table_name = input_outputs,
-    partition_keys = [node_id, workflow_id],
-    clustering_keys = [id],
+    partition_keys = [node_id],
+    clustering_keys = [workflow_id, id],
     secondary_indexes = []
 )]
 pub struct InputOutput {
@@ -114,17 +113,9 @@ impl InputOutput {
 impl Callbacks for InputOutput {
     created_at_cb_fn!();
 
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        InputOutputTemplate::insert_new_io_temp(session, self.clone()).await;
-
-        Ok(())
-    }
-
     updated_at_cb_fn!();
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        InputOutputTemplate::remove_io_temp_if_not_used(session, self.clone()).await;
-
         let mut workflow = self.workflow(session).await?;
         let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
 
@@ -161,3 +152,5 @@ sanitize_description_cb!(IoDescription);
 
 partial_input_output!(IoTitle, node_id, workflow_id, id, title, updated_at);
 impl_updated_at_cb!(IoTitle);
+
+partial_input_output!(IoDelete, node_id, workflow_id, id);

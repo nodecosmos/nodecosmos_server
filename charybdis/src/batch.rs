@@ -1,5 +1,7 @@
 use crate::{CharybdisError, Model, SerializedValues, ValueList};
+use scylla::transport::session::TypedRowIter;
 use scylla::CachingSession;
+use std::fmt::Debug;
 
 // Simple batch for Charybdis models
 pub struct CharybdisModelBatch {
@@ -48,6 +50,24 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
+    pub fn append_deletes<T: Model + ValueList>(
+        &mut self,
+        mut iter: TypedRowIter<T>,
+    ) -> Result<(), CharybdisError> {
+        while let Some(model) = iter.next() {
+            match model {
+                Ok(model) => {
+                    let result = self.append_delete(model);
+                    if let Err(e) = result {
+                        return Err(CharybdisError::from(e));
+                    }
+                }
+                Err(e) => return Err(CharybdisError::from(e)),
+            };
+        }
+
+        Ok(())
+    }
     pub async fn execute(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         db_session.batch(&self.batch, self.values.clone()).await?;
 

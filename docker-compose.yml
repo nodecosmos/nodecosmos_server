@@ -21,7 +21,19 @@ services:
     command: --seeds=scylla1 --smp 20
     ports:
       - "9044:9042"
+  #---------------------------------------------------------------------------------------------------
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
+  #---------------------------------------------------------------------------------------------------
+  #  elasticsearch:
+  #    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.2
+  #    environment:
+  #      - discovery.type=single-node
+  #    ports:
+  #      - "9200:9200"
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    ports:
+      - "7700:7700"

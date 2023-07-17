@@ -1,6 +1,9 @@
+use crate::models::flow::FlowDelete;
+use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{default_to_true, impl_updated_at_cb, sanitize_description_cb};
+use crate::models::input_output::IoDelete;
 use crate::models::udts::{Creator, Owner};
-use crate::models::workflow::Workflow;
+use crate::models::workflow::{Workflow, WorkflowDelete};
 use charybdis::*;
 use chrono::Utc;
 use scylla::batch::Batch;
@@ -170,25 +173,73 @@ impl Node {
         Ok(())
     }
 
+    pub async fn delete_workflows(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<(), CharybdisError> {
+        let workflows = Workflow {
+            node_id: self.id,
+            ..Default::default()
+        }
+        .find_by_partition_key(&db_session)
+        .await?;
+
+        for workflow in workflows {
+            workflow?.delete_cb(&db_session).await?;
+        }
+
+        Ok(())
+    }
+
+    // delete descendant nodes, workflows, flows, and flow steps as single batch
     pub async fn delete_descendants(
         &self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
         match &self.descendant_ids {
-            // TODO: run one by one in order to trigger cbs for each
             Some(descendant_ids) => {
-                let mut batch: Batch = Default::default();
-                let mut values = Vec::with_capacity(descendant_ids.len());
+                let mut batch = CharybdisModelBatch::new();
 
                 for descendant_id in descendant_ids {
-                    let query = Node::DELETE_QUERY;
-                    batch.append_statement(query);
-                    values.push((self.root_id, descendant_id));
+                    let workflows_to_delete = WorkflowDelete {
+                        node_id: *descendant_id,
+                        ..Default::default()
+                    }
+                    .find_by_partition_key(db_session)
+                    .await?;
+
+                    let flows_to_delete = FlowDelete {
+                        node_id: *descendant_id,
+                        ..Default::default()
+                    }
+                    .find_by_partition_key(db_session)
+                    .await?;
+
+                    let flow_steps_to_delete = FlowStepDelete {
+                        node_id: *descendant_id,
+                        ..Default::default()
+                    }
+                    .find_by_partition_key(db_session)
+                    .await?;
+
+                    let ios_to_delete = IoDelete {
+                        node_id: *descendant_id,
+                        ..Default::default()
+                    }
+                    .find_by_partition_key(db_session)
+                    .await?;
+
+                    batch.append_deletes(ios_to_delete)?;
+                    batch.append_deletes(flow_steps_to_delete)?;
+                    batch.append_deletes(flows_to_delete)?;
+                    batch.append_deletes(workflows_to_delete)?;
+                    batch.append_delete(DeleteNode {
+                        id: *descendant_id,
+                        root_id: self.root_id,
+                    })?;
                 }
 
-                db_session.batch(&batch, values).await?;
-
-                Ok(())
+                batch.execute(db_session).await
             }
             None => Ok(()),
         }
@@ -218,16 +269,9 @@ impl Callbacks for Node {
     async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         self.pull_from_parent_children(db_session).await?;
         self.pull_from_ancestors(db_session).await?;
+
         self.delete_descendants(db_session).await?;
-
-        let mut workflow = Workflow::new();
-        workflow.node_id = self.id;
-
-        let workflows = workflow.find_by_partition_key(&db_session).await?;
-
-        for workflow in workflows {
-            workflow?.delete_cb(&db_session).await?;
-        }
+        self.delete_workflows(db_session).await?;
 
         Ok(())
     }
@@ -276,3 +320,5 @@ impl_updated_at_cb!(UpdateNodeOwner);
 
 partial_node!(UpdateNodeLikesCount, root_id, id, likes_count, updated_at);
 impl_updated_at_cb!(UpdateNodeLikesCount);
+
+partial_node!(DeleteNode, root_id, id);

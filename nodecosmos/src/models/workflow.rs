@@ -1,6 +1,7 @@
-use crate::models::flow::Flow;
+use crate::models::flow::{find_flow_delete_query, FlowDelete};
+use crate::models::flow_step::{find_flow_step_delete_query, FlowStepDelete};
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
-use crate::models::input_output::InputOutput;
+use crate::models::input_output::{find_io_delete_query, IoDelete};
 use charybdis::*;
 use chrono::Utc;
 
@@ -102,24 +103,34 @@ impl Callbacks for Workflow {
     updated_at_cb_fn!();
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        let mut flow = Flow::new();
-        flow.node_id = self.node_id;
-        flow.workflow_id = self.id;
+        if self.flow_ids.is_some() {
+            let mut batch = CharybdisModelBatch::new();
 
-        let flows = flow.find_by_partition_key(session).await?;
+            let flow_steps = FlowStepDelete::find(
+                session,
+                find_flow_step_delete_query!("node_id = ? AND workflow_id = ?"),
+                (self.node_id, self.id),
+            )
+            .await?;
+            let flows = FlowDelete::find(
+                session,
+                find_flow_delete_query!("node_id = ? AND workflow_id = ?"),
+                (self.node_id, self.id),
+            )
+            .await?;
 
-        for flow in flows {
-            flow?.delete_cb(session).await?;
-        }
+            let input_outputs = IoDelete::find(
+                session,
+                find_io_delete_query!("node_id = ? AND workflow_id = ?"),
+                (self.node_id, self.id),
+            )
+            .await?;
 
-        // delete ios
-        let mut input_output = InputOutput::new();
-        input_output.workflow_id = self.id;
+            batch.append_deletes(input_outputs)?;
+            batch.append_deletes(flow_steps)?;
+            batch.append_deletes(flows)?;
 
-        let input_outputs = input_output.find_by_partition_key(session).await?;
-
-        for input_output in input_outputs {
-            input_output?.delete_cb(session).await?;
+            batch.execute(session).await?;
         }
 
         Ok(())
@@ -134,3 +145,5 @@ partial_workflow!(
     updated_at
 );
 impl_updated_at_cb!(UpdateInitialInputsWorkflow);
+
+partial_workflow!(WorkflowDelete, node_id, id);
