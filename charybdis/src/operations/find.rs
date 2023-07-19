@@ -2,7 +2,7 @@ use scylla::frame::value::ValueList;
 use scylla::query::Query;
 use scylla::transport::iterator::TypedRowIterator;
 use scylla::transport::session::TypedRowIter;
-use scylla::IntoTypedRows;
+use scylla::{Bytes, IntoTypedRows};
 use scylla::{CachingSession, QueryResult};
 
 use crate::errors::CharybdisError;
@@ -21,12 +21,19 @@ pub trait Find: BaseModel {
         values: impl ValueList,
     ) -> Result<Self, CharybdisError>;
 
-    async fn find_paged(
+    async fn find_iter(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
         page_size: i32,
     ) -> Result<TypedRowIterator<Self>, CharybdisError>;
+
+    async fn find_paged(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+        page_size: Option<Bytes>,
+    ) -> Result<(TypedRowIter<Self>, Option<Bytes>), CharybdisError>;
 
     // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
@@ -61,8 +68,22 @@ impl<T: BaseModel> Find for T {
         Ok(typed_row)
     }
 
-    // find iter
     async fn find_paged(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+        paging_state: Option<Bytes>,
+    ) -> Result<(TypedRowIter<Self>, Option<Bytes>), CharybdisError> {
+        let res = session.execute_paged(query, values, paging_state).await?;
+        let paging_state = res.paging_state.clone();
+        let rows = res.rows()?;
+        let typed_rows: TypedRowIter<Self> = rows.into_typed();
+
+        Ok((typed_rows, paging_state))
+    }
+
+    // find iter
+    async fn find_iter(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,

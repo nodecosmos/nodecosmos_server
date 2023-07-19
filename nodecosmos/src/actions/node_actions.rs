@@ -2,7 +2,7 @@ use crate::actions::client_session::*;
 use crate::authorize::{auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
-use crate::models::udts::Owner;
+use crate::models::udts::{Owner, OwnerTypes};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
     AsNative, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
@@ -24,16 +24,9 @@ pub struct PrimaryKeyParams {
 pub async fn get_nodes(
     db_session: web::Data<CachingSession>,
 ) -> Result<HttpResponse, NodecosmosError> {
-
     let q = find_base_node_query!("public = true");
 
-    let mut nodes_iter = BaseNode::find_paged(
-        &db_session,
-        &q,
-        (),
-        DEFAULT_PAGE_SIZE,
-    )
-    .await?;
+    let mut nodes_iter = BaseNode::find_iter(&db_session, &q, (), DEFAULT_PAGE_SIZE).await?;
 
     let mut nodes = vec![];
 
@@ -84,7 +77,7 @@ pub async fn get_node(
 
     let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
 
-    let mut descendants = BaseNode::find_paged(
+    let mut descendants = BaseNode::find_iter(
         &db_session,
         &descendants_q,
         (node.root_id, all_node_ids),
@@ -136,7 +129,8 @@ pub async fn create_node(
     node.set_owner_id(current_user.id);
     node.set_owner(Owner {
         id: current_user.id,
-        username: current_user.username,
+        name: current_user.username,
+        owner_type: OwnerTypes::User.into(),
     });
 
     match parent {

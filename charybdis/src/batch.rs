@@ -1,7 +1,6 @@
 use crate::{CharybdisError, Model, SerializedValues, ValueList};
 use scylla::transport::session::TypedRowIter;
 use scylla::CachingSession;
-use std::fmt::Debug;
 
 // Simple batch for Charybdis models
 pub struct CharybdisModelBatch {
@@ -26,6 +25,25 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
+    pub fn append_creates<T: Model + ValueList>(
+        &mut self,
+        mut iter: TypedRowIter<T>,
+    ) -> Result<(), CharybdisError> {
+        while let Some(model) = iter.next() {
+            match model {
+                Ok(model) => {
+                    let result = self.append_create(&model);
+                    if let Err(e) = result {
+                        return Err(CharybdisError::from(e));
+                    }
+                }
+                Err(e) => return Err(CharybdisError::from(e)),
+            };
+        }
+
+        Ok(())
+    }
+
     pub fn append_update<T: Model>(&mut self, model: T) -> Result<(), CharybdisError> {
         self.batch.append_statement(T::UPDATE_QUERY);
 
@@ -34,6 +52,25 @@ impl CharybdisModelBatch {
             .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
 
         self.values.push(update_values.into_owned());
+
+        Ok(())
+    }
+
+    pub fn append_updates<T: Model + ValueList>(
+        &mut self,
+        mut iter: TypedRowIter<T>,
+    ) -> Result<(), CharybdisError> {
+        while let Some(model) = iter.next() {
+            match model {
+                Ok(model) => {
+                    let result = self.append_update(model);
+                    if let Err(e) = result {
+                        return Err(CharybdisError::from(e));
+                    }
+                }
+                Err(e) => return Err(CharybdisError::from(e)),
+            };
+        }
 
         Ok(())
     }

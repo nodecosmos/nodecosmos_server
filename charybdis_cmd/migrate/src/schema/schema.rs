@@ -11,6 +11,7 @@ pub struct SchemaObject {
     pub partition_keys: Vec<String>,
     pub clustering_keys: Vec<String>,
     pub secondary_indexes: Vec<String>,
+    pub table_options: Option<String>,
 }
 
 impl SchemaObject {
@@ -23,6 +24,7 @@ impl SchemaObject {
             partition_keys: Vec::new(),
             clustering_keys: Vec::new(),
             secondary_indexes: Vec::new(),
+            table_options: None,
         }
     }
 }

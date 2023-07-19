@@ -49,7 +49,7 @@ impl<'a> MigrationPlan<'a> {
     }
 
     async fn run_tables(&self) -> Result<(), ()> {
-        let empty_udt = SchemaObject::new();
+        let empty_table = SchemaObject::new();
 
         for (name, table) in self.current_code_schema.tables.iter() {
             let migration = Migration::new(
@@ -59,7 +59,7 @@ impl<'a> MigrationPlan<'a> {
                 self.current_db_schema
                     .tables
                     .get(name)
-                    .unwrap_or(&empty_udt),
+                    .unwrap_or(&empty_table),
                 &self.session,
             );
 
@@ -70,7 +70,7 @@ impl<'a> MigrationPlan<'a> {
     }
 
     async fn run_materialized_views(&self) -> Result<(), ()> {
-        let empty_udt = SchemaObject::new();
+        let empty_mv = SchemaObject::new();
 
         for (name, materialized_view) in self.current_code_schema.materialized_views.iter() {
             let migration = Migration::new(
@@ -80,7 +80,7 @@ impl<'a> MigrationPlan<'a> {
                 self.current_db_schema
                     .materialized_views
                     .get(name)
-                    .unwrap_or(&empty_udt),
+                    .unwrap_or(&empty_mv),
                 &self.session,
             );
 

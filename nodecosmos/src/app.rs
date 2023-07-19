@@ -4,6 +4,8 @@ use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{cookie, http, web};
+use elasticsearch::http::transport::Transport;
+use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
 use std::{env, fs, time::Duration};
 use toml::Value;
@@ -44,11 +46,33 @@ pub async fn get_db_session(app: &App) -> web::Data<CachingSession> {
         .use_keyspace(keyspace, false)
         .build()
         .await
-        .unwrap();
+        .unwrap_or_else(|e| {
+            panic!(
+                "Unable to connect to scylla hosts: {:?}. \nError: {}",
+                known_nodes, e
+            )
+        });
 
     let session = CachingSession::from(session, 1000);
 
     web::Data::new(session)
+}
+
+pub async fn get_elastic_client(app: &App) -> web::Data<Elasticsearch> {
+    let host = app.config["elasticsearch"]["host"]
+        .as_str()
+        .expect("Missing elastic host");
+
+    let transport = Transport::single_node(host).unwrap_or_else(|e| {
+        panic!(
+            "Unable to connect to elastic host: {}. \nError: {}",
+            app.config["elasticsearch"]["host"], e
+        )
+    });
+
+    let client = Elasticsearch::new(transport);
+
+    web::Data::new(client)
 }
 
 pub fn get_cors(app: &App) -> Cors {

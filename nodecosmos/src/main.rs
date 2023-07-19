@@ -5,15 +5,15 @@
 mod actions;
 mod app;
 mod authorize;
+mod elastic;
 mod errors;
 mod models;
 
+use crate::app::{get_cors, get_db_session, get_elastic_client, get_port, get_session_middleware};
 use actions::*;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use app::App as NodecosmosApp;
-
-use crate::app::{get_cors, get_db_session, get_port, get_session_middleware};
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +21,10 @@ async fn main() {
 
     let nodecosmos = NodecosmosApp::new();
     let session = get_db_session(&nodecosmos).await;
+    let elastic_client = get_elastic_client(&nodecosmos).await;
     let port = get_port(&nodecosmos);
+
+    elastic::build(&elastic_client).await;
 
     HttpServer::new(move || {
         App::new()
@@ -29,6 +32,7 @@ async fn main() {
             .wrap(get_cors(&nodecosmos))
             .wrap(get_session_middleware(&nodecosmos))
             .app_data(session.clone())
+            .app_data(elastic_client.clone())
             .service(
                 web::scope("/users")
                     .service(get_user)

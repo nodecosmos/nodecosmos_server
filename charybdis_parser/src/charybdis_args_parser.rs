@@ -16,6 +16,7 @@ pub struct CharybdisArgs {
     pub fields_names: Option<Vec<String>>,
     pub field_types_hash: Option<HashMap<String, TokenStream>>,
     pub field_attributes_hash: Option<HashMap<String, TokenStream>>,
+    pub table_options: Option<String>,
 }
 
 impl CharybdisArgs {
@@ -86,6 +87,7 @@ impl Parse for CharybdisArgs {
         let mut fields_names = None;
         let mut field_types_hash = None;
         let mut field_attributes_hash = None;
+        let mut table_options = None;
 
         while !input.is_empty() {
             let key: syn::Ident = input.parse()?;
@@ -142,6 +144,11 @@ impl Parse for CharybdisArgs {
                         Self::hash_expr_lit_to_hash(hash, "field_attributes_hash".to_string());
                     field_attributes_hash = Some(parsed_field_attributes_hash);
                 }
+                "table_options" => {
+                    // parse ruby style hash
+                    let value: syn::LitStr = input.parse()?;
+                    table_options = Option::from(value.value());
+                }
                 _ => {}
             }
 
@@ -160,6 +167,7 @@ impl Parse for CharybdisArgs {
             fields_names,
             field_types_hash,
             field_attributes_hash,
+            table_options,
         })
     }
 }

@@ -50,13 +50,20 @@ impl<'a> Migration<'a> {
                 } else {
                     "".to_string()
                 };
+                let table_options = self.current_code_schema.table_options.clone();
+                let table_options_clause = if table_options.is_some() {
+                    format!("\nWITH {}", table_options.unwrap().to_string())
+                } else {
+                    "".to_string()
+                };
 
                 let cql = format!(
-                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n)",
+                    "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n) \n {}",
                     self.migration_object_name,
                     self.current_code_schema.get_cql_fields(),
                     self.current_code_schema.partition_keys.join(", "),
                     clustering_keys_clause,
+                    table_options_clause,
                 );
 
                 self.execute(&cql).await;
@@ -64,6 +71,12 @@ impl<'a> Migration<'a> {
             MigrationObjectType::MaterializedView => {
                 let mut primary_key = self.current_code_schema.partition_keys.clone();
                 primary_key.append(&mut self.current_code_schema.clustering_keys.clone());
+                let table_options = self.current_code_schema.table_options.clone();
+                let table_options_clause = if table_options.is_some() {
+                    format!("\nWITH {}", table_options.unwrap().to_string())
+                } else {
+                    "".to_string()
+                };
 
                 let materialized_view_where_clause = format!(
                     "WHERE {}",
@@ -91,8 +104,11 @@ impl<'a> Migration<'a> {
                 let primary_key_clause = format!("PRIMARY KEY ({})", primary_key.join(", "));
 
                 let cql = format!(
-                    "CREATE MATERIALIZED VIEW IF NOT EXISTS {}\nAS {} {}\n",
-                    self.migration_object_name, materialized_view_select_clause, primary_key_clause,
+                    "CREATE MATERIALIZED VIEW IF NOT EXISTS {}\nAS {} {} {}\n",
+                    self.migration_object_name,
+                    materialized_view_select_clause,
+                    primary_key_clause,
+                    table_options_clause
                 );
 
                 self.execute(&cql).await;
@@ -104,7 +120,7 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}",
             "Detected new fields in".bright_cyan(),
-            self.migration_object_name.bright_yellow(),
+            self.migration_object_name.bright_blue(),
             self.migration_obj_type_str().bright_yellow()
         );
 

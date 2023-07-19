@@ -1,17 +1,19 @@
 pub use super::udts::Address;
-use charybdis::*;
-use chrono::Utc;
 use crate::models::helpers::impl_updated_at_cb;
 use bcrypt::{hash, verify};
+use charybdis::{Boolean, Callbacks, CharybdisError, Find, Set, Text, Timestamp, Uuid};
+use charybdis_macros::{charybdis_model, partial_model_generator};
+use chrono::Utc;
+use scylla::CachingSession;
 
 const BCRYPT_COST: u32 = 6;
 
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = users,
-    partition_keys = [id],
-    clustering_keys = [],
-    secondary_indexes = [username, email]
+table_name = users,
+partition_keys = [id],
+clustering_keys = [],
+secondary_indexes = [username, email]
 )]
 pub struct User {
     #[serde(default = "Uuid::new_v4")]

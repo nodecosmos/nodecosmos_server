@@ -69,6 +69,8 @@ pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str)
                         schema_object.partition_keys = args.partition_keys.unwrap_or(vec![]);
                         schema_object.clustering_keys = args.clustering_keys.unwrap_or(vec![]);
                         schema_object.secondary_indexes = args.secondary_indexes.unwrap_or(vec![]);
+
+                        schema_object.table_options = args.table_options;
                     }
                 }
             }

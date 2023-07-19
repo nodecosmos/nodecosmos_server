@@ -7,6 +7,9 @@ services:
     command: --smp 20
     ports:
       - "9042:9042"
+    networks:
+      scylla_net:
+        ipv4_address: 172.28.1.1
 
   scylla2:
     image: scylladb/scylla:latest
@@ -14,6 +17,9 @@ services:
     command: --seeds=scylla1 --smp 20
     ports:
       - "9043:9042"
+    networks:
+      scylla_net:
+        ipv4_address: 172.28.1.2
 
   scylla3:
     image: scylladb/scylla:latest
@@ -21,19 +27,35 @@ services:
     command: --seeds=scylla1 --smp 20
     ports:
       - "9044:9042"
-  #---------------------------------------------------------------------------------------------------
+    networks:
+      scylla_net:
+        ipv4_address: 172.28.1.3
+  #-------------------------------------------------------------------------------------------------
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
-  #---------------------------------------------------------------------------------------------------
-  #  elasticsearch:
-  #    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.2
-  #    environment:
-  #      - discovery.type=single-node
-  #    ports:
-  #      - "9200:9200"
-  meilisearch:
-    image: getmeili/meilisearch:latest
+
+  #-------------------------------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.1
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - "ES_JAVA_OPTS=-Xms4096m -Xmx4096m" # 4GB of RAM
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     ports:
-      - "7700:7700"
+      - "9200:9200"
+#---------------------------------------------------------------------------------------------------
+networks:
+  scylla_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

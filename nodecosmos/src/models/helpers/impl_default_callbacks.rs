@@ -102,3 +102,24 @@ macro_rules! sanitize_description_cb {
 }
 
 pub(crate) use sanitize_description_cb;
+
+macro_rules! sanitize_description_cb_fn {
+    () => {
+        async fn before_update(
+            &mut self,
+            _session: &charybdis::CachingSession,
+        ) -> Result<(), charybdis::CharybdisError> {
+            use ammonia::clean;
+
+            self.updated_at = Some(Utc::now());
+
+            if let Some(description) = &self.description {
+                self.description = Some(clean(description));
+            }
+
+            Ok(())
+        }
+    };
+}
+
+pub(crate) use sanitize_description_cb_fn;

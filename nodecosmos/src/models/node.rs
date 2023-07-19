@@ -1,6 +1,8 @@
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
-use crate::models::helpers::{default_to_true, impl_updated_at_cb, sanitize_description_cb};
+use crate::models::helpers::{
+    default_to_false, default_to_true, impl_updated_at_cb, sanitize_description_cb_fn,
+};
 use crate::models::input_output::IoDelete;
 use crate::models::udts::{Creator, Owner};
 use crate::models::workflow::{Workflow, WorkflowDelete};
@@ -13,7 +15,7 @@ use scylla::batch::Batch;
     table_name = nodes,
     partition_keys = [root_id],
     clustering_keys = [id],
-    secondary_indexes = [public, id]
+    secondary_indexes = [id],
 )]
 pub struct Node {
     #[serde(default)]
@@ -23,7 +25,10 @@ pub struct Node {
     pub root_id: Uuid,
 
     #[serde(default = "default_to_true")]
-    pub public: Option<Boolean>,
+    pub is_public: Option<Boolean>,
+
+    #[serde(rename = "isRoot", default = "default_to_false")]
+    pub is_root: Option<Boolean>,
 
     #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
@@ -41,16 +46,25 @@ pub struct Node {
     pub title: Option<Text>,
     pub description: Option<Text>,
 
+    #[serde(rename = "shortDescription")]
+    pub short_description: Option<Text>,
+
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
 
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
 
+    #[serde(rename = "ownerType")]
+    pub owner_type: Option<Text>,
+
+    #[serde(rename = "creatorId")]
+    pub creator_id: Option<Uuid>,
+
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    pub owner: Option<Owner>,
+    pub owner: Option<Owner>, // for front-end compatibility
     pub creator: Option<Creator>,
 
     // timestamps
@@ -87,6 +101,7 @@ impl Node {
         self.id = Uuid::new_v4();
         self.created_at = Some(Utc::now());
         self.updated_at = Some(Utc::now());
+        self.is_root = Some(self.parent_id.is_none());
 
         if self.root_id == Uuid::nil() {
             self.root_id = self.id;
@@ -109,7 +124,7 @@ impl Node {
         self.ancestor_ids = Some(ancestor_ids);
     }
 
-    pub async fn append_to_parent_children(
+    pub async fn push_to_parent_children(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
@@ -254,7 +269,7 @@ impl Callbacks for Node {
     }
 
     async fn after_insert(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
-        self.append_to_parent_children(db_session).await?;
+        self.push_to_parent_children(db_session).await?;
         self.push_to_ancestors(db_session).await?;
 
         Ok(())
@@ -310,10 +325,29 @@ partial_node!(
     root_id,
     id,
     description,
+    short_description,
     description_markdown,
     updated_at
 );
-sanitize_description_cb!(UpdateNodeDescription);
+impl Callbacks for UpdateNodeDescription {
+    sanitize_description_cb_fn!();
+
+    async fn after_update(&mut self, _db_session: &CachingSession) -> Result<(), CharybdisError> {
+        use ammonia::clean;
+
+        self.updated_at = Some(Utc::now());
+
+        if let Some(description) = &self.description {
+            self.description = Some(clean(description));
+        }
+
+        if let Some(short_description) = &self.short_description {
+            self.short_description = Some(clean(short_description));
+        }
+
+        Ok(())
+    }
+}
 
 partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
 impl_updated_at_cb!(UpdateNodeOwner);

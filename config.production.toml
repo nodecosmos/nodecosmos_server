@@ -4,7 +4,7 @@ secret_key = "${SECRET_KEY}"
 session_expiration_in_days = 30
 
 [scylla]
-hosts = ["${SCYLLA_HOST_1}", "${SCYLLA_HOST_2}", "${SCYLLA_HOST_3}"]
+hosts = ["${SCYLLA_HOST_1}", "${SCYLLA_HOST_2}"]
 keyspace = "nodecosmos"
 
 [redis]

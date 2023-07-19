@@ -5,5 +5,5 @@ mod property;
 
 pub use address::Address;
 pub use creator::Creator;
-pub use owner::Owner;
+pub use owner::*;
 pub use property::Property;
