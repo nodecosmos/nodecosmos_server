@@ -5,7 +5,11 @@ use elasticsearch::Elasticsearch;
 use serde_json::json;
 
 pub async fn build_nodes_index(client: &Elasticsearch) {
-    println!("{}", "Building elastic index for 'nodes'".bright_green());
+    println!(
+        "{} {}",
+        "Building elastic index for".bright_green(),
+        "nodes".bright_yellow()
+    );
 
     let response: Response = client
         .indices()
@@ -19,8 +23,8 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
             },
             "mappings": {
                 "properties": {
-                    "root_id": { "type": "keyword" },
-                    "id": { "type": "keyword" },
+                    "root_id": { "type": "keyword", "index": false },
+                    "id": { "type": "keyword", "index": false },
                     "title": { "type": "text" },
                     "description": { "type": "text" },
                     "is_root": { "type": "boolean" },
@@ -49,7 +53,8 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
     }
 
     println!(
-        "{}",
-        "Index for 'nodes' created successfully!".bright_green()
+        "{} {}\n",
+        "Successfully created elastic index".bright_green(),
+        "nodes".bright_yellow()
     );
 }

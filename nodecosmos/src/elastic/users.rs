@@ -5,6 +5,12 @@ use elasticsearch::Elasticsearch;
 use serde_json::json;
 
 pub async fn build_user_index(client: &Elasticsearch) {
+    println!(
+        "{} {}",
+        "Building elastic index for".bright_green(),
+        "users".bright_yellow()
+    );
+
     let response: Response = client
         .indices()
         .create(IndicesCreateParts::Index("users"))
@@ -17,7 +23,7 @@ pub async fn build_user_index(client: &Elasticsearch) {
             },
             "mappings": {
                 "properties": {
-                    "id": { "type": "keyword" },
+                    "id": { "type": "keyword", "index": false },
                     "email": { "type": "keyword" },
                     "username": { "type": "keyword" },
                     "first_name": { "type": "text" },
@@ -45,7 +51,8 @@ pub async fn build_user_index(client: &Elasticsearch) {
     }
 
     println!(
-        "{}",
-        "Index for 'users' created successfully!".bright_green()
+        "{} {}\n",
+        "Successfully created elastic index".bright_green(),
+        "users".bright_yellow()
     );
 }
