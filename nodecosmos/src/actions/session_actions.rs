@@ -39,7 +39,7 @@ pub async fn login(
         return HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}}));
     }
 
-    match set_current_user(&client_session, user) {
+    match set_current_user(&client_session, &user) {
         Ok(current_user) => HttpResponse::Ok().json(json!({"success": true, "user": current_user})),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }

@@ -11,10 +11,10 @@ pub async fn add_document<T: Model + Serialize + Debug>(
     client: &Elasticsearch,
     index: &str,
     model: &T,
-    id: &String,
+    id: String,
 ) {
     let response = client
-        .index(IndexParts::IndexId(index, id))
+        .index(IndexParts::IndexId(index, &id))
         .body(&model)
         .send()
         .await;
@@ -49,10 +49,10 @@ pub async fn update_document<T: Model + Serialize + Debug>(
     client: &Elasticsearch,
     index: &str,
     model: &T,
-    id: &String,
+    id: String,
 ) {
     let response = client
-        .update(UpdateParts::IndexId(index, id))
+        .update(UpdateParts::IndexId(index, &id))
         .body(json!({
             "doc": model
         }))
@@ -85,8 +85,8 @@ pub async fn update_document<T: Model + Serialize + Debug>(
     }
 }
 
-pub async fn delete_document(client: &Elasticsearch, index: &str, id: &String) {
-    let response = client.delete(DeleteParts::IndexId(index, id)).send().await;
+pub async fn delete_document(client: &Elasticsearch, index: &str, id: String) {
+    let response = client.delete(DeleteParts::IndexId(index, &id)).send().await;
 
     if let Ok(response) = response {
         if !response.status_code().is_success() {

@@ -153,7 +153,7 @@ pub async fn create_node(
         &elastic_client,
         Node::ELASTIC_IDX_NAME,
         &node,
-        &node.id.to_string(),
+        node.id.to_string(),
     )
     .await;
 
@@ -176,7 +176,7 @@ pub async fn update_node_title(
         &elastic_client,
         Node::ELASTIC_IDX_NAME,
         &node,
-        &node.id.to_string(),
+        node.id.to_string(),
     )
     .await;
 
@@ -199,7 +199,7 @@ pub async fn update_node_description(
         &elastic_client,
         Node::ELASTIC_IDX_NAME,
         &node,
-        &node.id.to_string(),
+        node.id.to_string(),
     )
     .await;
 
@@ -223,12 +223,7 @@ pub async fn delete_node(
 
     auth_node_update(&node, &current_user).await?;
     node.delete_cb(&db_session).await?;
-    delete_document(
-        &elastic_client,
-        Node::ELASTIC_IDX_NAME,
-        &node.id.to_string(),
-    )
-    .await;
+    delete_document(&elastic_client, Node::ELASTIC_IDX_NAME, node.id.to_string()).await;
 
     bulk_delete_documents(
         &elastic_client,

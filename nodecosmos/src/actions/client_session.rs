@@ -11,7 +11,7 @@ partial_user!(CurrentUser, id, username, email, confirmed);
 
 pub fn set_current_user(
     client_session: &Session,
-    user: User,
+    user: &User,
 ) -> Result<CurrentUser, NodecosmosError> {
     let current_user = CurrentUser {
         id: user.id,
