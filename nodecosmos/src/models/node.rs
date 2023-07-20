@@ -1,7 +1,7 @@
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{
-    default_to_false, default_to_true, impl_updated_at_cb, sanitize_description_cb_fn,
+    default_to_0, default_to_false, impl_updated_at_cb, sanitize_description_cb_fn,
 };
 use crate::models::input_output::IoDelete;
 use crate::models::udts::{Creator, Owner};
@@ -18,13 +18,13 @@ use scylla::batch::Batch;
     secondary_indexes = [id],
 )]
 pub struct Node {
-    #[serde(default)]
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
 
-    #[serde(default = "default_to_true")]
+    #[serde(rename = "isPublic")]
     pub is_public: Option<Boolean>,
 
     #[serde(rename = "isRoot", default = "default_to_false")]
@@ -74,11 +74,20 @@ pub struct Node {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
-    #[serde(rename = "likesCount")]
+    #[serde(rename = "likesCount", default = "default_to_0")]
     pub likes_count: Option<BigInt>,
 }
 
 impl Node {
+    pub const ELASTIC_IDX_NAME: &'static str = "nodes";
+
+    pub fn set_owner(&mut self, owner: Owner) {
+        self.owner_id = Some(owner.id);
+        self.owner_type = Some(owner.owner_type.clone());
+
+        self.owner = Some(owner);
+    }
+
     pub async fn parent(&self, db_session: &CachingSession) -> Option<Node> {
         match self.parent_id {
             Some(parent_id) => {
@@ -97,31 +106,16 @@ impl Node {
         }
     }
 
-    pub fn set_defaults(&mut self) {
-        self.id = Uuid::new_v4();
+    pub async fn set_defaults(&mut self) -> Result<(), CharybdisError> {
+        if self.root_id == Uuid::nil() {
+            self.root_id = self.id;
+        }
+
         self.created_at = Some(Utc::now());
         self.updated_at = Some(Utc::now());
         self.is_root = Some(self.parent_id.is_none());
 
-        if self.root_id == Uuid::nil() {
-            self.root_id = self.id;
-        }
-    }
-
-    pub fn set_owner(&mut self, owner: Owner) {
-        self.owner = Some(owner);
-    }
-
-    pub fn set_owner_id(&mut self, owner_id: Uuid) {
-        self.owner_id = Some(owner_id);
-    }
-
-    pub fn set_editor_ids(&mut self, editor_ids: Option<Set<Uuid>>) {
-        self.editor_ids = editor_ids;
-    }
-
-    pub fn set_ancestor_ids(&mut self, ancestor_ids: Set<Uuid>) {
-        self.ancestor_ids = Some(ancestor_ids);
+        Ok(())
     }
 
     pub async fn push_to_parent_children(
@@ -262,8 +256,8 @@ impl Node {
 }
 
 impl Callbacks for Node {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.set_defaults();
+    async fn before_insert(&mut self, _db_session: &CachingSession) -> Result<(), CharybdisError> {
+        self.set_defaults().await?;
 
         Ok(())
     }

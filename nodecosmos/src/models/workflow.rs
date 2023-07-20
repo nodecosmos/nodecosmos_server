@@ -11,10 +11,10 @@ use chrono::Utc;
 /// Currently we only support one workflow per node,
 /// in future we will support multiple workflows per node.
 ///
-/// Single workflow can have multiple flows that can be executed in parallel.
-/// Flow should be isolated in a way that represents a single process.
-/// Each flow can have multiple flow steps that can be executed in parallel.
-/// Each flow step is made of input node and output.
+/// Single workflow can have multiple flows.
+/// Flow represents isolated process within workflow.
+/// Single flow can have many flow steps.
+/// Flow step contains inputs, nodes and outputs.
 ///
 /// In that sense Workflow is a collection of flows.
 ///
@@ -112,6 +112,7 @@ impl Callbacks for Workflow {
                 (self.node_id, self.id),
             )
             .await?;
+
             let flows = FlowDelete::find(
                 session,
                 find_flow_delete_query!("node_id = ? AND workflow_id = ?"),

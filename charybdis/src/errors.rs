@@ -1,6 +1,7 @@
 use crate::FromRowError;
 use scylla::frame::value::SerializeValuesError;
 use scylla::transport::errors::QueryError;
+use scylla::transport::iterator::NextRowError;
 use scylla::transport::query_result::{
     FirstRowTypedError, MaybeFirstRowTypedError, RowsExpectedError, SingleRowTypedError,
 };
@@ -17,6 +18,7 @@ pub enum CharybdisError {
     FirstRowTypedError(FirstRowTypedError, String),
     MaybeFirstRowTypedError(MaybeFirstRowTypedError, String),
     FromRowError(FromRowError, String),
+    NextRowError(NextRowError),
     // charybdis
     NotFoundError(String),
     ValidationError((String, String)),
@@ -48,6 +50,7 @@ impl fmt::Display for CharybdisError {
             CharybdisError::SerializeValuesError(e, model) => {
                 write!(f, "SerializeValuesError: {}\n{}", e, model)
             }
+            CharybdisError::NextRowError(e) => write!(f, "NextRowError: {}", e),
             // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for query: {}", e),
             CharybdisError::ValidationError(e) => write!(f, "ValidationError: {} {}", e.0, e.1),
@@ -66,6 +69,7 @@ impl Error for CharybdisError {
             CharybdisError::FirstRowTypedError(e, _) => Some(e),
             CharybdisError::MaybeFirstRowTypedError(e, _) => Some(e),
             CharybdisError::FromRowError(e, _) => Some(e),
+            CharybdisError::NextRowError(e) => Some(e),
             CharybdisError::SerializeValuesError(e, _) => Some(e),
             CharybdisError::ValidationError(_) => None,
             CharybdisError::CustomError(_) => None,
@@ -109,5 +113,11 @@ impl From<FromRowError> for CharybdisError {
 impl From<SerializeValuesError> for CharybdisError {
     fn from(e: SerializeValuesError) -> Self {
         CharybdisError::SerializeValuesError(e, "unknown".to_string())
+    }
+}
+
+impl From<NextRowError> for CharybdisError {
+    fn from(e: NextRowError) -> Self {
+        CharybdisError::NextRowError(e)
     }
 }

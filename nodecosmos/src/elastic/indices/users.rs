@@ -1,19 +1,20 @@
+use crate::models::user::User;
 use colored::Colorize;
 use elasticsearch::http::response::Response;
 use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::Elasticsearch;
 use serde_json::json;
 
-pub async fn build_nodes_index(client: &Elasticsearch) {
+pub async fn build_user_index(client: &Elasticsearch) {
     println!(
         "{} {}",
         "Building elastic index for".bright_green(),
-        "nodes".bright_yellow()
+        User::ELASTIC_IDX_NAME.bright_yellow()
     );
 
     let response: Response = client
         .indices()
-        .create(IndicesCreateParts::Index("nodes"))
+        .create(IndicesCreateParts::Index(User::ELASTIC_IDX_NAME))
         .body(json!({
             "settings": {
                 "index": {
@@ -22,22 +23,22 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
                 }
             },
             "mappings": {
+                "dynamic": false,
                 "properties": {
-                    "root_id": { "type": "keyword", "index": false },
                     "id": { "type": "keyword", "index": false },
-                    "title": { "type": "text" },
-                    "description": { "type": "text" },
-                    "is_root": { "type": "boolean" },
-                    "is_public": { "type": "boolean" },
-                    "created_at": { "type": "date" },
-                    "likes_count": { "type": "integer" },
+                    "email": { "type": "search_as_you_type" },
+                    "username": { "type": "search_as_you_type" },
+                    "firstName": { "type": "search_as_you_type" },
+                    "lastName": { "type": "search_as_you_type" },
+                    "bio": { "type": "text" },
+                    "createdAt": { "type": "date" },
                 }
             }
         }))
         .send()
         .await
         .unwrap_or_else(|e| {
-            panic!("Failed to create node index: {}", e);
+            panic!("Failed to create users index: {}", e);
         });
 
     if !response.status_code().is_success() {
@@ -55,6 +56,6 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
     println!(
         "{} {}\n",
         "Successfully created elastic index".bright_green(),
-        "nodes".bright_yellow()
+        User::ELASTIC_IDX_NAME.bright_yellow()
     );
 }

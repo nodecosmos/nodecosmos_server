@@ -7,18 +7,17 @@ pub async fn auth_node_creation(
     parent: &Option<Node>,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    match parent {
-        Some(parent) => {
-            if can_edit_node(current_user, &parent) {
-                Ok(())
-            } else {
-                Err(NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized",
-                    "message": "Not authorized to create node for provided parent!"
-                })))
-            }
+    if let Some(parent) = parent {
+        if can_edit_node(current_user, &parent) {
+            Ok(())
+        } else {
+            Err(NodecosmosError::Unauthorized(json!({
+                "error": "Unauthorized",
+                "message": "Not authorized to create node for provided parent!"
+            })))
         }
-        None => Ok(()),
+    } else {
+        Ok(())
     }
 }
 

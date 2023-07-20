@@ -4,7 +4,7 @@ services:
   scylla1:
     image: scylladb/scylla:latest
     container_name: scylla1
-    command: --smp 20
+    command: --smp ${SMP}
     ports:
       - "9042:9042"
     networks:
@@ -14,7 +14,7 @@ services:
   scylla2:
     image: scylladb/scylla:latest
     container_name: scylla2
-    command: --seeds=scylla1 --smp 20
+    command: --seeds=scylla1 --smp ${SMP}
     ports:
       - "9043:9042"
     networks:
@@ -24,7 +24,7 @@ services:
   scylla3:
     image: scylladb/scylla:latest
     container_name: scylla3
-    command: --seeds=scylla1 --smp 20
+    command: --seeds=scylla1 --smp ${SMP}
     ports:
       - "9044:9042"
     networks:

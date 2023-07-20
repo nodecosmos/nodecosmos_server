@@ -1,13 +1,15 @@
 use crate::actions::client_session::*;
 use crate::authorize::{auth_node_creation, auth_node_update};
+use crate::elastic::{add_document, bulk_delete_documents, delete_document, update_document};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
-    AsNative, BaseModel, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
-    UpdateWithCallbacks, Uuid,
+    AsNative, BaseModel, CharybdisError, DeleteWithCallbacks, Deserialize, Find,
+    InsertWithCallbacks, New, UpdateWithCallbacks, Uuid,
 };
+use elasticsearch::Elasticsearch;
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde_json::json;
@@ -26,7 +28,7 @@ pub async fn get_nodes(
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut nodes_iter = BaseNode::find_iter(
         &db_session,
-        Node::SELECT_FIELDS_CLAUSE,
+        BaseNode::SELECT_FIELDS_CLAUSE,
         (),
         DEFAULT_PAGE_SIZE,
     )
@@ -35,9 +37,8 @@ pub async fn get_nodes(
     let mut nodes = vec![];
 
     while let Some(node) = nodes_iter.next().await {
-        if let Ok(node) = node {
-            nodes.push(node);
-        }
+        let node = node.map_err(|e| CharybdisError::from(e))?;
+        nodes.push(node);
     }
 
     Ok(HttpResponse::Ok().json(nodes))
@@ -122,6 +123,7 @@ pub async fn get_node_description(
 #[post("")]
 pub async fn create_node(
     db_session: web::Data<CachingSession>,
+    elastic_client: web::Data<Elasticsearch>,
     node: web::Json<Node>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -130,28 +132,30 @@ pub async fn create_node(
 
     auth_node_creation(&parent, &current_user).await?;
 
-    node.set_owner_id(current_user.id);
     node.set_owner(Owner {
         id: current_user.id,
         name: current_user.username,
         owner_type: OwnerTypes::User.into(),
     });
 
-    match parent {
-        Some(parent) => {
-            node.set_editor_ids(parent.editor_ids);
+    if let Some(parent) = parent {
+        node.editor_ids = parent.editor_ids;
+        node.is_public = parent.is_public;
 
-            let mut ancestor_ids = parent.ancestor_ids.unwrap_or_else(|| vec![]);
-            ancestor_ids.push(parent.id);
+        let mut ancestor_ids = parent.ancestor_ids.unwrap_or_else(|| vec![]);
+        ancestor_ids.push(parent.id);
 
-            node.set_ancestor_ids(ancestor_ids);
-        }
-        None => {
-            node.set_editor_ids(Some(vec![current_user.id]));
-        }
+        node.ancestor_ids = Some(ancestor_ids);
     }
 
     node.insert_cb(&db_session).await?;
+    add_document(
+        &elastic_client,
+        Node::ELASTIC_IDX_NAME,
+        &node,
+        &node.id.to_string(),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -160,6 +164,7 @@ pub async fn create_node(
 pub async fn update_node_title(
     node: web::Json<UpdateNodeTitle>,
     db_session: web::Data<CachingSession>,
+    elastic_client: web::Data<Elasticsearch>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
@@ -167,6 +172,13 @@ pub async fn update_node_title(
 
     auth_node_update(&native_node, &current_user).await?;
     node.update_cb(&db_session).await?;
+    update_document(
+        &elastic_client,
+        Node::ELASTIC_IDX_NAME,
+        &node,
+        &node.id.to_string(),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -175,6 +187,7 @@ pub async fn update_node_title(
 pub async fn update_node_description(
     db_session: web::Data<CachingSession>,
     node: web::Json<UpdateNodeDescription>,
+    elastic_client: web::Data<Elasticsearch>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
@@ -182,6 +195,13 @@ pub async fn update_node_description(
 
     auth_node_update(&native_node, &current_user).await?;
     node.update_cb(&db_session).await?;
+    update_document(
+        &elastic_client,
+        Node::ELASTIC_IDX_NAME,
+        &node,
+        &node.id.to_string(),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -189,6 +209,7 @@ pub async fn update_node_description(
 #[delete("/{root_id}/{id}")]
 pub async fn delete_node(
     db_session: web::Data<CachingSession>,
+    elastic_client: web::Data<Elasticsearch>,
     params: web::Path<PrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -202,6 +223,19 @@ pub async fn delete_node(
 
     auth_node_update(&node, &current_user).await?;
     node.delete_cb(&db_session).await?;
+    delete_document(
+        &elastic_client,
+        Node::ELASTIC_IDX_NAME,
+        &node.id.to_string(),
+    )
+    .await;
+
+    bulk_delete_documents(
+        &elastic_client,
+        Node::ELASTIC_IDX_NAME,
+        node.descendant_ids.unwrap_or_else(|| vec![]),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().finish())
 }

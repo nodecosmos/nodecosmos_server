@@ -10,10 +10,10 @@ const BCRYPT_COST: u32 = 6;
 
 #[partial_model_generator]
 #[charybdis_model(
-table_name = users,
-partition_keys = [id],
-clustering_keys = [],
-secondary_indexes = [username, email]
+    table_name = users,
+    partition_keys = [id],
+    clustering_keys = [],
+    secondary_indexes = [username, email]
 )]
 pub struct User {
     #[serde(default = "Uuid::new_v4")]
@@ -21,16 +21,31 @@ pub struct User {
     pub username: Text,
     pub email: Text,
     pub password: Text,
+
+    #[serde(rename = "firstName")]
     pub first_name: Text,
+
+    #[serde(rename = "lastName")]
     pub last_name: Text,
+
+    pub bio: Option<Text>,
+
+    #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
+
+    #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
     pub address: Option<Address>,
     pub confirmed: Option<Boolean>,
+
+    #[serde(rename = "likedObjectIds")]
     pub liked_object_ids: Option<Set<Uuid>>,
 }
 
 impl User {
+    pub const ELASTIC_IDX_NAME: &'static str = "users";
+
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
         let query = find_user_query!("username = ?");
 
