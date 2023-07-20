@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, ResponseError};
 use charybdis::CharybdisError;
+use colored::Colorize;
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
@@ -10,6 +11,7 @@ pub enum NodecosmosError {
     Unauthorized(serde_json::Value),
     CharybdisError(CharybdisError),
     SerdeError(serde_json::Error),
+    ElasticError(elasticsearch::Error),
     // InternalServerError(String),
 }
 
@@ -20,6 +22,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: \n{}", e),
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: \n{}", e),
+            NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: \n{}", e),
             // NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
         }
     }
@@ -32,6 +35,7 @@ impl Error for NodecosmosError {
             NodecosmosError::Unauthorized(_) => None,
             NodecosmosError::CharybdisError(_) => None,
             NodecosmosError::SerdeError(_) => None,
+            NodecosmosError::ElasticError(_) => None,
             // NodecosmosError::InternalServerError(_) => None,
         }
     }
@@ -49,10 +53,14 @@ impl ResponseError for NodecosmosError {
                 CharybdisError::ValidationError((field, message)) => {
                     HttpResponse::Forbidden().json(json!({ "error": {field: message} }))
                 }
-                _ => HttpResponse::InternalServerError().json(json!({
-                    "error": "Internal Server Error",
-                    "message": e.to_string()
-                })),
+                _ => {
+                    println!("Internal Server Error: {}", e.to_string().red());
+
+                    HttpResponse::InternalServerError().json(json!({
+                        "error": "Internal Server Error",
+                        "message": e.to_string()
+                    }))
+                }
             },
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
@@ -75,5 +83,11 @@ impl From<CharybdisError> for NodecosmosError {
 impl From<serde_json::Error> for NodecosmosError {
     fn from(e: serde_json::Error) -> Self {
         NodecosmosError::SerdeError(e)
+    }
+}
+
+impl From<elasticsearch::Error> for NodecosmosError {
+    fn from(e: elasticsearch::Error) -> Self {
+        NodecosmosError::ElasticError(e)
     }
 }
