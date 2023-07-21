@@ -1,5 +1,6 @@
 use chrono::Utc;
 
+use crate::app::CbExtension;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_node_likes_count_query, UpdateNodeLikesCount};
 use crate::models::user::User;
@@ -83,6 +84,7 @@ impl Like {
     pub async fn update_model_likes_count(
         &self,
         session: &CachingSession,
+        ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
         match ObjectTypes::from_string(self.object_type.as_str()) {
             Some(ObjectTypes::Node) => {
@@ -92,7 +94,7 @@ impl Like {
                 let lc = self.likes_count(session).await?;
 
                 node.likes_count = Some(lc.count.0);
-                node.update_cb(session).await?;
+                node.update_cb(session, ext).await?;
 
                 Ok(())
             }
@@ -125,8 +127,12 @@ impl Like {
     }
 }
 
-impl Callbacks for Like {
-    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+impl ExtCallbacks<CbExtension> for Like {
+    async fn before_insert(
+        &mut self,
+        session: &CachingSession,
+        _ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.validate_not_liked(session).await?;
         self.set_defaults();
 
@@ -135,21 +141,33 @@ impl Callbacks for Like {
         Ok(())
     }
 
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        self.update_model_likes_count(session).await?;
+    async fn after_insert(
+        &mut self,
+        session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
+        self.update_model_likes_count(session, ext).await?;
         self.push_to_user_liked_obj_ids(session).await?;
 
         Ok(())
     }
 
-    async fn before_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn before_delete(
+        &mut self,
+        session: &CachingSession,
+        _ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         LikesCount::decrement(&session, self.object_id).await?;
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        self.update_model_likes_count(session).await?;
+    async fn after_delete(
+        &mut self,
+        session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
+        self.update_model_likes_count(session, ext).await?;
         self.pull_from_user_liked_obj_ids(session).await?;
 
         Ok(())

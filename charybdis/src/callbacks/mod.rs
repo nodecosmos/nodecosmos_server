@@ -1,3 +1,3 @@
 mod callbacks;
 
-pub use callbacks::Callbacks;
+pub use callbacks::*;

@@ -1,10 +1,11 @@
 use crate::actions::client_session::{CurrentUser, OptCurrentUser};
+use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;
 use crate::models::user::LikedObjectIdsUser;
 use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, Uuid};
+use charybdis::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, Uuid};
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
@@ -64,6 +65,7 @@ pub async fn get_likes_count(
 #[post("")]
 pub async fn create_like(
     db_session: web::Data<CachingSession>,
+    cb_extension: web::Data<CbExtension>,
     params: web::Json<LikeParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -77,7 +79,7 @@ pub async fn create_like(
         ..Default::default()
     };
 
-    like.insert_cb(&db_session).await?;
+    like.insert_cb(&db_session, &cb_extension).await?;
 
     let likes_count = LikesCount {
         object_id: params.object_id,
@@ -96,6 +98,7 @@ pub async fn create_like(
 #[delete("/{id}")]
 pub async fn delete_like(
     db_session: web::Data<CachingSession>,
+    cb_extension: web::Data<CbExtension>,
     id: web::Path<Uuid>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -109,7 +112,7 @@ pub async fn delete_like(
 
     let mut like = like.find_by_primary_key(&db_session).await?;
 
-    like.delete_cb(&db_session).await?;
+    like.delete_cb(&db_session, &cb_extension).await?;
 
     let likes_count = LikesCount {
         object_id,

@@ -3,7 +3,7 @@ use actix_session::config::PersistentSession;
 use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
-use actix_web::{cookie, http, web};
+use actix_web::{cookie, http};
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
@@ -29,7 +29,12 @@ impl App {
     }
 }
 
-pub async fn get_db_session(app: &App) -> web::Data<CachingSession> {
+#[derive(Clone)]
+pub struct CbExtension {
+    pub elastic_client: Elasticsearch,
+}
+
+pub async fn get_db_session(app: &App) -> CachingSession {
     let hosts = app.config["scylla"]["hosts"]
         .as_array()
         .expect("Missing hosts");
@@ -55,10 +60,10 @@ pub async fn get_db_session(app: &App) -> web::Data<CachingSession> {
 
     let session = CachingSession::from(session, 1000);
 
-    web::Data::new(session)
+    session
 }
 
-pub async fn get_elastic_client(app: &App) -> web::Data<Elasticsearch> {
+pub async fn get_elastic_client(app: &App) -> Elasticsearch {
     let host = app.config["elasticsearch"]["host"]
         .as_str()
         .expect("Missing elastic host");
@@ -72,7 +77,7 @@ pub async fn get_elastic_client(app: &App) -> web::Data<Elasticsearch> {
 
     let client = Elasticsearch::new(transport);
 
-    web::Data::new(client)
+    client
 }
 
 pub fn get_cors(app: &App) -> Cors {

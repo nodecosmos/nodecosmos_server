@@ -100,14 +100,16 @@ macro_rules! sanitize_description_cb {
         }
     };
 }
-
 pub(crate) use sanitize_description_cb;
 
-macro_rules! sanitize_description_cb_fn {
+// ExtCallbacks trait
+// when model implements ExtCallbacks trait
+macro_rules! sanitize_description_ext_cb_fn {
     () => {
         async fn before_update(
             &mut self,
             _session: &charybdis::CachingSession,
+            _ext: &crate::app::CbExtension,
         ) -> Result<(), charybdis::CharybdisError> {
             use ammonia::clean;
 
@@ -122,4 +124,4 @@ macro_rules! sanitize_description_cb_fn {
     };
 }
 
-pub(crate) use sanitize_description_cb_fn;
+pub(crate) use sanitize_description_ext_cb_fn;

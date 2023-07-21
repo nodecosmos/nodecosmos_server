@@ -1,7 +1,9 @@
 pub use super::udts::Address;
-use crate::models::helpers::impl_updated_at_cb;
+use crate::app::CbExtension;
+use crate::elastic::{add_elastic_document, delete_elastic_document};
+use crate::models::helpers::impl_user_updated_at_with_elastic_ext_cb;
 use bcrypt::{hash, verify};
-use charybdis::{Boolean, Callbacks, CharybdisError, Find, Set, Text, Timestamp, Uuid};
+use charybdis::{Boolean, CharybdisError, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use scylla::CachingSession;
@@ -117,8 +119,12 @@ impl User {
     }
 }
 
-impl Callbacks for User {
-    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+impl ExtCallbacks<CbExtension> for User {
+    async fn before_insert(
+        &mut self,
+        session: &CachingSession,
+        _ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.check_existing_user(session).await?;
 
         self.set_defaults();
@@ -127,8 +133,43 @@ impl Callbacks for User {
         Ok(())
     }
 
-    async fn before_update(&mut self, _: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_insert(
+        &mut self,
+        _session: &CachingSession,
+        cb_extension: &CbExtension,
+    ) -> Result<(), CharybdisError> {
+        add_elastic_document(
+            &cb_extension.elastic_client,
+            User::ELASTIC_IDX_NAME,
+            self,
+            self.id.to_string(),
+        )
+        .await;
+
+        Ok(())
+    }
+
+    async fn before_update(
+        &mut self,
+        _: &CachingSession,
+        _ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.updated_at = Some(Utc::now());
+        Ok(())
+    }
+
+    async fn after_delete(
+        &mut self,
+        _session: &CachingSession,
+        cb_extension: &CbExtension,
+    ) -> Result<(), CharybdisError> {
+        delete_elastic_document(
+            &cb_extension.elastic_client,
+            User::ELASTIC_IDX_NAME,
+            self.id.to_string(),
+        )
+        .await;
+
         Ok(())
     }
 }
@@ -136,8 +177,6 @@ impl Callbacks for User {
 partial_user!(GetUser, id, username, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-impl_updated_at_cb!(UpdateUser);
-
-partial_user!(DeleteUser, id);
+impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 
 partial_user!(LikedObjectIdsUser, id, liked_object_ids);

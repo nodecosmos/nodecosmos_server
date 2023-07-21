@@ -1,6 +1,7 @@
 use crate::callbacks::Callbacks;
 use crate::errors::CharybdisError;
 use crate::model::Model;
+use crate::ExtCallbacks;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
 
@@ -30,6 +31,28 @@ impl<T: Model + ValueList + Update + Callbacks> UpdateWithCallbacks for T {
         self.before_update(session).await?;
         let res = self.update(session).await;
         self.after_update(session).await?;
+
+        res
+    }
+}
+
+pub trait UpdateWithExtCallbacks<E> {
+    async fn update_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &E,
+    ) -> Result<QueryResult, CharybdisError>;
+}
+
+impl<T: Model + ValueList + Update + ExtCallbacks<E>, E> UpdateWithExtCallbacks<E> for T {
+    async fn update_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &E,
+    ) -> Result<QueryResult, CharybdisError> {
+        self.before_update(session, extension).await?;
+        let res = self.update(session).await;
+        self.after_update(session, extension).await?;
 
         res
     }

@@ -118,7 +118,7 @@ pub trait TableOptions {
 }
 
 ///
-/// In context of partial_model!() in case you need native model in order to run calculations
+/// In extension of partial_model!() in case you need native model in order to run calculations
 /// or other operations, you can use `as_native` method:
 /// ```rust
 /// partial_user!(UpdateUser, id, username);

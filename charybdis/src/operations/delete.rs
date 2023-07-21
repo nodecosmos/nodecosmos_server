@@ -1,4 +1,4 @@
-use crate::callbacks::Callbacks;
+use crate::callbacks::{Callbacks, ExtCallbacks};
 use crate::errors::CharybdisError;
 use crate::model::Model;
 use scylla::frame::value::ValueList;
@@ -30,6 +30,28 @@ impl<T: Model + ValueList + Delete + Callbacks> DeleteWithCallbacks for T {
         self.before_delete(session).await?;
         let res = self.delete(session).await;
         self.after_delete(session).await?;
+
+        res
+    }
+}
+
+pub trait DeleteWithExtCallbacks<E> {
+    async fn delete_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &E,
+    ) -> Result<QueryResult, CharybdisError>;
+}
+
+impl<T: Model + ValueList + Delete + ExtCallbacks<E>, E> DeleteWithExtCallbacks<E> for T {
+    async fn delete_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &E,
+    ) -> Result<QueryResult, CharybdisError> {
+        self.before_delete(session, extension).await?;
+        let res = self.delete(session).await;
+        self.after_delete(session, extension).await?;
 
         res
     }

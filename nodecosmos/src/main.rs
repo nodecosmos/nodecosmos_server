@@ -10,7 +10,9 @@ mod errors;
 mod models;
 mod services;
 
-use crate::app::{get_cors, get_db_session, get_elastic_client, get_port, get_session_middleware};
+use crate::app::{
+    get_cors, get_db_session, get_elastic_client, get_port, get_session_middleware, CbExtension,
+};
 use actions::*;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
@@ -21,9 +23,16 @@ async fn main() {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     let nodecosmos = NodecosmosApp::new();
-    let session = get_db_session(&nodecosmos).await;
+    let db_session = get_db_session(&nodecosmos).await;
     let elastic_client = get_elastic_client(&nodecosmos).await;
     let port = get_port(&nodecosmos);
+    let cb_extension = CbExtension {
+        elastic_client: elastic_client.clone(),
+    };
+    // web data
+    let db_session_web_data = web::Data::new(db_session);
+    let elastic_client_web_data = web::Data::new(elastic_client.clone());
+    let cb_extension_web_data = web::Data::new(cb_extension.clone());
 
     elastic::build(&elastic_client).await;
 
@@ -32,8 +41,9 @@ async fn main() {
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(get_cors(&nodecosmos))
             .wrap(get_session_middleware(&nodecosmos))
-            .app_data(session.clone())
-            .app_data(elastic_client.clone())
+            .app_data(db_session_web_data.clone())
+            .app_data(elastic_client_web_data.clone())
+            .app_data(cb_extension_web_data.clone())
             .service(
                 web::scope("/users")
                     .service(get_user)

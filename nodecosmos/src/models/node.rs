@@ -1,7 +1,13 @@
+use crate::app::CbExtension;
+use crate::elastic::{
+    add_elastic_document, bulk_delete_elastic_documents, delete_elastic_document,
+    update_elastic_document,
+};
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{
-    default_to_0, default_to_false, impl_updated_at_cb, sanitize_description_cb_fn,
+    default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
+    sanitize_description_ext_cb_fn,
 };
 use crate::models::input_output::IoDelete;
 use crate::models::udts::{Creator, Owner};
@@ -253,34 +259,70 @@ impl Node {
             None => Ok(()),
         }
     }
+
+    pub async fn add_to_elastic_index(&self, ext: &CbExtension) {
+        add_elastic_document(
+            &ext.elastic_client,
+            Node::ELASTIC_IDX_NAME,
+            self,
+            self.id.to_string(),
+        )
+        .await;
+    }
+
+    pub async fn delete_related_elastic_data(&self, ext: &CbExtension) {
+        delete_elastic_document(
+            &ext.elastic_client,
+            Node::ELASTIC_IDX_NAME,
+            self.id.to_string(),
+        )
+        .await;
+
+        bulk_delete_elastic_documents(
+            &ext.elastic_client,
+            Node::ELASTIC_IDX_NAME,
+            self.descendant_ids.clone().unwrap_or_else(|| vec![]),
+        )
+        .await;
+    }
 }
 
-impl Callbacks for Node {
-    async fn before_insert(&mut self, _db_session: &CachingSession) -> Result<(), CharybdisError> {
+impl ExtCallbacks<CbExtension> for Node {
+    async fn before_insert(
+        &mut self,
+        _db_session: &CachingSession,
+        _ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.set_defaults().await?;
 
         Ok(())
     }
 
-    async fn after_insert(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_insert(
+        &mut self,
+        db_session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.push_to_parent_children(db_session).await?;
         self.push_to_ancestors(db_session).await?;
 
-        Ok(())
-    }
-
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
-        self.updated_at = Some(Utc::now());
+        self.add_to_elastic_index(ext).await;
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(
+        &mut self,
+        db_session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.pull_from_parent_children(db_session).await?;
         self.pull_from_ancestors(db_session).await?;
 
         self.delete_descendants(db_session).await?;
         self.delete_workflows(db_session).await?;
+
+        self.delete_related_elastic_data(ext).await;
 
         Ok(())
     }
@@ -312,7 +354,7 @@ partial_node!(
 );
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
-impl_updated_at_cb!(UpdateNodeTitle);
+impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeTitle);
 
 partial_node!(
     UpdateNodeDescription,
@@ -323,13 +365,15 @@ partial_node!(
     description_markdown,
     updated_at
 );
-impl Callbacks for UpdateNodeDescription {
-    sanitize_description_cb_fn!();
+impl ExtCallbacks<CbExtension> for UpdateNodeDescription {
+    sanitize_description_ext_cb_fn!();
 
-    async fn after_update(&mut self, _db_session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_update(
+        &mut self,
+        _db_session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         use ammonia::clean;
-
-        self.updated_at = Some(Utc::now());
 
         if let Some(description) = &self.description {
             self.description = Some(clean(description));
@@ -339,6 +383,14 @@ impl Callbacks for UpdateNodeDescription {
             self.short_description = Some(clean(short_description));
         }
 
+        update_elastic_document(
+            &ext.elastic_client,
+            Node::ELASTIC_IDX_NAME,
+            self,
+            self.id.to_string(),
+        )
+        .await;
+
         Ok(())
     }
 }
@@ -347,6 +399,6 @@ partial_node!(UpdateNodeOwner, root_id, id, owner_id, updated_at);
 impl_updated_at_cb!(UpdateNodeOwner);
 
 partial_node!(UpdateNodeLikesCount, root_id, id, likes_count, updated_at);
-impl_updated_at_cb!(UpdateNodeLikesCount);
+impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeLikesCount);
 
 partial_node!(DeleteNode, root_id, id);

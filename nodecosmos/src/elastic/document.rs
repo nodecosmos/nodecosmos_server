@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::fmt::Debug;
 
-pub async fn add_document<T: Model + Serialize + Debug>(
+pub async fn add_elastic_document<T: Model + Serialize + Debug>(
     client: &Elasticsearch,
     index: &str,
     model: &T,
@@ -45,7 +45,7 @@ pub async fn add_document<T: Model + Serialize + Debug>(
     }
 }
 
-pub async fn update_document<T: Model + Serialize + Debug>(
+pub async fn update_elastic_document<T: Model + Serialize + Debug>(
     client: &Elasticsearch,
     index: &str,
     model: &T,
@@ -85,7 +85,7 @@ pub async fn update_document<T: Model + Serialize + Debug>(
     }
 }
 
-pub async fn delete_document(client: &Elasticsearch, index: &str, id: String) {
+pub async fn delete_elastic_document(client: &Elasticsearch, index: &str, id: String) {
     let response = client.delete(DeleteParts::IndexId(index, &id)).send().await;
 
     if let Ok(response) = response {
@@ -112,7 +112,7 @@ pub async fn delete_document(client: &Elasticsearch, index: &str, id: String) {
     }
 }
 
-pub async fn bulk_delete_documents(client: &Elasticsearch, index: &str, ids: Vec<Uuid>) {
+pub async fn bulk_delete_elastic_documents(client: &Elasticsearch, index: &str, ids: Vec<Uuid>) {
     let mut ops = BulkOperations::new();
 
     for id in ids {
