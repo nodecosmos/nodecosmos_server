@@ -4,15 +4,16 @@ use crate::elastic::{add_document, bulk_delete_documents, delete_document, updat
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
+use crate::services::nodes::search::NodeSearchService;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
-    AsNative, BaseModel, CharybdisError, DeleteWithCallbacks, Deserialize, Find,
-    InsertWithCallbacks, New, UpdateWithCallbacks, Uuid,
+    AsNative, DeleteWithCallbacks, Deserialize, Find, InsertWithCallbacks, New,
+    UpdateWithCallbacks, Uuid,
 };
-use elasticsearch::{Elasticsearch, SearchParts};
+use elasticsearch::Elasticsearch;
 use futures::StreamExt;
 use scylla::CachingSession;
-use serde_json::{json, Value};
+use serde_json::json;
 
 const DEFAULT_PAGE_SIZE: i32 = 5;
 
@@ -24,53 +25,9 @@ pub struct PrimaryKeyParams {
 
 #[get("")]
 pub async fn get_nodes(
-    db_session: web::Data<CachingSession>,
     elastic_client: web::Data<Elasticsearch>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let query = json!({
-      "query": {
-        "function_score": {
-          "query": {
-            "match_all": {}
-          },
-          "functions": [
-            {
-              "field_value_factor": {
-                "field": "likesCount",
-                "factor": 2,
-                "modifier": "none"
-              }
-            }
-          ],
-          "score_mode": "sum",
-          "boost_mode": "replace"
-        }
-      },
-      "sort": [
-        { "likesCount": "desc" },
-        { "_score": "desc" }
-      ],
-      "from": 0,
-      "size": 10
-    });
-
-    let response = elastic_client
-        .search(SearchParts::Index(&[Node::ELASTIC_IDX_NAME]))
-        .body(query)
-        .send()
-        .await?;
-
-    let response_body = response.json::<Value>().await?;
-
-    let hits = response_body["hits"]["hits"].as_array().unwrap();
-
-    let mut nodes = vec![];
-    for hit in hits {
-        let document: BaseNode = serde_json::from_value(hit["_source"].clone()).unwrap();
-
-        nodes.push(document);
-    }
-
+    let nodes = NodeSearchService::new(&elastic_client).index().await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 

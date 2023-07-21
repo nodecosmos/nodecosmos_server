@@ -8,6 +8,7 @@ mod authorize;
 mod elastic;
 mod errors;
 mod models;
+mod services;
 
 use crate::app::{get_cors, get_db_session, get_elastic_client, get_port, get_session_middleware};
 use actions::*;
