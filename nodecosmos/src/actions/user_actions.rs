@@ -1,12 +1,14 @@
 use super::client_session::set_current_user;
 
+use crate::actions::client_session::CurrentUser;
 use crate::app::CbExtension;
+use crate::authorize::auth_user_update;
+use crate::errors::NodecosmosError;
 use crate::models::user::{GetUser, UpdateUser, User};
 use actix_session::Session;
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
-    CharybdisError, DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks,
-    Uuid,
+    AsNative, DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks, Uuid,
 };
 use scylla::CachingSession;
 use serde_json::json;
@@ -15,18 +17,15 @@ use serde_json::json;
 pub async fn get_user(
     db_session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
-) -> impl Responder {
+) -> Result<HttpResponse, NodecosmosError> {
     let user = GetUser {
         id: id.into_inner(),
         ..Default::default()
     };
 
-    let user = user.find_by_primary_key(&db_session).await;
+    let user = user.find_by_primary_key(&db_session).await?;
 
-    match user {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(e) => HttpResponse::NotFound().body(e.to_string()),
-    }
+    Ok(HttpResponse::Ok().json(user))
 }
 
 #[post("")]
@@ -35,28 +34,13 @@ pub async fn create_user(
     cb_extension: web::Data<CbExtension>,
     client_session: Session,
     user: web::Json<User>,
-) -> impl Responder {
+) -> Result<HttpResponse, NodecosmosError> {
     let mut user = user.into_inner();
 
-    let res = user.insert_cb(&db_session, &cb_extension).await;
+    user.insert_cb(&db_session, &cb_extension).await?;
+    let current_user = set_current_user(&client_session, &user)?;
 
-    match res {
-        Ok(_) => {
-            let current_user = set_current_user(&client_session, &user);
-
-            match current_user {
-                Ok(current_user) => HttpResponse::Ok()
-                    .json(json!({ "message": "User created", "user": current_user })),
-                Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-            }
-        }
-        Err(e) => match e {
-            CharybdisError::ValidationError((field, message)) => {
-                HttpResponse::Conflict().json(json!({ "error": {field: message} }))
-            }
-            _ => HttpResponse::InternalServerError().body(e.to_string()),
-        },
-    }
+    Ok(HttpResponse::Ok().json(json!({ "message": "User created", "user": current_user })))
 }
 
 #[put("")]
@@ -64,34 +48,33 @@ pub async fn update_user(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     user: web::Json<UpdateUser>,
-) -> impl Responder {
-    // TODO: authorize update
+    current_user: CurrentUser,
+) -> Result<HttpResponse, NodecosmosError> {
     let mut user = user.into_inner();
-    let res = user.update_cb(&db_session, &cb_extension).await;
+    let native_user = user.as_native();
 
-    match res {
-        Ok(_) => HttpResponse::Ok().json(json!({"message": "User updated"})),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
+    auth_user_update(&native_user, &current_user).await?;
+
+    user.update_cb(&db_session, &cb_extension).await?;
+
+    Ok(HttpResponse::Ok().json(user))
 }
 
 #[delete("/{id}")]
 pub async fn delete_user(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
+    current_user: CurrentUser,
     id: web::Path<Uuid>,
-) -> impl Responder {
-    // TODO: authorize deletion
-
+) -> Result<HttpResponse, NodecosmosError> {
     let mut user = User {
         id: id.into_inner(),
         ..Default::default()
     };
 
-    let res = user.delete_cb(&db_session, &cb_extension).await;
+    auth_user_update(&user, &current_user).await?;
 
-    match res {
-        Ok(_) => HttpResponse::Ok().json(json!({"message": "User deleted"})),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
+    user.delete_cb(&db_session, &cb_extension).await?;
+
+    Ok(HttpResponse::Ok().finish())
 }
