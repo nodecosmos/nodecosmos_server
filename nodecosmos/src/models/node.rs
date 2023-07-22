@@ -332,6 +332,7 @@ partial_node!(
     BaseNode,
     root_id,
     id,
+    short_description,
     ancestor_ids,
     child_ids,
     descendant_ids,
