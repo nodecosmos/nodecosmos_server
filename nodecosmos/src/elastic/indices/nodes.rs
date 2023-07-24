@@ -55,7 +55,7 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
                 "properties": {
                     "rootId": { "type": "keyword", "index": false },
                     "id": { "type": "keyword", "index": false },
-                    "title": { "type": "search_as_you_type" },
+                    "title": { "type": "text", "analyzer": "english" },
                     "shortDescription": { "type": "text", "index": false  },
                     "description": {
                         "type": "text",

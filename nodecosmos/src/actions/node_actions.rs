@@ -4,7 +4,7 @@ use crate::authorize::{auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
-use crate::services::nodes::search::NodeSearchService;
+use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
     AsNative, DeleteWithExtCallbacks, Deserialize, Find, InsertWithExtCallbacks, New,
@@ -26,8 +26,11 @@ pub struct PrimaryKeyParams {
 #[get("")]
 pub async fn get_nodes(
     elastic_client: web::Data<Elasticsearch>,
+    query: web::Query<NodeSearchQuery>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let nodes = NodeSearchService::new(&elastic_client).index().await?;
+    let nodes = NodeSearchService::new(&elastic_client, &query)
+        .index()
+        .await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 
