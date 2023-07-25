@@ -36,35 +36,28 @@ pub async fn get_workflow(
     let flow_steps = flow_step.find_by_partition_key(&db_session).await?;
 
     let mut input_output_ids = vec![];
-    let mut flows_vec = vec![];
     let mut flow_steps_vec = vec![];
-    let mut input_outputs = vec![];
+    let mut input_outputs: Vec<InputOutput> = vec![];
 
     if let Some(initial_input_ids) = &workflow.initial_input_ids {
         input_output_ids.extend(initial_input_ids.iter().cloned());
     }
 
-    for flow in flows {
-        if let Ok(flow) = flow {
-            flows_vec.push(flow);
-        }
-    }
+    let flows_vec: Vec<BaseFlow> = flows.into_iter().flatten().collect();
 
-    for step in flow_steps {
-        if let Ok(step) = step {
-            step.input_ids_by_node_id.iter().for_each(|io| {
-                io.values().for_each(|ids| {
-                    input_output_ids.extend(ids);
-                });
+    for step in flow_steps.flatten() {
+        step.input_ids_by_node_id.iter().for_each(|io| {
+            io.values().for_each(|ids| {
+                input_output_ids.extend(ids);
             });
-            step.output_ids_by_node_id.iter().for_each(|io| {
-                io.values().for_each(|ids| {
-                    input_output_ids.extend(ids);
-                });
+        });
+        step.output_ids_by_node_id.iter().for_each(|io| {
+            io.values().for_each(|ids| {
+                input_output_ids.extend(ids);
             });
+        });
 
-            flow_steps_vec.push(step);
-        }
+        flow_steps_vec.push(step);
     }
 
     if !input_output_ids.is_empty() {
@@ -75,11 +68,7 @@ pub async fn get_workflow(
         )
         .await?;
 
-        for input_output in input_outputs_res {
-            if let Ok(input_output) = input_output {
-                input_outputs.push(input_output);
-            }
-        }
+        input_outputs = input_outputs_res.into_iter().flatten().collect();
     }
 
     Ok(HttpResponse::Ok().json(json!({
