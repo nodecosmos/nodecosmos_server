@@ -6,7 +6,7 @@ use crate::migration::migration_plan::MigrationPlan;
 use schema::*;
 use scylla::Session;
 use session::initialize_session;
-use std::ffi::OsString;
+
 use std::fs::read_dir;
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -60,12 +60,11 @@ async fn main() {
 
 pub(crate) fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
-    let mut path_ancestors = path.as_path().ancestors();
+    let path_ancestors = path.as_path().ancestors();
 
-    while let Some(p) = path_ancestors.next() {
+    for p in path_ancestors {
         let has_cargo = read_dir(p)?
-            .into_iter()
-            .any(|p| p.unwrap().file_name() == OsString::from("Cargo.lock"));
+            .any(|p| p.unwrap().file_name() == *"Cargo.lock");
         if has_cargo {
             return Ok(PathBuf::from(p));
         }

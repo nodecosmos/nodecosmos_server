@@ -8,7 +8,7 @@ pub async fn auth_node_creation(
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
     if let Some(parent) = parent {
-        if can_edit_node(current_user, &parent) {
+        if can_edit_node(current_user, parent) {
             Ok(())
         } else {
             Err(NodecosmosError::Unauthorized(json!({
@@ -25,7 +25,7 @@ pub async fn auth_node_update(
     node: &Node,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    if can_edit_node(current_user, &node) {
+    if can_edit_node(current_user, node) {
         Ok(())
     } else {
         Err(NodecosmosError::Unauthorized(json!({

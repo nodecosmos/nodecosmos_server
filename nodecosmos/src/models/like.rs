@@ -136,7 +136,7 @@ impl ExtCallbacks<CbExtension> for Like {
         self.validate_not_liked(session).await?;
         self.set_defaults();
 
-        LikesCount::increment(&session, self.object_id).await?;
+        LikesCount::increment(session, self.object_id).await?;
 
         Ok(())
     }
@@ -157,7 +157,7 @@ impl ExtCallbacks<CbExtension> for Like {
         session: &CachingSession,
         _ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        LikesCount::decrement(&session, self.object_id).await?;
+        LikesCount::decrement(session, self.object_id).await?;
 
         Ok(())
     }

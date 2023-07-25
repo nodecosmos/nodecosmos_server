@@ -38,7 +38,7 @@ impl CurrentDbSchema {
             .get_materialized_views_from_system_schema(session)
             .await?;
 
-        return Ok(current_schema);
+        Ok(current_schema)
     }
 
     async fn get_tables_from_system_schema(
@@ -72,7 +72,7 @@ impl CurrentDbSchema {
                     .await?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_table_columns(
@@ -104,7 +104,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_table_partition_keys(
@@ -136,7 +136,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_table_clustering_keys(
@@ -168,7 +168,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_table_secondary_indexes(
@@ -199,7 +199,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn get_udts_from_system_schema(
@@ -236,7 +236,7 @@ impl CurrentDbSchema {
                 self.udts.insert(type_name, schema_object);
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     async fn get_materialized_views_from_system_schema(
@@ -266,7 +266,7 @@ impl CurrentDbSchema {
                     .await?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_materialized_view_columns(
@@ -296,7 +296,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_materialized_view_partition_key(
@@ -327,7 +327,7 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     async fn populate_materialized_view_clustering_keys(
@@ -358,14 +358,14 @@ impl CurrentDbSchema {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub(crate) async fn get_current_schema_as_json(
         &self,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let json = to_string_pretty(&self)?;
-        return Ok(json);
+        Ok(json)
     }
 
     pub(crate) async fn write_schema_to_json(
@@ -379,6 +379,6 @@ impl CurrentDbSchema {
         let path = project_root.to_str().unwrap().to_string() + "/current_schema.json";
 
         std::fs::write(path, json)?;
-        return Ok(());
+        Ok(())
     }
 }

@@ -12,7 +12,7 @@ pub async fn auth_workflow_creation(
     node_id: Uuid,
     current_user: CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    let node = Node::find_one(&db_session, find_node_query!("id = ?"), (node_id,)).await?;
+    let node = Node::find_one(db_session, find_node_query!("id = ?"), (node_id,)).await?;
 
     auth_node_update(&node, &current_user).await?;
 
@@ -31,11 +31,11 @@ pub async fn auth_workflow_update(
         ..Default::default()
     };
 
-    workflow.find_by_primary_key(&db_session).await?;
+    workflow.find_by_primary_key(db_session).await?;
 
     println!("{}", find_node_query!("id = ?"));
 
-    let node = Node::find_one(&db_session, find_node_query!("id = ?"), (node_id,)).await?;
+    let node = Node::find_one(db_session, find_node_query!("id = ?"), (node_id,)).await?;
 
     auth_node_update(&node, &current_user).await?;
 

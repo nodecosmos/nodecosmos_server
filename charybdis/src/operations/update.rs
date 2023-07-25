@@ -18,7 +18,7 @@ impl<T: Model + ValueList> Update for T {
         session
             .execute(Self::UPDATE_QUERY, update_values)
             .await
-            .map_err(|e| CharybdisError::QueryError(e))
+            .map_err(CharybdisError::QueryError)
     }
 }
 

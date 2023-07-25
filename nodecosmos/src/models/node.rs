@@ -101,7 +101,7 @@ impl Node {
                 parent.id = parent_id;
                 parent.root_id = self.root_id;
 
-                let parent = parent.find_by_primary_key(&db_session).await;
+                let parent = parent.find_by_primary_key(db_session).await;
 
                 match parent {
                     Ok(parent) => Some(parent),
@@ -200,7 +200,7 @@ impl Node {
         .await?;
 
         for workflow in workflows {
-            workflow?.delete_cb(&db_session).await?;
+            workflow?.delete_cb(db_session).await?;
         }
 
         Ok(())
@@ -281,7 +281,7 @@ impl Node {
         bulk_delete_elastic_documents(
             &ext.elastic_client,
             Node::ELASTIC_IDX_NAME,
-            self.descendant_ids.clone().unwrap_or_else(|| vec![]),
+            self.descendant_ids.clone().unwrap_or_default(),
         )
         .await;
     }

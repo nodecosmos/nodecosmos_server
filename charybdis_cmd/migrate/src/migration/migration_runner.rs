@@ -45,7 +45,7 @@ impl<'a> Migration<'a> {
             }
             MigrationObjectType::Table => {
                 let clustering_keys = self.current_code_schema.clustering_keys.join(", ");
-                let clustering_keys_clause = if clustering_keys.len() > 0 {
+                let clustering_keys_clause = if !clustering_keys.is_empty() {
                     format!(",{}", clustering_keys)
                 } else {
                     "".to_string()
@@ -89,9 +89,7 @@ impl<'a> Migration<'a> {
 
                 let mv_fields_without_types = self
                     .current_code_schema
-                    .fields
-                    .iter()
-                    .map(|(k, _)| k.clone())
+                    .fields.keys().cloned()
                     .collect::<Vec<String>>();
 
                 let materialized_view_select_clause = format!(

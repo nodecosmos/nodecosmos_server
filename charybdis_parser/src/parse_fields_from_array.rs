@@ -16,7 +16,7 @@ pub fn parse_array_expr(array_expr: ExprArray) -> Vec<String> {
     array_expr
         .elems
         .into_iter()
-        .filter_map(|expr| parse_string_literal(expr))
+        .filter_map(parse_string_literal)
         .collect()
 }
 

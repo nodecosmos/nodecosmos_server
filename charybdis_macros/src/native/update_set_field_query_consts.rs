@@ -57,7 +57,7 @@ pub(crate) fn push_to_set_fields_query_consts(
                 pub const #const_name: &'static str = #query_str;
             };
 
-            Some(TokenStream::from(expanded))
+            Some(expanded)
         })
         .collect();
 
@@ -65,7 +65,7 @@ pub(crate) fn push_to_set_fields_query_consts(
         #(#queries)*
     };
 
-    TokenStream::from(expanded)
+    expanded
 }
 
 pub(crate) fn pull_from_set_fields_query_consts(
@@ -122,7 +122,7 @@ pub(crate) fn pull_from_set_fields_query_consts(
                 pub const #const_name: &'static str = #query_str;
             };
 
-            Some(TokenStream::from(expanded))
+            Some(expanded)
         })
         .collect();
 
@@ -130,5 +130,5 @@ pub(crate) fn pull_from_set_fields_query_consts(
         #(#queries)*
     };
 
-    TokenStream::from(expanded)
+    expanded
 }

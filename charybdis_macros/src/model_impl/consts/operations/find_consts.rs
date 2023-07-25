@@ -17,7 +17,7 @@ pub(crate) fn find_by_primary_key_query_const(
     let query_str = format!(
         "SELECT {} FROM {} WHERE {} = ?",
         comma_sep_cols,
-        table_name.to_string(),
+        table_name,
         primary_key_where_clause
     );
 
@@ -41,7 +41,7 @@ pub(crate) fn find_by_partition_key_query_const(
     let query_str = format!(
         "SELECT {} FROM {} WHERE {} = ?",
         comma_sep_cols,
-        table_name.to_string(),
+        table_name,
         partition_keys_where_clause
     );
 

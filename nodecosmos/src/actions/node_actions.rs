@@ -42,10 +42,10 @@ pub async fn get_root_node(
     let mut node = BaseNode::new();
     node.root_id = root_id.into_inner();
 
-    let mut nodes_iter = node.find_by_partition_key(&db_session).await?;
+    let nodes_iter = node.find_by_partition_key(&db_session).await?;
 
     let mut nodes = vec![];
-    while let Some(node) = nodes_iter.next() {
+    for node in nodes_iter {
         if let Ok(node) = node {
             nodes.push(node);
         }
@@ -67,14 +67,14 @@ pub async fn get_node(
 
     let node = node.find_by_primary_key(&db_session).await?;
 
-    let mut all_node_ids = node.descendant_ids.clone().unwrap_or_else(|| vec![]);
+    let mut all_node_ids = node.descendant_ids.clone().unwrap_or_default();
     all_node_ids.push(node.id);
 
     let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
 
     let mut descendants = BaseNode::find_iter(
         &db_session,
-        &descendants_q,
+        descendants_q,
         (node.root_id, all_node_ids),
         DEFAULT_PAGE_SIZE,
     )
@@ -132,7 +132,7 @@ pub async fn create_node(
         node.editor_ids = parent.editor_ids;
         node.is_public = parent.is_public;
 
-        let mut ancestor_ids = parent.ancestor_ids.unwrap_or_else(|| vec![]);
+        let mut ancestor_ids = parent.ancestor_ids.unwrap_or_default();
         ancestor_ids.push(parent.id);
 
         node.ancestor_ids = Some(ancestor_ids);

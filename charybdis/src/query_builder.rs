@@ -19,7 +19,7 @@ impl<T: Model> CharybdisQuery<T> {
         let result: QueryResult = session
             .execute(self.query, &self.values)
             .await
-            .map_err(|e| CharybdisError::QueryError(e))?;
+            .map_err(CharybdisError::QueryError)?;
 
         match result.rows {
             Some(rows) => {

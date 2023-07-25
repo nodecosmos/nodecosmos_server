@@ -39,7 +39,7 @@ impl<'a> MigrationPlan<'a> {
                 MigrationObjectType::UDT,
                 udt,
                 self.current_db_schema.udts.get(name).unwrap_or(&empty_udt),
-                &self.session,
+                self.session,
             );
 
             migration.run().await;
@@ -60,7 +60,7 @@ impl<'a> MigrationPlan<'a> {
                     .tables
                     .get(name)
                     .unwrap_or(&empty_table),
-                &self.session,
+                self.session,
             );
 
             migration.run().await;
@@ -81,7 +81,7 @@ impl<'a> MigrationPlan<'a> {
                     .materialized_views
                     .get(name)
                     .unwrap_or(&empty_mv),
-                &self.session,
+                self.session,
             );
 
             migration.run().await;

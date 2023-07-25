@@ -86,6 +86,6 @@ impl<'a> NodeSearchService<'a> {
             ]);
         }
 
-        return data;
+        data
     }
 }

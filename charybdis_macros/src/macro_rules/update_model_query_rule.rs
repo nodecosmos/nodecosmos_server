@@ -13,7 +13,7 @@ pub fn update_model_query_rule(args: &CharybdisArgs, struct_name: &Ident) -> Tok
     let macro_name: TokenStream = parse_str::<TokenStream>(&macro_name_str).unwrap();
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
-    let update = format!("UPDATE {} SET ", table_name.to_string());
+    let update = format!("UPDATE {} SET ", table_name);
     let query_str = format!(" WHERE {} = ?", primary_key_where_clause);
 
     let expanded = quote! {
@@ -27,5 +27,5 @@ pub fn update_model_query_rule(args: &CharybdisArgs, struct_name: &Ident) -> Tok
         pub(crate) use #macro_name;
     };
 
-    TokenStream::from(expanded)
+    expanded
 }

@@ -27,13 +27,13 @@ pub async fn get_workflow(
     flow.node_id = node_id;
     flow.workflow_id = workflow.id;
 
-    let mut flows = flow.find_by_partition_key(&db_session).await?;
+    let flows = flow.find_by_partition_key(&db_session).await?;
 
     let mut flow_step = FlowStep::new();
     flow_step.node_id = node_id;
     flow_step.workflow_id = workflow.id;
 
-    let mut flow_steps = flow_step.find_by_partition_key(&db_session).await?;
+    let flow_steps = flow_step.find_by_partition_key(&db_session).await?;
 
     let mut input_output_ids = vec![];
     let mut flows_vec = vec![];
@@ -44,13 +44,13 @@ pub async fn get_workflow(
         input_output_ids.extend(initial_input_ids.iter().cloned());
     }
 
-    while let Some(flow) = flows.next() {
+    for flow in flows {
         if let Ok(flow) = flow {
             flows_vec.push(flow);
         }
     }
 
-    while let Some(step) = flow_steps.next() {
+    for step in flow_steps {
         if let Ok(step) = step {
             step.input_ids_by_node_id.iter().for_each(|io| {
                 io.values().for_each(|ids| {
@@ -68,14 +68,14 @@ pub async fn get_workflow(
     }
 
     if !input_output_ids.is_empty() {
-        let mut input_outputs_res = InputOutput::find(
+        let input_outputs_res = InputOutput::find(
             &db_session,
             find_input_output_query!("node_id = ? AND workflow_id = ? AND id IN ?"),
             (workflow.node_id, workflow.id, input_output_ids),
         )
         .await?;
 
-        while let Some(input_output) = input_outputs_res.next() {
+        for input_output in input_outputs_res {
             if let Ok(input_output) = input_output {
                 input_outputs.push(input_output);
             }

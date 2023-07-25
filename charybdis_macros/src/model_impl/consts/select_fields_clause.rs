@@ -8,7 +8,7 @@ pub fn select_fields_clause(ch_args: &CharybdisArgs, fields_named: &FieldsNamed)
 
     let comma_sep_cols = comma_sep_cols(fields_named);
 
-    let query_str = format!("SELECT {} FROM {}", comma_sep_cols, table_name.to_string());
+    let query_str = format!("SELECT {} FROM {}", comma_sep_cols, table_name);
 
     let generated = quote! {
         const SELECT_FIELDS_CLAUSE: &'static str = #query_str;

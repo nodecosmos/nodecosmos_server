@@ -17,7 +17,7 @@ impl<T: Model + ValueList> Delete for T {
         session
             .execute(T::DELETE_QUERY, primary_key_values)
             .await
-            .map_err(|e| CharybdisError::QueryError(e))
+            .map_err(CharybdisError::QueryError)
     }
 }
 

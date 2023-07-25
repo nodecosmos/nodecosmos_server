@@ -19,7 +19,7 @@ pub fn find_model_query_rule(
     let query_str = format!(
         "SELECT {} FROM {} WHERE ",
         comma_sep_cols,
-        table_name.to_string()
+        table_name
     );
 
     let expanded = quote! {
@@ -33,5 +33,5 @@ pub fn find_model_query_rule(
         pub(crate) use #macro_name;
     };
 
-    TokenStream::from(expanded)
+    expanded
 }

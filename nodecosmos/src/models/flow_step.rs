@@ -58,7 +58,7 @@ impl FlowStep {
         flow.workflow_id = self.workflow_id;
         flow.id = self.flow_id;
 
-        flow.find_by_primary_key(&session).await
+        flow.find_by_primary_key(session).await
     }
 
     pub async fn pull_output_id(
@@ -107,7 +107,7 @@ impl FlowStep {
 
                     output.node_id = self.node_id;
                     output.workflow_id = self.workflow_id;
-                    output.id = output_id.clone();
+                    output.id = *output_id;
 
                     output.find_by_primary_key(session).await?;
                     output.delete_cb(session).await?;
@@ -136,13 +136,13 @@ impl FlowStep {
 
                             output.node_id = self.node_id;
                             output.workflow_id = self.workflow_id;
-                            output.id = output_id.clone();
+                            output.id = *output_id;
 
                             output.find_by_primary_key(session).await?;
                             output.delete_cb(session).await?;
                         }
 
-                        node_ids_to_remove.push(node_id.clone());
+                        node_ids_to_remove.push(*node_id);
                     }
                 }
 

@@ -53,7 +53,7 @@ impl CharybdisArgs {
 
         // hashmap
         let mut parsed_field_types_hash = HashMap::new();
-        for pair in hash.split(";") {
+        for pair in hash.split(';') {
             let pair = pair.trim();
             let pair: Vec<&str> = pair.split("=>").collect();
 

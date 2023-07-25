@@ -28,11 +28,11 @@ impl CurrentCodeSchema {
 
         current_code_schema.get_models_from_code(project_root);
 
-        return current_code_schema;
+        current_code_schema
     }
 
     pub fn get_models_from_code(&mut self, project_root: &PathBuf) {
-        if let Some(models_base_dir) = find_src_models_dir(&project_root) {
+        if let Some(models_base_dir) = find_src_models_dir(project_root) {
             for entry in WalkDir::new(&models_base_dir) {
                 let entry: DirEntry = entry.unwrap();
                 if entry.path().is_file() {

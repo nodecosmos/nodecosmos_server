@@ -55,7 +55,7 @@ impl InputOutput {
         workflow.node_id = self.node_id;
         workflow.id = self.workflow_id;
 
-        workflow.find_by_primary_key(&session).await
+        workflow.find_by_primary_key(session).await
     }
 
     async fn flow_step(
@@ -73,7 +73,7 @@ impl InputOutput {
         flow_step.workflow_id = self.workflow_id;
         flow_step.id = self.flow_step_id.unwrap_or_default();
 
-        let fs = flow_step.find_by_primary_key(&session).await?;
+        let fs = flow_step.find_by_primary_key(session).await?;
 
         Ok(Some(fs))
     }
@@ -99,7 +99,7 @@ impl InputOutput {
                     next_flow_step.workflow_id = self.workflow_id;
                     next_flow_step.id = *id;
 
-                    let next_fs = next_flow_step.find_by_primary_key(&session).await?;
+                    let next_fs = next_flow_step.find_by_primary_key(session).await?;
 
                     return Ok(Some(next_fs));
                 }

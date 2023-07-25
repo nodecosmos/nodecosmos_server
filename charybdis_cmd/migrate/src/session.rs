@@ -8,7 +8,7 @@ pub(crate) async fn initialize_session(args: &Args) -> Session {
         .use_keyspace(&args.keyspace, false)
         .connection_timeout(Duration::from_secs(args.timeout));
 
-    if args.user.len() > 0 {
+    if !args.user.is_empty() {
         builder = builder.user(&args.user, &args.password);
     }
 

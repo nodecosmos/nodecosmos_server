@@ -27,15 +27,13 @@ impl CharybdisModelBatch {
 
     pub fn append_creates<T: Model + ValueList>(
         &mut self,
-        mut iter: TypedRowIter<T>,
+        iter: TypedRowIter<T>,
     ) -> Result<(), CharybdisError> {
-        while let Some(model) = iter.next() {
+        for model in iter {
             match model {
                 Ok(model) => {
                     let result = self.append_create(&model);
-                    if let Err(e) = result {
-                        return Err(CharybdisError::from(e));
-                    }
+                    result?
                 }
                 Err(e) => return Err(CharybdisError::from(e)),
             };
@@ -58,15 +56,13 @@ impl CharybdisModelBatch {
 
     pub fn append_updates<T: Model + ValueList>(
         &mut self,
-        mut iter: TypedRowIter<T>,
+        iter: TypedRowIter<T>,
     ) -> Result<(), CharybdisError> {
-        while let Some(model) = iter.next() {
+        for model in iter {
             match model {
                 Ok(model) => {
                     let result = self.append_update(model);
-                    if let Err(e) = result {
-                        return Err(CharybdisError::from(e));
-                    }
+                    result?
                 }
                 Err(e) => return Err(CharybdisError::from(e)),
             };
@@ -89,15 +85,13 @@ impl CharybdisModelBatch {
 
     pub fn append_deletes<T: Model + ValueList>(
         &mut self,
-        mut iter: TypedRowIter<T>,
+        iter: TypedRowIter<T>,
     ) -> Result<(), CharybdisError> {
-        while let Some(model) = iter.next() {
+        for model in iter {
             match model {
                 Ok(model) => {
                     let result = self.append_delete(model);
-                    if let Err(e) = result {
-                        return Err(CharybdisError::from(e));
-                    }
+                    result?
                 }
                 Err(e) => return Err(CharybdisError::from(e)),
             };

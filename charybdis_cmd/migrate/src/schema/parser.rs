@@ -35,7 +35,7 @@ pub(crate) fn parse_file_as_string(path: &Path) -> String {
 }
 
 pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str) -> SchemaObject {
-    let ast: syn::File = syn::parse_file(&file_content).unwrap();
+    let ast: syn::File = syn::parse_file(file_content).unwrap();
     let mut schema_object: SchemaObject = SchemaObject::new();
 
     for item in ast.items {
@@ -95,5 +95,5 @@ fn type_with_arguments(type_path: &syn::TypePath) -> String {
     }
 
     // If not an Option<T>, return the type with arguments as a string
-    return quote::quote! { #type_path }.to_string();
+    quote::quote! { #type_path }.to_string()
 }

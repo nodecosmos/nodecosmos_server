@@ -205,7 +205,7 @@ fn build_field_types_hash(fields_named: &FieldsNamed) -> String {
         field_types.extend(quote! { #name => #ty; });
     }
 
-    field_types.to_string().replace("\n", "")
+    field_types.to_string().replace('\n', "")
 }
 
 fn build_field_attributes_hash(fields_named: &FieldsNamed) -> String {
@@ -219,7 +219,7 @@ fn build_field_attributes_hash(fields_named: &FieldsNamed) -> String {
     }
 
     // strip newlines
-    field_attributes.to_string().replace("\n", "")
+    field_attributes.to_string().replace('\n', "")
 }
 
 pub fn char_model_field_attrs_macro_gen(args: TokenStream, input: TokenStream) -> TokenStream {

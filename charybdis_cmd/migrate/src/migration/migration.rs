@@ -76,14 +76,14 @@ impl<'a> Migration<'a> {
 
         let mut is_any_field_changed = false;
 
-        if !self.is_first_migration_run && self.new_fields().len() > 0 {
+        if !self.is_first_migration_run && !self.new_fields().is_empty() {
             self.panic_on_mv_fields_change();
 
             self.run_field_added_migration().await;
             is_any_field_changed = true;
         }
 
-        if !self.is_first_migration_run && self.removed_fields().len() > 0 {
+        if !self.is_first_migration_run && !self.removed_fields().is_empty() {
             self.panic_on_mv_fields_change();
             self.panic_on_udt_fields_removal();
 
@@ -92,12 +92,12 @@ impl<'a> Migration<'a> {
         }
 
         if self.migration_object_type != MigrationObjectType::UDT {
-            if self.new_secondary_indexes().len() > 0 {
+            if !self.new_secondary_indexes().is_empty() {
                 is_any_field_changed = true;
                 self.run_index_added_migration().await;
             }
 
-            if !self.is_first_migration_run && self.removed_secondary_indexes().len() > 0 {
+            if !self.is_first_migration_run && !self.removed_secondary_indexes().is_empty() {
                 is_any_field_changed = true;
                 self.run_index_removed_migration().await;
             }
@@ -180,7 +180,7 @@ impl<'a> Migration<'a> {
             .secondary_indexes
             .iter()
             .for_each(|index| {
-                if !code_sec_indexes.contains(&index) {
+                if !code_sec_indexes.contains(index) {
                     removed_indexes.push(index.clone());
                 }
             });
@@ -199,8 +199,8 @@ impl<'a> Migration<'a> {
     fn field_type_changed(&self) -> bool {
         for (field_name, field_type) in self.current_code_schema.fields.iter() {
             if let Some(db_field_type) = self.current_db_schema.fields.get(field_name) {
-                let code_field_type = field_type.to_lowercase().replace(" ", "");
-                let db_field_type = db_field_type.to_lowercase().replace(" ", "");
+                let code_field_type = field_type.to_lowercase().replace(' ', "");
+                let db_field_type = db_field_type.to_lowercase().replace(' ', "");
 
                 if code_field_type != db_field_type {
                     println!(
@@ -218,13 +218,11 @@ impl<'a> Migration<'a> {
     }
 
     fn panic_on_udt_fields_removal(&self) {
-        if self.migration_object_type == MigrationObjectType::UDT {
-            if self.removed_fields().len() > 0 {
-                panic!(
-                    "\n{}\n",
-                    "UDT fields removal is not allowed!".bold().bright_red()
-                );
-            }
+        if self.migration_object_type == MigrationObjectType::UDT && !self.removed_fields().is_empty() {
+            panic!(
+                "\n{}\n",
+                "UDT fields removal is not allowed!".bold().bright_red()
+            );
         }
     }
 
