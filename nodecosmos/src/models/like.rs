@@ -1,4 +1,5 @@
 use chrono::Utc;
+use std::fmt;
 
 use crate::app::CbExtension;
 use crate::models::likes_count::LikesCount;
@@ -10,10 +11,10 @@ use charybdis::*;
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
 #[partial_model_generator]
 #[charybdis_model(
-    table_name = likes,
-    partition_keys = [object_id],
-    clustering_keys = [user_id],
-    secondary_indexes = []
+table_name = likes,
+partition_keys = [object_id],
+clustering_keys = [user_id],
+secondary_indexes = []
 )]
 pub struct Like {
     pub object_id: Uuid,
@@ -29,13 +30,15 @@ pub enum ObjectTypes {
     Node,
 }
 
-impl ObjectTypes {
-    pub fn to_string(&self) -> String {
+impl fmt::Display for ObjectTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ObjectTypes::Node => "Node".to_string(),
+            ObjectTypes::Node => write!(f, "Node"),
         }
     }
+}
 
+impl ObjectTypes {
     pub fn from_string(s: &str) -> Option<Self> {
         match s {
             "Node" => Some(ObjectTypes::Node),

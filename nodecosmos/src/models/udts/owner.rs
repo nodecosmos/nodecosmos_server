@@ -1,4 +1,5 @@
 use charybdis::*;
+use std::fmt;
 
 #[charybdis_udt_model(type_name = owner)]
 pub struct Owner {
@@ -13,14 +14,16 @@ pub enum OwnerTypes {
     Organization,
 }
 
-impl OwnerTypes {
-    pub fn to_string(&self) -> String {
+impl fmt::Display for OwnerTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            OwnerTypes::User => "User".to_string(),
-            OwnerTypes::Organization => "Organization".to_string(),
+            OwnerTypes::User => write!(f, "User"),
+            OwnerTypes::Organization => write!(f, "Organization"),
         }
     }
+}
 
+impl OwnerTypes {
     pub fn from_string(s: &str) -> Self {
         match s {
             "User" => OwnerTypes::User,
