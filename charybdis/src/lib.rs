@@ -3,17 +3,17 @@
 
 mod batch;
 mod callbacks;
-mod cql;
 mod errors;
 mod model;
 mod operations;
 mod query_builder;
 mod serializers;
+mod types;
 
 // orm
 pub use crate::{
-    batch::CharybdisModelBatch, callbacks::*, cql::types::*, errors::CharybdisError, model::*,
-    operations::*, query_builder::CharybdisQuery, query_builder::*, serializers::*,
+    batch::CharybdisModelBatch, callbacks::*, errors::CharybdisError, model::*, operations::*,
+    query_builder::CharybdisQuery, query_builder::*, serializers::*, types::*,
 };
 
 // orm macros

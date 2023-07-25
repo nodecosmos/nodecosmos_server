@@ -1,12 +1,15 @@
+pub(crate) mod migration_plan;
+pub(crate) mod migration_runner;
+
 use colored::Colorize;
+use migration_runner::INDEX_SUFFIX;
 use scylla::Session;
 
-use crate::migration::migration_runner::INDEX_SUFFIX;
 use crate::schema::SchemaObject;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum MigrationObjectType {
-    UDT,
+    Udt,
     Table,
     MaterializedView,
 }
@@ -52,7 +55,7 @@ impl<'a> Migration<'a> {
             // self.run_field_type_changed_migration();
         }
 
-        if !self.is_first_migration_run && self.migration_object_type != MigrationObjectType::UDT {
+        if !self.is_first_migration_run && self.migration_object_type != MigrationObjectType::Udt {
             if self.partition_key_changed() {
                 panic!(
                     "\n\n{} {} {}\n{}\n\n",
@@ -91,7 +94,7 @@ impl<'a> Migration<'a> {
             is_any_field_changed = true;
         }
 
-        if self.migration_object_type != MigrationObjectType::UDT {
+        if self.migration_object_type != MigrationObjectType::Udt {
             if !self.new_secondary_indexes().is_empty() {
                 is_any_field_changed = true;
                 self.run_index_added_migration().await;
@@ -115,7 +118,7 @@ impl<'a> Migration<'a> {
 
     pub(crate) fn migration_obj_type_str(&self) -> String {
         match self.migration_object_type {
-            MigrationObjectType::UDT => "Type".to_string(),
+            MigrationObjectType::Udt => "Type".to_string(),
             MigrationObjectType::Table => "Table".to_string(),
             MigrationObjectType::MaterializedView => "Materialized View".to_string(),
         }
@@ -218,7 +221,9 @@ impl<'a> Migration<'a> {
     }
 
     fn panic_on_udt_fields_removal(&self) {
-        if self.migration_object_type == MigrationObjectType::UDT && !self.removed_fields().is_empty() {
+        if self.migration_object_type == MigrationObjectType::Udt
+            && !self.removed_fields().is_empty()
+        {
             panic!(
                 "\n{}\n",
                 "UDT fields removal is not allowed!".bold().bright_red()

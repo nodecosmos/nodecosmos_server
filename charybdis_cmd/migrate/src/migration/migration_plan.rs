@@ -1,5 +1,7 @@
-use crate::migration::migration::{Migration, MigrationObjectType};
-use crate::schema::{CurrentCodeSchema, CurrentDbSchema, SchemaObject};
+use crate::migration::{Migration, MigrationObjectType};
+use crate::schema::current_code_schema::CurrentCodeSchema;
+use crate::schema::current_db_schema::CurrentDbSchema;
+use crate::schema::SchemaObject;
 use colored::Colorize;
 use scylla::Session;
 
@@ -36,7 +38,7 @@ impl<'a> MigrationPlan<'a> {
         for (name, udt) in self.current_code_schema.udts.iter() {
             let migration = Migration::new(
                 name,
-                MigrationObjectType::UDT,
+                MigrationObjectType::Udt,
                 udt,
                 self.current_db_schema.udts.get(name).unwrap_or(&empty_udt),
                 self.session,

@@ -1,3 +1,7 @@
+pub(crate) mod current_code_schema;
+pub(crate) mod current_db_schema;
+pub(crate) mod parser;
+
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

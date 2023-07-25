@@ -1,4 +1,4 @@
-pub(crate) fn camel_to_snake_case(s: &String) -> String {
+pub(crate) fn camel_to_snake_case(s: &str) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
 

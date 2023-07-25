@@ -44,12 +44,7 @@ pub async fn get_root_node(
 
     let nodes_iter = node.find_by_partition_key(&db_session).await?;
 
-    let mut nodes = vec![];
-    for node in nodes_iter {
-        if let Ok(node) = node {
-            nodes.push(node);
-        }
-    }
+    let nodes: Vec<BaseNode> = nodes_iter.flatten().collect();
 
     Ok(HttpResponse::Ok().json(nodes))
 }

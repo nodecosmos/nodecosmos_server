@@ -1,11 +1,10 @@
 // use colored::Colorize;
+use crate::schema::{SchemaObject, SchemaObjects};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
 
 use super::parser::*;
-use super::schema::SchemaObject;
-use super::schema::SchemaObjects;
 
 const MODEL_MACRO_NAME: &str = "charybdis_model";
 const MATERIALIZED_VIEW_MACRO_NAME: &str = "charybdis_view_model";

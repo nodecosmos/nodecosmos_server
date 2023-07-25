@@ -34,47 +34,44 @@ pub(crate) fn parse_file_as_string(path: &Path) -> String {
     file_content
 }
 
-pub(crate) fn parse_charybdis_model_def(file_content: &String, macro_name: &str) -> SchemaObject {
+pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) -> SchemaObject {
     let ast: syn::File = syn::parse_file(file_content).unwrap();
     let mut schema_object: SchemaObject = SchemaObject::new();
 
     for item in ast.items {
-        match item {
-            Item::Struct(item_struct) => {
-                if let Fields::Named(fields_named) = item_struct.fields {
-                    for field in fields_named.named {
-                        if let Field {
-                            ident: Some(ident),
-                            ty: syn::Type::Path(type_path),
-                            ..
-                        } = field
-                        {
-                            let field_name = ident.to_string();
-                            let field_type = type_with_arguments(&type_path);
+        if let Item::Struct(item_struct) = item {
+            if let Fields::Named(fields_named) = item_struct.fields {
+                for field in fields_named.named {
+                    if let Field {
+                        ident: Some(ident),
+                        ty: syn::Type::Path(type_path),
+                        ..
+                    } = field
+                    {
+                        let field_name = ident.to_string();
+                        let field_type = type_with_arguments(&type_path);
 
-                            schema_object.fields.insert(field_name, field_type);
-                        }
-                    }
-                }
-
-                // parse charybdis macro content
-                for attr in &item_struct.attrs {
-                    if attr.path().is_ident(macro_name) {
-                        let args: CharybdisArgs = attr.parse_args().unwrap();
-
-                        schema_object.table_name = args.table_name.unwrap_or("".to_string());
-                        schema_object.type_name = args.type_name.unwrap_or("".to_string());
-                        schema_object.base_table = args.base_table.unwrap_or("".to_string());
-
-                        schema_object.partition_keys = args.partition_keys.unwrap_or(vec![]);
-                        schema_object.clustering_keys = args.clustering_keys.unwrap_or(vec![]);
-                        schema_object.secondary_indexes = args.secondary_indexes.unwrap_or(vec![]);
-
-                        schema_object.table_options = args.table_options;
+                        schema_object.fields.insert(field_name, field_type);
                     }
                 }
             }
-            _ => {}
+
+            // parse charybdis macro content
+            for attr in &item_struct.attrs {
+                if attr.path().is_ident(macro_name) {
+                    let args: CharybdisArgs = attr.parse_args().unwrap();
+
+                    schema_object.table_name = args.table_name.unwrap_or("".to_string());
+                    schema_object.type_name = args.type_name.unwrap_or("".to_string());
+                    schema_object.base_table = args.base_table.unwrap_or("".to_string());
+
+                    schema_object.partition_keys = args.partition_keys.unwrap_or(vec![]);
+                    schema_object.clustering_keys = args.clustering_keys.unwrap_or(vec![]);
+                    schema_object.secondary_indexes = args.secondary_indexes.unwrap_or(vec![]);
+
+                    schema_object.table_options = args.table_options;
+                }
+            }
         }
     }
 

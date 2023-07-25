@@ -105,3 +105,9 @@ impl CharybdisModelBatch {
         Ok(())
     }
 }
+
+impl Default for CharybdisModelBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}

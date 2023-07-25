@@ -35,7 +35,7 @@ pub async fn login(
             .json(json!({"error": {"username_or_email": "is not found"}}));
     }
 
-    if let Err(_) = user.verify_password(&login_form.password).await {
+    if user.verify_password(&login_form.password).await.is_err() {
         return HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}}));
     }
 

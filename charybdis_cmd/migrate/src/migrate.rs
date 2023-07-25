@@ -3,7 +3,6 @@ mod schema;
 mod session;
 
 use crate::migration::migration_plan::MigrationPlan;
-use schema::*;
 use scylla::Session;
 use session::initialize_session;
 
@@ -12,6 +11,8 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::{env, io};
 
+use crate::schema::current_code_schema::CurrentCodeSchema;
+use crate::schema::current_db_schema::CurrentDbSchema;
 use clap::Parser;
 
 /// Automatic Migration Tool
@@ -63,8 +64,7 @@ pub(crate) fn get_project_root() -> io::Result<PathBuf> {
     let path_ancestors = path.as_path().ancestors();
 
     for p in path_ancestors {
-        let has_cargo = read_dir(p)?
-            .any(|p| p.unwrap().file_name() == *"Cargo.lock");
+        let has_cargo = read_dir(p)?.any(|p| p.unwrap().file_name() == *"Cargo.lock");
         if has_cargo {
             return Ok(PathBuf::from(p));
         }

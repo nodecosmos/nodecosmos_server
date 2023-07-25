@@ -1,4 +1,4 @@
-use super::migration::{Migration, MigrationObjectType};
+use crate::migration::{Migration, MigrationObjectType};
 use crate::schema::SchemaObjectTrait;
 use colored::*;
 use strip_ansi_escapes::strip;
@@ -34,7 +34,7 @@ impl<'a> Migration<'a> {
         );
 
         match self.migration_object_type {
-            MigrationObjectType::UDT => {
+            MigrationObjectType::Udt => {
                 let cql = format!(
                     "CREATE TYPE IF NOT EXISTS {}\n(\n{}\n);\n",
                     self.migration_object_name,
@@ -89,7 +89,9 @@ impl<'a> Migration<'a> {
 
                 let mv_fields_without_types = self
                     .current_code_schema
-                    .fields.keys().cloned()
+                    .fields
+                    .keys()
+                    .cloned()
                     .collect::<Vec<String>>();
 
                 let materialized_view_select_clause = format!(
