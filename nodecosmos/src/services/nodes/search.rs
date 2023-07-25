@@ -4,9 +4,18 @@ use charybdis::Deserialize;
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde_json::{json, Value};
 
+const PAGE_SIZE: i16 = 10;
+
 #[derive(Deserialize)]
 pub struct NodeSearchQuery {
     q: Option<String>,
+
+    #[serde(default = "default_to_0")]
+    page: i16,
+}
+
+pub fn default_to_0() -> i16 {
+    0
 }
 
 pub struct NodeSearchService<'a> {
@@ -59,8 +68,8 @@ impl<'a> NodeSearchService<'a> {
                 { "likesCount": { "order": "desc" } },
                 { "createdAt": { "order": "desc" } }
             ],
-            "from": 0,
-            "size": 10
+            "from": self.node_search_query.page * PAGE_SIZE,
+            "size": PAGE_SIZE
         });
 
         if let Some(term) = &self.node_search_query.q {
@@ -69,6 +78,12 @@ impl<'a> NodeSearchService<'a> {
                 { "match": { "description": &term } }
             ]);
             data["query"]["bool"]["minimum_should_match"] = json!(1);
+            data["sort"] = json!([
+                { "_score": { "order": "desc" } },
+                { "isRoot": { "order": "desc" } },
+                { "likesCount": { "order": "desc" } },
+                { "createdAt": { "order": "desc" } }
+            ]);
         }
 
         return data;

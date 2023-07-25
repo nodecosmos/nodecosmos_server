@@ -58,9 +58,7 @@ pub async fn get_db_session(app: &App) -> CachingSession {
             )
         });
 
-    let session = CachingSession::from(session, 1000);
-
-    session
+    CachingSession::from(session, 1000)
 }
 
 pub async fn get_elastic_client(app: &App) -> Elasticsearch {
@@ -75,9 +73,7 @@ pub async fn get_elastic_client(app: &App) -> Elasticsearch {
         )
     });
 
-    let client = Elasticsearch::new(transport);
-
-    client
+    Elasticsearch::new(transport)
 }
 
 pub fn get_cors(app: &App) -> Cors {

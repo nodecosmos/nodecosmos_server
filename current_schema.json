@@ -1,205 +1,378 @@
 {
-  "took": 2,
-  "timed_out": false,
-  "_shards": {
-    "total": 2,
-    "successful": 2,
-    "skipped": 0,
-    "failed": 0
-  },
-  "hits": {
-    "total": {
-      "value": 5,
-      "relation": "eq"
+  "tables": {
+    "flow_steps": {
+      "fields": {
+        "node_ids": "list<uuid>",
+        "input_ids_by_node_id": "map<uuid, frozen<list<uuid>>>",
+        "created_at": "timestamp",
+        "id": "uuid",
+        "description_markdown": "text",
+        "output_ids_by_node_id": "map<uuid, frozen<list<uuid>>>",
+        "description": "text",
+        "updated_at": "timestamp",
+        "workflow_id": "uuid",
+        "node_id": "uuid",
+        "flow_id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
     },
-    "max_score": null,
-    "hits": [
-      {
-        "_index": "nodes",
-        "_id": "96393c07-4005-465f-a5a4-3408cfb7a52d",
-        "_score": 0.0,
-        "_source": {
-          "id": "96393c07-4005-465f-a5a4-3408cfb7a52d",
-          "rootId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "isPublic": true,
-          "isRoot": false,
-          "parentId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "childIds": null,
-          "descendantIds": null,
-          "ancestorIds": [
-            "4f872529-371c-4178-b1c9-63c1fd2bc642"
-          ],
-          "title": "test 789",
-          "description": null,
-          "shortDescription": null,
-          "descriptionMarkdown": null,
-          "ownerId": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-          "ownerType": "User",
-          "creatorId": null,
-          "editorIds": null,
-          "owner": {
-            "id": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-            "name": "goran",
-            "owner_type": "User"
-          },
-          "creator": null,
-          "createdAt": "2023-07-20T13:35:48.624034951Z",
-          "updatedAt": "2023-07-20T13:35:48.624035357Z",
-          "likesCount": 0
-        },
-        "sort": [
-          1689860148624,
-          0.0
-        ]
+    "likes_count": {
+      "fields": {
+        "object_id": "uuid",
+        "count": "counter"
       },
-      {
-        "_index": "nodes",
-        "_id": "f29fc882-7667-4984-966b-e7d8cc589280",
-        "_score": 0.0,
-        "_source": {
-          "id": "f29fc882-7667-4984-966b-e7d8cc589280",
-          "rootId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "isPublic": true,
-          "isRoot": false,
-          "parentId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "childIds": null,
-          "descendantIds": null,
-          "ancestorIds": [
-            "4f872529-371c-4178-b1c9-63c1fd2bc642"
-          ],
-          "title": "test 456",
-          "description": null,
-          "shortDescription": null,
-          "descriptionMarkdown": null,
-          "ownerId": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-          "ownerType": "User",
-          "creatorId": null,
-          "editorIds": null,
-          "owner": {
-            "id": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-            "name": "goran",
-            "owner_type": "User"
-          },
-          "creator": null,
-          "createdAt": "2023-07-20T13:35:46.704074388Z",
-          "updatedAt": "2023-07-20T13:35:46.704074833Z",
-          "likesCount": 0
-        },
-        "sort": [
-          1689860146704,
-          0.0
-        ]
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "object_id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "likes": {
+      "fields": {
+        "updated_at": "timestamp",
+        "object_type": "text",
+        "created_at": "timestamp",
+        "object_id": "uuid",
+        "user_id": "uuid",
+        "username": "text"
       },
-      {
-        "_index": "nodes",
-        "_id": "33ad1939-20e8-4c45-9475-7bf10535bae7",
-        "_score": 0.0,
-        "_source": {
-          "id": "33ad1939-20e8-4c45-9475-7bf10535bae7",
-          "rootId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "isPublic": true,
-          "isRoot": false,
-          "parentId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "childIds": null,
-          "descendantIds": null,
-          "ancestorIds": [
-            "4f872529-371c-4178-b1c9-63c1fd2bc642"
-          ],
-          "title": "test 123",
-          "description": null,
-          "shortDescription": null,
-          "descriptionMarkdown": null,
-          "ownerId": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-          "ownerType": "User",
-          "creatorId": null,
-          "editorIds": null,
-          "owner": {
-            "id": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-            "name": "goran",
-            "owner_type": "User"
-          },
-          "creator": null,
-          "createdAt": "2023-07-20T13:35:45.473268177Z",
-          "updatedAt": "2023-07-20T13:35:45.473269047Z",
-          "likesCount": 0
-        },
-        "sort": [
-          1689860145473,
-          0.0
-        ]
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "object_id"
+      ],
+      "clustering_keys": [
+        "user_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "flows": {
+      "fields": {
+        "description": "text",
+        "workflow_id": "uuid",
+        "node_id": "uuid",
+        "id": "uuid",
+        "title": "text",
+        "updated_at": "timestamp",
+        "description_markdown": "text",
+        "start_index": "int",
+        "step_ids": "list<uuid>",
+        "created_at": "timestamp"
       },
-      {
-        "_index": "nodes",
-        "_id": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-        "_score": 0.0,
-        "_source": {
-          "id": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "rootId": "4f872529-371c-4178-b1c9-63c1fd2bc642",
-          "isPublic": true,
-          "isRoot": true,
-          "parentId": null,
-          "childIds": null,
-          "descendantIds": null,
-          "ancestorIds": null,
-          "title": "Test",
-          "description": null,
-          "shortDescription": null,
-          "descriptionMarkdown": null,
-          "ownerId": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-          "ownerType": "User",
-          "creatorId": null,
-          "editorIds": null,
-          "owner": {
-            "id": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-            "name": "goran",
-            "owner_type": "User"
-          },
-          "creator": null,
-          "createdAt": "2023-07-20T13:24:01.621097635Z",
-          "updatedAt": "2023-07-20T13:47:07.848587502Z",
-          "likesCount": 0
-        },
-        "sort": [
-          1689859441621,
-          0.0
-        ]
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [
+        "flows_id_idx"
+      ],
+      "table_options": null
+    },
+    "contribution_requests": {
+      "fields": {
+        "title": "text",
+        "updated_at": "timestamp",
+        "created_at": "timestamp",
+        "id": "uuid",
+        "open": "boolean",
+        "node_id": "uuid",
+        "description": "text",
+        "description_markdown": "text",
+        "merged": "boolean"
       },
-      {
-        "_index": "nodes",
-        "_id": "5ca4af83-ae7f-450f-8898-51f7ffa764a1",
-        "_score": 0.0,
-        "_source": {
-          "id": "5ca4af83-ae7f-450f-8898-51f7ffa764a1",
-          "rootId": "5ca4af83-ae7f-450f-8898-51f7ffa764a1",
-          "isPublic": true,
-          "isRoot": true,
-          "parentId": null,
-          "childIds": null,
-          "descendantIds": null,
-          "ancestorIds": null,
-          "title": "Test 123",
-          "description": null,
-          "shortDescription": null,
-          "descriptionMarkdown": null,
-          "ownerId": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-          "ownerType": "User",
-          "creatorId": null,
-          "editorIds": null,
-          "owner": {
-            "id": "5c52fac8-3fc4-4409-ba8f-0511044880df",
-            "name": "goran",
-            "owner_type": "User"
-          },
-          "creator": null,
-          "createdAt": "2023-07-20T12:57:38.700781178Z",
-          "updatedAt": "2023-07-20T12:57:38.700784241Z",
-          "likesCount": 0
-        },
-        "sort": [
-          1689857858700,
-          0.0
-        ]
-      }
-    ]
-  }
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "nodes": {
+      "fields": {
+        "created_at": "timestamp",
+        "short_description": "text",
+        "descendant_ids": "list<uuid>",
+        "owner_id": "uuid",
+        "owner": "owner",
+        "updated_at": "timestamp",
+        "is_public": "boolean",
+        "root_id": "uuid",
+        "id": "uuid",
+        "owner_type": "text",
+        "child_ids": "list<uuid>",
+        "creator": "creator",
+        "title": "text",
+        "is_root": "boolean",
+        "creator_id": "uuid",
+        "ancestor_ids": "list<uuid>",
+        "editor_ids": "set<uuid>",
+        "description": "text",
+        "parent_id": "uuid",
+        "likes_count": "bigint",
+        "description_markdown": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "root_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": [
+        "nodes_id_idx"
+      ],
+      "table_options": null
+    },
+    "users": {
+      "fields": {
+        "email": "text",
+        "last_name": "text",
+        "confirmed": "boolean",
+        "first_name": "text",
+        "updated_at": "timestamp",
+        "id": "uuid",
+        "address": "address",
+        "created_at": "timestamp",
+        "liked_object_ids": "set<uuid>",
+        "password": "text",
+        "bio": "text",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": [
+        "users_email_idx",
+        "users_username_idx"
+      ],
+      "table_options": null
+    },
+    "input_outputs": {
+      "fields": {
+        "description_markdown": "text",
+        "created_at": "timestamp",
+        "description": "text",
+        "properties": "frozen<list<frozen<property>>>",
+        "title": "text",
+        "value": "text",
+        "unit": "text",
+        "workflow_id": "uuid",
+        "flow_step_id": "uuid",
+        "data_type": "text",
+        "updated_at": "timestamp",
+        "node_id": "uuid",
+        "id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "workflows": {
+      "fields": {
+        "created_at": "timestamp",
+        "node_id": "uuid",
+        "initial_input_ids": "list<uuid>",
+        "flow_ids": "list<uuid>",
+        "title": "text",
+        "description": "text",
+        "description_markdown": "text",
+        "id": "uuid",
+        "updated_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "udts": {
+    "owner": {
+      "fields": {
+        "id": "uuid",
+        "name": "text",
+        "owner_type": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "property": {
+      "fields": {
+        "title": "text",
+        "value": "text",
+        "data_type": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "address": {
+      "fields": {
+        "state": "text",
+        "street": "text",
+        "city": "text",
+        "country": "text",
+        "zip": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "creator": {
+      "fields": {
+        "id": "uuid",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "materialized_views": {
+    "users_username_idx_index": {
+      "fields": {
+        "id": "uuid",
+        "username": "text",
+        "idx_token": "bigint"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "username"
+      ],
+      "clustering_keys": [
+        "id",
+        "idx_token"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "nodes_id_idx_index": {
+      "fields": {
+        "root_id": "uuid",
+        "idx_token": "bigint",
+        "id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [
+        "idx_token",
+        "root_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "users_email_idx_index": {
+      "fields": {
+        "email": "text",
+        "id": "uuid",
+        "idx_token": "bigint"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
+      ],
+      "clustering_keys": [
+        "id",
+        "idx_token"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "flows_id_idx_index": {
+      "fields": {
+        "idx_token": "bigint",
+        "node_id": "uuid",
+        "id": "uuid",
+        "workflow_id": "uuid"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [
+        "idx_token",
+        "node_id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "keyspace_name": "nodecosmos"
 }

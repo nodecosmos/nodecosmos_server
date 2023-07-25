@@ -1,3 +1,4 @@
+pub mod commit;
 pub mod contribution_request;
 pub mod flow;
 pub mod flow_step;

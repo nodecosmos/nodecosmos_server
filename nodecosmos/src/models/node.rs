@@ -196,7 +196,7 @@ impl Node {
             node_id: self.id,
             ..Default::default()
         }
-        .find_by_partition_key(&db_session)
+        .find_by_partition_key(db_session)
         .await?;
 
         for workflow in workflows {

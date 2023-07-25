@@ -10,13 +10,18 @@ use charybdis::*;
 pub struct ContributionRequest {
     #[serde(rename = "nodeId")] // node where the contribution request was created
     pub node_id: Uuid,
+
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
     pub title: Option<Text>,
     pub description: Option<Text>,
 
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
+
+    #[serde(rename = "commitIds")]
+    pub commit_ids: Option<List<Uuid>>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
