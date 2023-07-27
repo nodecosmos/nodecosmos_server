@@ -1,6 +1,6 @@
 mod build;
-mod indices;
 mod document;
+mod indices;
 
-pub use build::build;
-pub use document::*;
+pub(crate) use build::build;
+pub(crate) use document::*;

@@ -106,6 +106,22 @@ async fn main() {
                     .service(update_io_description)
                     .service(delete_io),
             )
+            .service(
+                web::scope("contribution_requests")
+                    .service(get_contribution_requests)
+                    .service(get_contribution_request)
+                    .service(create_contribution_request)
+                    .service(update_contribution_request_title)
+                    .service(update_contribution_request_description),
+            )
+            .service(
+                web::scope("commits")
+                    .service(create_node_commit)
+                    .service(update_node_commit_title)
+                    .service(update_node_commit_description)
+                    .service(delete_node_commit)
+                    .service(create_workflow_commit),
+            )
     })
     .bind(("127.0.0.1", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

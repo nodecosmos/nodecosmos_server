@@ -342,6 +342,7 @@ partial_node!(
     editor_ids,
     likes_count,
     owner,
+    is_public,
     created_at,
     updated_at
 );
@@ -374,16 +375,6 @@ impl ExtCallbacks<CbExtension> for UpdateNodeDescription {
         _db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        use ammonia::clean;
-
-        if let Some(description) = &self.description {
-            self.description = Some(clean(description));
-        }
-
-        if let Some(short_description) = &self.short_description {
-            self.short_description = Some(clean(short_description));
-        }
-
         update_elastic_document(
             &ext.elastic_client,
             Node::ELASTIC_IDX_NAME,

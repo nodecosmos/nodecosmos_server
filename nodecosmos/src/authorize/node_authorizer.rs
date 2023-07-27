@@ -1,7 +1,31 @@
-use crate::actions::client_session::CurrentUser;
+use crate::actions::client_session::{CurrentUser, OptCurrentUser};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
+use charybdis::AsNative;
 use serde_json::json;
+
+pub async fn auth_node_access(
+    node: &BaseNode,
+    opt_current_user: OptCurrentUser,
+) -> Result<(), NodecosmosError> {
+    if node.is_public.is_some_and(|is_public| is_public) {
+        Ok(())
+    } else if let Some(current_user) = opt_current_user.0 {
+        if can_edit_node(&current_user, &node.as_native()) {
+            Ok(())
+        } else {
+            Err(NodecosmosError::Unauthorized(json!({
+                "error": "Unauthorized",
+                "message": "Not authorized to access node!"
+            })))
+        }
+    } else {
+        Err(NodecosmosError::Unauthorized(json!({
+            "error": "Unauthorized",
+            "message": "Not authorized to access node!"
+        })))
+    }
+}
 
 pub async fn auth_node_creation(
     parent: &Option<Node>,
@@ -35,7 +59,7 @@ pub async fn auth_node_update(
     }
 }
 
-fn can_edit_node(current_user: &CurrentUser, node: &Node) -> bool {
+pub fn can_edit_node(current_user: &CurrentUser, node: &Node) -> bool {
     let owner_id = node.owner_id.unwrap_or_default();
     if owner_id == current_user.id {
         return true; // Owner can edit

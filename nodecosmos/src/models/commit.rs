@@ -1,41 +1,50 @@
-use charybdis::{Map, Text, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+pub(crate) mod node_commit;
+pub(crate) mod workflow_commit;
 
-// pub enum CommitTypes {
-//     Create(ObjectTypes),
-//     Update(ObjectTypes),
-//     Delete(ObjectTypes),
-// }
-//
-// impl CommitTypes {
-//     pub fn to_string(&self) -> String {
-//         match self {
-//             CommitTypes::Create(object_type) => format!("Create_{}", object_type.to_string()),
-//             CommitTypes::Update(object_type) => format!("Update_{}", object_type.to_string()),
-//             CommitTypes::Delete(object_type) => format!("Delete_{}", object_type.to_string()),
-//         }
-//     }
-// }
-//
-// pub enum ObjectTypes {
-//     Node,
-//     Flow,
-//     FlowStep,
-//     InputOutput,
-//     Workflow,
-// }
-//
-// impl ObjectTypes {
-//     pub fn to_string(&self) -> String {
-//         match self {
-//             ObjectTypes::Node => "Node".to_string(),
-//             ObjectTypes::Flow => "Flow".to_string(),
-//             ObjectTypes::FlowStep => "FlowStep".to_string(),
-//             ObjectTypes::InputOutput => "InputOutput".to_string(),
-//             ObjectTypes::Workflow => "Workflow".to_string(),
-//         }
-//     }
-// }
+use crate::actions::commit_actions::CommitParams;
+use crate::models::contribution_request::ContributionRequest;
+use crate::models::helpers::created_at_cb_fn;
+use charybdis::{Callbacks, CharybdisError, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
+use charybdis_macros::{charybdis_model, partial_model_generator};
+use chrono::Utc;
+use scylla::CachingSession;
+use std::fmt::Display;
+
+pub enum CommitTypes {
+    Create(ObjectTypes),
+    Update(ObjectTypes),
+    Delete(ObjectTypes),
+}
+
+impl Display for CommitTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CommitTypes::Create(object_type) => write!(f, "Create_{}", object_type),
+            CommitTypes::Update(object_type) => write!(f, "Update_{}", object_type),
+            CommitTypes::Delete(object_type) => write!(f, "Delete_{}", object_type),
+        }
+    }
+}
+
+pub enum ObjectTypes {
+    Node,
+    Flow,
+    FlowStep,
+    InputOutput,
+    Workflow,
+}
+
+impl Display for ObjectTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ObjectTypes::Node => write!(f, "Node"),
+            ObjectTypes::Flow => write!(f, "Flow"),
+            ObjectTypes::FlowStep => write!(f, "FlowStep"),
+            ObjectTypes::InputOutput => write!(f, "InputOutput"),
+            ObjectTypes::Workflow => write!(f, "Workflow"),
+        }
+    }
+}
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -45,12 +54,92 @@ use charybdis_macros::{charybdis_model, partial_model_generator};
     secondary_indexes = []
 )]
 pub struct Commit {
-    contribution_request_id: Uuid,
-    id: Uuid,
+    pub node_id: Uuid,
+    pub contribution_request_id: Uuid,
+    pub id: Uuid,
+
+    #[serde(rename = "objectId")]
+    pub object_id: Uuid,
 
     #[serde(rename = "commitType")]
-    commit_type: Option<Text>,
+    pub commit_type: Text,
 
-    message: Option<Text>,
-    details: Option<Map<Text, Text>>,
+    #[serde(rename = "userId")]
+    pub user_id: Uuid,
+
+    pub data: Option<Map<Text, Text>>,
+
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<Timestamp>,
+
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<Timestamp>,
+}
+
+impl Commit {
+    async fn init(
+        params: CommitParams,
+        object_id: Uuid,
+        user_id: Uuid,
+        commit_type: CommitTypes,
+    ) -> Result<Commit, CharybdisError> {
+        let mut commit = Commit::new();
+
+        commit.node_id = params.node_id;
+        commit.contribution_request_id = params.contribution_request_id;
+
+        commit.object_id = object_id;
+        commit.user_id = user_id;
+        commit.commit_type = commit_type.to_string();
+
+        Ok(commit)
+    }
+
+    pub async fn create_update_object_commit(
+        session: &CachingSession,
+        params: CommitParams,
+        user_id: Uuid,
+        object_id: Uuid,
+        attribute: &str,
+        value: Text,
+        commit_type: CommitTypes,
+    ) -> Result<(), CharybdisError> {
+        let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
+        let mut commit_data: Map<Text, Text> = Map::new();
+
+        commit_data.insert(attribute.to_string(), value);
+        commit.data = Some(commit_data);
+
+        commit.insert_cb(session).await?;
+
+        Ok(())
+    }
+
+    pub async fn create_delete_object_commit(
+        session: &CachingSession,
+        params: CommitParams,
+        user_id: Uuid,
+        object_id: Uuid,
+        commit_type: CommitTypes,
+    ) -> Result<(), CharybdisError> {
+        let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
+
+        commit.insert_cb(session).await?;
+
+        Ok(())
+    }
+}
+
+impl Callbacks for Commit {
+    created_at_cb_fn!();
+
+    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        let mut contribution_request = ContributionRequest::new();
+        contribution_request.node_id = self.node_id;
+        contribution_request.id = self.contribution_request_id;
+
+        contribution_request
+            .push_to_commit_ids(self.id, session)
+            .await
+    }
 }

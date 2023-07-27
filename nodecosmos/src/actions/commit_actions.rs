@@ -1,0 +1,136 @@
+use crate::actions::client_session::CurrentUser;
+use crate::authorize::auth_commit;
+use crate::errors::NodecosmosError;
+use crate::models::commit::node_commit::NodeCommit;
+use crate::models::commit::workflow_commit::WorkflowCommit;
+use crate::models::commit::{Commit, CommitTypes, ObjectTypes};
+use crate::models::node::{Node, UpdateNodeDescription, UpdateNodeTitle};
+use crate::models::workflow::Workflow;
+use actix_web::{post, web, HttpResponse};
+use charybdis::{Deserialize, Uuid};
+use scylla::CachingSession;
+
+#[derive(Debug, Deserialize)]
+pub struct CommitParams {
+    pub contribution_request_id: Uuid,
+    pub node_id: Uuid,
+    pub object_id: Option<Uuid>,
+}
+
+#[post("/nodes/{contribution_request_id}/{node_id}/create")]
+pub async fn create_node_commit(
+    db_session: web::Data<CachingSession>,
+    node: web::Json<Node>,
+    current_user: CurrentUser,
+    params: web::Path<CommitParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+
+    auth_commit(&db_session, &params, &current_user).await?;
+
+    <Commit as NodeCommit>::create_node_commit(&db_session, params, current_user.id, &node).await?;
+
+    Ok(HttpResponse::Ok().json(node))
+}
+
+#[post("/nodes/{contribution_request_id}/{node_id}/title")]
+pub async fn update_node_commit_title(
+    db_session: web::Data<CachingSession>,
+    node: web::Json<UpdateNodeTitle>,
+    current_user: CurrentUser,
+    params: web::Path<CommitParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+
+    auth_commit(&db_session, &params, &current_user).await?;
+
+    let node = node.into_inner();
+
+    Commit::create_update_object_commit(
+        &db_session,
+        params,
+        current_user.id,
+        node.id,
+        "title",
+        node.title.clone().unwrap_or_default(),
+        CommitTypes::Update(ObjectTypes::Node),
+    )
+    .await?;
+
+    Ok(HttpResponse::Ok().json(node))
+}
+
+#[post("/nodes/{contribution_request_id}/{node_id}/description")]
+pub async fn update_node_commit_description(
+    db_session: web::Data<CachingSession>,
+    node: web::Json<UpdateNodeDescription>,
+    current_user: CurrentUser,
+    params: web::Path<CommitParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+
+    auth_commit(&db_session, &params, &current_user).await?;
+
+    let node = node.into_inner();
+
+    Commit::create_update_object_commit(
+        &db_session,
+        params,
+        current_user.id,
+        node.id,
+        "description",
+        node.description.clone().unwrap_or_default(),
+        CommitTypes::Update(ObjectTypes::Node),
+    )
+    .await?;
+
+    Ok(HttpResponse::Ok().json(node))
+}
+
+#[post("/nodes/{contribution_request_id}/{node_id}/{object_id}/delete")]
+pub async fn delete_node_commit(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    params: web::Path<CommitParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+
+    auth_commit(&db_session, &params, &current_user).await?;
+
+    if let Some(object_id) = params.object_id {
+        Commit::create_delete_object_commit(
+            &db_session,
+            params,
+            current_user.id,
+            object_id,
+            CommitTypes::Delete(ObjectTypes::Node),
+        )
+        .await?;
+
+        Ok(HttpResponse::Ok().finish())
+    } else {
+        Ok(HttpResponse::BadRequest().finish())
+    }
+}
+
+#[post("/workflows/{contribution_request_id}/{node_id}/create")]
+pub async fn create_workflow_commit(
+    db_session: web::Data<CachingSession>,
+    workflow: web::Json<Workflow>,
+    current_user: CurrentUser,
+    params: web::Path<CommitParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+
+    auth_commit(&db_session, &params, &current_user).await?;
+
+    <Commit as WorkflowCommit>::create_workflow_commit(
+        &db_session,
+        params,
+        current_user.id,
+        &workflow,
+    )
+    .await?;
+
+    Ok(HttpResponse::Ok().json(workflow))
+}

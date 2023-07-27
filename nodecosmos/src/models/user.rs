@@ -1,4 +1,4 @@
-pub use super::udts::Address;
+pub(crate) use super::udts::Address;
 use crate::app::CbExtension;
 use crate::elastic::{add_elastic_document, delete_elastic_document};
 use crate::models::helpers::impl_user_updated_at_with_elastic_ext_cb;

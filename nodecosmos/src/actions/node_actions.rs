@@ -1,6 +1,6 @@
 use crate::actions::client_session::*;
 use crate::app::CbExtension;
-use crate::authorize::{auth_node_creation, auth_node_update};
+use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
@@ -38,6 +38,7 @@ pub async fn get_nodes(
 pub async fn get_root_node(
     db_session: web::Data<CachingSession>,
     root_id: web::Path<Uuid>,
+    opt_current_user: OptCurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = BaseNode::new();
     node.root_id = root_id.into_inner();
@@ -45,6 +46,7 @@ pub async fn get_root_node(
     let nodes_iter = node.find_by_partition_key(&db_session).await?;
 
     let nodes: Vec<BaseNode> = nodes_iter.flatten().collect();
+    auth_node_access(&nodes[0], opt_current_user).await?;
 
     Ok(HttpResponse::Ok().json(nodes))
 }
@@ -53,6 +55,7 @@ pub async fn get_root_node(
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
     params: web::Path<PrimaryKeyParams>,
+    opt_current_user: OptCurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
     let mut node = BaseNode::new();
@@ -61,6 +64,8 @@ pub async fn get_node(
     node.id = params.id;
 
     let node = node.find_by_primary_key(&db_session).await?;
+
+    auth_node_access(&node, opt_current_user).await?;
 
     let mut all_node_ids = node.descendant_ids.clone().unwrap_or_default();
     all_node_ids.push(node.id);

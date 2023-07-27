@@ -1,6 +1,8 @@
 #[allow(unused_macros)]
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
+        use chrono::Utc;
+
         impl charybdis::Callbacks for $struct_name {
             async fn before_insert(
                 &mut self,
