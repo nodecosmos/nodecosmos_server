@@ -37,9 +37,7 @@ pub async fn login(
         );
     }
 
-    let verified = user.verify_password(&login_form.password).await?;
-
-    if !verified {
+    if !user.verify_password(&login_form.password).await? {
         return Ok(HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}})));
     }
 
