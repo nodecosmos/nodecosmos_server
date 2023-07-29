@@ -3,7 +3,6 @@ use crate::models::flow_step::{find_flow_step_delete_query, FlowStepDelete};
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::input_output::{find_io_delete_query, IoDelete};
 use charybdis::*;
-use chrono::Utc;
 
 ///
 /// Workflow model

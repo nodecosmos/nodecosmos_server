@@ -5,7 +5,6 @@ use crate::models::helpers::{
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::*;
-use chrono::Utc;
 
 #[derive(Clone)]
 #[partial_model_generator]

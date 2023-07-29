@@ -6,6 +6,7 @@ use bcrypt::{hash, verify};
 use charybdis::{Boolean, CharybdisError, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
+use colored::Colorize;
 use scylla::CachingSession;
 
 const BCRYPT_COST: u32 = 6;
@@ -81,20 +82,12 @@ impl User {
         Ok(())
     }
 
-    pub async fn verify_password(&self, password: &String) -> Result<(), CharybdisError> {
-        let password_hash = hash(&self.password, BCRYPT_COST).map_err(|_| {
-            // TODO: log error here
-
-            CharybdisError::CustomError(
-                "There was an error processing your request. Please try again later.".to_string(),
-            )
-        })?;
-
-        verify(password, &password_hash).map_err(|_| {
+    pub async fn verify_password(&self, password: &String) -> Result<bool, CharybdisError> {
+        let res = verify(password, &self.password).map_err(|_| {
             CharybdisError::ValidationError(("password".to_string(), "is incorrect".to_string()))
         })?;
 
-        Ok(())
+        Ok(res)
     }
 
     fn set_defaults(&mut self) {
@@ -108,7 +101,7 @@ impl User {
 
     fn set_password(&mut self) -> Result<(), CharybdisError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
-            // TODO: log error here
+            println!("{}", "error hashing password".bright_red().bold());
 
             CharybdisError::CustomError(
                 "There was an error processing your request. Please try again later.".to_string(),

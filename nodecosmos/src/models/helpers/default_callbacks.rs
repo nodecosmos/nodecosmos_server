@@ -1,14 +1,12 @@
 #[allow(unused_macros)]
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
-        use chrono::Utc;
-
         impl charybdis::Callbacks for $struct_name {
             async fn before_insert(
                 &mut self,
                 _session: &charybdis::CachingSession,
             ) -> Result<(), charybdis::CharybdisError> {
-                let now = Utc::now();
+                let now = chrono::Utc::now();
 
                 self.id = Uuid::new_v4();
                 self.created_at = Some(now);
@@ -21,7 +19,7 @@ macro_rules! impl_default_callbacks {
                 &mut self,
                 _session: &charybdis::CachingSession,
             ) -> Result<(), charybdis::CharybdisError> {
-                let now = Utc::now();
+                let now = chrono::Utc::now();
 
                 self.updated_at = Some(now);
 
@@ -40,7 +38,7 @@ macro_rules! created_at_cb_fn {
             &mut self,
             _session: &charybdis::CachingSession,
         ) -> Result<(), charybdis::CharybdisError> {
-            let now = Utc::now();
+            let now = chrono::Utc::now();
 
             self.id = Uuid::new_v4();
             self.created_at = Some(now);
@@ -59,7 +57,7 @@ macro_rules! impl_updated_at_cb {
                 &mut self,
                 _session: &charybdis::CachingSession,
             ) -> Result<(), charybdis::CharybdisError> {
-                self.updated_at = Some(Utc::now());
+                self.updated_at = Some(chrono::Utc::now());
 
                 Ok(())
             }
@@ -74,7 +72,7 @@ macro_rules! updated_at_cb_fn {
             &mut self,
             _session: &charybdis::CachingSession,
         ) -> Result<(), charybdis::CharybdisError> {
-            self.updated_at = Some(Utc::now());
+            self.updated_at = Some(chrono::Utc::now());
 
             Ok(())
         }
@@ -91,7 +89,7 @@ macro_rules! sanitize_description_cb {
             ) -> Result<(), charybdis::CharybdisError> {
                 use ammonia::clean;
 
-                self.updated_at = Some(Utc::now());
+                self.updated_at = Some(chrono::Utc::now());
 
                 if let Some(description) = &self.description {
                     self.description = Some(clean(description));
@@ -115,7 +113,7 @@ macro_rules! sanitize_description_ext_cb_fn {
         ) -> Result<(), charybdis::CharybdisError> {
             use ammonia::clean;
 
-            self.updated_at = Some(Utc::now());
+            self.updated_at = Some(chrono::Utc::now());
 
             if let Some(description) = &self.description {
                 self.description = Some(clean(description));

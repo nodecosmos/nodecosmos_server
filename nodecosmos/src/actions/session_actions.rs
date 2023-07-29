@@ -1,4 +1,5 @@
 use crate::client_session::{get_current_user, set_current_user};
+use crate::errors::NodecosmosError;
 use crate::models::user::User;
 use actix_session::Session;
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
@@ -17,7 +18,7 @@ pub async fn login(
     client_session: Session,
     db_session: web::Data<CachingSession>,
     login_form: web::Json<LoginForm>,
-) -> impl Responder {
+) -> Result<HttpResponse, NodecosmosError> {
     let login_form = login_form.into_inner();
 
     let mut user = User {
@@ -31,18 +32,20 @@ pub async fn login(
     } else if let Some(user_by_email) = user.find_by_email(&db_session).await {
         user = user_by_email;
     } else {
-        return HttpResponse::NotFound()
-            .json(json!({"error": {"username_or_email": "is not found"}}));
+        return Ok(
+            HttpResponse::NotFound().json(json!({"error": {"username_or_email": "is not found"}}))
+        );
     }
 
-    if user.verify_password(&login_form.password).await.is_err() {
-        return HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}}));
+    let verified = user.verify_password(&login_form.password).await?;
+
+    if !verified {
+        return Ok(HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}})));
     }
 
-    match set_current_user(&client_session, &user) {
-        Ok(current_user) => HttpResponse::Ok().json(json!({"success": true, "user": current_user})),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-    }
+    let current_user = set_current_user(&client_session, &user)?;
+
+    Ok(HttpResponse::Ok().json(json!({"success": true, "user": current_user})))
 }
 
 #[get("/sync")]

@@ -7,7 +7,6 @@ use charybdis::{
     charybdis_model, partial_model_generator, AsNative, Callbacks, CharybdisError,
     DeleteWithCallbacks, Find, Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
 };
-use chrono::Utc;
 use scylla::CachingSession;
 
 #[partial_model_generator]

@@ -52,7 +52,7 @@ impl<'a> Migration<'a> {
                 };
                 let table_options = self.current_code_schema.table_options.clone();
                 let table_options_clause = if table_options.is_some() {
-                    format!("\nWITH {}", table_options.unwrap().to_string())
+                    format!("\n {}", table_options.unwrap().to_string())
                 } else {
                     "".to_string()
                 };
@@ -73,7 +73,7 @@ impl<'a> Migration<'a> {
                 primary_key.append(&mut self.current_code_schema.clustering_keys.clone());
                 let table_options = self.current_code_schema.table_options.clone();
                 let table_options_clause = if table_options.is_some() {
-                    format!("\nWITH {}", table_options.unwrap().to_string())
+                    format!("\n {}", table_options.unwrap().to_string())
                 } else {
                     "".to_string()
                 };

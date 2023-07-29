@@ -1,7 +1,6 @@
 use crate::models::helpers::{impl_default_callbacks, impl_updated_at_cb, sanitize_description_cb};
-use charybdis::{execute, CharybdisError, List, Text, Timestamp, Uuid};
+use charybdis::{List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
-use scylla::CachingSession;
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -36,19 +35,6 @@ pub struct ContributionRequest {
     pub updated_at: Option<Timestamp>,
 
     pub status: Option<Text>,
-}
-
-impl ContributionRequest {
-    pub async fn push_to_commit_ids(
-        &self,
-        commit_id: Uuid,
-        session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        let query = ContributionRequest::PUSH_TO_COMMIT_IDS_QUERY;
-        execute(session, query, (commit_id, self.node_id, self.id)).await?;
-
-        Ok(())
-    }
 }
 
 impl_default_callbacks!(ContributionRequest);

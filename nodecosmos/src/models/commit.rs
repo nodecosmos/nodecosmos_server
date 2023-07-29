@@ -2,11 +2,9 @@ pub(crate) mod node_commit;
 pub(crate) mod workflow_commit;
 
 use crate::actions::commit_actions::CommitParams;
-use crate::models::contribution_request::ContributionRequest;
-use crate::models::helpers::created_at_cb_fn;
-use charybdis::{Callbacks, CharybdisError, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
+use crate::models::helpers::impl_default_callbacks;
+use charybdis::{CharybdisError, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
-use chrono::Utc;
 use scylla::CachingSession;
 use std::fmt::Display;
 
@@ -28,9 +26,9 @@ impl Display for CommitTypes {
 
 pub enum ObjectTypes {
     Node,
-    Flow,
-    FlowStep,
-    InputOutput,
+    // Flow,
+    // FlowStep,
+    // InputOutput,
     Workflow,
 }
 
@@ -38,9 +36,9 @@ impl Display for ObjectTypes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ObjectTypes::Node => write!(f, "Node"),
-            ObjectTypes::Flow => write!(f, "Flow"),
-            ObjectTypes::FlowStep => write!(f, "FlowStep"),
-            ObjectTypes::InputOutput => write!(f, "InputOutput"),
+            // ObjectTypes::Flow => write!(f, "Flow"),
+            // ObjectTypes::FlowStep => write!(f, "FlowStep"),
+            // ObjectTypes::InputOutput => write!(f, "InputOutput"),
             ObjectTypes::Workflow => write!(f, "Workflow"),
         }
     }
@@ -50,8 +48,9 @@ impl Display for ObjectTypes {
 #[charybdis_model(
     table_name = commits,
     partition_keys = [contribution_request_id],
-    clustering_keys = [id],
-    secondary_indexes = []
+    clustering_keys = [created_at, id],
+    secondary_indexes = [],
+    table_options = "WITH CLUSTERING ORDER BY (created_at DESC)"
 )]
 pub struct Commit {
     pub node_id: Uuid,
@@ -130,16 +129,4 @@ impl Commit {
     }
 }
 
-impl Callbacks for Commit {
-    created_at_cb_fn!();
-
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        let mut contribution_request = ContributionRequest::new();
-        contribution_request.node_id = self.node_id;
-        contribution_request.id = self.contribution_request_id;
-
-        contribution_request
-            .push_to_commit_ids(self.id, session)
-            .await
-    }
-}
+impl_default_callbacks!(Commit);
