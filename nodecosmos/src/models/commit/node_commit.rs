@@ -1,5 +1,6 @@
 use crate::actions::commit_actions::CommitParams;
-use crate::models::commit::{Commit, CommitTypes, ObjectTypes};
+use crate::models::commit::types::{Committable, ObjectTypes};
+use crate::models::commit::{Commit, CommitTypes};
 use crate::models::node::Node;
 use charybdis::{CharybdisError, InsertWithCallbacks, Map, Text, Uuid};
 use scylla::CachingSession;
@@ -24,7 +25,7 @@ impl NodeCommit for Commit {
             params,
             node.id,
             user_id,
-            CommitTypes::Create(ObjectTypes::Node),
+            CommitTypes::Create(ObjectTypes::Node(Committable::BaseObject)),
         )
         .await?;
 

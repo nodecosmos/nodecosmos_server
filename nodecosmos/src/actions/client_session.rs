@@ -52,7 +52,7 @@ impl FromRequest for CurrentUser {
             Some(user) => ready(Ok(user)),
             None => {
                 let error_response = NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized",
+                    "error": "Unauthorized! You must be logged in to perform this action",
                     "message": "You must be logged in to perform this action!"
                 }));
                 ready(Err(error_response))

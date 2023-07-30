@@ -2,8 +2,9 @@ use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_commit;
 use crate::errors::NodecosmosError;
 use crate::models::commit::node_commit::NodeCommit;
+use crate::models::commit::types::{CommitTypes, Committable, ObjectTypes};
 use crate::models::commit::workflow_commit::WorkflowCommit;
-use crate::models::commit::{Commit, CommitTypes, ObjectTypes};
+use crate::models::commit::Commit;
 use crate::models::node::{Node, UpdateNodeDescription, UpdateNodeTitle};
 use crate::models::workflow::Workflow;
 use actix_web::{post, web, HttpResponse};
@@ -53,7 +54,7 @@ pub async fn update_node_commit_title(
         node.id,
         "title",
         node.title.clone().unwrap_or_default(),
-        CommitTypes::Update(ObjectTypes::Node),
+        CommitTypes::Update(ObjectTypes::Node(Committable::Title)),
     )
     .await?;
 
@@ -80,7 +81,7 @@ pub async fn update_node_commit_description(
         node.id,
         "description",
         node.description.clone().unwrap_or_default(),
-        CommitTypes::Update(ObjectTypes::Node),
+        CommitTypes::Update(ObjectTypes::Node(Committable::Description)),
     )
     .await?;
 
@@ -103,7 +104,7 @@ pub async fn delete_node_commit(
             params,
             current_user.id,
             object_id,
-            CommitTypes::Delete(ObjectTypes::Node),
+            CommitTypes::Delete(ObjectTypes::Node(Committable::BaseObject)),
         )
         .await?;
 

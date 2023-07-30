@@ -15,13 +15,13 @@ pub async fn auth_node_access(
             Ok(())
         } else {
             Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized",
+                "error": "Unauthorized! Make sure you are logged in.",
                 "message": "Not authorized to access node!"
             })))
         }
     } else {
         Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized",
+            "error": "Unauthorized! Make sure you are logged in.",
             "message": "Not authorized to access node!"
         })))
     }
@@ -36,7 +36,7 @@ pub async fn auth_node_creation(
             Ok(())
         } else {
             Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized",
+                "error": "Unauthorized! Make sure you are logged in.",
                 "message": "Not authorized to create node for provided parent!"
             })))
         }
@@ -53,7 +53,7 @@ pub async fn auth_node_update(
         Ok(())
     } else {
         Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized",
+            "error": "Unauthorized! Make sure you are logged in.",
             "message": "Not authorized to update node!"
         })))
     }
