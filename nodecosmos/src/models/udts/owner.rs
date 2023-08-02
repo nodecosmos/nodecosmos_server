@@ -4,8 +4,14 @@ use std::fmt;
 #[charybdis_udt_model(type_name = owner)]
 pub struct Owner {
     pub id: Uuid,
+
+    #[serde(rename = "ownerType")]
     pub owner_type: Text, // user or organization
+
     pub name: Text,
+
+    #[serde(rename = "profileImageUrl")]
+    pub profile_image_url: Option<Text>,
 }
 
 #[derive(Debug, Deserialize)]

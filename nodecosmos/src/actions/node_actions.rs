@@ -4,6 +4,7 @@ use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
+use crate::services::nodes::reorder::{ReorderParams, Reorderer};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
@@ -126,6 +127,7 @@ pub async fn create_node(
         id: current_user.id,
         name: current_user.username,
         owner_type: OwnerTypes::User.into(),
+        profile_image_url: None,
     });
 
     if let Some(parent) = parent {
@@ -192,6 +194,21 @@ pub async fn delete_node(
 
     auth_node_update(&node, &current_user).await?;
     node.delete_cb(&db_session, &cb_extension).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[put("/reorder")]
+pub async fn reorder_nodes(
+    db_session: web::Data<CachingSession>,
+    params: web::Json<ReorderParams>,
+    current_user: CurrentUser,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+    let mut reorderer = Reorderer::new(db_session, params).await?;
+
+    auth_node_update(&reorderer.node, &current_user).await?;
+    reorderer.reorder().await?;
 
     Ok(HttpResponse::Ok().finish())
 }

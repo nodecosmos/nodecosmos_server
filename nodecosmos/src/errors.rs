@@ -64,7 +64,7 @@ impl ResponseError for NodecosmosError {
             },
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
-                "message": "Something went wrong"
+                "message": self.to_string()
             })),
         }
     }

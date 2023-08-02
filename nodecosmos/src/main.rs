@@ -66,7 +66,8 @@ async fn main() {
                     .service(update_node_title)
                     .service(update_node_description)
                     .service(delete_node)
-                    .service(get_node_description),
+                    .service(get_node_description)
+                    .service(reorder_nodes),
             )
             .service(
                 web::scope("/likes")

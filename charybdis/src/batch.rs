@@ -99,6 +99,20 @@ impl CharybdisModelBatch {
 
         Ok(())
     }
+
+    pub fn append_statement(
+        &mut self,
+        statement: &str,
+        values: impl ValueList,
+    ) -> Result<(), CharybdisError> {
+        self.batch.append_statement(statement);
+
+        let values = values.serialized()?;
+        self.values.push(values.into_owned());
+
+        Ok(())
+    }
+
     pub async fn execute(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         db_session.batch(&self.batch, self.values.clone()).await?;
 

@@ -1,20 +1,15 @@
+mod create_node;
+mod delete_node;
+
 use crate::app::CbExtension;
-use crate::elastic::{
-    add_elastic_document, bulk_delete_elastic_documents, delete_elastic_document,
-    update_elastic_document,
-};
-use crate::models::flow::FlowDelete;
-use crate::models::flow_step::FlowStepDelete;
+use crate::elastic::update_elastic_document;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
     sanitize_description_ext_cb_fn,
 };
-use crate::models::input_output::IoDelete;
 use crate::models::udts::{Creator, Owner};
-use crate::models::workflow::{Workflow, WorkflowDelete};
 use charybdis::*;
 use chrono::Utc;
-use scylla::batch::Batch;
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -87,13 +82,6 @@ pub struct Node {
 impl Node {
     pub const ELASTIC_IDX_NAME: &'static str = "nodes";
 
-    pub fn set_owner(&mut self, owner: Owner) {
-        self.owner_id = Some(owner.id);
-        self.owner_type = Some(owner.owner_type.clone());
-
-        self.owner = Some(owner);
-    }
-
     pub async fn parent(&self, db_session: &CachingSession) -> Option<Node> {
         match self.parent_id {
             Some(parent_id) => {
@@ -112,6 +100,13 @@ impl Node {
         }
     }
 
+    pub fn set_owner(&mut self, owner: Owner) {
+        self.owner_id = Some(owner.id);
+        self.owner_type = Some(owner.owner_type.clone());
+
+        self.owner = Some(owner);
+    }
+
     pub async fn set_defaults(&mut self) -> Result<(), CharybdisError> {
         if self.root_id == Uuid::nil() {
             self.root_id = self.id;
@@ -122,168 +117,6 @@ impl Node {
         self.is_root = Some(self.parent_id.is_none());
 
         Ok(())
-    }
-
-    pub async fn push_to_parent_children(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        if let Some(parent_id) = &self.parent_id {
-            let query = Node::PUSH_TO_CHILD_IDS_QUERY;
-            execute(db_session, query, (self.id, self.root_id, parent_id)).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn push_to_ancestors(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        if let Some(ancestor_ids) = &self.ancestor_ids {
-            let mut batch: Batch = Default::default();
-            let mut values = Vec::with_capacity(ancestor_ids.len());
-
-            for ancestor_id in ancestor_ids {
-                let query = Node::PUSH_TO_DESCENDANT_IDS_QUERY;
-                batch.append_statement(query);
-                values.push((self.id, self.root_id, ancestor_id));
-            }
-
-            db_session.batch(&batch, values).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn pull_from_parent_children(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        if let Some(parent_id) = &self.parent_id {
-            let query = Node::PULL_FROM_CHILD_IDS_QUERY;
-            execute(db_session, query, (self.id, self.root_id, parent_id)).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn pull_from_ancestors(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        if let Some(ancestor_ids) = &self.ancestor_ids {
-            let mut batch: Batch = Default::default();
-            let mut values = Vec::with_capacity(ancestor_ids.len());
-
-            for ancestor_id in ancestor_ids {
-                let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
-                batch.append_statement(query);
-                values.push((self.id, self.root_id, ancestor_id));
-            }
-
-            db_session.batch(&batch, values).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn delete_workflows(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        let workflows = Workflow {
-            node_id: self.id,
-            ..Default::default()
-        }
-        .find_by_partition_key(db_session)
-        .await?;
-
-        for workflow in workflows {
-            workflow?.delete_cb(db_session).await?;
-        }
-
-        Ok(())
-    }
-
-    // delete descendant nodes, workflows, flows, and flow steps as single batch
-    pub async fn delete_descendants(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
-        match &self.descendant_ids {
-            Some(descendant_ids) => {
-                let mut batch = CharybdisModelBatch::new();
-
-                for descendant_id in descendant_ids {
-                    let workflows_to_delete = WorkflowDelete {
-                        node_id: *descendant_id,
-                        ..Default::default()
-                    }
-                    .find_by_partition_key(db_session)
-                    .await?;
-
-                    let flows_to_delete = FlowDelete {
-                        node_id: *descendant_id,
-                        ..Default::default()
-                    }
-                    .find_by_partition_key(db_session)
-                    .await?;
-
-                    let flow_steps_to_delete = FlowStepDelete {
-                        node_id: *descendant_id,
-                        ..Default::default()
-                    }
-                    .find_by_partition_key(db_session)
-                    .await?;
-
-                    let ios_to_delete = IoDelete {
-                        node_id: *descendant_id,
-                        ..Default::default()
-                    }
-                    .find_by_partition_key(db_session)
-                    .await?;
-
-                    batch.append_deletes(ios_to_delete)?;
-                    batch.append_deletes(flow_steps_to_delete)?;
-                    batch.append_deletes(flows_to_delete)?;
-                    batch.append_deletes(workflows_to_delete)?;
-                    batch.append_delete(DeleteNode {
-                        id: *descendant_id,
-                        root_id: self.root_id,
-                    })?;
-                }
-
-                batch.execute(db_session).await
-            }
-            None => Ok(()),
-        }
-    }
-
-    pub async fn add_to_elastic_index(&self, ext: &CbExtension) {
-        add_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
-    }
-
-    pub async fn delete_related_elastic_data(&self, ext: &CbExtension) {
-        delete_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self.id.to_string(),
-        )
-        .await;
-
-        bulk_delete_elastic_documents(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self.descendant_ids.clone().unwrap_or_default(),
-        )
-        .await;
     }
 }
 
@@ -303,9 +136,7 @@ impl ExtCallbacks<CbExtension> for Node {
         db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        self.push_to_parent_children(db_session).await?;
-        self.push_to_ancestors(db_session).await?;
-
+        self.add_related_data(db_session).await?;
         self.add_to_elastic_index(ext).await;
 
         Ok(())
@@ -316,12 +147,7 @@ impl ExtCallbacks<CbExtension> for Node {
         db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        self.pull_from_parent_children(db_session).await?;
-        self.pull_from_ancestors(db_session).await?;
-
-        self.delete_descendants(db_session).await?;
-        self.delete_workflows(db_session).await?;
-
+        self.delete_related_data(db_session).await?;
         self.delete_related_elastic_data(ext).await;
 
         Ok(())
@@ -354,6 +180,10 @@ partial_node!(
     description,
     description_markdown
 );
+
+partial_node!(UpdateParent, root_id, id, parent_id);
+partial_node!(UpdateAncestors, root_id, id, ancestor_ids);
+partial_node!(UpdateChildIds, root_id, id, child_ids);
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
 impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeTitle);

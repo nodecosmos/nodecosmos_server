@@ -44,7 +44,7 @@ impl<'a> NodeSearchService<'a> {
         let res = vec![];
         let hits = response_body["hits"]["hits"].as_array().unwrap_or(&res);
 
-        let mut nodes = vec![];
+        let mut nodes: Vec<BaseNode> = Vec::new();
         for hit in hits {
             let document = serde_json::from_value(hit["_source"].clone())?;
 

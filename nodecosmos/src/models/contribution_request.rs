@@ -1,4 +1,5 @@
 use crate::models::helpers::{impl_default_callbacks, impl_updated_at_cb, sanitize_description_cb};
+use crate::models::udts::Owner;
 use charybdis::{List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 
@@ -16,8 +17,10 @@ pub struct ContributionRequest {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "userId")]
-    pub user_id: Uuid,
+    #[serde(rename = "ownerId")]
+    pub owner_id: Uuid,
+
+    pub owner: Option<Owner>,
 
     pub title: Option<Text>,
     pub description: Option<Text>,
@@ -43,7 +46,7 @@ partial_contribution_request!(
     BaseContributionRequest,
     node_id,
     id,
-    user_id,
+    owner_id,
     title,
     created_at,
     status
@@ -53,7 +56,7 @@ partial_contribution_request!(
     UpdateContributionRequestTitle,
     node_id,
     id,
-    user_id,
+    owner_id,
     title,
     updated_at
 );
@@ -63,7 +66,7 @@ partial_contribution_request!(
     UpdateContributionRequestDescription,
     node_id,
     id,
-    user_id,
+    owner_id,
     description,
     description_markdown,
     updated_at
