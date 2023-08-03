@@ -1,3 +1,4 @@
+pub mod clone_ref;
 mod default_callbacks;
 mod defaults;
 mod node_callbacks;

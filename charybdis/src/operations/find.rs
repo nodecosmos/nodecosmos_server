@@ -35,7 +35,6 @@ pub trait Find: BaseModel {
         page_size: Option<Bytes>,
     ) -> Result<(TypedRowIter<Self>, Option<Bytes>), CharybdisError>;
 
-    // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
 
     async fn find_by_partition_key(
