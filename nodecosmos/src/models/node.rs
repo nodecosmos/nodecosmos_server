@@ -181,9 +181,20 @@ partial_node!(
     description_markdown
 );
 
+partial_node!(
+    ReorderNode,
+    root_id,
+    id,
+    parent_id,
+    child_ids,
+    ancestor_ids,
+    descendant_ids
+);
+
 partial_node!(UpdateParent, root_id, id, parent_id);
 partial_node!(UpdateAncestors, root_id, id, ancestor_ids);
 partial_node!(UpdateChildIds, root_id, id, child_ids);
+partial_node!(UpdateDescendantIds, root_id, id, descendant_ids);
 
 partial_node!(UpdateNodeTitle, root_id, id, title, updated_at);
 impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeTitle);

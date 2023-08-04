@@ -106,9 +106,7 @@ impl<T: BaseModel> Find for T {
             .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, &primary_key_values)
             .await?;
 
-        let res = result
-            .single_row_typed::<Self>()
-            .map_err(|e| CharybdisError::SingleRowTypedError(e, Self::DB_MODEL_NAME.to_string()))?;
+        let res = result.first_row_typed()?;
 
         Ok(res)
     }

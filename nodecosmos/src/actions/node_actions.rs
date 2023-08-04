@@ -6,17 +6,15 @@ use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
+use crate::services::resource_locker::ResourceLocker;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
     AsNative, DeleteWithExtCallbacks, Deserialize, Find, InsertWithExtCallbacks, New,
     UpdateWithExtCallbacks, Uuid,
 };
 use elasticsearch::Elasticsearch;
-use futures::StreamExt;
 use scylla::CachingSession;
 use serde_json::json;
-
-const DEFAULT_PAGE_SIZE: i32 = 5;
 
 #[derive(Debug, Deserialize)]
 pub struct PrimaryKeyParams {
@@ -47,6 +45,14 @@ pub async fn get_root_node(
     let nodes_iter = node.find_by_partition_key(&db_session).await?;
 
     let nodes: Vec<BaseNode> = nodes_iter.flatten().collect();
+
+    if nodes.is_empty() {
+        return Ok(HttpResponse::NotFound().json(json!({
+            "success": false,
+            "message": "Root node not found"
+        })));
+    }
+
     auth_node_access(&nodes[0], opt_current_user).await?;
 
     Ok(HttpResponse::Ok().json(nodes))
@@ -71,20 +77,16 @@ pub async fn get_node(
     let mut all_node_ids = node.descendant_ids.clone().unwrap_or_default();
     all_node_ids.push(node.id);
 
+    let all_node_ids_chunks = all_node_ids.chunks(100).into_iter();
+
     let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
-
-    let mut descendants = BaseNode::find_iter(
-        &db_session,
-        descendants_q,
-        (node.root_id, all_node_ids),
-        DEFAULT_PAGE_SIZE,
-    )
-    .await?;
-
     let mut nodes = vec![];
 
-    while let Some(descendant) = descendants.next().await {
-        if let Ok(descendant) = descendant {
+    for node_ids_chunk in all_node_ids_chunks {
+        let descendants =
+            BaseNode::find(&db_session, descendants_q, (node.root_id, node_ids_chunk)).await?;
+
+        for descendant in descendants.flatten() {
             nodes.push(descendant);
         }
     }
@@ -117,10 +119,12 @@ pub async fn create_node(
     cb_extension: web::Data<CbExtension>,
     node: web::Json<Node>,
     current_user: CurrentUser,
+    resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = node.into_inner();
     let parent = node.parent(&db_session).await;
 
+    resource_locker.check_node_lock(&node).await?;
     auth_node_creation(&parent, &current_user).await?;
 
     node.set_owner(Owner {
@@ -183,12 +187,15 @@ pub async fn delete_node(
     cb_extension: web::Data<CbExtension>,
     params: web::Path<PrimaryKeyParams>,
     current_user: CurrentUser,
+    resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
     let mut node = Node::new();
 
     node.root_id = params.root_id;
     node.id = params.id;
+
+    resource_locker.check_node_lock(&node).await?;
 
     let mut node = node.find_by_primary_key(&db_session).await?;
 
@@ -203,12 +210,15 @@ pub async fn reorder_nodes(
     db_session: web::Data<CachingSession>,
     params: web::Json<ReorderParams>,
     current_user: CurrentUser,
+    resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let params = params.into_inner();
+
     let mut reorderer = Reorderer::new(db_session, params).await?;
 
+    resource_locker.check_node_lock(&reorderer.node).await?;
     auth_node_update(&reorderer.node, &current_user).await?;
-    reorderer.reorder().await?;
+    reorderer.reorder(&resource_locker).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

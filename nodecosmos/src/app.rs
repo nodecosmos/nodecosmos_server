@@ -4,6 +4,8 @@ use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{cookie, http};
+use deadpool_redis::{Config, Pool, Runtime};
+
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
@@ -133,5 +135,17 @@ pub fn get_session_middleware(app: &App) -> SessionMiddleware<RedisActorSessionS
 
     SessionMiddleware::builder(redis_actor_session_store, secret_key)
         .session_lifecycle(ttl)
+        .cookie_secure(false)
         .build()
+}
+
+pub async fn get_redis_pool(app: &App) -> Pool {
+    let redis_url = app.config["redis"]["url"]
+        .as_str()
+        .expect("Missing redis url");
+
+    let cfg = Config::from_url(redis_url);
+
+    cfg.create_pool(Some(Runtime::Tokio1))
+        .expect("Failed to create pool.")
 }

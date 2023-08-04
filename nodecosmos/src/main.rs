@@ -11,12 +11,16 @@ mod models;
 mod services;
 
 use crate::app::{
-    get_cors, get_db_session, get_elastic_client, get_port, get_session_middleware, CbExtension,
+    get_cors, get_db_session, get_elastic_client, get_port, get_redis_pool, get_session_middleware,
+    CbExtension,
 };
+use crate::services::resource_locker::ResourceLocker;
 use actions::*;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use app::App as NodecosmosApp;
+use deadpool_redis::Pool;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -29,14 +33,23 @@ async fn main() {
     let cb_extension = CbExtension {
         elastic_client: elastic_client.clone(),
     };
+
     // web data
     let db_session_web_data = web::Data::new(db_session);
     let elastic_client_web_data = web::Data::new(elastic_client.clone());
     let cb_extension_web_data = web::Data::new(cb_extension.clone());
 
+    let pool: Pool = get_redis_pool(&nodecosmos).await;
+    let pool_web_data = web::Data::new(pool.clone());
+
     elastic::build(&elastic_client).await;
 
     HttpServer::new(move || {
+        let pool_arc = Arc::clone(&pool_web_data);
+
+        let resource_locker = ResourceLocker::new(pool_arc);
+        let resource_locker_web_data = web::Data::new(resource_locker);
+
         App::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(get_cors(&nodecosmos))
@@ -44,6 +57,8 @@ async fn main() {
             .app_data(db_session_web_data.clone())
             .app_data(elastic_client_web_data.clone())
             .app_data(cb_extension_web_data.clone())
+            .app_data(pool_web_data.clone())
+            .app_data(resource_locker_web_data)
             .service(
                 web::scope("/users")
                     .service(get_user)
@@ -124,7 +139,7 @@ async fn main() {
                     .service(create_workflow_commit),
             )
     })
-    .bind(("127.0.0.1", port))
+    .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
     .run()
     .await

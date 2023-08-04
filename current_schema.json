@@ -2,16 +2,16 @@
   "tables": {
     "flows": {
       "fields": {
-        "id": "uuid",
         "description": "text",
-        "start_index": "int",
-        "title": "text",
-        "updated_at": "timestamp",
-        "workflow_id": "uuid",
-        "node_id": "uuid",
+        "id": "uuid",
         "step_ids": "list<uuid>",
-        "created_at": "timestamp",
-        "description_markdown": "text"
+        "start_index": "int",
+        "description_markdown": "text",
+        "node_id": "uuid",
+        "title": "text",
+        "workflow_id": "uuid",
+        "updated_at": "timestamp",
+        "created_at": "timestamp"
       },
       "type_name": "",
       "table_name": "",
@@ -28,108 +28,19 @@
       ],
       "table_options": null
     },
-    "flow_steps": {
-      "fields": {
-        "node_id": "uuid",
-        "description": "text",
-        "description_markdown": "text",
-        "updated_at": "timestamp",
-        "workflow_id": "uuid",
-        "created_at": "timestamp",
-        "flow_id": "uuid",
-        "input_ids_by_node_id": "map<uuid, frozen<list<uuid>>>",
-        "node_ids": "list<uuid>",
-        "id": "uuid",
-        "output_ids_by_node_id": "map<uuid, frozen<list<uuid>>>"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "node_id"
-      ],
-      "clustering_keys": [
-        "id",
-        "workflow_id"
-      ],
-      "secondary_indexes": [],
-      "table_options": null
-    },
     "contribution_requests": {
       "fields": {
-        "description_markdown": "text",
         "description": "text",
+        "description_markdown": "text",
+        "owner": "owner",
+        "updated_at": "timestamp",
         "commit_ids": "list<uuid>",
-        "updated_at": "timestamp",
-        "id": "uuid",
-        "owner_id": "uuid",
         "node_id": "uuid",
-        "created_at": "timestamp",
-        "owner": "owner",
-        "status": "text",
-        "title": "text"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "node_id"
-      ],
-      "clustering_keys": [
-        "id"
-      ],
-      "secondary_indexes": [],
-      "table_options": null
-    },
-    "nodes": {
-      "fields": {
-        "short_description": "text",
-        "creator": "creator",
-        "id": "uuid",
-        "owner_id": "uuid",
-        "creator_id": "uuid",
-        "child_ids": "list<uuid>",
-        "description_markdown": "text",
-        "editor_ids": "set<uuid>",
-        "owner": "owner",
-        "updated_at": "timestamp",
-        "is_public": "boolean",
-        "description": "text",
-        "owner_type": "text",
-        "root_id": "uuid",
-        "created_at": "timestamp",
-        "is_root": "boolean",
         "title": "text",
-        "ancestor_ids": "list<uuid>",
-        "descendant_ids": "list<uuid>",
-        "parent_id": "uuid",
-        "likes_count": "bigint"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "root_id"
-      ],
-      "clustering_keys": [
-        "id"
-      ],
-      "secondary_indexes": [
-        "nodes_id_idx"
-      ],
-      "table_options": null
-    },
-    "workflows": {
-      "fields": {
-        "initial_input_ids": "list<uuid>",
-        "id": "uuid",
-        "node_id": "uuid",
         "created_at": "timestamp",
-        "description": "text",
-        "updated_at": "timestamp",
-        "flow_ids": "list<uuid>",
-        "description_markdown": "text",
-        "title": "text"
+        "owner_id": "uuid",
+        "id": "uuid",
+        "status": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -139,84 +50,6 @@
       ],
       "clustering_keys": [
         "id"
-      ],
-      "secondary_indexes": [],
-      "table_options": null
-    },
-    "likes": {
-      "fields": {
-        "username": "text",
-        "object_id": "uuid",
-        "object_type": "text",
-        "created_at": "timestamp",
-        "updated_at": "timestamp",
-        "user_id": "uuid"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "object_id"
-      ],
-      "clustering_keys": [
-        "user_id"
-      ],
-      "secondary_indexes": [],
-      "table_options": null
-    },
-    "users": {
-      "fields": {
-        "liked_object_ids": "set<uuid>",
-        "updated_at": "timestamp",
-        "created_at": "timestamp",
-        "email": "text",
-        "bio": "text",
-        "password": "text",
-        "address": "address",
-        "confirmed": "boolean",
-        "first_name": "text",
-        "id": "uuid",
-        "username": "text",
-        "last_name": "text"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "id"
-      ],
-      "clustering_keys": [],
-      "secondary_indexes": [
-        "users_email_idx",
-        "users_username_idx"
-      ],
-      "table_options": null
-    },
-    "input_outputs": {
-      "fields": {
-        "title": "text",
-        "unit": "text",
-        "data_type": "text",
-        "flow_step_id": "uuid",
-        "updated_at": "timestamp",
-        "value": "text",
-        "workflow_id": "uuid",
-        "description_markdown": "text",
-        "node_id": "uuid",
-        "created_at": "timestamp",
-        "properties": "frozen<list<frozen<property>>>",
-        "description": "text",
-        "id": "uuid"
-      },
-      "type_name": "",
-      "table_name": "",
-      "base_table": "",
-      "partition_keys": [
-        "node_id"
-      ],
-      "clustering_keys": [
-        "id",
-        "workflow_id"
       ],
       "secondary_indexes": [],
       "table_options": null
@@ -236,17 +69,82 @@
       "secondary_indexes": [],
       "table_options": null
     },
+    "nodes": {
+      "fields": {
+        "short_description": "text",
+        "owner_type": "text",
+        "editor_ids": "set<uuid>",
+        "descendant_ids": "list<uuid>",
+        "owner": "owner",
+        "id": "uuid",
+        "description_markdown": "text",
+        "description": "text",
+        "ancestor_ids": "list<uuid>",
+        "creator_id": "uuid",
+        "is_public": "boolean",
+        "owner_id": "uuid",
+        "parent_id": "uuid",
+        "root_id": "uuid",
+        "is_root": "boolean",
+        "title": "text",
+        "child_ids": "list<uuid>",
+        "creator": "creator",
+        "updated_at": "timestamp",
+        "created_at": "timestamp",
+        "likes_count": "bigint"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "root_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": [
+        "nodes_id_idx"
+      ],
+      "table_options": null
+    },
+    "flow_steps": {
+      "fields": {
+        "description_markdown": "text",
+        "workflow_id": "uuid",
+        "flow_id": "uuid",
+        "node_id": "uuid",
+        "id": "uuid",
+        "input_ids_by_node_id": "map<uuid, frozen<list<uuid>>>",
+        "created_at": "timestamp",
+        "node_ids": "list<uuid>",
+        "output_ids_by_node_id": "map<uuid, frozen<list<uuid>>>",
+        "description": "text",
+        "updated_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
     "commits": {
       "fields": {
         "node_id": "uuid",
         "data": "map<text, text>",
-        "commit_type": "text",
-        "id": "uuid",
+        "updated_at": "timestamp",
         "contribution_request_id": "uuid",
-        "object_id": "uuid",
         "user_id": "uuid",
+        "object_id": "uuid",
+        "commit_type": "text",
         "created_at": "timestamp",
-        "updated_at": "timestamp"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -260,31 +158,117 @@
       ],
       "secondary_indexes": [],
       "table_options": null
-    }
-  },
-  "udts": {
-    "address": {
+    },
+    "workflows": {
       "fields": {
-        "city": "text",
-        "street": "text",
-        "zip": "text",
-        "state": "text",
-        "country": "text"
+        "id": "uuid",
+        "title": "text",
+        "created_at": "timestamp",
+        "node_id": "uuid",
+        "updated_at": "timestamp",
+        "description_markdown": "text",
+        "flow_ids": "list<uuid>",
+        "initial_input_ids": "list<uuid>",
+        "description": "text"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
-      "partition_keys": [],
-      "clustering_keys": [],
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
       "secondary_indexes": [],
       "table_options": null
     },
+    "input_outputs": {
+      "fields": {
+        "id": "uuid",
+        "description": "text",
+        "value": "text",
+        "description_markdown": "text",
+        "data_type": "text",
+        "unit": "text",
+        "workflow_id": "uuid",
+        "title": "text",
+        "flow_step_id": "uuid",
+        "properties": "frozen<list<frozen<property>>>",
+        "node_id": "uuid",
+        "updated_at": "timestamp",
+        "created_at": "timestamp"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id",
+        "workflow_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "users": {
+      "fields": {
+        "first_name": "text",
+        "id": "uuid",
+        "password": "text",
+        "bio": "text",
+        "updated_at": "timestamp",
+        "last_name": "text",
+        "username": "text",
+        "confirmed": "boolean",
+        "created_at": "timestamp",
+        "liked_object_ids": "set<uuid>",
+        "email": "text",
+        "address": "address"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": [
+        "users_email_idx",
+        "users_username_idx"
+      ],
+      "table_options": null
+    },
+    "likes": {
+      "fields": {
+        "object_id": "uuid",
+        "created_at": "timestamp",
+        "user_id": "uuid",
+        "updated_at": "timestamp",
+        "username": "text",
+        "object_type": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "object_id"
+      ],
+      "clustering_keys": [
+        "user_id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "udts": {
     "owner": {
       "fields": {
         "id": "uuid",
         "profile_image_url": "text",
-        "name": "text",
-        "owner_type": "text"
+        "owner_type": "text",
+        "name": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -296,8 +280,8 @@
     },
     "property": {
       "fields": {
-        "title": "text",
         "data_type": "text",
+        "title": "text",
         "value": "text"
       },
       "type_name": "",
@@ -310,8 +294,24 @@
     },
     "creator": {
       "fields": {
-        "username": "text",
-        "id": "uuid"
+        "id": "uuid",
+        "username": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "address": {
+      "fields": {
+        "city": "text",
+        "country": "text",
+        "zip": "text",
+        "state": "text",
+        "street": "text"
       },
       "type_name": "",
       "table_name": "",
@@ -325,9 +325,9 @@
   "materialized_views": {
     "nodes_id_idx_index": {
       "fields": {
-        "id": "uuid",
+        "idx_token": "bigint",
         "root_id": "uuid",
-        "idx_token": "bigint"
+        "id": "uuid"
       },
       "type_name": "",
       "table_name": "",
@@ -342,17 +342,17 @@
       "secondary_indexes": [],
       "table_options": null
     },
-    "users_email_idx_index": {
+    "users_username_idx_index": {
       "fields": {
-        "idx_token": "bigint",
-        "email": "text",
-        "id": "uuid"
+        "username": "text",
+        "id": "uuid",
+        "idx_token": "bigint"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
       "partition_keys": [
-        "email"
+        "username"
       ],
       "clustering_keys": [
         "id",
@@ -363,10 +363,10 @@
     },
     "flows_id_idx_index": {
       "fields": {
+        "id": "uuid",
         "node_id": "uuid",
-        "idx_token": "bigint",
         "workflow_id": "uuid",
-        "id": "uuid"
+        "idx_token": "bigint"
       },
       "type_name": "",
       "table_name": "",
@@ -382,17 +382,17 @@
       "secondary_indexes": [],
       "table_options": null
     },
-    "users_username_idx_index": {
+    "users_email_idx_index": {
       "fields": {
         "id": "uuid",
-        "username": "text",
+        "email": "text",
         "idx_token": "bigint"
       },
       "type_name": "",
       "table_name": "",
       "base_table": "",
       "partition_keys": [
-        "username"
+        "email"
       ],
       "clustering_keys": [
         "id",
