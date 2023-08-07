@@ -1,5 +1,5 @@
 port = 3000
-allowed_origin = "http://192.168.1.104:3001"
+allowed_origin = "http://localhost:3001"
 secret_key = "aSx1aUVGmXkw1moGEVwkq2o7WXsaU6P0kzYbsuDMXLc=zeljazeljazeljazelja"
 session_expiration_in_days = 30
 

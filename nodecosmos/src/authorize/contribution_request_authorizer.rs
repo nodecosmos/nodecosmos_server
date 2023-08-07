@@ -20,7 +20,7 @@ pub async fn auth_contribution_request_creation(
     )
     .await?;
 
-    if node.is_public.is_some_and(|is_public| is_public) || can_edit_node(current_user, &node) {
+    if node.is_public.unwrap_or(false) || can_edit_node(current_user, &node) {
         Ok(())
     } else {
         Err(NodecosmosError::Unauthorized(json!({

@@ -20,6 +20,9 @@ pub struct ContributionRequest {
     #[serde(rename = "ownerId")]
     pub owner_id: Uuid,
 
+    #[serde(rename = "editorIds")]
+    pub editor_ids: Option<List<Uuid>>,
+
     pub owner: Option<Owner>,
 
     pub title: Option<Text>,

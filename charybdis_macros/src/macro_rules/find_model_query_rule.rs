@@ -16,11 +16,7 @@ pub fn find_model_query_rule(
     let macro_name_str: String = format!("find_{}_query", struct_name_str);
     let macro_name: TokenStream = parse_str::<TokenStream>(&macro_name_str).unwrap();
 
-    let query_str = format!(
-        "SELECT {} FROM {} WHERE ",
-        comma_sep_cols,
-        table_name
-    );
+    let query_str = format!("SELECT {} FROM {} WHERE ", comma_sep_cols, table_name);
 
     let expanded = quote! {
         #[allow(unused_macros)]

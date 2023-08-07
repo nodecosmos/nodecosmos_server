@@ -1,8 +1,8 @@
 use crate::errors::NodecosmosError;
 use crate::models::helpers::clone_ref::ClonedRef;
 use crate::models::node::{
-    find_reorder_node_query, find_update_descendant_ids_query, Node, ReorderNode, UpdateAncestors, UpdateChildIds,
-    UpdateDescendantIds, UpdateParent,
+    find_reorder_node_query, find_update_descendant_ids_query, Node, ReorderNode, UpdateAncestors,
+    UpdateChildIds, UpdateDescendantIds, UpdateParent,
 };
 use crate::services::resource_locker::ResourceLocker;
 use actix_web::web::Data;
@@ -37,7 +37,10 @@ pub struct Reorderer {
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
 
 impl Reorderer {
-    pub async fn new(db_session: Data<CachingSession>, params: ReorderParams) -> Result<Self, NodecosmosError> {
+    pub async fn new(
+        db_session: Data<CachingSession>,
+        params: ReorderParams,
+    ) -> Result<Self, NodecosmosError> {
         let root = ReorderNode {
             root_id: params.root_id,
             id: params.root_id,
@@ -72,7 +75,10 @@ impl Reorderer {
         })
     }
 
-    pub async fn reorder(&mut self, resource_locker: &ResourceLocker) -> Result<(), NodecosmosError> {
+    pub async fn reorder(
+        &mut self,
+        resource_locker: &ResourceLocker,
+    ) -> Result<(), NodecosmosError> {
         resource_locker
             .lock_resource(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
             .await?;
@@ -90,7 +96,9 @@ impl Reorderer {
 
             return match res {
                 Ok(_) => {
-                    resource_locker.unlock_resource(&self.root.id.to_string()).await?;
+                    resource_locker
+                        .unlock_resource(&self.root.id.to_string())
+                        .await?;
                     Ok(())
                 }
                 Err(e) => {
@@ -99,14 +107,18 @@ impl Reorderer {
                     self.root.descendant_ids = Some(descendant_ids);
                     self.root.update(&self.db_session).await?; // Prevent orphaned nodes
 
-                    resource_locker.unlock_resource(&self.root.id.to_string()).await?;
+                    resource_locker
+                        .unlock_resource(&self.root.id.to_string())
+                        .await?;
 
                     return Err(e);
                 }
             };
         }
 
-        resource_locker.unlock_resource(&self.root.id.to_string()).await?;
+        resource_locker
+            .unlock_resource(&self.root.id.to_string())
+            .await?;
 
         Ok(())
     }
@@ -118,7 +130,10 @@ impl Reorderer {
 
         let now = std::time::Instant::now();
         self.remove_node_from_old_ancestors().await?;
-        println!("elapsed for remove_node_from_old_ancestors: {:?}", now.elapsed());
+        println!(
+            "elapsed for remove_node_from_old_ancestors: {:?}",
+            now.elapsed()
+        );
 
         let now = std::time::Instant::now();
         self.remove_node_descendants_from_old_ancestors().await?;
@@ -171,7 +186,12 @@ impl Reorderer {
     async fn remove_from_old_parent(&mut self) -> Result<(), NodecosmosError> {
         if let Some(parent_id) = &self.node.parent_id {
             let query = Node::PULL_FROM_CHILD_IDS_QUERY;
-            execute(&self.db_session, query, (self.node.id, self.node.root_id, parent_id)).await?;
+            execute(
+                &self.db_session,
+                query,
+                (self.node.id, self.node.root_id, parent_id),
+            )
+            .await?;
         }
 
         Ok(())
@@ -201,8 +221,12 @@ impl Reorderer {
 
         for ancestor_ids in ancestor_ids_chunks.clone() {
             let ancestor_query = find_update_descendant_ids_query!("root_id = ? AND id IN ?");
-            let ancestors =
-                UpdateDescendantIds::find(&self.db_session, ancestor_query, (self.node.root_id, ancestor_ids)).await?;
+            let ancestors = UpdateDescendantIds::find(
+                &self.db_session,
+                ancestor_query,
+                (self.node.root_id, ancestor_ids),
+            )
+            .await?;
 
             for ancestor in ancestors.flatten() {
                 let mut new_descendant_ids = ancestor.descendant_ids.unwrap_or_default();
@@ -290,14 +314,21 @@ impl Reorderer {
 
         // get all descendants in batches
         for descendant_ids in descendant_ids_chunks {
-            let descendants_batch =
-                ReorderNode::find(&self.db_session, descendants_q, (self.root.id, descendant_ids)).await?;
+            let descendants_batch = ReorderNode::find(
+                &self.db_session,
+                descendants_q,
+                (self.root.id, descendant_ids),
+            )
+            .await?;
 
             descendants.extend(descendants_batch.flatten());
         }
 
         for descendant in descendants {
+            // This was well tested and it works. However, it's not clear why it doesn't work if batch
+            // is created outside of the loop
             // TODO: figure out why it doesn't work if batch is created outside of the loop
+
             let mut batch = CharybdisModelBatch::new();
 
             // add descendant to new ancestors
