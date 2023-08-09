@@ -128,7 +128,8 @@ async fn main() {
                     .service(get_contribution_request)
                     .service(create_contribution_request)
                     .service(update_contribution_request_title)
-                    .service(update_contribution_request_description),
+                    .service(update_contribution_request_description)
+                    .service(delete_contribution_request),
             )
             .service(
                 web::scope("commits")

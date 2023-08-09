@@ -35,7 +35,7 @@ pub async fn auth_contribution_request_update(
     contribution_request: &ContributionRequest,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    if contribution_request.owner_id == current_user.id {
+    if contribution_request.owner_id == Some(current_user.id) {
         Ok(())
     } else {
         let node = Node::find_one(
@@ -67,7 +67,7 @@ pub async fn auth_commit(
 
     let contribution_request = contribution_request.find_by_primary_key(db_session).await?;
 
-    if contribution_request.owner_id == current_user.id {
+    if contribution_request.owner_id == Some(current_user.id) {
         Ok(())
     } else {
         let node = Node::find_one(

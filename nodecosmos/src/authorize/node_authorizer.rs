@@ -60,8 +60,7 @@ pub async fn auth_node_update(
 }
 
 pub fn can_edit_node(current_user: &CurrentUser, node: &Node) -> bool {
-    let owner_id = node.owner_id.unwrap_or_default();
-    if owner_id == current_user.id {
+    if node.owner_id == Some(current_user.id) {
         return true; // Owner can edit
     }
 

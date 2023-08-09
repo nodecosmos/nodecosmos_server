@@ -1,7 +1,11 @@
+pub(crate) mod statuses;
+
+use crate::models::commit::Commit;
 use crate::models::helpers::{impl_default_callbacks, impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::Owner;
-use charybdis::{List, Text, Timestamp, Uuid};
+use charybdis::{Callbacks, CharybdisError, List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
+use scylla::CachingSession;
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -18,7 +22,7 @@ pub struct ContributionRequest {
     pub id: Uuid,
 
     #[serde(rename = "ownerId")]
-    pub owner_id: Uuid,
+    pub owner_id: Option<Uuid>,
 
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<List<Uuid>>,
@@ -43,13 +47,35 @@ pub struct ContributionRequest {
     pub status: Option<Text>,
 }
 
-impl_default_callbacks!(ContributionRequest);
+impl ContributionRequest {
+    pub fn set_owner(&mut self, owner: Owner) {
+        self.owner_id = Some(owner.id);
+        self.owner = Some(owner);
+    }
+}
+
+impl Callbacks for ContributionRequest {
+    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+        let now = chrono::Utc::now();
+
+        self.id = Uuid::new_v4();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        Commit::delete_contribution_request_commits(session, self.id).await?;
+        Ok(())
+    }
+}
 
 partial_contribution_request!(
     BaseContributionRequest,
     node_id,
     id,
-    owner_id,
+    owner,
     title,
     created_at,
     status
