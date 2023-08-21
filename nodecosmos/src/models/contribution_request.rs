@@ -1,7 +1,7 @@
-pub(crate) mod statuses;
+pub(crate) mod status;
 
 use crate::models::commit::Commit;
-use crate::models::helpers::{impl_default_callbacks, impl_updated_at_cb, sanitize_description_cb};
+use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::Owner;
 use charybdis::{Callbacks, CharybdisError, List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
@@ -44,6 +44,7 @@ pub struct ContributionRequest {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
+    #[serde(default = "status::default_status")]
     pub status: Option<Text>,
 }
 

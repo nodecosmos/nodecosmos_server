@@ -3,7 +3,6 @@ pub(crate) mod types;
 pub(crate) mod workflow_commit;
 
 use crate::actions::commit_actions::CommitParams;
-use crate::actions::create_contribution_request;
 use crate::models::commit::types::CommitTypes;
 use crate::models::helpers::impl_default_callbacks;
 use charybdis::{

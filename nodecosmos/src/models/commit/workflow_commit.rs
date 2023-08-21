@@ -1,5 +1,5 @@
 use crate::actions::commit_actions::CommitParams;
-use crate::models::commit::types::{Committable, ObjectTypes};
+use crate::models::commit::types::{CommitObjectTypes, Committable};
 use crate::models::commit::{Commit, CommitTypes};
 use crate::models::workflow::Workflow;
 use charybdis::{CharybdisError, InsertWithCallbacks, Map, Text, Uuid};
@@ -25,7 +25,7 @@ impl WorkflowCommit for Commit {
             params,
             workflow.id,
             user_id,
-            CommitTypes::Create(ObjectTypes::Workflow(Committable::BaseObject)),
+            CommitTypes::Create(CommitObjectTypes::Workflow(Committable::BaseObject)),
         )
         .await?;
 

@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 pub enum CommitTypes {
-    Create(ObjectTypes),
-    Update(ObjectTypes),
-    Delete(ObjectTypes),
+    Create(CommitObjectTypes),
+    Update(CommitObjectTypes),
+    Delete(CommitObjectTypes),
 }
 
 impl Display for CommitTypes {
@@ -16,7 +16,7 @@ impl Display for CommitTypes {
     }
 }
 
-pub enum ObjectTypes {
+pub enum CommitObjectTypes {
     Node(Committable),
     // Flow,
     // FlowStep,
@@ -40,14 +40,14 @@ impl Display for Committable {
     }
 }
 
-impl Display for ObjectTypes {
+impl Display for CommitObjectTypes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ObjectTypes::Node(committable) => write!(f, "NODE_{}", committable),
-            // ObjectTypes::Flow => write!(f, "Flow"),
-            // ObjectTypes::FlowStep => write!(f, "FlowStep"),
-            // ObjectTypes::InputOutput => write!(f, "InputOutput"),
-            ObjectTypes::Workflow(committable) => write!(f, "WORKFLOW_{}", committable),
+            CommitObjectTypes::Node(committable) => write!(f, "NODE_{}", committable),
+            // CommitObjectTypes::Flow => write!(f, "Flow"),
+            // CommitObjectTypes::FlowStep => write!(f, "FlowStep"),
+            // CommitObjectTypes::InputOutput => write!(f, "InputOutput"),
+            CommitObjectTypes::Workflow(committable) => write!(f, "WORKFLOW_{}", committable),
         }
     }
 }
