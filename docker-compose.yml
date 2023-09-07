@@ -38,7 +38,7 @@ services:
 
   #-------------------------------------------------------------------------------------------------
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.2
     environment:
       - node.name=elasticsearch
       - cluster.name=es-docker-cluster
@@ -52,6 +52,20 @@ services:
         hard: -1
     ports:
       - "9200:9200"
+    networks:
+      - esnet
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.9.2
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - esnet
+
 #---------------------------------------------------------------------------------------------------
 networks:
   scylla_net:
@@ -59,3 +73,4 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/16
+  esnet:

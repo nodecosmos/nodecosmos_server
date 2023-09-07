@@ -1,10 +1,10 @@
 use crate::app::CbExtension;
-use crate::elastic::bulk_delete_elastic_documents;
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::input_output::IoDelete;
 use crate::models::node::{DeleteNode, Node};
 use crate::models::workflow::WorkflowDelete;
+use crate::services::elastic::bulk_delete_elastic_documents;
 use charybdis::{CharybdisError, CharybdisModelBatch, Find};
 use scylla::CachingSession;
 

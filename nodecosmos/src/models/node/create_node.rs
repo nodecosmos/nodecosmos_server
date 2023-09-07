@@ -1,6 +1,6 @@
 use crate::app::CbExtension;
-use crate::elastic::add_elastic_document;
 use crate::models::node::Node;
+use crate::services::elastic::add_elastic_document;
 use charybdis::{CharybdisError, CharybdisModelBatch};
 use scylla::CachingSession;
 

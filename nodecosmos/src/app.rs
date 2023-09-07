@@ -14,7 +14,7 @@ use toml::Value;
 
 #[derive(Clone)]
 pub struct App {
-    config: Value,
+    pub config: Value,
 }
 
 impl App {
@@ -148,4 +148,12 @@ pub async fn get_redis_pool(app: &App) -> Pool {
 
     cfg.create_pool(Some(Runtime::Tokio1))
         .expect("Failed to create pool.")
+}
+
+pub async fn get_aws_s3_client() -> aws_sdk_s3::Client {
+    let config = aws_config::from_env().load().await;
+
+    let client = aws_sdk_s3::Client::new(&config);
+
+    client
 }

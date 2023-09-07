@@ -26,7 +26,6 @@ impl Error for RedisError {
         match self {
             RedisError::PoolError(e) => Some(e),
             RedisError::RedisError(e) => Some(e),
-            // NodecosmosError::InternalServerError(_) => None,
         }
     }
 }
@@ -40,7 +39,8 @@ pub enum NodecosmosError {
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
     RedisError(RedisError),
-    // InternalServerError(String),
+    InternalServerError(String),
+    UnsupportedMediaType,
 }
 
 impl fmt::Display for NodecosmosError {
@@ -53,7 +53,8 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: \n{}", e),
             NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: \n{}", e),
             NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: \n{}", e),
-            // NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
+            NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
+            NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
         }
     }
 }
@@ -68,7 +69,8 @@ impl Error for NodecosmosError {
             NodecosmosError::ElasticError(e) => Some(e),
             NodecosmosError::ResourceLocked(_) => None,
             NodecosmosError::RedisError(e) => Some(e),
-            // NodecosmosError::InternalServerError(_) => None,
+            NodecosmosError::InternalServerError(_) => None,
+            NodecosmosError::UnsupportedMediaType => None,
         }
     }
 }
@@ -97,6 +99,7 @@ impl ResponseError for NodecosmosError {
                     }))
                 }
             },
+            NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().finish(),
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
                 "message": self.to_string()

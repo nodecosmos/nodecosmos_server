@@ -4,9 +4,11 @@ use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
+use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
 use crate::services::resource_locker::ResourceLocker;
+use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
     AsNative, DeleteWithExtCallbacks, Deserialize, Find, InsertWithExtCallbacks, New,
@@ -129,7 +131,8 @@ pub async fn create_node(
 
     node.set_owner(Owner {
         id: current_user.id,
-        name: current_user.username,
+        name: current_user.full_name(),
+        username: Some(current_user.username),
         owner_type: OwnerTypes::User.into(),
         profile_image_url: None,
     });
@@ -221,4 +224,39 @@ pub async fn reorder_nodes(
     reorderer.reorder(&resource_locker).await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/{root_id}/{id}/upload_cover_image")]
+async fn upload_cover_image(
+    params: web::Path<PrimaryKeyParams>,
+    db_session: web::Data<CachingSession>,
+    cb_extension: web::Data<CbExtension>,
+    s3_client: web::Data<aws_sdk_s3::Client>,
+    nc_app: web::Data<crate::NodecosmosApp>,
+    // current_user: CurrentUser,
+    payload: Multipart,
+) -> Result<HttpResponse, NodecosmosError> {
+    // iterate over multipart stream
+    let params = params.into_inner();
+    let mut node = Node::new();
+
+    node.root_id = params.root_id;
+    node.id = params.id;
+
+    let node = node.find_by_primary_key(&db_session).await?;
+    // auth_node_update(&node, &current_user).await?;
+
+    let image = handle_cover_image_upload(
+        payload,
+        &s3_client,
+        &nc_app,
+        node,
+        &db_session,
+        &cb_extension,
+    )
+    .await?;
+
+    return Ok(HttpResponse::Ok()
+        .content_type("application/octet-stream")
+        .body(image));
 }

@@ -13,3 +13,6 @@ url = "redis://127.0.0.1:6379/"
 
 [elasticsearch]
 host = "http://127.0.0.1:9200"
+
+[aws]
+bucket = "nodecosmos-development"

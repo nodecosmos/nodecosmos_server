@@ -1,7 +1,7 @@
 pub(crate) use super::udts::Address;
 use crate::app::CbExtension;
-use crate::elastic::{add_elastic_document, delete_elastic_document};
-use crate::models::helpers::impl_user_updated_at_with_elastic_ext_cb;
+use crate::models::helpers::{default_to_false_bool, impl_user_updated_at_with_elastic_ext_cb};
+use crate::services::elastic::{add_elastic_document, delete_elastic_document};
 use bcrypt::{hash, verify};
 use charybdis::{Boolean, CharybdisError, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
@@ -40,7 +40,12 @@ pub struct User {
     pub updated_at: Option<Timestamp>,
 
     pub address: Option<Address>,
-    pub confirmed: Option<Boolean>,
+
+    #[serde(rename = "isConfirmed", default = "default_to_false_bool")]
+    pub is_confirmed: Boolean,
+
+    #[serde(rename = "isBlocked", default = "default_to_false_bool")]
+    pub is_blocked: Boolean,
 
     #[serde(rename = "likedObjectIds")]
     pub liked_object_ids: Option<Set<Uuid>>,
@@ -96,7 +101,6 @@ impl User {
         self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
-        self.confirmed = Some(false);
     }
 
     fn set_password(&mut self) -> Result<(), CharybdisError> {

@@ -16,7 +16,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 ext: &crate::app::CbExtension,
             ) -> Result<(), charybdis::CharybdisError> {
-                crate::elastic::update_elastic_document(
+                crate::services::elastic::update_elastic_document(
                     &ext.elastic_client,
                     crate::models::user::User::ELASTIC_IDX_NAME,
                     self,

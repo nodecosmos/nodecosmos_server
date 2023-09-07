@@ -1,4 +1,4 @@
-macro_rules! impl_node_updated_at_with_elastic_ext_cb {
+macro_rules!  impl_node_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
         impl charybdis::ExtCallbacks<crate::app::CbExtension> for $struct_name {
             async fn before_update(
@@ -16,7 +16,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 ext: &crate::app::CbExtension,
             ) -> Result<(), charybdis::CharybdisError> {
-                crate::elastic::update_elastic_document(
+                crate::services::elastic::update_elastic_document(
                     &ext.elastic_client,
                     crate::models::node::Node::ELASTIC_IDX_NAME,
                     self,

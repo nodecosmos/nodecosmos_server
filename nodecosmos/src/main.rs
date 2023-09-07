@@ -5,15 +5,12 @@
 mod actions;
 mod app;
 mod authorize;
-mod elastic;
 mod errors;
 mod models;
 mod services;
 
-use crate::app::{
-    get_cors, get_db_session, get_elastic_client, get_port, get_redis_pool, get_session_middleware,
-    CbExtension,
-};
+use crate::app::*;
+use crate::services::elastic;
 use crate::services::resource_locker::ResourceLocker;
 use actions::*;
 use actix_web::middleware::Logger;
@@ -33,11 +30,14 @@ async fn main() {
     let cb_extension = CbExtension {
         elastic_client: elastic_client.clone(),
     };
+    let s3_client = get_aws_s3_client().await;
 
     // web data
     let db_session_web_data = web::Data::new(db_session);
     let elastic_client_web_data = web::Data::new(elastic_client.clone());
     let cb_extension_web_data = web::Data::new(cb_extension.clone());
+    let s3_client_web_data = web::Data::new(s3_client.clone());
+    let nodecosmos_web_data = web::Data::new(nodecosmos.clone());
 
     let pool: Pool = get_redis_pool(&nodecosmos).await;
     let pool_web_data = web::Data::new(pool.clone());
@@ -59,6 +59,8 @@ async fn main() {
             .app_data(cb_extension_web_data.clone())
             .app_data(pool_web_data.clone())
             .app_data(resource_locker_web_data)
+            .app_data(s3_client_web_data.clone())
+            .app_data(nodecosmos_web_data.clone())
             .service(
                 web::scope("/users")
                     .service(get_user)
@@ -82,7 +84,9 @@ async fn main() {
                     .service(update_node_description)
                     .service(delete_node)
                     .service(get_node_description)
-                    .service(reorder_nodes),
+                    .service(reorder_nodes)
+                    .service(upload_cover_image),
+                // .service(get_node_cover_image_upload_url),
             )
             .service(
                 web::scope("/likes")

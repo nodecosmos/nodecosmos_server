@@ -1,4 +1,5 @@
 use crate::errors::NodecosmosError;
+use crate::models::helpers::default_to_false_bool;
 use crate::models::user::*;
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
@@ -7,7 +8,22 @@ use charybdis::*;
 use futures::future::{ready, Ready};
 use serde_json::json;
 
-partial_user!(CurrentUser, id, username, email, confirmed);
+partial_user!(
+    CurrentUser,
+    id,
+    first_name,
+    last_name,
+    username,
+    email,
+    is_confirmed,
+    is_blocked
+);
+
+impl CurrentUser {
+    pub fn full_name(&self) -> String {
+        format!("{} {}", self.first_name, self.last_name)
+    }
+}
 
 pub fn set_current_user(
     client_session: &Session,
@@ -15,9 +31,12 @@ pub fn set_current_user(
 ) -> Result<CurrentUser, NodecosmosError> {
     let current_user = CurrentUser {
         id: user.id,
+        first_name: user.first_name.clone(),
+        last_name: user.last_name.clone(),
         username: user.username.clone(),
         email: user.email.clone(),
-        confirmed: user.confirmed,
+        is_confirmed: user.is_confirmed,
+        is_blocked: user.is_blocked,
     };
 
     client_session
@@ -37,7 +56,13 @@ pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
         });
 
     match current_user {
-        Ok(Some(user)) => Some(user),
+        Ok(Some(user)) => {
+            if user.is_blocked {
+                None
+            } else {
+                Some(user)
+            }
+        }
         _ => None,
     }
 }

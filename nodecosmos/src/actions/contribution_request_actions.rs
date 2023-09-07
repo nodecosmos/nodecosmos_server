@@ -63,7 +63,8 @@ pub async fn create_contribution_request(
     auth_contribution_request_creation(&db_session, &contribution_request, &current_user).await?;
     contribution_request.set_owner(Owner {
         id: current_user.id,
-        name: current_user.username,
+        name: current_user.full_name(),
+        username: Some(current_user.username),
         owner_type: OwnerTypes::User.into(),
         profile_image_url: None,
     });
