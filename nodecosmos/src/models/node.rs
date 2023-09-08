@@ -78,8 +78,11 @@ pub struct Node {
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub likes_count: Option<BigInt>,
 
-    #[serde(rename = "coverImage")]
-    pub cover_image: Option<Text>,
+    #[serde(rename = "coverImageUrl")]
+    pub cover_image_url: Option<Text>,
+
+    #[serde(rename = "coverImageKey")]
+    pub cover_image_filename: Option<Text>,
 }
 
 impl Node {
@@ -172,7 +175,7 @@ partial_node!(
     likes_count,
     owner,
     is_public,
-    cover_image,
+    cover_image_url,
     created_at,
     updated_at
 );
@@ -238,7 +241,14 @@ impl_updated_at_cb!(UpdateNodeOwner);
 partial_node!(UpdateNodeLikesCount, root_id, id, likes_count, updated_at);
 impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeLikesCount);
 
-partial_node!(UpdateNodeCoverImage, root_id, id, cover_image, updated_at);
+partial_node!(
+    UpdateNodeCoverImage,
+    root_id,
+    id,
+    cover_image_url,
+    cover_image_filename,
+    updated_at
+);
 impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeCoverImage);
 
 partial_node!(DeleteNode, root_id, id);

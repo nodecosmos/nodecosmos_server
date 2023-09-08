@@ -1,10 +1,10 @@
 use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateNodeCoverImage};
-use crate::services::aws::s3::upload_to_s3;
+use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::services::image::*;
 use actix_multipart::Multipart;
-use charybdis::UpdateWithExtCallbacks;
+use charybdis::{New, UpdateWithExtCallbacks};
 use futures::StreamExt;
 
 const IMG_WIDTH: u32 = 850;
@@ -18,11 +18,13 @@ pub async fn handle_cover_image_upload(
     node: Node,
     db_session: &charybdis::CachingSession,
     cb_extension: &CbExtension,
-) -> Result<Vec<u8>, NodecosmosError> {
+) -> Result<String, NodecosmosError> {
     if let Some(item) = payload.next().await {
         let mut field = item.map_err(|e| {
             NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
         })?;
+
+        println!("Field name: {}", field.name());
 
         let buffer = read_image_buffer(&mut field).await?;
         let decoded_img = decode_image(&buffer)?;
@@ -34,35 +36,41 @@ pub async fn handle_cover_image_upload(
             compressed = compress_image(rgb_image)?;
         }
 
-        let bucket = nc_app.config["aws"]["bucket"]
-            .as_str()
-            .expect("Missing bucket");
-        let file_name = format!("{}/cover.jpeg", node.id);
+        let timestamp = chrono::Utc::now().timestamp();
 
-        let url = format!("https://{}.s3.amazonaws.com/{}", bucket, file_name);
+        if node.cover_image_url.is_some() {
+            let key = node.cover_image_filename.ok_or_else(|| {
+                NodecosmosError::InternalServerError("Missing cover image key".to_string())
+            })?;
 
-        upload_to_s3(
+            delete_s3_object(s3_client, &nc_app.bucket, &key).await?;
+        }
+
+        let new_cover_image_filename = format!("{}/{}-cover.jpeg", node.id, timestamp);
+        let url = format!(
+            "https://{}.s3.amazonaws.com/{}",
+            nc_app.bucket, new_cover_image_filename
+        );
+
+        upload_s3_object(
             s3_client,
             compressed.clone(),
-            nc_app.config["aws"]["bucket"]
-                .as_str()
-                .expect("Missing bucket"),
-            &file_name,
+            &nc_app.bucket,
+            &new_cover_image_filename,
         )
         .await?;
 
-        let mut update_node_cover_img = UpdateNodeCoverImage {
-            id: node.id,
-            root_id: node.root_id,
-            cover_image: Some(url),
-            updated_at: None,
-        };
+        let mut update_node_cover_img = UpdateNodeCoverImage::new();
+        update_node_cover_img.id = node.id;
+        update_node_cover_img.root_id = node.root_id;
+        update_node_cover_img.cover_image_url = Some(url.clone());
+        update_node_cover_img.cover_image_filename = Some(new_cover_image_filename);
 
         update_node_cover_img
             .update_cb(db_session, cb_extension)
             .await?;
 
-        return Ok(compressed);
+        return Ok(url);
     }
 
     Err(NodecosmosError::InternalServerError(

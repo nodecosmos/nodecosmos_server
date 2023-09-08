@@ -4,6 +4,7 @@ use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::udts::{Owner, OwnerTypes};
+use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
@@ -233,10 +234,9 @@ async fn upload_cover_image(
     cb_extension: web::Data<CbExtension>,
     s3_client: web::Data<aws_sdk_s3::Client>,
     nc_app: web::Data<crate::NodecosmosApp>,
-    // current_user: CurrentUser,
+    current_user: CurrentUser,
     payload: Multipart,
 ) -> Result<HttpResponse, NodecosmosError> {
-    // iterate over multipart stream
     let params = params.into_inner();
     let mut node = Node::new();
 
@@ -244,9 +244,9 @@ async fn upload_cover_image(
     node.id = params.id;
 
     let node = node.find_by_primary_key(&db_session).await?;
-    // auth_node_update(&node, &current_user).await?;
+    auth_node_update(&node, &current_user).await?;
 
-    let image = handle_cover_image_upload(
+    let image_url = handle_cover_image_upload(
         payload,
         &s3_client,
         &nc_app,
@@ -256,7 +256,45 @@ async fn upload_cover_image(
     )
     .await?;
 
-    return Ok(HttpResponse::Ok()
-        .content_type("application/octet-stream")
-        .body(image));
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "coverImageUrl": image_url
+    })))
+}
+
+#[delete("/{root_id}/{id}/delete_cover_image")]
+async fn delete_cover_image(
+    db_session: web::Data<CachingSession>,
+    cb_extension: web::Data<CbExtension>,
+    s3_client: web::Data<aws_sdk_s3::Client>,
+    nc_app: web::Data<crate::NodecosmosApp>,
+    params: web::Path<PrimaryKeyParams>,
+    current_user: CurrentUser,
+) -> Result<HttpResponse, NodecosmosError> {
+    let params = params.into_inner();
+    let mut node = UpdateNodeCoverImage::new();
+    node.root_id = params.root_id;
+    node.id = params.id;
+
+    let mut node = node.find_by_primary_key(&db_session).await?;
+    let native_node = node.as_native().find_by_primary_key(&db_session).await?;
+
+    auth_node_update(&native_node, &current_user).await?;
+
+    if node.cover_image_url.is_some() {
+        let key = node.cover_image_filename.clone().ok_or_else(|| {
+            NodecosmosError::InternalServerError("Missing cover image key".to_string())
+        })?;
+
+        println!("Deleting cover image from S3: {}", key);
+
+        delete_s3_object(&s3_client, &nc_app.bucket, &key).await?;
+    }
+
+    node.cover_image_url = None;
+    node.cover_image_filename = None;
+
+    node.update_cb(&db_session, &cb_extension).await?;
+
+    Ok(HttpResponse::Ok().finish())
 }

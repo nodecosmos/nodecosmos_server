@@ -15,6 +15,7 @@ use toml::Value;
 #[derive(Clone)]
 pub struct App {
     pub config: Value,
+    pub bucket: String,
 }
 
 impl App {
@@ -25,9 +26,13 @@ impl App {
         let config_file = format!("config.{}.toml", env);
 
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
-        let value = contents.parse::<Value>().expect("Unable to parse TOML");
+        let config = contents.parse::<Value>().expect("Unable to parse TOML");
+        let bucket = config["aws"]["bucket"]
+            .as_str()
+            .expect("Missing bucket")
+            .to_string();
 
-        Self { config: value }
+        Self { config, bucket }
     }
 }
 

@@ -22,7 +22,7 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
                 "isPublic": { "type": "boolean" },
                 "createdAt": { "type": "date" },
                 "likesCount": { "type": "integer" },
-                "coverImage": { "type": "keyword", "index": false },
+                "coverImageUrl": { "type": "keyword", "index": false },
             }
         }
     );
