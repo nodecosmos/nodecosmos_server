@@ -1,7 +1,8 @@
 use crate::actions::client_session::{CurrentUser, OptCurrentUser};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
-use charybdis::AsNative;
+use charybdis::{AsNative, Find, Uuid};
+use scylla::CachingSession;
 use serde_json::json;
 
 pub async fn auth_node_access(
@@ -59,13 +60,25 @@ pub async fn auth_node_update(
     }
 }
 
+pub async fn auth_node_update_by_id(
+    id: &Uuid,
+    db_session: &CachingSession,
+    current_user: &CurrentUser,
+) -> Result<(), NodecosmosError> {
+    let node = Node::find_one(db_session, find_node_query!("id = ?"), (id,)).await?;
+
+    auth_node_update(&node, current_user).await?;
+
+    Ok(())
+}
+
 pub fn can_edit_node(current_user: &CurrentUser, node: &Node) -> bool {
     if node.owner_id == Some(current_user.id) {
         return true; // Owner can edit
     }
 
     let editor_ids = node.editor_ids.as_ref();
-    if editor_ids.is_some() && editor_ids.unwrap().contains(&current_user.id) {
+    if editor_ids.map_or(false, |ids| ids.contains(&current_user.id)) {
         return true; // Editor can edit
     }
 

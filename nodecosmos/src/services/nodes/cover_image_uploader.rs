@@ -24,8 +24,6 @@ pub async fn handle_cover_image_upload(
             NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
         })?;
 
-        println!("Field name: {}", field.name());
-
         let buffer = read_image_buffer(&mut field).await?;
         let decoded_img = decode_image(&buffer)?;
         let resized_image = resize_image(decoded_img, IMG_WIDTH, IMG_HEIGHT)?;
@@ -54,7 +52,7 @@ pub async fn handle_cover_image_upload(
 
         upload_s3_object(
             s3_client,
-            compressed.clone(),
+            compressed,
             &nc_app.bucket,
             &new_cover_image_filename,
         )

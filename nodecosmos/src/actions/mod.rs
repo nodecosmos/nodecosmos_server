@@ -1,6 +1,6 @@
+mod attachment_actions;
 pub(crate) mod client_session;
 pub(crate) mod commit_actions;
-
 mod contribution_request_actions;
 mod flow_actions;
 mod flow_step_actions;
@@ -11,6 +11,7 @@ mod session_actions;
 mod user_actions;
 mod workflow_actions;
 
+pub(crate) use attachment_actions::*;
 pub(crate) use commit_actions::*;
 pub(crate) use contribution_request_actions::*;
 pub(crate) use flow_actions::*;

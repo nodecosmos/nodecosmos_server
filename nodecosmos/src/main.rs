@@ -143,6 +143,7 @@ async fn main() {
                     .service(delete_node_commit)
                     .service(create_workflow_commit),
             )
+            .service(web::scope("attachments").service(upload_image))
     })
     .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

@@ -1,3 +1,4 @@
+pub(crate) mod attachment;
 pub(crate) mod commit;
 pub(crate) mod contribution_request;
 pub(crate) mod flow;
