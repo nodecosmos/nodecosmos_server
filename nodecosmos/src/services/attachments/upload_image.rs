@@ -14,13 +14,13 @@ const TARGET_SIZE_IN_BYTES: usize = 15 * 1024;
 const MAX_IMAGE_WIDTH: u32 = 852;
 
 #[derive(Deserialize)]
-pub struct AttachmentParams {
+pub struct ImageAttachmentParams {
     pub node_id: Uuid,
     pub object_id: Uuid,
 }
 
 pub(crate) async fn upload_image_attachment(
-    params: &AttachmentParams,
+    params: &ImageAttachmentParams,
     nc_app: &crate::NodecosmosApp,
     s3_client: &aws_sdk_s3::Client,
     db_session: &charybdis::CachingSession,
@@ -61,8 +61,8 @@ pub(crate) async fn upload_image_attachment(
         attachment.node_id = params.node_id;
         attachment.object_id = params.object_id;
         attachment.key = key;
-        attachment.url = url;
-        attachment.user_id = user.id;
+        attachment.url = Some(url);
+        attachment.user_id = Some(user.id);
 
         attachment.insert_cb(db_session).await?;
 

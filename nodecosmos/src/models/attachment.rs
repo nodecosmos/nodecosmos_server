@@ -20,10 +20,10 @@ pub struct Attachment {
     pub id: Uuid,
 
     pub key: Text,
-    pub url: Text,
+    pub url: Option<Text>,
 
     #[serde(rename = "userId")]
-    pub user_id: Uuid,
+    pub user_id: Option<Uuid>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
