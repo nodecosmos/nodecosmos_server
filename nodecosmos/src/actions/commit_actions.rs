@@ -25,11 +25,15 @@ pub async fn create_node_commit(
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_commit(&db_session, &params, &current_user).await?;
 
-    <Commit as NodeCommit>::create_node_commit(&db_session, params, current_user.id, &node).await?;
+    <Commit as NodeCommit>::create_node_commit(
+        &db_session,
+        params.into_inner(),
+        current_user.id,
+        &node,
+    )
+    .await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -41,15 +45,13 @@ pub async fn update_node_commit_title(
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_commit(&db_session, &params, &current_user).await?;
 
     let node = node.into_inner();
 
     Commit::create_update_object_commit(
         &db_session,
-        params,
+        params.into_inner(),
         current_user.id,
         node.id,
         "title",
@@ -68,15 +70,13 @@ pub async fn update_node_commit_description(
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_commit(&db_session, &params, &current_user).await?;
 
     let node = node.into_inner();
 
     Commit::create_update_object_commit(
         &db_session,
-        params,
+        params.into_inner(),
         current_user.id,
         node.id,
         "description",
@@ -94,14 +94,12 @@ pub async fn delete_node_commit(
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_commit(&db_session, &params, &current_user).await?;
 
     if let Some(object_id) = params.object_id {
         Commit::create_delete_object_commit(
             &db_session,
-            params,
+            params.into_inner(),
             current_user.id,
             object_id,
             CommitTypes::Delete(CommitObjectTypes::Node(Committable::BaseObject)),
@@ -121,13 +119,11 @@ pub async fn create_workflow_commit(
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_commit(&db_session, &params, &current_user).await?;
 
     <Commit as WorkflowCommit>::create_workflow_commit(
         &db_session,
-        params,
+        params.into_inner(),
         current_user.id,
         &workflow,
     )

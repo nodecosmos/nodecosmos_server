@@ -19,8 +19,6 @@ pub async fn login(
     db_session: web::Data<CachingSession>,
     login_form: web::Json<LoginForm>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let login_form = login_form.into_inner();
-
     let mut user = User {
         username: login_form.username_or_email.clone(),
         email: login_form.username_or_email.clone(),

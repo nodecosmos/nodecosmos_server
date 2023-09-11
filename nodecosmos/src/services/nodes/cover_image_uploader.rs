@@ -9,7 +9,7 @@ use futures::StreamExt;
 
 const IMG_WIDTH: u32 = 850;
 const IMG_HEIGHT: u32 = 375;
-const TARGET_SIZE_IN_BYTES: usize = 15 * 1024;
+const TARGET_SIZE_IN_BYTES: usize = 150 * 1024;
 
 pub async fn handle_cover_image_upload(
     mut payload: Multipart,
@@ -41,7 +41,17 @@ pub async fn handle_cover_image_upload(
                 NodecosmosError::InternalServerError("Missing cover image key".to_string())
             })?;
 
-            delete_s3_object(s3_client, &nc_app.bucket, &key).await?;
+            // delete s3 object asynchronously
+            let bucket = nc_app.bucket.clone();
+            let key = key.clone();
+            let s3_client = s3_client.clone();
+            tokio::spawn(async move {
+                let _ = delete_s3_object(&s3_client, &bucket, &key)
+                    .await
+                    .map_err(|e| {
+                        println!("Failed to delete existing cover image from S3: {:?}", e);
+                    });
+            });
         }
 
         let new_cover_image_filename = format!("{}/{}-cover.jpeg", node.id, timestamp);

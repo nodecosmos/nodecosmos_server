@@ -20,8 +20,6 @@ pub async fn upload_image(
     payload: Multipart,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     auth_node_update_by_id(&params.node_id, &db_session, &current_user).await?;
 
     let attachment = upload_image_attachment(
@@ -54,7 +52,6 @@ pub async fn get_presigned_url(
     s3_client: web::Data<aws_sdk_s3::Client>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let bucket = &nc_app.bucket;
 
     auth_node_update_by_id(&params.node_id, &db_session, &current_user).await?;
@@ -71,12 +68,11 @@ pub async fn get_presigned_url(
 
 #[post("")]
 pub async fn create_attachment(
-    attachment: web::Json<Attachment>,
+    mut attachment: web::Json<Attachment>,
     db_session: web::Data<CachingSession>,
     nc_app: web::Data<crate::NodecosmosApp>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut attachment = attachment.into_inner();
     let url = Attachment::build_s3_url(nc_app.bucket.clone(), attachment.key.clone());
 
     attachment.url = Some(url);

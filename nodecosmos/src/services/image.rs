@@ -46,7 +46,11 @@ pub(crate) fn resize_image(
     width: u32,
     height: u32,
 ) -> Result<image::DynamicImage, NodecosmosError> {
+    println!("img.width(): {}", img.width());
+    println!("img.height(): {}", img.height());
+
     if img.width() > width || img.height() > height {
+        println!("Resizing image");
         img = img.resize(width, height, image::imageops::FilterType::Lanczos3);
     }
 

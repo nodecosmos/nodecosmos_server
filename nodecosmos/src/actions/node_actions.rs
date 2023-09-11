@@ -67,7 +67,6 @@ pub async fn get_node(
     params: web::Path<PrimaryKeyParams>,
     opt_current_user: OptCurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut node = BaseNode::new();
 
     node.root_id = params.root_id;
@@ -102,7 +101,6 @@ pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
     params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut node = GetNodeDescription::new();
 
     node.root_id = params.root_id;
@@ -120,11 +118,10 @@ pub async fn get_node_description(
 pub async fn create_node(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
-    node: web::Json<Node>,
+    mut node: web::Json<Node>,
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = node.into_inner();
     let parent = node.parent(&db_session).await;
 
     resource_locker.check_node_lock(&node).await?;
@@ -155,12 +152,11 @@ pub async fn create_node(
 
 #[put("/title")]
 pub async fn update_node_title(
-    node: web::Json<UpdateNodeTitle>,
+    mut node: web::Json<UpdateNodeTitle>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = node.into_inner();
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
@@ -172,11 +168,10 @@ pub async fn update_node_title(
 #[put("/description")]
 pub async fn update_node_description(
     db_session: web::Data<CachingSession>,
-    node: web::Json<UpdateNodeDescription>,
+    mut node: web::Json<UpdateNodeDescription>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = node.into_inner();
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
@@ -193,7 +188,6 @@ pub async fn delete_node(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut node = Node::new();
 
     node.root_id = params.root_id;
@@ -216,9 +210,7 @@ pub async fn reorder_nodes(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
-    let mut reorderer = Reorderer::new(db_session, params).await?;
+    let mut reorderer = Reorderer::new(db_session, params.into_inner()).await?;
 
     resource_locker.check_node_lock(&reorderer.node).await?;
     auth_node_update(&reorderer.node, &current_user).await?;
@@ -237,7 +229,6 @@ async fn upload_cover_image(
     current_user: CurrentUser,
     payload: Multipart,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut node = Node::new();
 
     node.root_id = params.root_id;
@@ -271,7 +262,6 @@ async fn delete_cover_image(
     params: web::Path<PrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut node = UpdateNodeCoverImage::new();
     node.root_id = params.root_id;
     node.id = params.id;
@@ -288,7 +278,17 @@ async fn delete_cover_image(
 
         println!("Deleting cover image from S3: {}", key);
 
-        delete_s3_object(&s3_client, &nc_app.bucket, &key).await?;
+        let bucket = nc_app.bucket.clone();
+        let key = key.clone();
+        let s3_client = s3_client.clone();
+
+        tokio::spawn(async move {
+            let _ = delete_s3_object(&s3_client, &bucket, &key)
+                .await
+                .map_err(|e| {
+                    println!("Failed to delete cover image from S3: {:?}", e);
+                });
+        });
     }
 
     node.cover_image_url = None;

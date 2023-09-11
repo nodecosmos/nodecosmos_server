@@ -83,10 +83,8 @@ pub async fn get_workflow(
 pub async fn create_workflow(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    workflow: web::Json<Workflow>,
+    mut workflow: web::Json<Workflow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut workflow = workflow.into_inner();
-
     auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
 
     workflow.insert_cb(&db_session).await?;
@@ -101,10 +99,8 @@ pub async fn create_workflow(
 pub async fn update_initial_inputs(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    workflow: web::Json<UpdateInitialInputsWorkflow>,
+    mut workflow: web::Json<UpdateInitialInputsWorkflow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut workflow = workflow.into_inner();
-
     auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
 
     workflow.update_cb(&db_session).await?;

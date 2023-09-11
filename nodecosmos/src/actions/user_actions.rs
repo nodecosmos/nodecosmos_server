@@ -33,10 +33,8 @@ pub async fn create_user(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     client_session: Session,
-    user: web::Json<User>,
+    mut user: web::Json<User>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut user = user.into_inner();
-
     user.insert_cb(&db_session, &cb_extension).await?;
     let current_user = set_current_user(&client_session, &user)?;
 
@@ -47,10 +45,9 @@ pub async fn create_user(
 pub async fn update_user(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
-    user: web::Json<UpdateUser>,
+    mut user: web::Json<UpdateUser>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut user = user.into_inner();
     let native_user = user.as_native();
 
     auth_user_update(&native_user, &current_user).await?;

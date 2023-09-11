@@ -56,10 +56,8 @@ pub async fn get_contribution_request(
 pub async fn create_contribution_request(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    contribution_request: web::Json<ContributionRequest>,
+    mut contribution_request: web::Json<ContributionRequest>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut contribution_request = contribution_request.into_inner();
-
     auth_contribution_request_creation(&db_session, &contribution_request, &current_user).await?;
     contribution_request.set_owner(Owner {
         id: current_user.id,
@@ -88,7 +86,6 @@ pub async fn update_contribution_request_title(
     auth_contribution_request_update(&db_session, &native_cr, &current_user).await?;
 
     let mut contribution_request = contribution_request.into_inner();
-
     contribution_request.update_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
@@ -98,7 +95,7 @@ pub async fn update_contribution_request_title(
 pub async fn update_contribution_request_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    contribution_request: web::Json<UpdateContributionRequestDescription>,
+    mut contribution_request: web::Json<UpdateContributionRequestDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let native_cr = contribution_request
         .as_native()
@@ -107,7 +104,6 @@ pub async fn update_contribution_request_description(
 
     auth_contribution_request_update(&db_session, &native_cr, &current_user).await?;
 
-    let mut contribution_request = contribution_request.into_inner();
     contribution_request.update_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))

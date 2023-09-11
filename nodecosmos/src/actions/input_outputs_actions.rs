@@ -20,10 +20,8 @@ pub struct PrimaryKeyParams {
 pub async fn create_io(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    input_output: web::Json<InputOutput>,
+    mut input_output: web::Json<InputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = input_output.into_inner();
-
     auth_workflow_update(
         &db_session,
         input_output.node_id,
@@ -45,8 +43,6 @@ pub async fn get_io_description(
     db_session: web::Data<CachingSession>,
     params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     let mut input_output = IoDescription::new();
     input_output.node_id = params.node_id;
     input_output.workflow_id = params.workflow_id;
@@ -88,10 +84,8 @@ pub async fn update_io_title(
 pub async fn update_io_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    input_output: web::Json<IoDescription>,
+    mut input_output: web::Json<IoDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = input_output.into_inner();
-
     auth_workflow_update(
         &db_session,
         input_output.node_id,
@@ -114,8 +108,6 @@ pub async fn delete_io(
     params: web::Path<PrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     let mut input_output = InputOutput::new();
     input_output.node_id = params.node_id;
     input_output.workflow_id = params.workflow_id;

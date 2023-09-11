@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
 use aws_sdk_s3::primitives::ByteStream;
-use std::fmt::format;
 use std::time::Duration;
 
 pub async fn upload_s3_object(

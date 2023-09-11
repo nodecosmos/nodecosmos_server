@@ -20,10 +20,8 @@ pub struct PrimaryKeyParams {
 pub async fn create_flow(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow: web::Json<Flow>,
+    mut flow: web::Json<Flow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow = flow.into_inner();
-
     auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
 
     flow.insert_cb(&db_session).await?;
@@ -40,7 +38,6 @@ pub async fn get_flow_description(
     _current_user: CurrentUser,
     params: web::Path<PrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut flow = FlowDescription::new();
 
     flow.node_id = params.node_id;
@@ -59,10 +56,8 @@ pub async fn get_flow_description(
 pub async fn update_flow_title(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow: web::Json<UpdateFlowTitle>,
+    mut flow: web::Json<UpdateFlowTitle>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow = flow.into_inner();
-
     auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
 
     flow.update_cb(&db_session).await?;
@@ -77,10 +72,8 @@ pub async fn update_flow_title(
 pub async fn update_flow_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow: web::Json<FlowDescription>,
+    mut flow: web::Json<FlowDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow = flow.into_inner();
-
     auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
 
     flow.update_cb(&db_session).await?;
@@ -104,7 +97,6 @@ pub async fn delete_flow(
     current_user: CurrentUser,
     params: web::Path<DeleteParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
     let mut flow = Flow::new();
 
     flow.node_id = params.node_id;

@@ -13,11 +13,9 @@ use serde_json::json;
 #[post("")]
 pub async fn create_flow_step(
     db_session: web::Data<CachingSession>,
-    flow_step: web::Json<FlowStep>,
+    mut flow_step: web::Json<FlowStep>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
     auth_workflow_update(
         &db_session,
         flow_step.node_id,
@@ -38,10 +36,8 @@ pub async fn create_flow_step(
 pub async fn update_flow_step_nodes(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow_step: web::Json<UpdateFlowStepNodeIds>,
+    mut flow_step: web::Json<UpdateFlowStepNodeIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
     auth_workflow_update(
         &db_session,
         flow_step.node_id,
@@ -62,10 +58,8 @@ pub async fn update_flow_step_nodes(
 pub async fn update_flow_step_outputs(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow_step: web::Json<UpdateFlowStepOutputIds>,
+    mut flow_step: web::Json<UpdateFlowStepOutputIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
     auth_workflow_update(
         &db_session,
         flow_step.node_id,
@@ -86,10 +80,8 @@ pub async fn update_flow_step_outputs(
 pub async fn update_flow_step_inputs(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow_step: web::Json<UpdateFlowStepInputIds>,
+    mut flow_step: web::Json<UpdateFlowStepInputIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
     auth_workflow_update(
         &db_session,
         flow_step.node_id,
@@ -110,10 +102,8 @@ pub async fn update_flow_step_inputs(
 pub async fn update_flow_step_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    flow_step: web::Json<FlowStepDescription>,
+    mut flow_step: web::Json<FlowStepDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut flow_step = flow_step.into_inner();
-
     auth_workflow_update(
         &db_session,
         flow_step.node_id,
@@ -136,8 +126,6 @@ pub async fn delete_flow_step(
     current_user: CurrentUser,
     flow_step: web::Path<FlowStep>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let flow_step = flow_step.into_inner();
-
     let mut flow_step = flow_step.find_by_primary_key(&db_session).await?;
     auth_workflow_update(
         &db_session,

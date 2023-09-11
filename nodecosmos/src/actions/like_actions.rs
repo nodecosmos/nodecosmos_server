@@ -69,8 +69,6 @@ pub async fn create_like(
     params: web::Json<LikeParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let params = params.into_inner();
-
     let mut like = Like {
         object_id: params.object_id,
         object_type: params.object_type.to_string(),
