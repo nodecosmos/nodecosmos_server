@@ -14,7 +14,6 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        let mut batch = CharybdisModelBatch::new();
         let mut node_ids_to_delete = vec![self.id];
 
         let ancestor_ids = self.ancestor_ids.clone().unwrap_or_default();
@@ -23,58 +22,71 @@ impl Node {
             node_ids_to_delete.extend(descendant_ids);
         }
 
+        let mut batch = CharybdisModelBatch::new();
+
         if let Some(parent_id) = &self.parent_id {
             let query = Node::PULL_FROM_CHILD_IDS_QUERY;
             batch.append_statement(query, (self.id, self.root_id, parent_id))?;
         }
 
-        for id in node_ids_to_delete {
-            // remove node from ancestor's descendant_ids
-            for ancestor_id in &ancestor_ids {
-                let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
-                batch.append_statement(query, (id, self.root_id, ancestor_id))?;
+        batch.execute(db_session).await?;
+
+        let node_ids_to_delete_chunks = node_ids_to_delete.chunks(100);
+
+        for chunk in node_ids_to_delete_chunks {
+            let mut batch = CharybdisModelBatch::new();
+            let node_ids = chunk;
+
+            for id in node_ids {
+                // remove node from ancestor's descendant_ids
+                for ancestor_id in &ancestor_ids {
+                    let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
+                    batch.append_statement(query, (id, self.root_id, ancestor_id))?;
+                }
+
+                // remove workflows, flows, flow steps, and ios
+                let workflows_to_delete = WorkflowDelete {
+                    node_id: *id,
+                    ..Default::default()
+                }
+                .find_by_partition_key(db_session)
+                .await?;
+
+                let flows_to_delete = FlowDelete {
+                    node_id: *id,
+                    ..Default::default()
+                }
+                .find_by_partition_key(db_session)
+                .await?;
+
+                let flow_steps_to_delete = FlowStepDelete {
+                    node_id: *id,
+                    ..Default::default()
+                }
+                .find_by_partition_key(db_session)
+                .await?;
+
+                let ios_to_delete = IoDelete {
+                    node_id: *id,
+                    ..Default::default()
+                }
+                .find_by_partition_key(db_session)
+                .await?;
+
+                batch.append_deletes(ios_to_delete)?;
+                batch.append_deletes(flow_steps_to_delete)?;
+                batch.append_deletes(flows_to_delete)?;
+                batch.append_deletes(workflows_to_delete)?;
+                batch.append_delete(DeleteNode {
+                    id: *id,
+                    root_id: self.root_id,
+                })?;
             }
 
-            // remove workflows, flows, flow steps, and ios
-            let workflows_to_delete = WorkflowDelete {
-                node_id: id,
-                ..Default::default()
-            }
-            .find_by_partition_key(db_session)
-            .await?;
-
-            let flows_to_delete = FlowDelete {
-                node_id: id,
-                ..Default::default()
-            }
-            .find_by_partition_key(db_session)
-            .await?;
-
-            let flow_steps_to_delete = FlowStepDelete {
-                node_id: id,
-                ..Default::default()
-            }
-            .find_by_partition_key(db_session)
-            .await?;
-
-            let ios_to_delete = IoDelete {
-                node_id: id,
-                ..Default::default()
-            }
-            .find_by_partition_key(db_session)
-            .await?;
-
-            batch.append_deletes(ios_to_delete)?;
-            batch.append_deletes(flow_steps_to_delete)?;
-            batch.append_deletes(flows_to_delete)?;
-            batch.append_deletes(workflows_to_delete)?;
-            batch.append_delete(DeleteNode {
-                id,
-                root_id: self.root_id,
-            })?;
+            batch.execute(db_session).await?;
         }
 
-        batch.execute(db_session).await
+        Ok(())
     }
 
     pub async fn delete_related_elastic_data(&self, ext: &CbExtension) {

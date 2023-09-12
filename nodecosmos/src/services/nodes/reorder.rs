@@ -35,6 +35,7 @@ pub struct Reorderer {
 }
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
+const REORDER_DESCENDANTS_LIMIT: usize = 1000;
 
 impl Reorderer {
     pub async fn new(
@@ -79,6 +80,14 @@ impl Reorderer {
         &mut self,
         resource_locker: &ResourceLocker,
     ) -> Result<(), NodecosmosError> {
+        let descendants_count = self.node.descendant_ids.clone().unwrap_or_default().len();
+
+        if descendants_count > REORDER_DESCENDANTS_LIMIT {
+            return Err(NodecosmosError::Forbidden(
+                "Reorder is not allowed for nodes with more than 1000 descendants".to_string(),
+            ));
+        }
+
         resource_locker
             .lock_resource(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
             .await?;

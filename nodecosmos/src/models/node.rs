@@ -148,12 +148,21 @@ impl ExtCallbacks<CbExtension> for Node {
         Ok(())
     }
 
-    async fn after_delete(
+    async fn before_delete(
         &mut self,
         db_session: &CachingSession,
-        ext: &CbExtension,
+        _extension: &CbExtension,
     ) -> Result<(), CharybdisError> {
         self.delete_related_data(db_session).await?;
+
+        Ok(())
+    }
+
+    async fn after_delete(
+        &mut self,
+        _db_session: &CachingSession,
+        ext: &CbExtension,
+    ) -> Result<(), CharybdisError> {
         self.delete_related_elastic_data(ext).await;
 
         Ok(())

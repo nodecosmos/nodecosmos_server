@@ -40,6 +40,7 @@ pub enum NodecosmosError {
     ElasticError(elasticsearch::Error),
     RedisError(RedisError),
     InternalServerError(String),
+    Forbidden(String),
     UnsupportedMediaType,
 }
 
@@ -55,6 +56,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: \n{}", e),
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
+            NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
         }
     }
 }
@@ -71,6 +73,7 @@ impl Error for NodecosmosError {
             NodecosmosError::RedisError(e) => Some(e),
             NodecosmosError::InternalServerError(_) => None,
             NodecosmosError::UnsupportedMediaType => None,
+            NodecosmosError::Forbidden(_) => None,
         }
     }
 }
@@ -100,6 +103,10 @@ impl ResponseError for NodecosmosError {
                 }
             },
             NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().finish(),
+            NodecosmosError::Forbidden(e) => HttpResponse::Forbidden().json(json!({
+                "error": "Forbidden",
+                "message": e
+            })),
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
                 "message": self.to_string()
