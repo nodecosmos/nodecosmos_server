@@ -32,7 +32,7 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
     if idx_exists(client, Node::ELASTIC_IDX_NAME).await {
         println!(
             "\n{} {}",
-            "Updating elastic index for".bright_green(),
+            "Sync elastic index for".bright_green(),
             Node::ELASTIC_IDX_NAME.bright_yellow()
         );
 

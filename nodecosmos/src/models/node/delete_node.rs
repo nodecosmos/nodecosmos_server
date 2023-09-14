@@ -33,6 +33,7 @@ impl Node {
 
         let node_ids_to_delete_chunks = node_ids_to_delete.chunks(100);
 
+        // delete nodes in chunks of 100
         for chunk in node_ids_to_delete_chunks {
             let mut batch = CharybdisModelBatch::new();
             let node_ids = chunk;

@@ -26,7 +26,7 @@ pub async fn build_user_index(client: &Elasticsearch) {
     if idx_exists(client, User::ELASTIC_IDX_NAME).await {
         println!(
             "{} {}\n",
-            "Updating elastic index for".bright_green(),
+            "Sync elastic index for".bright_green(),
             User::ELASTIC_IDX_NAME.bright_yellow()
         );
         response = client
