@@ -76,10 +76,10 @@ pub async fn get_node(
 
     auth_node_access(&node, opt_current_user).await?;
 
-    let mut all_node_ids = node.descendant_ids.clone().unwrap_or_default();
+    let mut all_node_ids = node.descendant_ids.unwrap_or_default();
     all_node_ids.push(node.id);
 
-    let all_node_ids_chunks = all_node_ids.chunks(100).into_iter();
+    let all_node_ids_chunks = all_node_ids.chunks(100);
 
     let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
     let mut nodes = vec![];
