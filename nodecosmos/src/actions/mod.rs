@@ -10,6 +10,7 @@ mod node_actions;
 mod session_actions;
 mod user_actions;
 mod workflow_actions;
+mod ws;
 
 pub(crate) use attachment_actions::*;
 pub(crate) use commit_actions::*;
@@ -22,3 +23,4 @@ pub(crate) use node_actions::*;
 pub(crate) use session_actions::*;
 pub(crate) use user_actions::*;
 pub(crate) use workflow_actions::*;
+pub(crate) use ws::*;

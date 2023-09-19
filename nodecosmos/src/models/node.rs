@@ -3,11 +3,11 @@ mod delete_node;
 
 use crate::app::CbExtension;
 use crate::models::helpers::{
-    default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
-    sanitize_description_ext_cb_fn,
+    blob_default_to_none, default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
+    impl_updated_at_cb, sanitize_description_ext_cb_fn,
 };
 use crate::models::udts::{Creator, Owner};
-use crate::services::elastic::update_elastic_document;
+use crate::services::{elastic::update_elastic_document, serializer};
 use charybdis::*;
 use chrono::Utc;
 
@@ -52,6 +52,13 @@ pub struct Node {
 
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
+
+    #[serde(
+        rename = "descriptionBlob",
+        with = "serializer::base64_serializer",
+        default = "blob_default_to_none"
+    )]
+    pub description_blob: Option<Blob>,
 
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
@@ -197,6 +204,8 @@ partial_node!(
     description_markdown
 );
 
+partial_node!(GetNodedescriptionBlob, root_id, id, description_blob);
+
 partial_node!(
     ReorderNode,
     root_id,
@@ -222,6 +231,7 @@ partial_node!(
     description,
     short_description,
     description_markdown,
+    description_blob,
     updated_at
 );
 impl ExtCallbacks<CbExtension> for UpdateNodeDescription {

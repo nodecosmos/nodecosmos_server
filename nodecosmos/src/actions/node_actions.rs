@@ -20,7 +20,7 @@ use scylla::CachingSession;
 use serde_json::json;
 
 #[derive(Debug, Deserialize)]
-pub struct PrimaryKeyParams {
+pub struct NodePrimaryKeyParams {
     pub root_id: Uuid,
     pub id: Uuid,
 }
@@ -64,7 +64,7 @@ pub async fn get_root_node(
 #[get("/{root_id}/{id}")]
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
-    params: web::Path<PrimaryKeyParams>,
+    params: web::Path<NodePrimaryKeyParams>,
     opt_current_user: OptCurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = BaseNode::new();
@@ -99,9 +99,27 @@ pub async fn get_node(
 #[get("/{root_id}/{id}/description")]
 pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
-    params: web::Path<PrimaryKeyParams>,
+    params: web::Path<NodePrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = GetNodeDescription::new();
+
+    node.root_id = params.root_id;
+    node.id = params.id;
+
+    let node = node.find_by_primary_key(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "node": node
+    })))
+}
+
+#[get("/{root_id}/{id}/description_blob")]
+pub async fn get_node_description_blob(
+    db_session: web::Data<CachingSession>,
+    params: web::Path<NodePrimaryKeyParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut node = GetNodedescriptionBlob::new();
 
     node.root_id = params.root_id;
     node.id = params.id;
@@ -184,7 +202,7 @@ pub async fn update_node_description(
 pub async fn delete_node(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
-    params: web::Path<PrimaryKeyParams>,
+    params: web::Path<NodePrimaryKeyParams>,
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -221,7 +239,7 @@ pub async fn reorder_nodes(
 
 #[post("/{root_id}/{id}/upload_cover_image")]
 async fn upload_cover_image(
-    params: web::Path<PrimaryKeyParams>,
+    params: web::Path<NodePrimaryKeyParams>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     s3_client: web::Data<aws_sdk_s3::Client>,
@@ -259,7 +277,7 @@ async fn delete_cover_image(
     cb_extension: web::Data<CbExtension>,
     s3_client: web::Data<aws_sdk_s3::Client>,
     nc_app: web::Data<crate::NodecosmosApp>,
-    params: web::Path<PrimaryKeyParams>,
+    params: web::Path<NodePrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = UpdateNodeCoverImage::new();

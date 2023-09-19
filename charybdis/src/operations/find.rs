@@ -67,20 +67,6 @@ impl<T: BaseModel> Find for T {
         Ok(typed_row)
     }
 
-    async fn find_paged(
-        session: &CachingSession,
-        query: &'static str,
-        values: impl ValueList,
-        paging_state: Option<Bytes>,
-    ) -> Result<(TypedRowIter<Self>, Option<Bytes>), CharybdisError> {
-        let res = session.execute_paged(query, values, paging_state).await?;
-        let paging_state = res.paging_state.clone();
-        let rows = res.rows()?;
-        let typed_rows: TypedRowIter<Self> = rows.into_typed();
-
-        Ok((typed_rows, paging_state))
-    }
-
     // find iter
     async fn find_iter(
         session: &CachingSession,
@@ -94,6 +80,20 @@ impl<T: BaseModel> Find for T {
         let typed_rows: TypedRowIterator<Self> = res.into_typed();
 
         Ok(typed_rows)
+    }
+
+    async fn find_paged(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+        paging_state: Option<Bytes>,
+    ) -> Result<(TypedRowIter<Self>, Option<Bytes>), CharybdisError> {
+        let res = session.execute_paged(query, values, paging_state).await?;
+        let paging_state = res.paging_state.clone();
+        let rows = res.rows()?;
+        let typed_rows: TypedRowIter<Self> = rows.into_typed();
+
+        Ok((typed_rows, paging_state))
     }
 
     // methods

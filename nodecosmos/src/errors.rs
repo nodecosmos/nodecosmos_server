@@ -41,6 +41,7 @@ pub enum NodecosmosError {
     RedisError(RedisError),
     InternalServerError(String),
     Forbidden(String),
+    ActixError(actix_web::Error),
     UnsupportedMediaType,
 }
 
@@ -57,6 +58,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
+            NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
         }
     }
 }
@@ -74,6 +76,7 @@ impl Error for NodecosmosError {
             NodecosmosError::InternalServerError(_) => None,
             NodecosmosError::UnsupportedMediaType => None,
             NodecosmosError::Forbidden(_) => None,
+            NodecosmosError::ActixError(e) => Some(e),
         }
     }
 }
@@ -146,5 +149,11 @@ impl From<deadpool_redis::PoolError> for NodecosmosError {
 impl From<deadpool_redis::redis::RedisError> for NodecosmosError {
     fn from(e: deadpool_redis::redis::RedisError) -> Self {
         NodecosmosError::RedisError(RedisError::RedisError(e))
+    }
+}
+
+impl From<actix_web::Error> for NodecosmosError {
+    fn from(e: actix_web::Error) -> Self {
+        NodecosmosError::ActixError(e)
     }
 }
