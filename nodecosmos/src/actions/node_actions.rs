@@ -114,12 +114,12 @@ pub async fn get_node_description(
     })))
 }
 
-#[get("/{root_id}/{id}/description_blob")]
-pub async fn get_node_description_blob(
+#[get("/{root_id}/{id}/description_base64")]
+pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
     params: web::Path<NodePrimaryKeyParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetNodedescriptionBlob::new();
+    let mut node = GetNodedescriptionBase64::new();
 
     node.root_id = params.root_id;
     node.id = params.id;

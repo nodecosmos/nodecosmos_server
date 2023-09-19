@@ -2511,7 +2511,6 @@ dependencies = [
  "ammonia",
  "aws-config",
  "aws-sdk-s3",
- "base64 0.21.4",
  "bcrypt",
  "bytestring",
  "charybdis",

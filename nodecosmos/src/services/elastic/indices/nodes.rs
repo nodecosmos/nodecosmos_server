@@ -3,10 +3,47 @@ use crate::services::elastic::build::idx_exists;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
-use serde_json::json;
+use serde_json::{json, Value};
 
-pub async fn build_nodes_index(client: &Elasticsearch) {
-    let mappings = json!(
+fn settings_json() -> Value {
+    json!({
+        "analysis": {
+          "analyzer": {
+            "english_with_html_strip": {
+              "tokenizer": "standard",
+              "char_filter": ["html_strip"],
+              "filter": [
+                "english_possessive_stemmer",
+                "lowercase",
+                "english_stop",
+                "english_stemmer"
+              ]
+            }
+          },
+          "filter": {
+            "english_possessive_stemmer": {
+              "type": "stemmer",
+              "language": "possessive_english"
+            },
+            "english_stop": {
+              "type": "stop",
+              "stopwords": "_english_"
+            },
+            "english_stemmer": {
+              "type": "stemmer",
+              "language": "english"
+            }
+          }
+        },
+        "index": {
+            "number_of_shards": 2,
+            "number_of_replicas": 1
+        }
+    })
+}
+
+fn mappings_json() -> Value {
+    json!(
         {
             "dynamic": false,
             "properties": {
@@ -25,8 +62,10 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
                 "coverImageUrl": { "type": "keyword", "index": false },
             }
         }
-    );
+    )
+}
 
+pub async fn build_nodes_index(client: &Elasticsearch) {
     let response;
 
     if idx_exists(client, Node::ELASTIC_IDX_NAME).await {
@@ -39,7 +78,7 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
         response = client
             .indices()
             .put_mapping(IndicesPutMappingParts::Index(&[Node::ELASTIC_IDX_NAME]))
-            .body(mappings)
+            .body(mappings_json())
             .send()
             .await;
     } else {
@@ -52,41 +91,8 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
             .indices()
             .create(IndicesCreateParts::Index(Node::ELASTIC_IDX_NAME))
             .body(json!({
-                "settings": {
-                    "analysis": {
-                      "analyzer": {
-                        "english_with_html_strip": {
-                          "tokenizer": "standard",
-                          "char_filter": ["html_strip"],
-                          "filter": [
-                            "english_possessive_stemmer",
-                            "lowercase",
-                            "english_stop",
-                            "english_stemmer"
-                          ]
-                        }
-                      },
-                      "filter": {
-                        "english_possessive_stemmer": {
-                          "type": "stemmer",
-                          "language": "possessive_english"
-                        },
-                        "english_stop": {
-                          "type": "stop",
-                          "stopwords": "_english_"
-                        },
-                        "english_stemmer": {
-                          "type": "stemmer",
-                          "language": "english"
-                        }
-                      }
-                    },
-                    "index": {
-                        "number_of_shards": 2,
-                        "number_of_replicas": 1
-                    }
-                },
-                "mappings": mappings
+                "settings": settings_json(),
+                "mappings": mappings_json()
             }))
             .send()
             .await;
@@ -97,6 +103,8 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
     });
 
     if !response.status_code().is_success() {
+        eprintln!("Failed Elasticsearch operation. Debug info: ...");
+
         panic!(
             "Failed to handle node index: {}! Response body: {}",
             response.status_code(),

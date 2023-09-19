@@ -86,7 +86,7 @@ async fn main() {
                     .service(update_node_description)
                     .service(delete_node)
                     .service(get_node_description)
-                    .service(get_node_description_blob)
+                    .service(get_node_description_base64)
                     .service(reorder_nodes)
                     .service(upload_cover_image)
                     .service(delete_cover_image)

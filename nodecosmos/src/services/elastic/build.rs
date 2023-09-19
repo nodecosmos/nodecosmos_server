@@ -14,5 +14,8 @@ pub async fn idx_exists(client: &Elasticsearch, idx: &str) -> bool {
         .send()
         .await
         .unwrap();
-    response.status_code().is_success()
+
+    let status = response.status_code().clone();
+
+    status.is_success()
 }
