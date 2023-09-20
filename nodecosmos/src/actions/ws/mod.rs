@@ -1,3 +1,3 @@
-mod node_description;
+mod description_pool;
 
-pub(crate) use node_description::*;
+pub(crate) use description_pool::*;

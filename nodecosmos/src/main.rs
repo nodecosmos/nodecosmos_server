@@ -38,7 +38,7 @@ async fn main() {
     let cb_extension_web_data = web::Data::new(cb_extension.clone());
     let s3_client_web_data = web::Data::new(s3_client.clone());
     let nodecosmos_web_data = web::Data::new(nodecosmos.clone());
-    let node_desc_ws_conn_pool = web::Data::new(NodeDescriptionWsConnectionPool::default());
+    let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
 
     let pool: Pool = get_redis_pool(&nodecosmos).await;
     let pool_web_data = web::Data::new(pool.clone());
@@ -62,7 +62,8 @@ async fn main() {
             .app_data(resource_locker_web_data)
             .app_data(s3_client_web_data.clone())
             .app_data(nodecosmos_web_data.clone())
-            .app_data(node_desc_ws_conn_pool.clone())
+            .app_data(desc_ws_conn_pool.clone())
+            .service(web::scope("/ws").service(description_ws))
             .service(
                 web::scope("/users")
                     .service(get_user)
@@ -89,8 +90,7 @@ async fn main() {
                     .service(get_node_description_base64)
                     .service(reorder_nodes)
                     .service(upload_cover_image)
-                    .service(delete_cover_image)
-                    .service(node_description_ws),
+                    .service(delete_cover_image),
             )
             .service(
                 web::scope("/likes")
