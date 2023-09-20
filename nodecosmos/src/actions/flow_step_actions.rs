@@ -16,13 +16,7 @@ pub async fn create_flow_step(
     mut flow_step: web::Json<FlowStep>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.insert_cb(&db_session).await?;
 
@@ -38,13 +32,7 @@ pub async fn update_flow_step_nodes(
     current_user: CurrentUser,
     mut flow_step: web::Json<UpdateFlowStepNodeIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.update_cb(&db_session).await?;
 
@@ -60,13 +48,7 @@ pub async fn update_flow_step_outputs(
     current_user: CurrentUser,
     mut flow_step: web::Json<UpdateFlowStepOutputIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.update_cb(&db_session).await?;
 
@@ -82,13 +64,7 @@ pub async fn update_flow_step_inputs(
     current_user: CurrentUser,
     mut flow_step: web::Json<UpdateFlowStepInputIds>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.update_cb(&db_session).await?;
 
@@ -104,13 +80,7 @@ pub async fn update_flow_step_description(
     current_user: CurrentUser,
     mut flow_step: web::Json<FlowStepDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.update_cb(&db_session).await?;
 
@@ -127,13 +97,7 @@ pub async fn delete_flow_step(
     flow_step: web::Path<FlowStep>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut flow_step = flow_step.find_by_primary_key(&db_session).await?;
-    auth_workflow_update(
-        &db_session,
-        flow_step.node_id,
-        flow_step.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
     flow_step.delete_cb(&db_session).await?;
 

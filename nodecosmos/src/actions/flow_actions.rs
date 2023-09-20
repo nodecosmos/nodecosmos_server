@@ -22,7 +22,7 @@ pub async fn create_flow(
     current_user: CurrentUser,
     mut flow: web::Json<Flow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
+    auth_workflow_update(&db_session, flow.node_id, current_user).await?;
 
     flow.insert_cb(&db_session).await?;
 
@@ -58,7 +58,7 @@ pub async fn update_flow_title(
     current_user: CurrentUser,
     mut flow: web::Json<UpdateFlowTitle>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
+    auth_workflow_update(&db_session, flow.node_id, current_user).await?;
 
     flow.update_cb(&db_session).await?;
 
@@ -74,7 +74,7 @@ pub async fn update_flow_description(
     current_user: CurrentUser,
     mut flow: web::Json<FlowDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_update(&db_session, flow.node_id, flow.workflow_id, current_user).await?;
+    auth_workflow_update(&db_session, flow.node_id, current_user).await?;
 
     flow.update_cb(&db_session).await?;
 
@@ -104,13 +104,7 @@ pub async fn delete_flow(
     flow.id = params.id;
 
     let mut flow = flow.find_by_primary_key(&db_session).await?;
-    auth_workflow_update(
-        &db_session,
-        params.node_id,
-        params.workflow_id,
-        current_user,
-    )
-    .await?;
+    auth_workflow_update(&db_session, params.node_id, current_user).await?;
 
     flow.delete_cb(&db_session).await?;
 

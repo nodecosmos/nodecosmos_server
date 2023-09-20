@@ -16,7 +16,7 @@ use chrono::Utc;
     table_name = nodes,
     partition_keys = [root_id],
     clustering_keys = [id],
-    secondary_indexes = [id],
+    secondary_indexes = [],
 )]
 pub struct Node {
     #[serde(default = "Uuid::new_v4")]

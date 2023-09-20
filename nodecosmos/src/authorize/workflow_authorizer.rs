@@ -1,10 +1,8 @@
 use crate::actions::client_session::CurrentUser;
-use crate::authorize::auth_node_update;
+use crate::authorize::auth_node_update_by_id;
 use crate::errors::NodecosmosError;
-use crate::models::node::{find_node_query, Node};
-use crate::models::workflow::Workflow;
 
-use charybdis::{Find, Uuid};
+use charybdis::Uuid;
 use scylla::CachingSession;
 
 pub async fn auth_workflow_creation(
@@ -12,32 +10,13 @@ pub async fn auth_workflow_creation(
     node_id: Uuid,
     current_user: CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    let node = Node::find_one(db_session, find_node_query!("id = ?"), (node_id,)).await?;
-
-    auth_node_update(&node, &current_user).await?;
-
-    Ok(())
+    auth_node_update_by_id(&node_id, db_session, &current_user).await
 }
 
 pub async fn auth_workflow_update(
     db_session: &CachingSession,
     node_id: Uuid,
-    workflow_id: Uuid,
     current_user: CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    let workflow = Workflow {
-        node_id,
-        id: workflow_id,
-        ..Default::default()
-    };
-
-    workflow.find_by_primary_key(db_session).await?;
-
-    println!("{}", find_node_query!("id = ?"));
-
-    let node = Node::find_one(db_session, find_node_query!("id = ?"), (node_id,)).await?;
-
-    auth_node_update(&node, &current_user).await?;
-
-    Ok(())
+    auth_node_update_by_id(&node_id, db_session, &current_user).await
 }

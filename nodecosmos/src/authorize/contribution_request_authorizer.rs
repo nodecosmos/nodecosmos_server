@@ -1,33 +1,31 @@
 use crate::actions::client_session::CurrentUser;
 use crate::actions::commit_actions::CommitParams;
-use crate::authorize::can_edit_node;
+use crate::authorize::auth_node_update_by_id;
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::ContributionRequest;
-use crate::models::node::{find_node_query, Node};
+use crate::models::materialized_views::auth_node_by_id::{
+    find_auth_node_by_id_query, AuthNodeById,
+};
 use charybdis::{Find, New};
 use scylla::CachingSession;
-use serde_json::json;
 
 pub async fn auth_contribution_request_creation(
     db_session: &CachingSession,
     contribution_request: &ContributionRequest,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    let node = Node::find_one(
+    let node = AuthNodeById::find_one(
         db_session,
-        find_node_query!("id = ?"),
+        find_auth_node_by_id_query!("id = ?"),
         (contribution_request.node_id,),
     )
     .await?;
 
-    if node.is_public.unwrap_or(false) || can_edit_node(current_user, &node) {
-        Ok(())
-    } else {
-        Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized",
-            "message": "Not authorized to create contribution request for provided node!"
-        })))
+    if node.is_public.unwrap_or(false) {
+        return Ok(());
     }
+
+    auth_node_update_by_id(&contribution_request.node_id, db_session, &current_user).await
 }
 
 pub async fn auth_contribution_request_update(
@@ -38,21 +36,7 @@ pub async fn auth_contribution_request_update(
     if contribution_request.owner_id == Some(current_user.id) {
         Ok(())
     } else {
-        let node = Node::find_one(
-            db_session,
-            find_node_query!("id = ?"),
-            (contribution_request.node_id,),
-        )
-        .await?;
-
-        if can_edit_node(current_user, &node) {
-            return Ok(());
-        }
-
-        Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized",
-            "message": "Not authorized to update current contribution request!"
-        })))
+        auth_node_update_by_id(&contribution_request.node_id, db_session, &current_user).await
     }
 }
 
@@ -70,19 +54,6 @@ pub async fn auth_commit(
     if contribution_request.owner_id == Some(current_user.id) {
         Ok(())
     } else {
-        let node = Node::find_one(
-            db_session,
-            find_node_query!("id = ?"),
-            (contribution_request.node_id,),
-        )
-        .await?;
-        if can_edit_node(current_user, &node) {
-            Ok(())
-        } else {
-            Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized",
-                "message": "Not authorized to commit to current contribution request!"
-            })))
-        }
+        auth_node_update_by_id(&contribution_request.node_id, db_session, &current_user).await
     }
 }
