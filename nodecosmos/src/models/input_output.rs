@@ -1,10 +1,9 @@
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{
-    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
-};
+use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::*;
+use futures::StreamExt;
 
 #[derive(Clone)]
 #[partial_model_generator]
@@ -12,7 +11,7 @@ use charybdis::*;
     table_name = input_outputs,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, id],
-    secondary_indexes = []
+    secondary_indexes = [original_id]
 )]
 pub struct InputOutput {
     #[serde(rename = "nodeId")]
@@ -24,6 +23,12 @@ pub struct InputOutput {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
+    #[serde(rename = "rootNodeId")]
+    pub root_node_id: Uuid,
+
+    #[serde(rename = "originalId")]
+    pub original_id: Option<Uuid>,
+
     #[serde(rename = "flowStepId")]
     pub flow_step_id: Option<Uuid>,
 
@@ -32,13 +37,13 @@ pub struct InputOutput {
 
     #[serde(rename = "dataType")]
     pub data_type: Option<Text>,
+    pub value: Option<Text>,
 
     pub description: Option<Text>,
 
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
 
-    pub value: Option<Text>,
     pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
     #[serde(rename = "createdAt")]
@@ -49,6 +54,26 @@ pub struct InputOutput {
 }
 
 impl InputOutput {
+    async fn ios_by_original_id(
+        session: &CachingSession,
+        original_id: Uuid,
+    ) -> Result<Vec<InputOutput>, CharybdisError> {
+        let mut ios_iter = InputOutput::find_iter(
+            session,
+            find_input_output_query!("original_id = ?"),
+            (original_id,),
+            100,
+        )
+        .await?;
+
+        let mut ios: Vec<InputOutput> = vec![];
+        while let Some(io_result) = ios_iter.next().await {
+            ios.push(io_result?);
+        }
+
+        Ok(ios)
+    }
+
     async fn workflow(&self, session: &CachingSession) -> Result<Workflow, CharybdisError> {
         let mut workflow = Workflow::new();
         workflow.node_id = self.node_id;
@@ -110,9 +135,64 @@ impl InputOutput {
 }
 
 impl Callbacks for InputOutput {
-    created_at_cb_fn!();
+    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        let now = chrono::Utc::now();
+
+        self.id = Uuid::new_v4();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+
+        if let Some(original_id) = self.original_id {
+            let original_io = InputOutput::find_one(
+                session,
+                find_input_output_query!("original_id = ?"),
+                (original_id,),
+            )
+            .await?;
+
+            self.title = original_io.title;
+            self.unit = original_io.unit;
+            self.data_type = original_io.data_type;
+            self.description = original_io.description;
+            self.description_markdown = original_io.description_markdown;
+        } else {
+            self.original_id = Some(self.id);
+        }
+
+        Ok(())
+    }
 
     updated_at_cb_fn!();
+
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        if let Some(original_id) = self.original_id {
+            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
+
+            for chunk in ios.chunks(25) {
+                let mut batch = CharybdisModelBatch::new();
+
+                for io in chunk {
+                    if io.id == self.id {
+                        continue;
+                    }
+                    let mut updated_io = io.clone();
+                    updated_io.title = self.title.clone();
+                    updated_io.unit = self.unit.clone();
+                    updated_io.data_type = self.data_type.clone();
+                    updated_io.description = self.description.clone();
+                    updated_io.description_markdown = self.description_markdown.clone();
+                    updated_io.updated_at = self.updated_at;
+
+                    batch.append_update(updated_io)?;
+                }
+
+                // Execute the batch update
+                batch.execute(session).await?;
+            }
+        }
+
+        Ok(())
+    }
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         let mut workflow = self.workflow(session).await?;
@@ -143,13 +223,81 @@ partial_input_output!(
     node_id,
     workflow_id,
     id,
+    original_id,
     description,
     description_markdown,
     updated_at
 );
-sanitize_description_cb!(IoDescription);
+impl Callbacks for IoDescription {
+    sanitize_description_cb_fn!();
 
-partial_input_output!(IoTitle, node_id, workflow_id, id, title, updated_at);
-impl_updated_at_cb!(IoTitle);
+    /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
+    /// while allowing IO to have it's own properties and value.
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        if let Some(original_id) = self.original_id {
+            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
+
+            for chunk in ios.chunks(25) {
+                let mut batch = CharybdisModelBatch::new();
+
+                for io in chunk {
+                    if io.id == self.id {
+                        continue;
+                    }
+                    let mut updated_io = io.clone();
+                    updated_io.description = self.description.clone();
+                    updated_io.description_markdown = self.description_markdown.clone();
+                    updated_io.updated_at = self.updated_at;
+
+                    batch.append_update(updated_io)?;
+                }
+
+                // Execute the batch update
+                batch.execute(session).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+partial_input_output!(
+    IoTitle,
+    node_id,
+    workflow_id,
+    id,
+    original_id,
+    title,
+    updated_at
+);
+impl Callbacks for IoTitle {
+    updated_at_cb_fn!();
+
+    /// See IoDescription::after_update for explanation
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+        if let Some(original_id) = self.original_id {
+            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
+
+            for chunk in ios.chunks(25) {
+                let mut batch = CharybdisModelBatch::new();
+
+                for io in chunk {
+                    if io.id == self.id {
+                        continue;
+                    }
+                    let mut updated_io = io.clone();
+                    updated_io.title = self.title.clone();
+                    updated_io.updated_at = self.updated_at;
+
+                    batch.append_update(updated_io)?;
+                }
+
+                batch.execute(session).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
 
 partial_input_output!(IoDelete, node_id, workflow_id, id);

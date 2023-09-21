@@ -1,4 +1,4 @@
-use charybdis::{Set, Uuid};
+use charybdis::{Boolean, Set, Uuid};
 use charybdis_macros::charybdis_view_model;
 
 #[charybdis_view_model(
@@ -12,5 +12,5 @@ pub struct AuthNodeById {
     pub id: Uuid,
     pub editor_ids: Option<Set<Uuid>>,
     pub owner_id: Option<Uuid>,
-    pub is_public: Option<bool>,
+    pub is_public: Option<Boolean>,
 }

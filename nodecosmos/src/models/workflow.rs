@@ -30,6 +30,9 @@ pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
+    #[serde(rename = "rootNodeId")]
+    pub root_node_id: Uuid,
+
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub title: Option<Text>,

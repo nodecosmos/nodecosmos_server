@@ -50,6 +50,7 @@ impl<T: BaseModel> Find for T {
         values: impl ValueList,
     ) -> Result<TypedRowIter<Self>, CharybdisError> {
         let result: QueryResult = session.execute(query, values).await?;
+
         let rows = result.rows()?;
         let typed_rows: TypedRowIter<Self> = rows.into_typed();
 
@@ -76,8 +77,8 @@ impl<T: BaseModel> Find for T {
     ) -> Result<TypedRowIterator<Self>, CharybdisError> {
         let query = Query::new(query).with_page_size(page_size);
 
-        let res = session.execute_iter(query, values).await?;
-        let typed_rows: TypedRowIterator<Self> = res.into_typed();
+        let rows = session.execute_iter(query, values).await?;
+        let typed_rows: TypedRowIterator<Self> = rows.into_typed();
 
         Ok(typed_rows)
     }

@@ -2,29 +2,9 @@
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
         impl charybdis::Callbacks for $struct_name {
-            async fn before_insert(
-                &mut self,
-                _session: &charybdis::CachingSession,
-            ) -> Result<(), charybdis::CharybdisError> {
-                let now = chrono::Utc::now();
+            crate::models::helpers::created_at_cb_fn!();
 
-                self.id = Uuid::new_v4();
-                self.created_at = Some(now);
-                self.updated_at = Some(now);
-
-                Ok(())
-            }
-
-            async fn before_update(
-                &mut self,
-                _session: &charybdis::CachingSession,
-            ) -> Result<(), charybdis::CharybdisError> {
-                let now = chrono::Utc::now();
-
-                self.updated_at = Some(now);
-
-                Ok(())
-            }
+            crate::models::helpers::updated_at_cb_fn!();
         }
     };
 }
@@ -53,14 +33,7 @@ pub(crate) use created_at_cb_fn;
 macro_rules! impl_updated_at_cb {
     ($struct_name:ident) => {
         impl charybdis::Callbacks for $struct_name {
-            async fn before_update(
-                &mut self,
-                _session: &charybdis::CachingSession,
-            ) -> Result<(), charybdis::CharybdisError> {
-                self.updated_at = Some(chrono::Utc::now());
-
-                Ok(())
-            }
+            crate::models::helpers::updated_at_cb_fn!();
         }
     };
 }
@@ -83,24 +56,32 @@ pub(crate) use updated_at_cb_fn;
 macro_rules! sanitize_description_cb {
     ($struct_name:ident) => {
         impl charybdis::Callbacks for $struct_name {
-            async fn before_update(
-                &mut self,
-                _session: &charybdis::CachingSession,
-            ) -> Result<(), charybdis::CharybdisError> {
-                use ammonia::clean;
-
-                self.updated_at = Some(chrono::Utc::now());
-
-                if let Some(description) = &self.description {
-                    self.description = Some(clean(description));
-                }
-
-                Ok(())
-            }
+            crate::models::helpers::sanitize_description_cb_fn!();
         }
     };
 }
 pub(crate) use sanitize_description_cb;
+
+macro_rules! sanitize_description_cb_fn {
+    () => {
+        async fn before_update(
+            &mut self,
+            _session: &charybdis::CachingSession,
+        ) -> Result<(), charybdis::CharybdisError> {
+            use ammonia::clean;
+
+            self.updated_at = Some(chrono::Utc::now());
+
+            if let Some(description) = &self.description {
+                self.description = Some(clean(description));
+            }
+
+            Ok(())
+        }
+    };
+}
+
+pub(crate) use sanitize_description_cb_fn;
 
 // ExtCallbacks trait
 // when model implements ExtCallbacks trait
