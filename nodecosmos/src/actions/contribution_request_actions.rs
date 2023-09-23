@@ -31,10 +31,10 @@ pub async fn get_contribution_requests(
 #[derive(Deserialize)]
 pub struct ContributionRequestParams {
     pub node_id: Uuid,
-    pub contribution_request_id: Uuid,
+    pub id: Uuid,
 }
 
-#[get("/{node_id}/{contribution_request_id}")]
+#[get("/{node_id}/{id}")]
 pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     params: web::Path<ContributionRequestParams>,
@@ -43,9 +43,9 @@ pub async fn get_contribution_request(
 
     let mut contribution_request = ContributionRequest::new();
     contribution_request.node_id = params.node_id;
-    contribution_request.id = params.contribution_request_id;
+    contribution_request.id = params.id;
 
-    contribution_request
+    let contribution_request = contribution_request
         .find_by_primary_key(&db_session)
         .await?;
 
@@ -109,7 +109,7 @@ pub async fn update_contribution_request_description(
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
-#[delete("/{node_id}/{contribution_request_id}")]
+#[delete("/{node_id}/{id}")]
 pub async fn delete_contribution_request(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
@@ -119,7 +119,7 @@ pub async fn delete_contribution_request(
 
     let mut contribution_request = ContributionRequest::new();
     contribution_request.node_id = params.node_id;
-    contribution_request.id = params.contribution_request_id;
+    contribution_request.id = params.id;
 
     let contribution_request = contribution_request
         .find_by_primary_key(&db_session)

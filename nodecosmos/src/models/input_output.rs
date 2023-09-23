@@ -164,36 +164,6 @@ impl Callbacks for InputOutput {
 
     updated_at_cb_fn!();
 
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
-        if let Some(original_id) = self.original_id {
-            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
-
-            for chunk in ios.chunks(25) {
-                let mut batch = CharybdisModelBatch::new();
-
-                for io in chunk {
-                    if io.id == self.id {
-                        continue;
-                    }
-                    let mut updated_io = io.clone();
-                    updated_io.title = self.title.clone();
-                    updated_io.unit = self.unit.clone();
-                    updated_io.data_type = self.data_type.clone();
-                    updated_io.description = self.description.clone();
-                    updated_io.description_markdown = self.description_markdown.clone();
-                    updated_io.updated_at = self.updated_at;
-
-                    batch.append_update(updated_io)?;
-                }
-
-                // Execute the batch update
-                batch.execute(session).await?;
-            }
-        }
-
-        Ok(())
-    }
-
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
         let mut workflow = self.workflow(session).await?;
         let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
