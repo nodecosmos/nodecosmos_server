@@ -54,8 +54,11 @@ pub async fn auth_node_update_by_id(
     db_session: &CachingSession,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
+    println!("auth_node_update_by_id");
     let auth_node =
         AuthNodeById::find_one(db_session, find_auth_node_by_id_query!("id = ?"), (id,)).await?;
+
+    println!("auth_node_update_by_id: {:?}", auth_node);
 
     let mut node = Node::new();
     node.id = auth_node.id;

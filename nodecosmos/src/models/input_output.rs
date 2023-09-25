@@ -11,7 +11,7 @@ use futures::StreamExt;
     table_name = input_outputs,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, id],
-    secondary_indexes = [original_id]
+    secondary_indexes = [original_id, id]
 )]
 pub struct InputOutput {
     #[serde(rename = "nodeId")]
@@ -143,18 +143,16 @@ impl Callbacks for InputOutput {
         self.updated_at = Some(now);
 
         if let Some(original_id) = self.original_id {
-            let original_io = InputOutput::find_one(
-                session,
-                find_input_output_query!("original_id = ?"),
-                (original_id,),
-            )
-            .await?;
+            let original_io =
+                InputOutput::find_one(session, find_input_output_query!("id = ?"), (original_id,))
+                    .await?;
 
             self.title = original_io.title;
             self.unit = original_io.unit;
             self.data_type = original_io.data_type;
             self.description = original_io.description;
             self.description_markdown = original_io.description_markdown;
+            self.original_id = original_io.original_id;
         } else {
             self.original_id = Some(self.id);
         }

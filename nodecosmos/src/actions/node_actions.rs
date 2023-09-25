@@ -140,7 +140,7 @@ pub async fn create_node(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let parent = node.parent(&db_session).await;
+    let parent = node.parent(&db_session).await?;
 
     resource_locker.check_node_lock(&node).await?;
     auth_node_creation(&parent, &current_user).await?;

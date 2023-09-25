@@ -2,6 +2,7 @@ mod create_node;
 mod delete_node;
 
 use crate::app::CbExtension;
+use crate::errors::NodecosmosError;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
     sanitize_description_ext_cb_fn,
@@ -91,21 +92,20 @@ pub struct Node {
 impl Node {
     pub const ELASTIC_IDX_NAME: &'static str = "nodes";
 
-    pub async fn parent(&self, db_session: &CachingSession) -> Option<Node> {
+    pub async fn parent(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Node>, NodecosmosError> {
         match self.parent_id {
             Some(parent_id) => {
                 let mut parent = Node::new();
                 parent.id = parent_id;
                 parent.root_id = self.root_id;
 
-                let parent = parent.find_by_primary_key(db_session).await;
-
-                match parent {
-                    Ok(parent) => Some(parent),
-                    Err(_) => None,
-                }
+                let parent = parent.find_by_primary_key(db_session).await?;
+                Ok(Some(parent))
             }
-            None => None,
+            None => Ok(None),
         }
     }
 

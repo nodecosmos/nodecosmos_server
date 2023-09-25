@@ -17,11 +17,9 @@ pub async fn get_workflow(
 ) -> Result<HttpResponse, NodecosmosError> {
     let node_id = node_id.into_inner();
 
-    // Currently we only support one workflow per node, in future we will support multiple
-    // workflows per node.
-
     let workflow =
         Workflow::find_one(&db_session, find_workflow_query!("node_id = ?"), (node_id,)).await?;
+
     // flows
     let mut flow = BaseFlow::new();
     flow.node_id = node_id;
