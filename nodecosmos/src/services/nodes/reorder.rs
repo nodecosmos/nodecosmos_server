@@ -35,7 +35,7 @@ pub struct Reorderer {
 }
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
-const REORDER_DESCENDANTS_LIMIT: usize = 1000;
+const REORDER_DESCENDANTS_LIMIT: usize = 500;
 
 impl Reorderer {
     pub async fn new(
@@ -333,46 +333,50 @@ impl Reorderer {
             descendants.extend(descendants_batch.flatten());
         }
 
-        for descendant in descendants {
-            // This was well tested and it works. However, it's not clear why it doesn't work if batch
-            // is created outside of the loop
-            // TODO: figure out why it doesn't work if batch is created outside of the loop
+        let descendant_chunks = descendants.chunks(100);
 
-            let mut batch = CharybdisModelBatch::new();
+        for descendant_chunk in descendant_chunks {
+            let mut batch = CharybdisModelBatch::new().with_uniq_timestamp();
 
-            // add descendant to new ancestors
-            for ancestor_id in &new_node_ancestor_ids {
-                let query = Node::PUSH_TO_DESCENDANT_IDS_QUERY;
+            for descendant in descendant_chunk {
+                // add descendant to new ancestors
+                for ancestor_id in &new_node_ancestor_ids {
+                    let query = Node::PUSH_TO_DESCENDANT_IDS_QUERY;
 
-                batch.append_statement(query, (descendant.id, self.node.root_id, *ancestor_id))?;
+                    batch.append_statement(
+                        query,
+                        (descendant.id, self.node.root_id, *ancestor_id),
+                    )?;
+                }
+
+                let current_ancestor_ids = descendant.ancestor_ids.cloned_ref();
+
+                // current reordered node + 1 index
+                let split_index = current_ancestor_ids
+                    .iter()
+                    .position(|id| id == &self.node.id)
+                    .unwrap_or_default();
+
+                // take all existing ancestors bellow the reordered_node
+                let preserved_ancestor_ids = current_ancestor_ids
+                    .iter()
+                    .skip(split_index)
+                    .cloned()
+                    .collect::<Vec<Uuid>>();
+
+                // append new ancestors to preserved ancestors
+                let mut new_complete_ancestor_ids = new_node_ancestor_ids.clone();
+                new_complete_ancestor_ids.extend(preserved_ancestor_ids);
+
+                let update_ancestors_node = UpdateAncestors {
+                    root_id: self.node.root_id,
+                    id: descendant.id,
+                    ancestor_ids: Some(new_complete_ancestor_ids),
+                };
+
+                batch.append_update(update_ancestors_node)?;
             }
 
-            let current_ancestor_ids = descendant.ancestor_ids.cloned_ref();
-
-            // current reordered node + 1 index
-            let split_index = current_ancestor_ids
-                .iter()
-                .position(|id| id == &self.node.id)
-                .unwrap_or_default();
-
-            // take all existing ancestors bellow the reordered_node
-            let preserved_ancestor_ids = current_ancestor_ids
-                .iter()
-                .skip(split_index)
-                .cloned()
-                .collect::<Vec<Uuid>>();
-
-            // append new ancestors to preserved ancestors
-            let mut new_complete_ancestor_ids = new_node_ancestor_ids.clone();
-            new_complete_ancestor_ids.extend(preserved_ancestor_ids);
-
-            let update_ancestors_node = UpdateAncestors {
-                root_id: self.node.root_id,
-                id: descendant.id,
-                ancestor_ids: Some(new_complete_ancestor_ids),
-            };
-
-            batch.append_update(update_ancestors_node)?;
             batch.execute(&self.db_session).await?;
         }
 
