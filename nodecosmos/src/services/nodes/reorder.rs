@@ -80,6 +80,14 @@ impl Reorderer {
         &mut self,
         resource_locker: &ResourceLocker,
     ) -> Result<(), NodecosmosError> {
+        if let Some(is_root) = self.node.is_root {
+            if is_root {
+                return Err(NodecosmosError::Forbidden(
+                    "Reorder is not allowed for root nodes".to_string(),
+                ));
+            }
+        }
+
         let descendants_count = self.node.descendant_ids.clone().unwrap_or_default().len();
 
         if descendants_count > REORDER_DESCENDANTS_LIMIT {
