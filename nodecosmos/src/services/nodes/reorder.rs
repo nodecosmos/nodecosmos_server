@@ -39,8 +39,7 @@ pub struct Reorderer {
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
 const ORDER_CORRECTION: f64 = 0.000000001;
-
-// const REORDER_DESCENDANTS_LIMIT: usize = 500;
+const REORDER_DESCENDANTS_LIMIT: usize = 5000;
 
 impl Reorderer {
     pub async fn new(
@@ -134,6 +133,13 @@ impl Reorderer {
             return Err(NodecosmosError::Forbidden(
                 "Can not reorder within self".to_string(),
             ));
+        }
+
+        if self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
+            return Err(NodecosmosError::Forbidden(format!(
+                "Can not reorder more than {} descendants",
+                REORDER_DESCENDANTS_LIMIT
+            )));
         }
 
         resource_locker
