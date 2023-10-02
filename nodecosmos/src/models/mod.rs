@@ -9,6 +9,7 @@ pub(crate) mod like;
 pub(crate) mod likes_count;
 pub(crate) mod materialized_views;
 pub(crate) mod node;
+pub(crate) mod node_descendant;
 pub(crate) mod udts;
 pub(crate) mod user;
 pub(crate) mod workflow;

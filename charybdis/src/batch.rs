@@ -90,7 +90,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_update<T: Model>(&mut self, model: T) -> Result<(), CharybdisError> {
+    pub fn append_update<T: Model>(&mut self, model: &T) -> Result<(), CharybdisError> {
         self.append_statement_to_batch(T::UPDATE_QUERY);
 
         let update_values = model
@@ -109,7 +109,7 @@ impl CharybdisModelBatch {
         for model in iter {
             match model {
                 Ok(model) => {
-                    let result = self.append_update(model);
+                    let result = self.append_update(&model);
                     result?
                 }
                 Err(e) => return Err(CharybdisError::from(e)),
@@ -119,7 +119,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_delete<T: Model + ValueList>(&mut self, model: T) -> Result<(), CharybdisError> {
+    pub fn append_delete<T: Model + ValueList>(&mut self, model: &T) -> Result<(), CharybdisError> {
         self.append_statement_to_batch(T::DELETE_QUERY);
 
         let primary_key_values = model
@@ -138,7 +138,7 @@ impl CharybdisModelBatch {
         for model in iter {
             match model {
                 Ok(model) => {
-                    let result = self.append_delete(model);
+                    let result = self.append_delete(&model);
                     result?
                 }
                 Err(e) => return Err(CharybdisError::from(e)),

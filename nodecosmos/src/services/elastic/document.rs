@@ -62,7 +62,7 @@ pub async fn update_elastic_document<T: Model + Serialize + Debug>(
     if let Ok(response) = response {
         if !response.status_code().is_success() {
             println!(
-                "\n{} {} \n{} {} \n{} {}\n {} {}\n",
+                "\n{} {} \n{} {} \n{} {}\n \n{} {}\n",
                 "Failed to update".bright_red().bold(),
                 index.bright_yellow(),
                 "Status:".bright_red().bold(),

@@ -70,7 +70,6 @@ pub async fn handle_cover_image_upload(
 
         let mut update_node_cover_img = UpdateNodeCoverImage::new();
         update_node_cover_img.id = node.id;
-        update_node_cover_img.root_id = node.root_id;
         update_node_cover_img.cover_image_url = Some(url.clone());
         update_node_cover_img.cover_image_filename = Some(new_cover_image_filename);
 

@@ -3,6 +3,7 @@ use crate::app::CbExtension;
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
+use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Owner, OwnerTypes};
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
@@ -36,75 +37,44 @@ pub async fn get_nodes(
     Ok(HttpResponse::Ok().json(nodes))
 }
 
-#[get("/{root_id}")]
-pub async fn get_root_node(
-    db_session: web::Data<CachingSession>,
-    root_id: web::Path<Uuid>,
-    opt_current_user: OptCurrentUser,
-) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = BaseNode::new();
-    node.root_id = root_id.into_inner();
-
-    let nodes_iter = node.find_by_partition_key(&db_session).await?;
-
-    let nodes: Vec<BaseNode> = nodes_iter.flatten().collect();
-
-    if nodes.is_empty() {
-        return Ok(HttpResponse::NotFound().json(json!({
-            "success": false,
-            "message": "Root node not found"
-        })));
-    }
-
-    auth_node_access(&nodes[0], opt_current_user).await?;
-
-    Ok(HttpResponse::Ok().json(nodes))
-}
-
-#[get("/{root_id}/{id}")]
+#[get("/{id}")]
 pub async fn get_node(
     db_session: web::Data<CachingSession>,
-    params: web::Path<NodePrimaryKeyParams>,
+    id: web::Path<Uuid>,
     opt_current_user: OptCurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = BaseNode::new();
-
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
 
     auth_node_access(&node, opt_current_user).await?;
 
-    let mut all_node_ids = node.descendant_ids.unwrap_or_default();
-    all_node_ids.push(node.id);
-
-    let all_node_ids_chunks = all_node_ids.chunks(100);
-
-    let descendants_q = find_base_node_query!("root_id = ? AND id IN ?");
-    let mut nodes = vec![];
-
-    for node_ids_chunk in all_node_ids_chunks {
-        let descendants =
-            BaseNode::find(&db_session, descendants_q, (node.root_id, node_ids_chunk)).await?;
-
-        for descendant in descendants.flatten() {
-            nodes.push(descendant);
-        }
+    let descendants = NodeDescendant {
+        root_id: node.id,
+        ..Default::default()
     }
+    .find_by_partition_key(&db_session)
+    .await?
+    .flatten()
+    .collect::<Vec<NodeDescendant>>();
 
-    Ok(HttpResponse::Ok().json(nodes))
+    Ok(HttpResponse::Ok().json({
+        json!({
+            "success": true,
+            "node": node,
+            "descendants": descendants
+        })
+    }))
 }
 
-#[get("/{root_id}/{id}/description")]
+#[get("/{id}/description")]
 pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
-    params: web::Path<NodePrimaryKeyParams>,
+    id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = GetNodeDescription::new();
-
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
 
@@ -114,15 +84,13 @@ pub async fn get_node_description(
     })))
 }
 
-#[get("/{root_id}/{id}/description_base64")]
+#[get("/{id}/description_base64")]
 pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
-    params: web::Path<NodePrimaryKeyParams>,
+    id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = GetNodedescriptionBase64::new();
-
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
 
@@ -178,6 +146,13 @@ pub async fn update_node_title(
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
+
+    node.order_index = native_node.order_index;
+    node.ancestor_ids = native_node.ancestor_ids;
+
+    println!("node.ancestor_ids: {:?}", node.ancestor_ids);
+    println!("node.order_index: {:?}", node.order_index);
+
     node.update_cb(&db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(node))
@@ -198,18 +173,16 @@ pub async fn update_node_description(
     Ok(HttpResponse::Ok().json(node))
 }
 
-#[delete("/{root_id}/{id}")]
+#[delete("/{id}")]
 pub async fn delete_node(
+    id: web::Path<Uuid>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
-    params: web::Path<NodePrimaryKeyParams>,
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = Node::new();
-
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     resource_locker.check_node_lock(&node).await?;
 
@@ -237,9 +210,9 @@ pub async fn reorder_nodes(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/{root_id}/{id}/upload_cover_image")]
+#[post("/{id}/upload_cover_image")]
 async fn upload_cover_image(
-    params: web::Path<NodePrimaryKeyParams>,
+    id: web::Path<Uuid>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     s3_client: web::Data<aws_sdk_s3::Client>,
@@ -248,9 +221,7 @@ async fn upload_cover_image(
     payload: Multipart,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = Node::new();
-
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
     auth_node_update(&node, &current_user).await?;
@@ -271,18 +242,17 @@ async fn upload_cover_image(
     })))
 }
 
-#[delete("/{root_id}/{id}/delete_cover_image")]
+#[delete("/{id}/delete_cover_image")]
 async fn delete_cover_image(
+    id: web::Path<Uuid>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     s3_client: web::Data<aws_sdk_s3::Client>,
     nc_app: web::Data<crate::NodecosmosApp>,
-    params: web::Path<NodePrimaryKeyParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = UpdateNodeCoverImage::new();
-    node.root_id = params.root_id;
-    node.id = params.id;
+    node.id = *id;
 
     let mut node = node.find_by_primary_key(&db_session).await?;
     let native_node = node.as_native().find_by_primary_key(&db_session).await?;

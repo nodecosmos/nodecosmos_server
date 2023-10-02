@@ -217,7 +217,7 @@ impl Callbacks for IoDescription {
                     updated_io.description_markdown = self.description_markdown.clone();
                     updated_io.updated_at = self.updated_at;
 
-                    batch.append_update(updated_io)?;
+                    batch.append_update(&updated_io)?;
                 }
 
                 // Execute the batch update
@@ -257,7 +257,7 @@ impl Callbacks for IoTitle {
                     updated_io.title = self.title.clone();
                     updated_io.updated_at = self.updated_at;
 
-                    batch.append_update(updated_io)?;
+                    batch.append_update(&updated_io)?;
                 }
 
                 batch.execute(session).await?;

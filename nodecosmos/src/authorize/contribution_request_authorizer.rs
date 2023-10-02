@@ -1,11 +1,9 @@
 use crate::actions::client_session::CurrentUser;
 use crate::actions::commit_actions::CommitParams;
-use crate::authorize::auth_node_update_by_id;
+use crate::authorize::{auth_node_update, auth_node_update_by_id};
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::ContributionRequest;
-use crate::models::materialized_views::auth_node_by_id::{
-    find_auth_node_by_id_query, AuthNodeById,
-};
+use crate::models::node::Node;
 use charybdis::{Find, New};
 use scylla::CachingSession;
 
@@ -14,18 +12,18 @@ pub async fn auth_contribution_request_creation(
     contribution_request: &ContributionRequest,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
-    let node = AuthNodeById::find_one(
-        db_session,
-        find_auth_node_by_id_query!("id = ?"),
-        (contribution_request.node_id,),
-    )
+    let node = Node {
+        id: contribution_request.node_id,
+        ..Default::default()
+    }
+    .find_by_primary_key(db_session)
     .await?;
 
     if node.is_public.unwrap_or(false) {
         return Ok(());
     }
 
-    auth_node_update_by_id(&contribution_request.node_id, db_session, &current_user).await
+    auth_node_update(&node, &current_user).await
 }
 
 pub async fn auth_contribution_request_update(

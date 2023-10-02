@@ -3,6 +3,7 @@ use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::input_output::IoDelete;
 use crate::models::node::{DeleteNode, Node};
+use crate::models::node_descendant::NodeDescendant;
 use crate::models::workflow::WorkflowDelete;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use charybdis::{CharybdisError, CharybdisModelBatch, Find};
@@ -13,37 +14,37 @@ impl Node {
     pub async fn delete_related_data(
         &self,
         db_session: &CachingSession,
+        ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
         let mut node_ids_to_delete = vec![self.id];
 
-        let ancestor_ids = self.ancestor_ids.clone().unwrap_or_default();
-
-        if let Some(descendant_ids) = &self.descendant_ids {
-            node_ids_to_delete.extend(descendant_ids);
+        let descendants = NodeDescendant {
+            root_id: self.id,
+            ..Default::default()
         }
+        .find_by_partition_key(db_session)
+        .await?
+        .flatten();
 
-        let mut batch = CharybdisModelBatch::new();
-
-        if let Some(parent_id) = &self.parent_id {
-            let query = Node::PULL_FROM_CHILD_IDS_QUERY;
-            batch.append_statement(query, (self.id, self.root_id, parent_id))?;
-        }
-
-        batch.execute(db_session).await?;
+        let descendant_ids = descendants.map(|descendant| descendant.id);
+        node_ids_to_delete.extend(descendant_ids);
 
         let node_ids_to_delete_chunks = node_ids_to_delete.chunks(100);
 
         // delete nodes in chunks of 100
-        for chunk in node_ids_to_delete_chunks {
+        for node_ids in node_ids_to_delete_chunks {
             let mut batch = CharybdisModelBatch::new();
-            let node_ids = chunk;
 
             for id in node_ids {
                 // remove node from ancestor's descendant_ids
-                for ancestor_id in &ancestor_ids {
-                    let query = Node::PULL_FROM_DESCENDANT_IDS_QUERY;
-                    batch.append_statement(query, (id, self.root_id, ancestor_id))?;
+                let mut node = Node {
+                    id: *id,
+                    ..Default::default()
                 }
+                .find_by_primary_key(db_session)
+                .await?;
+
+                node.remove_from_ancestors(db_session).await?;
 
                 // remove workflows, flows, flow steps, and ios
                 let workflows_to_delete = WorkflowDelete {
@@ -78,23 +79,10 @@ impl Node {
                 batch.append_deletes(flow_steps_to_delete)?;
                 batch.append_deletes(flows_to_delete)?;
                 batch.append_deletes(workflows_to_delete)?;
-                batch.append_delete(DeleteNode {
-                    id: *id,
-                    root_id: self.root_id,
-                })?;
+                batch.append_delete(&DeleteNode { id: *id })?;
             }
 
             batch.execute(db_session).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn delete_related_elastic_data(&self, ext: &CbExtension) {
-        let mut node_ids_to_delete = vec![self.id];
-
-        if let Some(descendant_ids) = &self.descendant_ids {
-            node_ids_to_delete.extend(descendant_ids);
         }
 
         bulk_delete_elastic_documents(
@@ -103,5 +91,7 @@ impl Node {
             node_ids_to_delete,
         )
         .await;
+
+        Ok(())
     }
 }
