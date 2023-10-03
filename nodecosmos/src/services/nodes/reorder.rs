@@ -43,7 +43,7 @@ pub struct Reorderer {
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
 const ORDER_CORRECTION: f64 = 0.000000001;
-const REORDER_DESCENDANTS_LIMIT: usize = 15000;
+const REORDER_DESCENDANTS_LIMIT: usize = 5000;
 
 impl Reorderer {
     pub async fn new(
