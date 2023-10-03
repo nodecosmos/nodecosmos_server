@@ -129,9 +129,9 @@ impl Callbacks for Workflow {
             )
             .await?;
 
-            batch.append_deletes(input_outputs)?;
-            batch.append_deletes(flow_steps)?;
-            batch.append_deletes(flows)?;
+            batch.append_deletes(input_outputs.flatten().collect())?;
+            batch.append_deletes(flow_steps.flatten().collect())?;
+            batch.append_deletes(flows.flatten().collect())?;
 
             batch.execute(session).await?;
         }

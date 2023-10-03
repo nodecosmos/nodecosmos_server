@@ -55,9 +55,7 @@ pub async fn get_node(
         ..Default::default()
     }
     .find_by_partition_key(&db_session)
-    .await?
-    .flatten()
-    .collect::<Vec<NodeDescendant>>();
+    .await?;
 
     Ok(HttpResponse::Ok().json({
         json!({

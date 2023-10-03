@@ -1,9 +1,12 @@
+mod recovery;
+
 use crate::errors::NodecosmosError;
 use crate::models::helpers::clone_ref::ClonedRef;
 use crate::models::node::{
     find_update_node_ancestor_ids_query, Node, ReorderNode, UpdateNodeAncestorIds, UpdateNodeOrder,
 };
-use crate::models::node_descendant::NodeDescendant;
+use crate::models::node_descendant::{DeleteNodeDescendant, NodeDescendant};
+use crate::services::nodes::reorder::recovery::recover_root_node;
 use crate::services::resource_locker::ResourceLocker;
 use actix_web::web::Data;
 use charybdis::{CharybdisModelBatch, Delete, Deserialize, Find, Insert, Update, Uuid};
@@ -27,6 +30,7 @@ pub struct ReorderParams {
 pub struct Reorderer {
     pub params: ReorderParams,
     pub root: ReorderNode,
+    pub current_root_descendants: Vec<NodeDescendant>,
     pub node: Node,
     pub descendants: Vec<NodeDescendant>,
     pub descendant_ids: Vec<Uuid>,
@@ -39,7 +43,7 @@ pub struct Reorderer {
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
 const ORDER_CORRECTION: f64 = 0.000000001;
-const REORDER_DESCENDANTS_LIMIT: usize = 5000;
+const REORDER_DESCENDANTS_LIMIT: usize = 15000;
 
 impl Reorderer {
     pub async fn new(
@@ -51,6 +55,13 @@ impl Reorderer {
             ..Default::default()
         }
         .find_by_primary_key(&db_session)
+        .await?;
+
+        let current_root_descendants = NodeDescendant {
+            root_id: params.root_id,
+            ..Default::default()
+        }
+        .find_by_partition_key(&db_session)
         .await?;
 
         let node = Node {
@@ -67,14 +78,12 @@ impl Reorderer {
         .find_by_primary_key(&db_session)
         .await?;
 
-        let descendants: Vec<NodeDescendant> = NodeDescendant {
+        let descendants = NodeDescendant {
             root_id: params.id,
             ..Default::default()
         }
         .find_by_partition_key(&db_session)
-        .await?
-        .flatten()
-        .collect();
+        .await?;
 
         let descendant_ids = descendants
             .iter()
@@ -104,6 +113,7 @@ impl Reorderer {
         Ok(Self {
             params,
             root,
+            current_root_descendants,
             node,
             descendants,
             descendant_ids,
@@ -135,7 +145,7 @@ impl Reorderer {
             ));
         }
 
-        if self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
+        if self.is_parent_changed() && self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
             return Err(NodecosmosError::Forbidden(format!(
                 "Can not reorder more than {} descendants",
                 REORDER_DESCENDANTS_LIMIT
@@ -156,7 +166,12 @@ impl Reorderer {
                 Ok(())
             }
             Err(err) => {
-                println!("error in exec_reorder: {:?}", err);
+                println!("FATAL error in exec_reorder: {:?}", err);
+
+                if self.is_parent_changed() {
+                    recover_root_node(&self.root, &self.current_root_descendants, &self.db_session)
+                        .await;
+                }
 
                 resource_locker
                     .unlock_resource(&self.root.id.to_string())
@@ -172,15 +187,9 @@ impl Reorderer {
 
         if self.is_parent_changed() {
             self.remove_node_from_old_ancestors().await?;
-
-            println!("finished remove_node_from_old_ancestors");
-
             self.build_new_ancestor_ids();
             self.add_new_ancestors().await?;
-            println!("finished add_new_ancestors");
-
             self.add_node_to_new_ancestors().await?;
-            println!("finished add_node_to_new_ancestors");
         }
 
         Ok(())
@@ -244,28 +253,29 @@ impl Reorderer {
     async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let old_ancestor_ids = self.node.ancestor_ids.cloned_ref();
 
-        let mut descendant_ids_to_remove = vec![self.node.id];
-        descendant_ids_to_remove.extend(self.descendant_ids.clone());
-
         for ancestor_id in old_ancestor_ids {
-            let all_ancestor_descendants: Vec<NodeDescendant> = NodeDescendant {
+            // delete node from ancestors' descendants
+            let descendant = DeleteNodeDescendant {
                 root_id: ancestor_id,
-                ..Default::default()
-            }
-            .find_by_partition_key(&self.db_session)
-            .await?
-            .flatten()
-            .collect();
+                id: self.node.id,
+                order_index: Some(self.old_order_index),
+            };
 
-            let all_ancestor_descendants_chunks = all_ancestor_descendants.chunks(100);
+            descendant.delete(&self.db_session).await?;
 
-            for ancestor_chunk in all_ancestor_descendants_chunks {
+            // delete node's descendants from ancestors' descendants
+            let descendant_chunks = self.descendants.chunks(100);
+            for descendants in descendant_chunks {
                 let mut batch = CharybdisModelBatch::new();
 
-                for descendant in ancestor_chunk {
-                    if descendant_ids_to_remove.contains(&descendant.id) {
-                        batch.append_delete(descendant)?;
-                    }
+                for descendant in descendants {
+                    let descendant = DeleteNodeDescendant {
+                        root_id: ancestor_id,
+                        id: descendant.id,
+                        order_index: descendant.order_index,
+                    };
+
+                    batch.append_delete(&descendant)?;
                 }
 
                 batch.execute(&self.db_session).await?;

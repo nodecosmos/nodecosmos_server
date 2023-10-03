@@ -1,5 +1,4 @@
 use crate::{CharybdisError, Model, SerializedValues, ValueList};
-use scylla::transport::session::TypedRowIter;
 use scylla::CachingSession;
 
 // Simple batch for Charybdis models
@@ -75,16 +74,11 @@ impl CharybdisModelBatch {
 
     pub fn append_creates<T: Model + ValueList>(
         &mut self,
-        iter: TypedRowIter<T>,
+        iter: Vec<T>,
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            match model {
-                Ok(model) => {
-                    let result = self.append_create(&model);
-                    result?
-                }
-                Err(e) => return Err(CharybdisError::from(e)),
-            };
+            let result = self.append_create(&model);
+            result?
         }
 
         Ok(())
@@ -104,16 +98,11 @@ impl CharybdisModelBatch {
 
     pub fn append_updates<T: Model + ValueList>(
         &mut self,
-        iter: TypedRowIter<T>,
+        iter: Vec<T>,
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            match model {
-                Ok(model) => {
-                    let result = self.append_update(&model);
-                    result?
-                }
-                Err(e) => return Err(CharybdisError::from(e)),
-            };
+            let result = self.append_update(&model);
+            result?
         }
 
         Ok(())
@@ -133,16 +122,11 @@ impl CharybdisModelBatch {
 
     pub fn append_deletes<T: Model + ValueList>(
         &mut self,
-        iter: TypedRowIter<T>,
+        iter: Vec<T>,
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            match model {
-                Ok(model) => {
-                    let result = self.append_delete(&model);
-                    result?
-                }
-                Err(e) => return Err(CharybdisError::from(e)),
-            };
+            let result = self.append_delete(&model);
+            result?
         }
 
         Ok(())

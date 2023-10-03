@@ -24,3 +24,4 @@ pub struct NodeDescendant {
 }
 
 partial_node_descendant!(UpdateNodeDescendantTitle, root_id, order_index, id, title);
+partial_node_descendant!(DeleteNodeDescendant, root_id, order_index, id);

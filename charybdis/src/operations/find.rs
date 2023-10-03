@@ -1,3 +1,4 @@
+use futures::TryStreamExt;
 use scylla::frame::value::ValueList;
 use scylla::query::Query;
 use scylla::transport::iterator::TypedRowIterator;
@@ -40,7 +41,7 @@ pub trait Find: BaseModel {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<TypedRowIter<Self>, CharybdisError>;
+    ) -> Result<Vec<Self>, CharybdisError>;
 }
 
 impl<T: BaseModel> Find for T {
@@ -97,7 +98,6 @@ impl<T: BaseModel> Find for T {
         Ok((typed_rows, paging_state))
     }
 
-    // methods
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError> {
         let primary_key_values = self.get_primary_key_values().map_err(|e| {
             CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
@@ -115,23 +115,25 @@ impl<T: BaseModel> Find for T {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<TypedRowIter<Self>, CharybdisError> {
+    ) -> Result<Vec<Self>, CharybdisError> {
         let get_partition_key_values = self.get_partition_key_values().map_err(|e| {
             CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
         })?;
 
-        let result: QueryResult = session
-            .execute(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
+        let rows_stream = session
+            .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
+            .await?
+            .into_typed::<Self>();
+
+        let mut results = Vec::new();
+
+        rows_stream
+            .try_fold(&mut results, |acc, row| async {
+                acc.push(row);
+                Ok(acc)
+            })
             .await?;
 
-        match result.rows {
-            Some(rows) => {
-                let typed_rows: TypedRowIter<Self> = rows.into_typed();
-                Ok(typed_rows)
-            }
-            None => Err(CharybdisError::NotFoundError(
-                Self::FIND_BY_PARTITION_KEY_QUERY.to_string(),
-            )),
-        }
+        Ok(results)
     }
 }

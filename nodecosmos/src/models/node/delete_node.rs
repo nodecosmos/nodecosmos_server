@@ -23,10 +23,9 @@ impl Node {
             ..Default::default()
         }
         .find_by_partition_key(db_session)
-        .await?
-        .flatten();
+        .await?;
 
-        let descendant_ids = descendants.map(|descendant| descendant.id);
+        let descendant_ids = descendants.iter().map(|descendant| descendant.id);
         node_ids_to_delete.extend(descendant_ids);
 
         let node_ids_to_delete_chunks = node_ids_to_delete.chunks(100);

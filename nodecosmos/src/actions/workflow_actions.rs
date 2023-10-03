@@ -24,22 +24,18 @@ pub async fn get_workflow(
     let mut flow = BaseFlow::new();
     flow.node_id = node_id;
     flow.workflow_id = workflow.id;
-    let flows_res = flow.find_by_partition_key(&db_session).await?;
-    let flows: Vec<BaseFlow> = flows_res.into_iter().flatten().collect();
+    let flows = flow.find_by_partition_key(&db_session).await?;
 
     // flow steps
     let mut flow_step = FlowStep::new();
     flow_step.node_id = node_id;
     flow_step.workflow_id = workflow.id;
-    let flow_steps_res = flow_step.find_by_partition_key(&db_session).await?;
-    let flow_steps: Vec<FlowStep> = flow_steps_res.into_iter().flatten().collect();
+    let flow_steps = flow_step.find_by_partition_key(&db_session).await?;
 
     // input outputs
     let mut base_ios = InputOutputsByRootNodeId::new();
     base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs_res = base_ios.find_by_partition_key(&db_session).await?;
-    let input_outputs: Vec<InputOutputsByRootNodeId> =
-        input_outputs_res.into_iter().flatten().collect();
+    let input_outputs = base_ios.find_by_partition_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
@@ -61,9 +57,7 @@ pub async fn create_workflow(
 
     let mut base_ios = InputOutputsByRootNodeId::new();
     base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs_res = base_ios.find_by_partition_key(&db_session).await?;
-    let input_outputs: Vec<InputOutputsByRootNodeId> =
-        input_outputs_res.into_iter().flatten().collect();
+    let input_outputs = base_ios.find_by_partition_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
