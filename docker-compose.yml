@@ -10,6 +10,12 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.1
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 16gb
+
 
   scylla2:
     image: scylladb/scylla:latest
@@ -20,6 +26,11 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.2
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 16gb
 
   scylla3:
     image: scylladb/scylla:latest
@@ -30,6 +41,13 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.3
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 16gb
+
+
   #-------------------------------------------------------------------------------------------------
   redis:
     image: redis:latest

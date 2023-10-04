@@ -43,47 +43,56 @@ pub struct Reorderer {
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
 const ORDER_CORRECTION: f64 = 0.000000001;
-const REORDER_DESCENDANTS_LIMIT: usize = 5000;
+const REORDER_DESCENDANTS_LIMIT: usize = 1000;
 
 impl Reorderer {
     pub async fn new(
         db_session: Data<CachingSession>,
         params: ReorderParams,
     ) -> Result<Self, NodecosmosError> {
-        let root = ReorderNode {
+        let reorder_node = ReorderNode {
             id: params.root_id,
             ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        };
+        let root_q = reorder_node.find_by_primary_key(&db_session);
 
-        let current_root_descendants = NodeDescendant {
+        let node_descendant = NodeDescendant {
             root_id: params.root_id,
             ..Default::default()
-        }
-        .find_by_partition_key(&db_session)
-        .await?;
+        };
+        let current_root_descendants_q = node_descendant.find_by_partition_key(&db_session);
 
         let node = Node {
             id: params.id,
             ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        };
+        let node_q = node.find_by_primary_key(&db_session);
 
-        let new_parent = ReorderNode {
+        let parent = ReorderNode {
             id: params.new_parent_id,
             ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        };
+        let new_parent_q = parent.find_by_primary_key(&db_session);
 
-        let descendants = NodeDescendant {
+        let descendant = NodeDescendant {
             root_id: params.id,
             ..Default::default()
-        }
-        .find_by_partition_key(&db_session)
-        .await?;
+        };
+        let descendants_q = descendant.find_by_partition_key(&db_session);
+
+        let futures = futures::join!(
+            root_q,
+            current_root_descendants_q,
+            node_q,
+            new_parent_q,
+            descendants_q
+        );
+
+        let root = futures.0?;
+        let current_root_descendants = futures.1?;
+        let node = futures.2?;
+        let new_parent = futures.3?;
+        let descendants = futures.4?;
 
         let descendant_ids = descendants
             .iter()
@@ -129,28 +138,8 @@ impl Reorderer {
         &mut self,
         resource_locker: &ResourceLocker,
     ) -> Result<(), NodecosmosError> {
-        if let Some(is_root) = self.node.is_root {
-            if is_root {
-                return Err(NodecosmosError::Forbidden(
-                    "Reorder is not allowed for root nodes".to_string(),
-                ));
-            }
-        }
-
-        if self.descendant_ids.contains(&self.params.new_parent_id)
-            || self.node.id == self.params.new_parent_id
-        {
-            return Err(NodecosmosError::Forbidden(
-                "Can not reorder within self".to_string(),
-            ));
-        }
-
-        if self.is_parent_changed() && self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
-            return Err(NodecosmosError::Forbidden(format!(
-                "Can not reorder more than {} descendants",
-                REORDER_DESCENDANTS_LIMIT
-            )));
-        }
+        self.check_reorder_validity()?;
+        self.check_reorder_limit()?;
 
         resource_locker
             .lock_resource(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
@@ -180,6 +169,37 @@ impl Reorderer {
                 return Err(err);
             }
         };
+    }
+
+    fn check_reorder_validity(&mut self) -> Result<(), NodecosmosError> {
+        if let Some(is_root) = self.node.is_root {
+            if is_root {
+                return Err(NodecosmosError::Forbidden(
+                    "Reorder is not allowed for root nodes".to_string(),
+                ));
+            }
+        }
+
+        if self.descendant_ids.contains(&self.params.new_parent_id)
+            || self.node.id == self.params.new_parent_id
+        {
+            return Err(NodecosmosError::Forbidden(
+                "Can not reorder within self".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn check_reorder_limit(&mut self) -> Result<(), NodecosmosError> {
+        if self.is_parent_changed() && self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
+            return Err(NodecosmosError::Forbidden(format!(
+                "Can not reorder more than {} descendants",
+                REORDER_DESCENDANTS_LIMIT
+            )));
+        }
+
+        Ok(())
     }
 
     async fn execute_reorder(&mut self) -> Result<(), NodecosmosError> {
@@ -249,7 +269,7 @@ impl Reorderer {
         Ok(())
     }
 
-    /// Removes nodes and its descendants from old ancestors
+    /// Removes node and its descendants from old ancestors
     async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let old_ancestor_ids = self.node.ancestor_ids.cloned_ref();
 
@@ -285,7 +305,7 @@ impl Reorderer {
         Ok(())
     }
 
-    /// Adds new ancestors to nodes and its descendants
+    /// Adds new ancestors to node and its descendants
     async fn add_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let new_node_ancestor_ids = self.new_node_ancestor_ids.cloned_ref();
         let update_ancestors_node = UpdateNodeAncestorIds {
@@ -341,42 +361,40 @@ impl Reorderer {
         Ok(())
     }
 
-    /// Adds nodes and its descendants to new ancestors
+    /// Adds node and its descendants to new ancestors
     async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendant_ids_to_add = vec![self.node.id];
         descendant_ids_to_add.extend(self.descendant_ids.clone());
 
-        if let Some(ancestor_ids) = self.new_node_ancestor_ids.clone() {
-            for ancestor_id in ancestor_ids {
-                let descendant = NodeDescendant {
-                    root_id: ancestor_id,
-                    id: self.node.id,
-                    order_index: Some(self.new_order_index),
-                    title: self.node.title.clone(),
-                    parent_id: Some(self.params.new_parent_id),
-                };
+        for ancestor_id in self.new_node_ancestor_ids.cloned_ref() {
+            let descendant = NodeDescendant {
+                root_id: ancestor_id,
+                id: self.node.id,
+                order_index: Some(self.new_order_index),
+                title: self.node.title.clone(),
+                parent_id: Some(self.params.new_parent_id),
+            };
 
-                descendant.insert(&self.db_session).await?;
+            descendant.insert(&self.db_session).await?;
 
-                let descendant_chunks = self.descendants.chunks(100);
+            let descendant_chunks = self.descendants.chunks(100);
 
-                for chunk in descendant_chunks {
-                    let mut batch = CharybdisModelBatch::new();
+            for chunk in descendant_chunks {
+                let mut batch = CharybdisModelBatch::new();
 
-                    for descendant in chunk {
-                        let descendant = NodeDescendant {
-                            root_id: ancestor_id,
-                            id: descendant.id,
-                            order_index: descendant.order_index,
-                            title: descendant.title.clone(),
-                            parent_id: descendant.parent_id,
-                        };
+                for descendant in chunk {
+                    let descendant = NodeDescendant {
+                        root_id: ancestor_id,
+                        id: descendant.id,
+                        order_index: descendant.order_index,
+                        title: descendant.title.clone(),
+                        parent_id: descendant.parent_id,
+                    };
 
-                        batch.append_create(&descendant)?;
-                    }
-
-                    batch.execute(&self.db_session).await?;
+                    batch.append_create(&descendant)?;
                 }
+
+                batch.execute(&self.db_session).await?;
             }
         }
 

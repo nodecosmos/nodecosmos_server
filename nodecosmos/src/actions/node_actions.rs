@@ -148,9 +148,6 @@ pub async fn update_node_title(
     node.order_index = native_node.order_index;
     node.ancestor_ids = native_node.ancestor_ids;
 
-    println!("node.ancestor_ids: {:?}", node.ancestor_ids);
-    println!("node.order_index: {:?}", node.order_index);
-
     node.update_cb(&db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(node))

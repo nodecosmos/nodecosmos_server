@@ -3,9 +3,14 @@ use crate::models::node_descendant::NodeDescendant;
 use charybdis::Update;
 use csv::Writer;
 use scylla::CachingSession;
-
-// in case of a failure, we need to save the recovery data
-// as csv file, so that we can recover nodes from the reorder failure
+/// Problem with using scylla batches for complete tree structure is that they are
+/// basically unusable for large trees (1000s nodes). We get a timeout error.
+/// In order to allow reordering for large nodes, we have logic outside batches.
+/// This means that we need to recover from failures in case of a db connection failure or
+/// similar events that can cause a failure mid reorder.
+/// This is not a perfect solution, but it is the best we can do for now.
+/// By having correct root node and descendants, we can recover complete tree structure.
+/// If connection is still down, we can save the data to a csv file and try to recover later.
 pub(crate) async fn recover_root_node(
     root: &ReorderNode,
     root_descendants: &Vec<NodeDescendant>,
