@@ -111,7 +111,7 @@ impl Node {
     pub async fn descendants(
         &self,
         db_session: &CachingSession,
-    ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
+    ) -> Result<Vec<NodeDescendant>, CharybdisError> {
         let descendants = NodeDescendant {
             root_id: self.id,
             ..Default::default()
@@ -149,6 +149,7 @@ impl Node {
 
             self.ancestor_ids = Some(ancestor_ids);
         } else {
+            self.is_root = Some(true);
             self.root_id = self.id;
         }
 

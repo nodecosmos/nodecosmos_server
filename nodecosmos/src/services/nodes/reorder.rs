@@ -42,13 +42,14 @@ pub struct Reorderer {
     pub descendant_ids: Vec<Uuid>,
     pub new_parent: ReorderNode,
     pub new_node_ancestor_ids: Option<Vec<Uuid>>,
+    pub old_node_ancestor_ids: Vec<Uuid>,
     pub old_order_index: f64,
     pub new_order_index: f64,
     pub db_session: Data<CachingSession>,
 }
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
-const REORDER_DESCENDANTS_LIMIT: usize = 1000;
+const REORDER_DESCENDANTS_LIMIT: usize = 15000;
 
 impl Reorderer {
     pub async fn new(
@@ -59,6 +60,7 @@ impl Reorderer {
         let descendant_ids = reorder_data.descendants.pluck_id();
         let old_order_index = reorder_data.node.order_index.unwrap_or_default();
         let new_order_index = calculate_new_index(&params, &db_session).await?;
+        let old_node_ancestor_ids = reorder_data.node.ancestor_ids.cloned_ref();
 
         Ok(Self {
             params,
@@ -69,6 +71,7 @@ impl Reorderer {
             descendant_ids,
             new_parent: reorder_data.new_parent,
             new_node_ancestor_ids: None,
+            old_node_ancestor_ids,
             old_order_index,
             new_order_index,
             db_session,
@@ -205,9 +208,7 @@ impl Reorderer {
 
     /// Removes node and its descendants from old ancestors
     async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        let old_ancestor_ids = self.node.ancestor_ids.cloned_ref();
-
-        for ancestor_id in old_ancestor_ids {
+        for ancestor_id in self.old_node_ancestor_ids.clone() {
             // delete node from ancestors' descendants
             let descendant = DeleteNodeDescendant {
                 root_id: ancestor_id,
@@ -284,7 +285,7 @@ impl Reorderer {
 
                 let update_ancestors_node = UpdateNodeAncestorIds {
                     id: update_ancestor_node.id,
-                    parent_id: Some(self.params.new_parent_id),
+                    parent_id: update_ancestor_node.parent_id,
                     ancestor_ids: Some(new_complete_ancestor_ids),
                 };
 
@@ -299,9 +300,6 @@ impl Reorderer {
 
     /// Adds node and its descendants to new ancestors
     async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        let mut descendant_ids_to_add = vec![self.node.id];
-        descendant_ids_to_add.extend(self.descendant_ids.clone());
-
         for ancestor_id in self.new_node_ancestor_ids.cloned_ref() {
             let descendant = NodeDescendant {
                 root_id: ancestor_id,

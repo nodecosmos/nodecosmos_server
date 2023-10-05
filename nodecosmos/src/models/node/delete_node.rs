@@ -3,7 +3,6 @@ use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::input_output::IoDelete;
 use crate::models::node::{DeleteNode, Node};
-use crate::models::node_descendant::NodeDescendant;
 use crate::models::workflow::WorkflowDelete;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use charybdis::{CharybdisError, CharybdisModelBatch, Find};
@@ -18,12 +17,7 @@ impl Node {
     ) -> Result<(), CharybdisError> {
         let mut node_ids_to_delete = vec![self.id];
 
-        let descendants = NodeDescendant {
-            root_id: self.id,
-            ..Default::default()
-        }
-        .find_by_partition_key(db_session)
-        .await?;
+        let descendants = self.descendants(db_session).await?;
 
         let descendant_ids = descendants.iter().map(|descendant| descendant.id);
         node_ids_to_delete.extend(descendant_ids);
