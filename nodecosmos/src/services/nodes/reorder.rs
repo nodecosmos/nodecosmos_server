@@ -1,12 +1,18 @@
 mod recovery;
+mod reorder_data;
+
+pub(crate) use recovery::recover_reorder_failures;
 
 use crate::errors::NodecosmosError;
 use crate::models::helpers::clone_ref::ClonedRef;
+use crate::models::helpers::Pluckable;
 use crate::models::node::{
     find_update_node_ancestor_ids_query, Node, ReorderNode, UpdateNodeAncestorIds, UpdateNodeOrder,
 };
 use crate::models::node_descendant::{DeleteNodeDescendant, NodeDescendant};
-use crate::services::nodes::reorder::recovery::recover_root_node;
+use crate::services::logger::log_fatal;
+use crate::services::nodes::reorder::recovery::recover_from_root;
+use crate::services::nodes::reorder::reorder_data::{calculate_new_index, find_reorder_data};
 use crate::services::resource_locker::ResourceLocker;
 use actix_web::web::Data;
 use charybdis::{CharybdisModelBatch, Delete, Deserialize, Find, Insert, Update, Uuid};
@@ -42,7 +48,6 @@ pub struct Reorderer {
 }
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
-const ORDER_CORRECTION: f64 = 0.000000001;
 const REORDER_DESCENDANTS_LIMIT: usize = 1000;
 
 impl Reorderer {
@@ -50,74 +55,11 @@ impl Reorderer {
         db_session: Data<CachingSession>,
         params: ReorderParams,
     ) -> Result<Self, NodecosmosError> {
-        let reorder_node = ReorderNode {
-            id: params.root_id,
-            ..Default::default()
-        };
-        let root_q = reorder_node.find_by_primary_key(&db_session);
-
-        let node_descendant = NodeDescendant {
-            root_id: params.root_id,
-            ..Default::default()
-        };
-        let current_root_descendants_q = node_descendant.find_by_partition_key(&db_session);
-
-        let node = Node {
-            id: params.id,
-            ..Default::default()
-        };
-        let node_q = node.find_by_primary_key(&db_session);
-
-        let parent = ReorderNode {
-            id: params.new_parent_id,
-            ..Default::default()
-        };
-        let new_parent_q = parent.find_by_primary_key(&db_session);
-
-        let descendant = NodeDescendant {
-            root_id: params.id,
-            ..Default::default()
-        };
-        let descendants_q = descendant.find_by_partition_key(&db_session);
-
-        let futures = futures::join!(
-            root_q,
-            current_root_descendants_q,
-            node_q,
-            new_parent_q,
-            descendants_q
-        );
-
-        let root = futures.0?;
-        let current_root_descendants = futures.1?;
-        let node = futures.2?;
-        let new_parent = futures.3?;
-        let descendants = futures.4?;
-
-        let descendant_ids = descendants
-            .iter()
-            .map(|descendant| descendant.id)
-            .collect::<Vec<Uuid>>();
-
+        let (root, current_root_descendants, node, new_parent, descendants) =
+            find_reorder_data(&db_session, &params).await?;
+        let descendant_ids = descendants.pluck_id();
         let old_order_index = node.order_index.clone().unwrap_or_default();
-
-        let mut new_order_index = 0f64;
-
-        if let Some(new_bottom_sibling_id) = params.new_bottom_sibling_id {
-            let new_bottom_sibling = UpdateNodeOrder {
-                id: new_bottom_sibling_id,
-                ..Default::default()
-            }
-            .find_by_primary_key(&db_session)
-            .await?;
-            let bottom_sibling_order_index = new_bottom_sibling.order_index.unwrap_or_default();
-
-            if bottom_sibling_order_index == 0f64 {
-                new_order_index = -0.1;
-            } else {
-                new_order_index = bottom_sibling_order_index - ORDER_CORRECTION;
-            }
-        }
+        let new_order_index = calculate_new_index(&params, &db_session).await?;
 
         Ok(Self {
             params,
@@ -155,10 +97,10 @@ impl Reorderer {
                 Ok(())
             }
             Err(err) => {
-                println!("FATAL error in exec_reorder: {:?}", err);
+                log_fatal(format!("exec_reorder: {:?}", err));
 
                 if self.is_parent_changed() {
-                    recover_root_node(&self.root, &self.current_root_descendants, &self.db_session)
+                    recover_from_root(&self.root, &self.current_root_descendants, &self.db_session)
                         .await;
                 }
 
@@ -300,6 +242,11 @@ impl Reorderer {
 
                 batch.execute(&self.db_session).await?;
             }
+
+            // simulate mid reorder error
+            return Err(NodecosmosError::InternalServerError(
+                "MId reorder Error".to_string(),
+            ));
         }
 
         Ok(())

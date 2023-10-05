@@ -1,6 +1,7 @@
 use charybdis::{Double, Text, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 
+#[derive(Clone)]
 #[partial_model_generator]
 #[charybdis_model(
     table_name = node_descendants,

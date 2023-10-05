@@ -6,6 +6,7 @@ use actix_web::cookie::Key;
 use actix_web::{cookie, http};
 use deadpool_redis::{Config, Pool, Runtime};
 
+use crate::services::nodes::reorder::recover_reorder_failures;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
@@ -33,6 +34,11 @@ impl App {
             .to_string();
 
         Self { config, bucket }
+    }
+
+    /// Init processes that need to be run on startup
+    pub async fn init(&self, db_session: &CachingSession) {
+        recover_reorder_failures(db_session).await;
     }
 }
 

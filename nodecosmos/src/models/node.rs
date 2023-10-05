@@ -2,13 +2,14 @@ mod create_node;
 mod delete_node;
 mod node_tree_handler;
 
+use crate::actions::client_session::CurrentUser;
 use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
     sanitize_description_ext_cb_fn,
 };
-use crate::models::udts::{Creator, Owner};
+use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::services::elastic::update_elastic_document;
 use charybdis::*;
 use chrono::Utc;
@@ -98,7 +99,6 @@ impl Node {
             Some(parent_id) => {
                 let mut parent = Node::new();
                 parent.id = parent_id;
-                parent.root_id = self.root_id;
 
                 let parent = parent.find_by_primary_key(db_session).await?;
                 Ok(Some(parent))
@@ -107,37 +107,44 @@ impl Node {
         }
     }
 
-    pub fn set_owner(&mut self, owner: Owner) {
+    pub fn set_owner(&mut self, current_user: CurrentUser) {
+        let owner = Owner {
+            id: current_user.id,
+            name: current_user.full_name(),
+            username: Some(current_user.username),
+            owner_type: OwnerTypes::User.into(),
+            profile_image_url: None,
+        };
+
         self.owner_id = Some(owner.id);
         self.owner_type = Some(owner.owner_type.clone());
 
+        // for now
         self.owner = Some(owner);
     }
 
-    pub async fn set_defaults(&mut self) -> Result<(), CharybdisError> {
-        if self.root_id == Uuid::nil() {
+    pub async fn set_defaults(&mut self, parent: Option<Self>) -> Result<(), CharybdisError> {
+        if let Some(parent) = parent {
+            self.root_id = parent.root_id;
+            self.editor_ids = parent.editor_ids;
+            self.is_public = parent.is_public;
+
+            let mut ancestor_ids = parent.ancestor_ids.unwrap_or_default();
+            ancestor_ids.push(parent.id);
+
+            self.ancestor_ids = Some(ancestor_ids);
+        } else {
             self.root_id = self.id;
         }
 
         self.created_at = Some(Utc::now());
         self.updated_at = Some(Utc::now());
-        self.is_root = Some(self.parent_id.is_none());
 
         Ok(())
     }
 }
 
 impl ExtCallbacks<CbExtension> for Node {
-    async fn before_insert(
-        &mut self,
-        _db_session: &CachingSession,
-        _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        self.set_defaults().await?;
-
-        Ok(())
-    }
-
     async fn after_insert(
         &mut self,
         db_session: &CachingSession,

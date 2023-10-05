@@ -45,6 +45,8 @@ async fn main() {
 
     elastic::build(&elastic_client).await;
 
+    nodecosmos.init(&db_session_web_data).await;
+
     HttpServer::new(move || {
         let pool_arc = Arc::clone(&pool_web_data);
 
