@@ -3,7 +3,6 @@ use crate::app::CbExtension;
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
-use crate::models::node_descendant::NodeDescendant;
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
@@ -49,12 +48,7 @@ pub async fn get_node(
 
     auth_node_access(&node, opt_current_user).await?;
 
-    let descendants = NodeDescendant {
-        root_id: node.id,
-        ..Default::default()
-    }
-    .find_by_partition_key(&db_session)
-    .await?;
+    let descendants = node.as_native().descendants(&db_session).await?;
 
     Ok(HttpResponse::Ok().json({
         json!({

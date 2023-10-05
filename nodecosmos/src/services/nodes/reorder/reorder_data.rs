@@ -73,6 +73,7 @@ pub(crate) async fn find_reorder_data(
 }
 
 const ORDER_CORRECTION: f64 = 0.000000001;
+
 /// Calculate new order index for node, as we can not update other nodes order index
 pub(crate) async fn calculate_new_index(
     params: &ReorderParams,

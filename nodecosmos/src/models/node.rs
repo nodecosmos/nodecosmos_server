@@ -9,6 +9,7 @@ use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
     sanitize_description_ext_cb_fn,
 };
+use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::services::elastic::update_elastic_document;
 use charybdis::*;
@@ -107,6 +108,20 @@ impl Node {
         }
     }
 
+    pub async fn descendants(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
+        let descendants = NodeDescendant {
+            root_id: self.id,
+            ..Default::default()
+        }
+        .find_by_partition_key(db_session)
+        .await?;
+
+        Ok(descendants)
+    }
+
     pub fn set_owner(&mut self, current_user: CurrentUser) {
         let owner = Owner {
             id: current_user.id,
@@ -198,7 +213,7 @@ partial_node!(GetNodedescriptionBase64, id, description_base64);
 
 partial_node!(ReorderNode, id, parent_id, ancestor_ids);
 
-partial_node!(UpdateNodeAncestorIds, id, ancestor_ids);
+partial_node!(UpdateNodeAncestorIds, id, parent_id, ancestor_ids);
 partial_node!(UpdateNodeOrder, id, parent_id, order_index);
 
 partial_node!(

@@ -242,12 +242,12 @@ impl Reorderer {
 
                 batch.execute(&self.db_session).await?;
             }
-
-            // simulate mid reorder error
-            return Err(NodecosmosError::InternalServerError(
-                "MId reorder Error".to_string(),
-            ));
         }
+
+        // simulate mid reorder error
+        return Err(NodecosmosError::InternalServerError(
+            "MId reorder Error".to_string(),
+        ));
 
         Ok(())
     }
@@ -257,6 +257,7 @@ impl Reorderer {
         let new_node_ancestor_ids = self.new_node_ancestor_ids.cloned_ref();
         let update_ancestors_node = UpdateNodeAncestorIds {
             id: self.node.id,
+            parent_id: Some(self.params.new_parent_id),
             ancestor_ids: Some(new_node_ancestor_ids.clone()),
         };
 
@@ -296,6 +297,7 @@ impl Reorderer {
 
                 let update_ancestors_node = UpdateNodeAncestorIds {
                     id: update_ancestor_node.id,
+                    parent_id: Some(self.params.new_parent_id),
                     ancestor_ids: Some(new_complete_ancestor_ids),
                 };
 
