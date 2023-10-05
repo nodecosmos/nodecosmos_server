@@ -13,11 +13,7 @@ impl ResourceLocker {
         Self { pool }
     }
 
-    pub async fn lock_resource(
-        &self,
-        resource_id: &str,
-        ttl: usize,
-    ) -> Result<bool, NodecosmosError> {
+    pub async fn lock(&self, resource_id: &str, ttl: usize) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
         let namespaced_key = format!("LOCK:{}", resource_id);
@@ -32,7 +28,7 @@ impl ResourceLocker {
         Ok(true)
     }
 
-    pub async fn is_resource_locked(&self, resource_id: &str) -> Result<bool, NodecosmosError> {
+    pub async fn is_locked(&self, resource_id: &str) -> Result<bool, NodecosmosError> {
         let namespaced_key = format!("LOCK:{}", resource_id);
         let mut connection = self.pool.get().await?;
 
@@ -41,7 +37,7 @@ impl ResourceLocker {
         Ok(res)
     }
 
-    pub async fn unlock_resource(&self, resource_id: &str) -> Result<bool, NodecosmosError> {
+    pub async fn unlock(&self, resource_id: &str) -> Result<bool, NodecosmosError> {
         let namespaced_key = format!("LOCK:{}", resource_id);
         let mut connection = self.pool.get().await?;
 
@@ -51,7 +47,7 @@ impl ResourceLocker {
     }
 
     pub async fn check_node_lock(&self, node: &Node) -> Result<(), NodecosmosError> {
-        if self.is_resource_locked(&node.root_id.to_string()).await? {
+        if self.is_locked(&node.root_id.to_string()).await? {
             return Err(NodecosmosError::ResourceLocked(
                 "Resource Locked: Reorder in progress. If issue persist contact support"
                     .to_string(),

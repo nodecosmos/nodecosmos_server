@@ -5,30 +5,29 @@ use crate::services::nodes::reorder::ReorderParams;
 use charybdis::Find;
 use scylla::CachingSession;
 
+pub struct ReorderData {
+    pub root: ReorderNode,
+    pub current_root_descendants: Vec<NodeDescendant>,
+    pub node: Node,
+    pub new_parent: ReorderNode,
+    pub descendants: Vec<NodeDescendant>,
+}
+
 pub(crate) async fn find_reorder_data(
     db_session: &CachingSession,
     params: &ReorderParams,
-) -> Result<
-    (
-        ReorderNode,
-        Vec<NodeDescendant>,
-        Node,
-        ReorderNode,
-        Vec<NodeDescendant>,
-    ),
-    NodecosmosError,
-> {
+) -> Result<ReorderData, NodecosmosError> {
     let root_node = ReorderNode {
         id: params.root_id,
         ..Default::default()
     };
     let root_q = root_node.find_by_primary_key(&db_session);
 
-    let rot_node_descendants = NodeDescendant {
+    let root_node_descendants = NodeDescendant {
         root_id: params.root_id,
         ..Default::default()
     };
-    let current_root_descendants_q = rot_node_descendants.find_by_partition_key(&db_session);
+    let current_root_descendants_q = root_node_descendants.find_by_partition_key(&db_session);
 
     let node = Node {
         id: params.id,
@@ -63,13 +62,15 @@ pub(crate) async fn find_reorder_data(
     let new_parent = futures.3?;
     let descendants = futures.4?;
 
-    return Ok((
+    let data = ReorderData {
         root,
         current_root_descendants,
         node,
         new_parent,
         descendants,
-    ));
+    };
+
+    Ok(data)
 }
 
 const ORDER_CORRECTION: f64 = 0.000000001;

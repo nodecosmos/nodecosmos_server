@@ -55,20 +55,19 @@ impl Reorderer {
         db_session: Data<CachingSession>,
         params: ReorderParams,
     ) -> Result<Self, NodecosmosError> {
-        let (root, current_root_descendants, node, new_parent, descendants) =
-            find_reorder_data(&db_session, &params).await?;
-        let descendant_ids = descendants.pluck_id();
-        let old_order_index = node.order_index.clone().unwrap_or_default();
+        let reorder_data = find_reorder_data(&db_session, &params).await?;
+        let descendant_ids = reorder_data.descendants.pluck_id();
+        let old_order_index = reorder_data.node.order_index.unwrap_or_default();
         let new_order_index = calculate_new_index(&params, &db_session).await?;
 
         Ok(Self {
             params,
-            root,
-            current_root_descendants,
-            node,
-            descendants,
+            root: reorder_data.root,
+            current_root_descendants: reorder_data.current_root_descendants,
+            node: reorder_data.node,
+            descendants: reorder_data.descendants,
             descendant_ids,
-            new_parent,
+            new_parent: reorder_data.new_parent,
             new_node_ancestor_ids: None,
             old_order_index,
             new_order_index,
@@ -76,24 +75,19 @@ impl Reorderer {
         })
     }
 
-    pub async fn reorder(
-        &mut self,
-        resource_locker: &ResourceLocker,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn reorder(&mut self, locker: &ResourceLocker) -> Result<(), NodecosmosError> {
         self.check_reorder_validity()?;
         self.check_reorder_limit()?;
 
-        resource_locker
-            .lock_resource(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
+        locker
+            .lock(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
             .await?;
 
         let res = self.execute_reorder().await;
 
         return match res {
             Ok(_) => {
-                resource_locker
-                    .unlock_resource(&self.root.id.to_string())
-                    .await?;
+                locker.unlock(&self.root.id.to_string()).await?;
                 Ok(())
             }
             Err(err) => {
@@ -104,9 +98,7 @@ impl Reorderer {
                         .await;
                 }
 
-                resource_locker
-                    .unlock_resource(&self.root.id.to_string())
-                    .await?;
+                locker.unlock(&self.root.id.to_string()).await?;
 
                 return Err(err);
             }
@@ -243,11 +235,6 @@ impl Reorderer {
                 batch.execute(&self.db_session).await?;
             }
         }
-
-        // simulate mid reorder error
-        return Err(NodecosmosError::InternalServerError(
-            "MId reorder Error".to_string(),
-        ));
 
         Ok(())
     }

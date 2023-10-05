@@ -22,6 +22,17 @@ pub(crate) async fn recover_from_root(
     let root_insert_res = root.update(db_session).await;
     let mut child_nodes_by_parent_id = ChildNodesByParentId::new();
 
+    let res = delete_tree(root, root_descendants, db_session)
+        .await
+        .map_err(|err| {
+            log_error(format!("Recovery Error in deleting tree: {}", err));
+        });
+
+    if res.is_err() {
+        serialize_and_store_to_disk(root, root_descendants);
+        return;
+    }
+
     match root_insert_res {
         Ok(_) => {
             let root_descendants_chunks = root_descendants.chunks(100);
@@ -30,20 +41,6 @@ pub(crate) async fn recover_from_root(
                 let mut batch = charybdis::CharybdisModelBatch::new();
 
                 for descendant in root_descendant_chunk {
-                    let res = delete_descendants(descendant, db_session)
-                        .await
-                        .map_err(|err| {
-                            log_error(format!(
-                                "Recovery Error in deleting descendants' descendants: {}",
-                                err
-                            ));
-                        });
-
-                    if res.is_err() {
-                        serialize_and_store_to_disk(root, root_descendants);
-                        return;
-                    }
-
                     let res = batch.append_create(descendant).map_err(|err| {
                         log_error(format!(
                             "Recovery Error in adding descendant to batch: {}",
@@ -73,7 +70,7 @@ pub(crate) async fn recover_from_root(
                 }
             }
 
-            let res = recover_tree_structure(root, &child_nodes_by_parent_id, db_session).await;
+            let res = rebuild_tree(root, &child_nodes_by_parent_id, db_session).await;
             match res {
                 Ok(_) => {
                     log_success(format!("Recovery successful for root: {}", root.id));
@@ -95,6 +92,25 @@ pub(crate) async fn recover_from_root(
             serialize_and_store_to_disk(root, root_descendants)
         }
     }
+}
+
+async fn delete_tree(
+    root: &ReorderNode,
+    root_descendants: &Vec<NodeDescendant>,
+    db_session: &CachingSession,
+) -> Result<(), NodecosmosError> {
+    let root_node_descendant = NodeDescendant {
+        id: root.id,
+        ..Default::default()
+    };
+
+    delete_descendants(&root_node_descendant, db_session).await?;
+
+    for descendant in root_descendants {
+        delete_descendants(descendant, db_session).await?;
+    }
+
+    Ok(())
 }
 
 async fn delete_descendants(
@@ -119,7 +135,7 @@ async fn delete_descendants(
     Ok(())
 }
 
-async fn recover_tree_structure(
+async fn rebuild_tree(
     root: &ReorderNode,
     child_nodes_by_parent_id: &ChildNodesByParentId<'_>,
     db_session: &CachingSession,
@@ -137,7 +153,7 @@ async fn recover_tree_structure(
             let mut current_ancestor_ids = ancestor_ids.clone();
             current_ancestor_ids.push(node_id);
 
-            update_ancestors(node, &current_ancestor_ids, db_session).await?;
+            update_ancestors(node, Some(node_id), &current_ancestor_ids, db_session).await?;
             append_to_ancestors(node, &current_ancestor_ids, db_session).await?;
 
             stack.push((node.id, current_ancestor_ids));
@@ -149,12 +165,13 @@ async fn recover_tree_structure(
 
 async fn update_ancestors(
     node: &NodeDescendant,
+    parent_id: Option<Uuid>,
     ancestor_ids: &Vec<Uuid>,
     db_session: &CachingSession,
 ) -> Result<(), NodecosmosError> {
     UpdateNodeAncestorIds {
         id: node.id,
-        parent_id: node.parent_id,
+        parent_id,
         ancestor_ids: Some(ancestor_ids.clone()),
     }
     .update(db_session)
@@ -237,10 +254,17 @@ pub async fn recover_reorder_failures(db_session: &CachingSession) {
     }
 
     for file_name in file_names {
-        log_warning(format!("Recovering from file: {}", file_name));
-        let serialized = std::fs::read_to_string(file_name.clone()).unwrap();
-        let recovery_data: RecoveryData = serde_json::from_str(&serialized).unwrap();
-        std::fs::remove_file(file_name).unwrap();
+        let full_name = format!("{}/{}", RECOVERY_DATA_DIR, file_name);
+        let serialized = std::fs::read_to_string(full_name.clone()).unwrap();
+        let recovery_data: RecoveryData = serde_json::from_str(&serialized)
+            .map_err(|err| {
+                log_fatal(format!(
+                    "Error in deserializing recovery data from file {}: {}",
+                    full_name, err
+                ));
+            })
+            .unwrap();
+        std::fs::remove_file(full_name).unwrap();
 
         recover_from_root(
             &recovery_data.root,
