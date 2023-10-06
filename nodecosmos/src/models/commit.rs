@@ -5,9 +5,7 @@ pub(crate) mod workflow_commit;
 use crate::actions::commit_actions::CommitParams;
 use crate::models::commit::types::CommitTypes;
 use crate::models::helpers::impl_default_callbacks;
-use charybdis::{
-    CharybdisError, CharybdisModelBatch, Find, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid,
-};
+use charybdis::{CharybdisError, Delete, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
 
@@ -103,14 +101,9 @@ impl Commit {
         session: &CachingSession,
         contribution_request_id: Uuid,
     ) -> Result<(), CharybdisError> {
-        let mut batch = CharybdisModelBatch::new();
         let mut commit = Commit::new();
         commit.contribution_request_id = contribution_request_id;
-        let commits = commit.find_by_partition_key(session).await?;
-
-        batch.append_deletes(commits)?;
-
-        batch.execute(session).await?;
+        commit.delete_by_partition_key(session).await?;
 
         Ok(())
     }

@@ -37,9 +37,9 @@ impl Node {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        let mut batch = CharybdisModelBatch::new();
-
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
+            let mut batch = CharybdisModelBatch::new();
+
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
                     root_id: ancestor_id.to_owned(),
@@ -50,9 +50,9 @@ impl Node {
 
                 batch.append_delete(&node_descendant)?;
             }
-        }
 
-        batch.execute(db_session).await?;
+            batch.execute(db_session).await?;
+        }
 
         Ok(())
     }

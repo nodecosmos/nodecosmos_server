@@ -2,10 +2,12 @@ use crate::app::CbExtension;
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::input_output::IoDelete;
-use crate::models::node::{DeleteNode, Node};
+use crate::models::like::Like;
+use crate::models::likes_count::LikesCount;
+use crate::models::node::{find_node_query, DeleteNode, Node};
 use crate::models::workflow::WorkflowDelete;
 use crate::services::elastic::bulk_delete_elastic_documents;
-use charybdis::{CharybdisError, CharybdisModelBatch, Find};
+use charybdis::{CharybdisError, CharybdisModelBatch, Delete, Find};
 use scylla::CachingSession;
 
 impl Node {
@@ -28,51 +30,41 @@ impl Node {
         for node_ids in node_ids_to_delete_chunks {
             let mut batch = CharybdisModelBatch::new();
 
-            for id in node_ids {
-                // remove node from ancestor's descendant_ids
-                let mut node = Node {
-                    id: *id,
-                    ..Default::default()
-                }
-                .find_by_primary_key(db_session)
-                .await?;
+            // remove node from ancestors' descendants
+            let nodes = Node::find(db_session, find_node_query!("id IN ?"), (node_ids,)).await?;
 
+            for mut node in nodes.flatten() {
                 node.remove_from_ancestors(db_session).await?;
 
-                // remove workflows, flows, flow steps, and ios
-                let workflows_to_delete = WorkflowDelete {
-                    node_id: *id,
+                batch.append_delete_by_partition_key(&WorkflowDelete {
+                    node_id: node.id,
+                    ..Default::default()
+                })?;
+                batch.append_delete_by_partition_key(&FlowDelete {
+                    node_id: node.id,
+                    ..Default::default()
+                })?;
+                batch.append_delete_by_partition_key(&FlowStepDelete {
+                    node_id: node.id,
+                    ..Default::default()
+                })?;
+                batch.append_delete_by_partition_key(&IoDelete {
+                    node_id: node.id,
+                    ..Default::default()
+                })?;
+
+                batch.append_delete_by_partition_key(&Like {
+                    object_id: node.id,
+                    ..Default::default()
+                })?;
+                LikesCount {
+                    object_id: node.id,
                     ..Default::default()
                 }
-                .find_by_partition_key(db_session)
+                .delete_by_partition_key(db_session)
                 .await?;
 
-                let flows_to_delete = FlowDelete {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .find_by_partition_key(db_session)
-                .await?;
-
-                let flow_steps_to_delete = FlowStepDelete {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .find_by_partition_key(db_session)
-                .await?;
-
-                let ios_to_delete = IoDelete {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .find_by_partition_key(db_session)
-                .await?;
-
-                batch.append_deletes(ios_to_delete)?;
-                batch.append_deletes(flow_steps_to_delete)?;
-                batch.append_deletes(flows_to_delete)?;
-                batch.append_deletes(workflows_to_delete)?;
-                batch.append_delete(&DeleteNode { id: *id })?;
+                batch.append_delete(&DeleteNode { id: node.id })?;
             }
 
             batch.execute(db_session).await?;

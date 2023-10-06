@@ -5,7 +5,10 @@ mod model_impl;
 mod native;
 use crate::macro_rules::*;
 use crate::model_impl::*;
-use crate::native::{pull_from_set_fields_query_consts, push_to_set_fields_query_consts};
+use crate::native::{
+    find_by_clustering_keys_functions, pull_from_set_fields_query_consts,
+    push_to_set_fields_query_consts,
+};
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
 use quote::quote;
@@ -35,6 +38,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let insert_query_const = insert_query_const(&args, fields_named);
     let update_query_const = update_query_const(&args, fields_named);
     let delete_query_const = delete_query_const(&args);
+    let delete_by_partition_key_query_const = delete_by_partition_key_query_const(&args);
 
     // model specific operation consts
     let push_to_set_fields_query_consts = push_to_set_fields_query_consts(&args, fields_named);
@@ -50,6 +54,9 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
+    // Associated functions for finding by clustering keys
+    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named);
+
     let expanded = quote! {
         #[derive(
             charybdis::Serialize,
@@ -62,6 +69,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         #input
 
         impl #struct_name {
+            #find_by_cks_funs
             #push_to_set_fields_query_consts
             #pull_from_set_fields_query_consts
         }
@@ -88,6 +96,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #insert_query_const
             #update_query_const
             #delete_query_const
+            #delete_by_partition_key_query_const
             // methods
             #get_update_values
         }
@@ -109,7 +118,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let struct_name = &input.ident;
     let fields_named = parse_named_fields(&input);
 
-    // consts
+    // Model consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
@@ -118,7 +127,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_by_partition_key_query_const = find_by_partition_key_query_const(&args, fields_named);
     let select_fields_clause = select_fields_clause(&args, fields_named);
 
-    // methods
+    // Model methods
     let get_primary_key_values = get_primary_key_values(&args);
     let get_partition_key_values = get_partition_key_values(&args);
     let get_clustering_key_values = get_clustering_key_values(&args);
@@ -126,7 +135,12 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
 
+    // Associated functions for finding by clustering keys
+    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named);
+
     let expanded = quote! {
+        use futures::TryStreamExt;
+
         #[derive(
             charybdis::Serialize,
             charybdis::Deserialize,
@@ -136,6 +150,10 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
             Debug
         )]
         #input
+
+        impl #struct_name {
+            #find_by_cks_funs
+        }
 
         impl charybdis::BaseModel for #struct_name {
             // consts

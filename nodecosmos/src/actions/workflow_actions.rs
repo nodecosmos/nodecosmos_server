@@ -1,13 +1,16 @@
 use crate::actions::client_session::CurrentUser;
-use crate::authorize::auth_workflow_creation;
+use crate::authorize::{auth_workflow_creation, auth_workflow_update};
 use crate::errors::NodecosmosError;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::materialized_views::base_ios_by_root_node_id::InputOutputsByRootNodeId;
-use crate::models::workflow::{find_workflow_query, UpdateInitialInputsWorkflow, Workflow};
-use actix_web::{get, post, put, web, HttpResponse};
-use charybdis::{Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
+use crate::models::workflow::{
+    find_workflow_query, UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow,
+};
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
 use scylla::CachingSession;
+use serde::Deserialize;
 use serde_json::json;
 
 #[get("/{node_id}")]
@@ -72,12 +75,57 @@ pub async fn update_initial_inputs(
     current_user: CurrentUser,
     mut workflow: web::Json<UpdateInitialInputsWorkflow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
+    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
 
     workflow.update_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
         "workflow": workflow,
+    })))
+}
+
+#[put("/title")]
+pub async fn update_workflow_title(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    mut workflow: web::Json<UpdateWorkflowTitle>,
+) -> Result<HttpResponse, NodecosmosError> {
+    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
+
+    workflow.update_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "workflow": workflow,
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteWfParams {
+    node_id: Uuid,
+    workflow_id: Uuid,
+}
+
+#[delete("/{node_id}/{workflow_id}")]
+pub async fn delete_workflow(
+    db_session: web::Data<CachingSession>,
+    current_user: CurrentUser,
+    params: web::Path<DeleteWfParams>,
+) -> Result<HttpResponse, NodecosmosError> {
+    let mut workflow = Workflow {
+        node_id: params.node_id,
+        id: params.workflow_id,
+        ..Default::default()
+    }
+    .find_by_primary_key(&db_session)
+    .await?;
+
+    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
+
+    workflow.delete_cb(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
     })))
 }

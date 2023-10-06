@@ -57,8 +57,7 @@ use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
 /// ```ignore
 /// let mut partial_user = PartialUser {id, username, email};
 /// partial_user.insert(&session).await?;
-/// partial_user.find_by_id(&session).await?;
-/// partial_user.find_by_id_and_email(&session).await?;
+/// partial_user.find_by_primary_key(&session).await?;
 /// ```
 ///
 /// ## Example usage:

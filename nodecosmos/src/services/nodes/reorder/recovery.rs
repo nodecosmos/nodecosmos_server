@@ -2,7 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::{Node, ReorderNode, UpdateNodeAncestorIds};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::logger::{log_error, log_fatal, log_success, log_warning};
-use charybdis::{Serialize, Update, Uuid};
+use charybdis::{CharybdisModelBatch, Delete, Serialize, Update, Uuid};
 use scylla::CachingSession;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -99,38 +99,14 @@ async fn delete_tree(
     root_descendants: &Vec<NodeDescendant>,
     db_session: &CachingSession,
 ) -> Result<(), NodecosmosError> {
-    let root_node_descendant = NodeDescendant {
+    NodeDescendant {
         id: root.id,
         ..Default::default()
-    };
-
-    delete_descendants(&root_node_descendant, db_session).await?;
-
-    for descendant in root_descendants {
-        delete_descendants(descendant, db_session).await?;
     }
-
-    Ok(())
-}
-
-async fn delete_descendants(
-    node: &NodeDescendant,
-    db_session: &CachingSession,
-) -> Result<(), NodecosmosError> {
-    let descendants = Node {
-        id: node.id,
-        ..Default::default()
-    }
-    .descendants(db_session)
+    .delete_by_partition_key(db_session)
     .await?;
-    let descendants_chunks = descendants.chunks(100);
 
-    for descendant_chunk in descendants_chunks {
-        let mut batch = charybdis::CharybdisModelBatch::new();
-        batch.append_deletes(descendant_chunk.to_vec())?;
-
-        batch.execute(db_session).await?;
-    }
+    CharybdisModelBatch::chunked_delete_by_partition_key(db_session, root_descendants).await?;
 
     Ok(())
 }

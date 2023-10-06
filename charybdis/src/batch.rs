@@ -21,6 +21,40 @@ impl CharybdisModelBatch {
         }
     }
 
+    pub async fn chunked_delete<T: Model + ValueList>(
+        db_session: &CachingSession,
+        iter: &Vec<T>,
+    ) -> Result<(), CharybdisError> {
+        let chunks = iter.chunks(100);
+
+        for chunk in chunks {
+            let mut batch = Self::new();
+
+            batch.append_deletes(chunk).unwrap();
+
+            batch.execute(db_session).await.unwrap();
+        }
+
+        Ok(())
+    }
+
+    pub async fn chunked_delete_by_partition_key<T: Model + ValueList>(
+        db_session: &CachingSession,
+        iter: &Vec<T>,
+    ) -> Result<(), CharybdisError> {
+        let chunks = iter.chunks(100);
+
+        for chunk in chunks {
+            let mut batch = Self::new();
+
+            batch.append_deletes_by_partition_key(chunk)?;
+
+            batch.execute(db_session).await?;
+        }
+
+        Ok(())
+    }
+
     pub fn with_uniq_timestamp(mut self) -> Self {
         self.with_uniq_timestamp = true;
         self
@@ -120,12 +154,39 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
+    pub fn append_delete_by_partition_key<T: Model + ValueList>(
+        &mut self,
+        model: &T,
+    ) -> Result<(), CharybdisError> {
+        self.append_statement_to_batch(T::DELETE_BY_PARTITION_KEY_QUERY);
+
+        let partition_key_values = model
+            .get_partition_key_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
+
+        self.values.push(partition_key_values.into_owned());
+
+        Ok(())
+    }
+
     pub fn append_deletes<T: Model + ValueList>(
         &mut self,
-        iter: Vec<T>,
+        iter: &[T],
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            let result = self.append_delete(&model);
+            let result = self.append_delete(model);
+            result?
+        }
+
+        Ok(())
+    }
+
+    pub fn append_deletes_by_partition_key<T: Model + ValueList>(
+        &mut self,
+        iter: &[T],
+    ) -> Result<(), CharybdisError> {
+        for model in iter {
+            let result = self.append_delete_by_partition_key(model);
             result?
         }
 

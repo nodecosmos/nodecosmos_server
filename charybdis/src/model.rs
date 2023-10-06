@@ -58,6 +58,7 @@ pub trait Model: BaseModel {
     const INSERT_QUERY: &'static str;
     const UPDATE_QUERY: &'static str;
     const DELETE_QUERY: &'static str;
+    const DELETE_BY_PARTITION_KEY_QUERY: &'static str;
 
     fn get_update_values(&self) -> SerializedResult;
 }
