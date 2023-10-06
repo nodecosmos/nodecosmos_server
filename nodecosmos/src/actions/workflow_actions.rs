@@ -127,5 +127,6 @@ pub async fn delete_workflow(
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
+        "workflow": workflow,
     })))
 }

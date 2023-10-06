@@ -119,6 +119,11 @@ impl Callbacks for Workflow {
             CharybdisModelBatch::chunked_delete(session, &flow_steps).await?;
             CharybdisModelBatch::chunked_delete(session, &flows).await?;
             CharybdisModelBatch::chunked_delete(session, &input_outputs).await?;
+        } else if self.initial_input_ids.is_some() {
+            let input_outputs =
+                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+
+            CharybdisModelBatch::chunked_delete(session, &input_outputs).await?;
         }
 
         Ok(())
@@ -134,6 +139,7 @@ partial_workflow!(
 );
 impl_updated_at_cb!(UpdateInitialInputsWorkflow);
 
+// used by node deletion
 partial_workflow!(WorkflowDelete, node_id, id);
 
 partial_workflow!(UpdateWorkflowTitle, node_id, id, title, updated_at);
