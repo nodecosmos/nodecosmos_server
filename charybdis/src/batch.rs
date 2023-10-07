@@ -21,6 +21,17 @@ impl CharybdisModelBatch {
         }
     }
 
+    pub fn unlogged() -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
+
+        Self {
+            batch: scylla::batch::Batch::new(scylla::batch::BatchType::Unlogged),
+            values: Vec::new(),
+            with_uniq_timestamp: false,
+            current_timestamp: now,
+        }
+    }
+
     pub fn from_batch_type(batch_type: scylla::batch::BatchType) -> Self {
         let now = chrono::Utc::now().timestamp_micros();
 
@@ -39,7 +50,7 @@ impl CharybdisModelBatch {
         let chunks = iter.chunks(100);
 
         for chunk in chunks {
-            let mut batch = Self::new();
+            let mut batch = Self::unlogged();
 
             batch.append_inserts(chunk).unwrap();
 
@@ -56,7 +67,7 @@ impl CharybdisModelBatch {
         let chunks = iter.chunks(100);
 
         for chunk in chunks {
-            let mut batch = Self::new();
+            let mut batch = Self::unlogged();
 
             batch.append_updates(chunk).unwrap();
 
@@ -73,7 +84,7 @@ impl CharybdisModelBatch {
         let chunks = iter.chunks(100);
 
         for chunk in chunks {
-            let mut batch = Self::new();
+            let mut batch = Self::unlogged();
 
             batch.append_deletes(chunk).unwrap();
 
@@ -90,7 +101,7 @@ impl CharybdisModelBatch {
         let chunks = iter.chunks(100);
 
         for chunk in chunks {
-            let mut batch = Self::new();
+            let mut batch = Self::unlogged();
 
             batch.append_deletes_by_partition_key(chunk)?;
 
