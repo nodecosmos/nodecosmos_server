@@ -1,4 +1,4 @@
-macro_rules!  impl_node_updated_at_with_elastic_ext_cb {
+macro_rules! impl_node_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
         impl charybdis::ExtCallbacks<crate::app::CbExtension> for $struct_name {
             async fn before_update(

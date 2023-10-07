@@ -1,3 +1,3 @@
 mod description_pool;
 
-pub(crate) use description_pool::*;
+pub use description_pool::*;

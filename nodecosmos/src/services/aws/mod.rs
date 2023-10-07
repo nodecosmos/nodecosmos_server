@@ -1,1 +1,1 @@
-pub(crate) mod s3;
+pub mod s3;

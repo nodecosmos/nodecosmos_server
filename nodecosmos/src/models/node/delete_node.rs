@@ -34,6 +34,7 @@ impl Node {
             let nodes = Node::find(db_session, find_node_query!("id IN ?"), (node_ids,)).await?;
 
             for mut node in nodes.flatten() {
+                // this will also remove the nodes descendants from self.descendants
                 node.remove_from_ancestors(db_session).await?;
 
                 batch.append_delete_by_partition_key(&WorkflowDelete {

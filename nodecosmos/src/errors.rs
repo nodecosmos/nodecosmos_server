@@ -42,6 +42,7 @@ pub enum NodecosmosError {
     InternalServerError(String),
     Forbidden(String),
     ActixError(actix_web::Error),
+    Conflict(String),
     UnsupportedMediaType,
 }
 
@@ -59,6 +60,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
+            NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
         }
     }
 }
@@ -77,6 +79,7 @@ impl Error for NodecosmosError {
             NodecosmosError::UnsupportedMediaType => None,
             NodecosmosError::Forbidden(_) => None,
             NodecosmosError::ActixError(e) => Some(e),
+            NodecosmosError::Conflict(_) => None,
         }
     }
 }
@@ -108,6 +111,10 @@ impl ResponseError for NodecosmosError {
             NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().finish(),
             NodecosmosError::Forbidden(e) => HttpResponse::Forbidden().json(json!({
                 "error": "Forbidden",
+                "message": e
+            })),
+            NodecosmosError::Conflict(e) => HttpResponse::Conflict().json(json!({
+                "error": "Conflict",
                 "message": e
             })),
             _ => HttpResponse::InternalServerError().json(json!({

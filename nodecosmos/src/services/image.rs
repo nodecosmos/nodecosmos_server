@@ -2,7 +2,7 @@ use crate::errors::NodecosmosError;
 use futures::StreamExt;
 use image::RgbImage;
 
-pub(crate) async fn read_image_buffer(
+pub async fn read_image_buffer(
     field: &mut actix_multipart::Field,
 ) -> Result<Vec<u8>, NodecosmosError> {
     let mut buffer: Vec<u8> = Vec::new();
@@ -15,7 +15,7 @@ pub(crate) async fn read_image_buffer(
     Ok(buffer)
 }
 
-pub(crate) fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
+pub fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
     let image_format = image::guess_format(buffer).map_err(|e| {
         NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e))
     })?;
@@ -27,7 +27,7 @@ pub(crate) fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, Nod
     Ok(image_format)
 }
 
-pub(crate) fn decode_image(buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosError> {
+pub fn decode_image(buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosError> {
     let image_format = read_image_format(buffer)?;
 
     if image_format != image::ImageFormat::Png && image_format != image::ImageFormat::Jpeg {
@@ -41,7 +41,7 @@ pub(crate) fn decode_image(buffer: &[u8]) -> Result<image::DynamicImage, Nodecos
     Ok(img)
 }
 
-pub(crate) fn resize_image(
+pub fn resize_image(
     mut img: image::DynamicImage,
     width: u32,
     height: u32,
@@ -57,7 +57,7 @@ pub(crate) fn resize_image(
     Ok(img)
 }
 
-pub(crate) fn convert_image_to_rgb(img: image::DynamicImage) -> Result<RgbImage, NodecosmosError> {
+pub fn convert_image_to_rgb(img: image::DynamicImage) -> Result<RgbImage, NodecosmosError> {
     let rgb_img = match img {
         image::DynamicImage::ImageRgb8(rgb_img) => rgb_img,
         _ => img.to_rgb8(),
@@ -66,7 +66,7 @@ pub(crate) fn convert_image_to_rgb(img: image::DynamicImage) -> Result<RgbImage,
     Ok(rgb_img)
 }
 
-pub(crate) fn compress_image(image_src: RgbImage) -> Result<Vec<u8>, NodecosmosError> {
+pub fn compress_image(image_src: RgbImage) -> Result<Vec<u8>, NodecosmosError> {
     let compressed: Vec<u8> = Vec::new();
 
     let mut compress = mozjpeg::Compress::new(mozjpeg::ColorSpace::JCS_RGB);

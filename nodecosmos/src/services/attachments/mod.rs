@@ -1,1 +1,1 @@
-pub(crate) mod upload_image;
+pub mod upload_image;

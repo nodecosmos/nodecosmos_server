@@ -1,86 +1,104 @@
 mod recovery;
 mod reorder_data;
+mod validator;
 
-pub(crate) use recovery::recover_reorder_failures;
+pub use recovery::recover_reorder_failures;
 
 use crate::errors::NodecosmosError;
 use crate::models::helpers::clone_ref::ClonedRef;
 use crate::models::helpers::Pluckable;
-use crate::models::node::{
-    find_update_node_ancestor_ids_query, Node, ReorderNode, UpdateNodeAncestorIds, UpdateNodeOrder,
-};
-use crate::models::node_descendant::{DeleteNodeDescendant, NodeDescendant};
+use crate::models::node::{Node, ReorderNode, UpdateNodeOrder};
+use crate::models::node_descendant::NodeDescendant;
 use crate::services::logger::log_fatal;
 use crate::services::nodes::reorder::recovery::recover_from_root;
-use crate::services::nodes::reorder::reorder_data::{calculate_new_index, find_reorder_data};
+use crate::services::nodes::reorder::reorder_data::{
+    build_new_ancestor_ids, build_new_index, find_reorder_data,
+};
+use crate::services::nodes::reorder::validator::ReorderValidator;
 use crate::services::resource_locker::ResourceLocker;
-use actix_web::web::Data;
-use charybdis::{CharybdisModelBatch, Delete, Deserialize, Find, Insert, Update, Uuid};
+use charybdis::{execute, CharybdisModelBatch, Update, Uuid};
 use scylla::CachingSession;
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct ReorderParams {
-    #[serde(rename = "rootId")]
-    pub root_id: Uuid,
-
-    #[serde(rename = "id")]
-    pub id: Uuid,
+    #[serde(rename = "nodeId")]
+    pub node_id: Uuid,
 
     #[serde(rename = "newParentId")]
     pub new_parent_id: Uuid,
+
+    #[serde(rename = "newUpperSiblingId")]
+    pub new_upper_sibling_id: Option<Uuid>,
 
     #[serde(rename = "newBottomSiblingId")]
     pub new_bottom_sibling_id: Option<Uuid>,
 }
 
-pub struct Reorderer {
+pub struct Reorderer<'a> {
     pub params: ReorderParams,
+    pub db_session: &'a CachingSession,
     pub root: ReorderNode,
-    pub current_root_descendants: Vec<NodeDescendant>,
+    pub root_descendants: Vec<NodeDescendant>,
     pub node: Node,
-    pub descendants: Vec<NodeDescendant>,
     pub descendant_ids: Vec<Uuid>,
+    pub descendants: Vec<NodeDescendant>,
     pub new_parent: ReorderNode,
-    pub new_node_ancestor_ids: Option<Vec<Uuid>>,
     pub old_node_ancestor_ids: Vec<Uuid>,
+    pub new_node_ancestor_ids: Vec<Uuid>,
+    pub new_upper_sibling: Option<ReorderNode>,
+    pub new_bottom_sibling: Option<ReorderNode>,
     pub old_order_index: f64,
     pub new_order_index: f64,
-    pub db_session: Data<CachingSession>,
 }
 
 const RESOURCE_LOCKER_TTL: usize = 100000; // 100 seconds
-const REORDER_DESCENDANTS_LIMIT: usize = 15000;
 
-impl Reorderer {
+impl<'a> Reorderer<'a> {
     pub async fn new(
-        db_session: Data<CachingSession>,
+        db_session: &'a CachingSession,
         params: ReorderParams,
-    ) -> Result<Self, NodecosmosError> {
+    ) -> Result<Reorderer<'a>, NodecosmosError> {
         let reorder_data = find_reorder_data(&db_session, &params).await?;
+
+        let root = reorder_data.root;
+        let root_descendants = reorder_data.root_descendants;
+
+        let node = reorder_data.node;
         let descendant_ids = reorder_data.descendants.pluck_id();
-        let old_order_index = reorder_data.node.order_index.unwrap_or_default();
-        let new_order_index = calculate_new_index(&params, &db_session).await?;
-        let old_node_ancestor_ids = reorder_data.node.ancestor_ids.cloned_ref();
+        let descendants = reorder_data.descendants;
+
+        let new_parent = reorder_data.new_parent;
+
+        let new_upper_sibling = reorder_data.new_upper_sibling;
+        let new_bottom_sibling = reorder_data.new_bottom_sibling;
+
+        let old_node_ancestor_ids = node.ancestor_ids.cloned_ref();
+        let new_node_ancestor_ids = build_new_ancestor_ids(&new_parent);
+
+        let old_order_index = node.order_index.unwrap_or_default();
+        let new_order_index = build_new_index(&new_upper_sibling, &new_bottom_sibling).await?;
 
         Ok(Self {
             params,
-            root: reorder_data.root,
-            current_root_descendants: reorder_data.current_root_descendants,
-            node: reorder_data.node,
-            descendants: reorder_data.descendants,
+            db_session,
+            root,
+            root_descendants,
+            node,
             descendant_ids,
-            new_parent: reorder_data.new_parent,
-            new_node_ancestor_ids: None,
+            descendants,
+            new_parent,
             old_node_ancestor_ids,
+            new_node_ancestor_ids,
+            new_upper_sibling,
+            new_bottom_sibling,
             old_order_index,
             new_order_index,
-            db_session,
         })
     }
 
     pub async fn reorder(&mut self, locker: &ResourceLocker) -> Result<(), NodecosmosError> {
-        self.check_reorder_validity()?;
-        self.check_reorder_limit()?;
+        ReorderValidator::new(self).validate()?;
 
         locker
             .lock(&self.root.id.to_string(), RESOURCE_LOCKER_TTL)
@@ -96,57 +114,27 @@ impl Reorderer {
             Err(err) => {
                 log_fatal(format!("exec_reorder: {:?}", err));
 
-                if self.is_parent_changed() {
-                    recover_from_root(&self.root, &self.current_root_descendants, &self.db_session)
-                        .await;
-                }
+                recover_from_root(&self.root, &self.root_descendants, &self.db_session).await;
 
                 locker.unlock(&self.root.id.to_string()).await?;
-
                 return Err(err);
             }
         };
     }
 
-    fn check_reorder_validity(&mut self) -> Result<(), NodecosmosError> {
-        if let Some(is_root) = self.node.is_root {
-            if is_root {
-                return Err(NodecosmosError::Forbidden(
-                    "Reorder is not allowed for root nodes".to_string(),
-                ));
-            }
-        }
-
-        if self.descendant_ids.contains(&self.params.new_parent_id)
-            || self.node.id == self.params.new_parent_id
-        {
-            return Err(NodecosmosError::Forbidden(
-                "Can not reorder within self".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn check_reorder_limit(&mut self) -> Result<(), NodecosmosError> {
-        if self.is_parent_changed() && self.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
-            return Err(NodecosmosError::Forbidden(format!(
-                "Can not reorder more than {} descendants",
-                REORDER_DESCENDANTS_LIMIT
-            )));
-        }
-
-        Ok(())
-    }
-
     async fn execute_reorder(&mut self) -> Result<(), NodecosmosError> {
         self.update_node_order().await?;
+        self.remove_node_from_old_ancestors().await?;
+        self.add_node_to_new_ancestors().await?;
 
         if self.is_parent_changed() {
-            self.remove_node_from_old_ancestors().await?;
-            self.build_new_ancestor_ids();
-            self.add_new_ancestors().await?;
-            self.add_node_to_new_ancestors().await?;
+            self.remove_old_ancestors_from_node().await?;
+            self.remove_old_ancestors_from_descendants().await?;
+            self.remove_node_descendants_from_old_ancestors().await?;
+
+            self.add_new_ancestors_to_node().await?;
+            self.add_new_ancestors_to_descendants().await?;
+            self.add_node_descendants_to_new_ancestors().await?;
         }
 
         Ok(())
@@ -160,16 +148,6 @@ impl Reorderer {
         false
     }
 
-    fn build_new_ancestor_ids(&mut self) {
-        let new_parent_ancestors = self.new_parent.ancestor_ids.cloned_ref();
-        let mut new_ancestors = Vec::with_capacity(new_parent_ancestors.len() + 1);
-
-        new_ancestors.extend(new_parent_ancestors);
-        new_ancestors.push(self.new_parent.id);
-
-        self.new_node_ancestor_ids = Some(new_ancestors);
-    }
-
     async fn update_node_order(&mut self) -> Result<(), NodecosmosError> {
         let update_order_node = UpdateNodeOrder {
             id: self.node.id,
@@ -179,117 +157,138 @@ impl Reorderer {
 
         update_order_node.update(&self.db_session).await?;
 
-        if !self.is_parent_changed() {
-            // just update node order_index for all ancestors
-            for ancestor_id in self.node.ancestor_ids.cloned_ref() {
-                let node_descendant = NodeDescendant {
-                    root_id: ancestor_id,
-                    id: self.node.id,
-                    order_index: Some(self.old_order_index),
+        Ok(())
+    }
+
+    async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
+        let mut descendants_to_delete = vec![];
+
+        for ancestor_id in self.old_node_ancestor_ids.clone() {
+            let descendant = NodeDescendant {
+                root_id: self.root.id,
+                node_id: ancestor_id,
+                id: self.node.id,
+                order_index: self.old_order_index,
+                ..Default::default()
+            };
+
+            descendants_to_delete.push(descendant);
+        }
+
+        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("remove_node_from_old_ancestors: {:?}", err));
+                return err;
+            })?;
+
+        Ok(())
+    }
+
+    async fn remove_node_descendants_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
+        let mut descendants_to_delete = vec![];
+
+        for ancestor_id in self.old_node_ancestor_ids.clone() {
+            for descendant in self.descendants.clone() {
+                let descendant = NodeDescendant {
+                    root_id: self.root.id,
+                    node_id: ancestor_id,
+                    id: descendant.id,
+                    order_index: descendant.order_index,
                     ..Default::default()
                 };
 
-                node_descendant.delete(&self.db_session).await?;
-
-                let node_descendant = NodeDescendant {
-                    root_id: ancestor_id,
-                    id: self.node.id,
-                    order_index: Some(self.new_order_index),
-                    title: self.node.title.clone(),
-                    parent_id: Some(self.params.new_parent_id),
-                };
-
-                node_descendant.insert(&self.db_session).await?;
+                descendants_to_delete.push(descendant);
             }
         }
+
+        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete)
+            .await
+            .map_err(|err| {
+                log_fatal(format!(
+                    "remove_node_descendants_from_old_ancestors: {:?}",
+                    err
+                ));
+                return err;
+            })?;
 
         Ok(())
     }
 
-    /// Removes node and its descendants from old ancestors
-    async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        for ancestor_id in self.old_node_ancestor_ids.clone() {
-            // delete node from ancestors' descendants
-            let descendant = DeleteNodeDescendant {
-                root_id: ancestor_id,
+    async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
+        let mut descendants_to_add = vec![];
+
+        for ancestor_id in self.new_node_ancestor_ids.clone() {
+            let descendant = NodeDescendant {
+                root_id: self.root.id,
+                node_id: ancestor_id,
                 id: self.node.id,
-                order_index: Some(self.old_order_index),
+                order_index: self.new_order_index,
+                title: self.node.title.clone(),
+                parent_id: Some(self.params.new_parent_id),
             };
 
-            descendant.delete(&self.db_session).await?;
-
-            // delete node's descendants from ancestors' descendants
-            let descendant_chunks = self.descendants.chunks(100);
-            for descendants in descendant_chunks {
-                let mut batch = CharybdisModelBatch::new();
-
-                for descendant in descendants {
-                    let descendant = DeleteNodeDescendant {
-                        root_id: ancestor_id,
-                        id: descendant.id,
-                        order_index: descendant.order_index,
-                    };
-
-                    batch.append_delete(&descendant)?;
-                }
-
-                batch.execute(&self.db_session).await?;
-            }
+            descendants_to_add.push(descendant);
         }
+
+        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
+                return err;
+            })?;
 
         Ok(())
     }
 
-    /// Adds new ancestors to node and its descendants
-    async fn add_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        let new_node_ancestor_ids = self.new_node_ancestor_ids.cloned_ref();
-        let update_ancestors_node = UpdateNodeAncestorIds {
-            id: self.node.id,
-            parent_id: Some(self.params.new_parent_id),
-            ancestor_ids: Some(new_node_ancestor_ids.clone()),
-        };
+    async fn add_node_descendants_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
+        let mut descendants_to_add = vec![];
 
-        update_ancestors_node.update(&self.db_session).await?;
-
-        let descendant_ids_chunks = self.descendant_ids.chunks(100);
-
-        for descendant_ids in descendant_ids_chunks {
-            let mut batch = CharybdisModelBatch::new();
-            let update_ancestor_nodes = UpdateNodeAncestorIds::find(
-                &self.db_session,
-                find_update_node_ancestor_ids_query!("id IN ?"),
-                (descendant_ids,),
-            )
-            .await?
-            .flatten();
-
-            for update_ancestor_node in update_ancestor_nodes {
-                let current_ancestor_ids = update_ancestor_node.ancestor_ids.cloned_ref();
-
-                // current reordered node + 1 index
-                let split_index = current_ancestor_ids
-                    .iter()
-                    .position(|id| id == &self.node.id)
-                    .unwrap_or_default();
-
-                // take all existing ancestors bellow the reordered_node
-                let preserved_ancestor_ids = current_ancestor_ids
-                    .iter()
-                    .skip(split_index)
-                    .cloned()
-                    .collect::<Vec<Uuid>>();
-
-                // append new ancestors to preserved ancestors
-                let mut new_complete_ancestor_ids = new_node_ancestor_ids.clone();
-                new_complete_ancestor_ids.extend(preserved_ancestor_ids);
-
-                let update_ancestors_node = UpdateNodeAncestorIds {
-                    id: update_ancestor_node.id,
-                    parent_id: update_ancestor_node.parent_id,
-                    ancestor_ids: Some(new_complete_ancestor_ids),
+        for ancestor_id in self.new_node_ancestor_ids.clone() {
+            for descendant in self.descendants.clone() {
+                let descendant = NodeDescendant {
+                    root_id: self.root.id,
+                    node_id: ancestor_id,
+                    id: descendant.id,
+                    order_index: descendant.order_index,
+                    title: descendant.title.clone(),
+                    parent_id: descendant.parent_id,
                 };
 
-                batch.append_update(&update_ancestors_node)?;
+                descendants_to_add.push(descendant);
+            }
+        }
+
+        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
+                return err;
+            })?;
+
+        Ok(())
+    }
+
+    async fn remove_old_ancestors_from_node(&mut self) -> Result<(), NodecosmosError> {
+        execute(
+            self.db_session,
+            Node::PULL_FROM_ANCESTOR_IDS_QUERY,
+            (self.old_node_ancestor_ids.clone(), self.node.id),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn remove_old_ancestors_from_descendants(&mut self) -> Result<(), NodecosmosError> {
+        for descendant_chunk in self.descendant_ids.chunks(100) {
+            let mut batch = CharybdisModelBatch::new();
+
+            for descendant_id in descendant_chunk {
+                batch.append_statement(
+                    Node::PULL_FROM_ANCESTOR_IDS_QUERY,
+                    (self.old_node_ancestor_ids.clone(), descendant_id),
+                )?;
             }
 
             batch.execute(&self.db_session).await?;
@@ -298,38 +297,29 @@ impl Reorderer {
         Ok(())
     }
 
-    /// Adds node and its descendants to new ancestors
-    async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        for ancestor_id in self.new_node_ancestor_ids.cloned_ref() {
-            let descendant = NodeDescendant {
-                root_id: ancestor_id,
-                id: self.node.id,
-                order_index: Some(self.new_order_index),
-                title: self.node.title.clone(),
-                parent_id: Some(self.params.new_parent_id),
-            };
+    async fn add_new_ancestors_to_node(&mut self) -> Result<(), NodecosmosError> {
+        execute(
+            self.db_session,
+            Node::PUSH_TO_ANCESTOR_IDS_QUERY,
+            (self.new_node_ancestor_ids.clone(), self.node.id),
+        )
+        .await?;
 
-            descendant.insert(&self.db_session).await?;
+        Ok(())
+    }
 
-            let descendant_chunks = self.descendants.chunks(100);
+    async fn add_new_ancestors_to_descendants(&mut self) -> Result<(), NodecosmosError> {
+        for descendant_chunk in self.descendant_ids.chunks(100) {
+            let mut batch = CharybdisModelBatch::new();
 
-            for chunk in descendant_chunks {
-                let mut batch = CharybdisModelBatch::new();
-
-                for descendant in chunk {
-                    let descendant = NodeDescendant {
-                        root_id: ancestor_id,
-                        id: descendant.id,
-                        order_index: descendant.order_index,
-                        title: descendant.title.clone(),
-                        parent_id: descendant.parent_id,
-                    };
-
-                    batch.append_create(&descendant)?;
-                }
-
-                batch.execute(&self.db_session).await?;
+            for descendant_id in descendant_chunk {
+                batch.append_statement(
+                    Node::PUSH_TO_ANCESTOR_IDS_QUERY,
+                    (self.new_node_ancestor_ids.clone(), descendant_id),
+                )?;
             }
+
+            batch.execute(&self.db_session).await?;
         }
 
         Ok(())

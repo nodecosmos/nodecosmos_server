@@ -6,12 +6,18 @@ use charybdis_macros::{charybdis_model, partial_model_generator};
 #[charybdis_model(
     table_name = node_descendants,
     partition_keys = [root_id],
-    clustering_keys = [order_index, id],
+    clustering_keys = [node_id, order_index, id],
     secondary_indexes = [],
 )]
 pub struct NodeDescendant {
     #[serde(rename = "rootId")]
     pub root_id: Uuid,
+
+    #[serde(rename = "nodeId")]
+    pub node_id: Uuid,
+
+    #[serde(rename = "order")]
+    pub order_index: Double,
 
     pub id: Uuid,
 
@@ -19,10 +25,4 @@ pub struct NodeDescendant {
     pub parent_id: Option<Uuid>,
 
     pub title: Option<Text>,
-
-    #[serde(rename = "order")]
-    pub order_index: Option<Double>,
 }
-
-partial_node_descendant!(UpdateNodeDescendantTitle, root_id, order_index, id, title);
-partial_node_descendant!(DeleteNodeDescendant, root_id, order_index, id);

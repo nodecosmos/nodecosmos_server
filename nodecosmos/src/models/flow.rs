@@ -64,7 +64,7 @@ impl Flow {
         execute(
             session,
             Flow::PUSH_TO_STEP_IDS_QUERY,
-            (step_id, self.node_id, self.workflow_id, self.id),
+            (vec![step_id], self.node_id, self.workflow_id, self.id),
         )
         .await?;
 
@@ -79,7 +79,7 @@ impl Flow {
         execute(
             session,
             Flow::PULL_FROM_STEP_IDS_QUERY,
-            (step_id, self.node_id, self.workflow_id, self.id),
+            (vec![step_id], self.node_id, self.workflow_id, self.id),
         )
         .await?;
 

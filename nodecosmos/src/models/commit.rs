@@ -1,6 +1,6 @@
-pub(crate) mod node_commit;
-pub(crate) mod types;
-pub(crate) mod workflow_commit;
+pub mod node_commit;
+pub mod types;
+pub mod workflow_commit;
 
 use crate::actions::commit_actions::CommitParams;
 use crate::models::commit::types::CommitTypes;

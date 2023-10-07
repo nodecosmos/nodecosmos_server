@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::node::{Node, ReorderNode, UpdateNodeAncestorIds};
+use crate::models::node::{ReorderNode, UpdateNodeAncestorIds};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::logger::{log_error, log_fatal, log_success, log_warning};
 use charybdis::{CharybdisModelBatch, Delete, Serialize, Update, Uuid};
@@ -14,7 +14,7 @@ type ChildNodesByParentId<'a> = HashMap<Uuid, Vec<&'a NodeDescendant>>;
 /// In order to allow reordering for large nodes, we have logic outside batches.
 /// This means that we don't have atomicity of reorder queries guaranteed.
 /// As a result, we need custom recovery logic in case of failure.
-pub(crate) async fn recover_from_root(
+pub async fn recover_from_root(
     root: &ReorderNode,
     root_descendants: &Vec<NodeDescendant>,
     db_session: &CachingSession,
@@ -22,42 +22,43 @@ pub(crate) async fn recover_from_root(
     let root_insert_res = root.update(db_session).await;
     let mut child_nodes_by_parent_id = ChildNodesByParentId::new();
 
-    let res = delete_tree(root, root_descendants, db_session)
-        .await
-        .map_err(|err| {
-            log_error(format!("Recovery Error in deleting tree: {}", err));
-        });
+    log_warning(format!("Recovery started for root: {}", root.id));
+
+    let now = std::time::Instant::now();
+
+    let res = delete_tree(root, db_session).await.map_err(|err| {
+        log_error(format!("Recovery Error in deleting tree: {}", err));
+    });
+
+    println!("sleeping for 10 seconds");
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
+    log_warning(format!("Recovery delete_tree took: {:?}", now.elapsed()));
 
     if res.is_err() {
         serialize_and_store_to_disk(root, root_descendants);
         return;
     }
 
+    let now = std::time::Instant::now();
     match root_insert_res {
         Ok(_) => {
             let root_descendants_chunks = root_descendants.chunks(100);
 
             for root_descendant_chunk in root_descendants_chunks {
-                let mut batch = charybdis::CharybdisModelBatch::new();
+                let mut batch =
+                    CharybdisModelBatch::from_batch_type(scylla::batch::BatchType::Unlogged);
 
-                for descendant in root_descendant_chunk {
-                    let res = batch.append_create(descendant).map_err(|err| {
-                        log_error(format!(
-                            "Recovery Error in adding descendant to batch: {}",
-                            err
-                        ));
-                    });
+                let res = batch.append_inserts(root_descendant_chunk).map_err(|err| {
+                    log_error(format!(
+                        "Recovery Error in adding descendants to batch: {}",
+                        err
+                    ));
+                });
 
-                    if res.is_err() {
-                        serialize_and_store_to_disk(root, root_descendants);
-                        return;
-                    }
-
-                    let parent_id = descendant.parent_id.unwrap_or_default();
-                    child_nodes_by_parent_id
-                        .entry(parent_id)
-                        .or_insert_with(Vec::new)
-                        .push(&descendant);
+                if res.is_err() {
+                    serialize_and_store_to_disk(root, root_descendants);
+                    return;
                 }
 
                 let res = batch.execute(db_session).await.map_err(|err| {
@@ -68,12 +69,24 @@ pub(crate) async fn recover_from_root(
                     serialize_and_store_to_disk(root, root_descendants);
                     return;
                 }
+
+                for descendant in root_descendant_chunk {
+                    child_nodes_by_parent_id
+                        .entry(descendant.parent_id.unwrap_or_default())
+                        .or_insert_with(Vec::new)
+                        .push(&descendant);
+                }
             }
 
+            log_warning(format!("Descendant stored after: {:?}", now.elapsed()));
+            log_warning(format!("Rebuilding Tree Started for root: {}", root.id));
+
+            let now = std::time::Instant::now();
             let res = rebuild_tree(root, &child_nodes_by_parent_id, db_session).await;
             match res {
                 Ok(_) => {
                     log_success(format!("Recovery successful for root: {}", root.id));
+                    log_success(format!("rebuild_tree took: {:?}", now.elapsed()));
                 }
                 Err(err) => {
                     log_error(format!(
@@ -96,17 +109,14 @@ pub(crate) async fn recover_from_root(
 
 async fn delete_tree(
     root: &ReorderNode,
-    root_descendants: &Vec<NodeDescendant>,
     db_session: &CachingSession,
 ) -> Result<(), NodecosmosError> {
     NodeDescendant {
-        id: root.id,
+        root_id: root.id,
         ..Default::default()
     }
     .delete_by_partition_key(db_session)
     .await?;
-
-    CharybdisModelBatch::chunked_delete_by_partition_key(db_session, root_descendants).await?;
 
     Ok(())
 }
@@ -120,74 +130,84 @@ async fn rebuild_tree(
     let mut stack = vec![(root.id, vec![])];
     let empty_child_nodes_vec = vec![];
 
-    while let Some((node_id, ancestor_ids)) = stack.pop() {
+    let mut update_ancestor_nodes = vec![];
+    let mut append_descendants_nodes = vec![];
+
+    while let Some((parent_id, ancestor_ids)) = stack.pop() {
         let child_nodes = child_nodes_by_parent_id
-            .get(&node_id)
+            .get(&parent_id)
             .unwrap_or(&empty_child_nodes_vec);
 
         for node in child_nodes {
             let mut current_ancestor_ids = ancestor_ids.clone();
-            current_ancestor_ids.push(node_id);
+            current_ancestor_ids.push(parent_id);
 
-            update_ancestors(node, Some(node_id), &current_ancestor_ids, db_session).await?;
-            append_to_ancestors(node, &current_ancestor_ids, db_session).await?;
+            push_update_ancestor_node(
+                &mut update_ancestor_nodes,
+                node,
+                parent_id,
+                &current_ancestor_ids,
+            );
+
+            push_insert_descendants_nodes(
+                &mut append_descendants_nodes,
+                node,
+                &current_ancestor_ids,
+            );
 
             stack.push((node.id, current_ancestor_ids));
         }
     }
 
-    Ok(())
-}
+    CharybdisModelBatch::chunked_update(db_session, &append_descendants_nodes)
+        .await
+        .map_err(|err| {
+            log_error(format!("Recovery Error in saving descendants: {}", err));
+            return err;
+        })?;
 
-async fn update_ancestors(
-    node: &NodeDescendant,
-    parent_id: Option<Uuid>,
-    ancestor_ids: &Vec<Uuid>,
-    db_session: &CachingSession,
-) -> Result<(), NodecosmosError> {
-    UpdateNodeAncestorIds {
-        id: node.id,
-        parent_id,
-        ancestor_ids: Some(ancestor_ids.clone()),
-    }
-    .update(db_session)
-    .await
-    .map_err(|err| {
-        log_error(format!(
-            "Recovery Error in updating descendant ancestors: {}",
-            err
-        ));
-
-        err
-    })?;
+    CharybdisModelBatch::chunked_update(db_session, &update_ancestor_nodes)
+        .await
+        .map_err(|err| {
+            log_error(format!("Recovery Error in updating ancestors: {}", err));
+            return err;
+        })?;
 
     Ok(())
 }
 
-async fn append_to_ancestors(
+fn push_update_ancestor_node(
+    vec: &mut Vec<UpdateNodeAncestorIds>,
     node: &NodeDescendant,
+    parent_id: Uuid,
     ancestor_ids: &Vec<Uuid>,
-    db_session: &CachingSession,
-) -> Result<(), NodecosmosError> {
-    let mut node = Node {
+) {
+    let update_anc_node = UpdateNodeAncestorIds {
         id: node.id,
-        title: node.title.clone(),
-        parent_id: node.parent_id,
+        parent_id: Some(parent_id),
         ancestor_ids: Some(ancestor_ids.clone()),
-        order_index: node.order_index,
-        ..Default::default()
     };
 
-    node.append_to_ancestors(db_session).await.map_err(|err| {
-        log_error(format!(
-            "Recovery Error in appending descendant ancestors: {}",
-            err
-        ));
+    vec.push(update_anc_node);
+}
 
-        err
-    })?;
+fn push_insert_descendants_nodes(
+    vec: &mut Vec<NodeDescendant>,
+    node: &NodeDescendant,
+    ancestor_ids: &Vec<Uuid>,
+) {
+    for ancestor_id in ancestor_ids {
+        let node_descendant = NodeDescendant {
+            root_id: node.root_id,
+            node_id: *ancestor_id,
+            id: node.id,
+            order_index: node.order_index,
+            parent_id: node.parent_id,
+            title: node.title.clone(),
+        };
 
-    Ok(())
+        vec.push(node_descendant);
+    }
 }
 
 /// Hopefully this is never needed, but in case of a full db connection failure mid reorder,
@@ -204,8 +224,10 @@ pub fn serialize_and_store_to_disk(root: &ReorderNode, root_descendants: &Vec<No
     let recovery_data = RecoveryData {
         root: ReorderNode {
             id: root.id,
+            root_id: root.root_id,
             parent_id: root.parent_id,
             ancestor_ids: root.ancestor_ids.clone(),
+            order_index: root.order_index,
         },
         root_descendants: root_descendants.clone(),
     };

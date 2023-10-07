@@ -105,7 +105,6 @@ pub async fn create_node(
     auth_node_creation(&parent, &current_user).await?;
 
     node.set_owner(current_user);
-
     node.set_defaults(parent).await?;
 
     node.insert_cb(&db_session, &cb_extension).await?;
@@ -124,9 +123,7 @@ pub async fn update_node_title(
 
     auth_node_update(&native_node, &current_user).await?;
 
-    node.order_index = native_node.order_index;
-    node.ancestor_ids = native_node.ancestor_ids;
-
+    node.set_defaults(native_node);
     node.update_cb(&db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(node))
@@ -175,7 +172,7 @@ pub async fn reorder_nodes(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut reorderer = Reorderer::new(db_session, params.into_inner()).await?;
+    let mut reorderer = Reorderer::new(&db_session, params.into_inner()).await?;
 
     resource_locker.check_node_lock(&reorderer.node).await?;
     auth_node_update(&reorderer.node, &current_user).await?;

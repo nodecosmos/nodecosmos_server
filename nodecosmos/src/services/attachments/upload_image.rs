@@ -19,7 +19,7 @@ pub struct ImageAttachmentParams {
     pub object_id: Uuid,
 }
 
-pub(crate) async fn upload_image_attachment(
+pub async fn upload_image_attachment(
     params: &ImageAttachmentParams,
     nc_app: &crate::NodecosmosApp,
     s3_client: &aws_sdk_s3::Client,

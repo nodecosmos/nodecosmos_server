@@ -61,7 +61,7 @@ impl Workflow {
         execute(
             session,
             Workflow::PUSH_TO_FLOW_IDS_QUERY,
-            (flow_id, self.node_id, self.id),
+            (vec![flow_id], self.node_id, self.id),
         )
         .await?;
 
@@ -76,7 +76,7 @@ impl Workflow {
         execute(
             session,
             Workflow::PULL_FROM_FLOW_IDS_QUERY,
-            (flow_id, self.node_id, self.id),
+            (vec![flow_id], self.node_id, self.id),
         )
         .await?;
 
@@ -91,7 +91,7 @@ impl Workflow {
         execute(
             session,
             Workflow::PULL_FROM_INITIAL_INPUT_IDS_QUERY,
-            (initial_input_id, self.node_id, self.id),
+            (vec![initial_input_id], self.node_id, self.id),
         )
         .await?;
 

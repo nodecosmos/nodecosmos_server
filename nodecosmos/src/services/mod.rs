@@ -1,7 +1,7 @@
-pub(crate) mod attachments;
-pub(crate) mod aws;
-pub(crate) mod elastic;
-pub(crate) mod image;
-pub(crate) mod logger;
-pub(crate) mod nodes;
-pub(crate) mod resource_locker;
+pub mod attachments;
+pub mod aws;
+pub mod elastic;
+pub mod image;
+pub mod logger;
+pub mod nodes;
+pub mod resource_locker;

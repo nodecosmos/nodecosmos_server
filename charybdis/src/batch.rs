@@ -21,6 +21,51 @@ impl CharybdisModelBatch {
         }
     }
 
+    pub fn from_batch_type(batch_type: scylla::batch::BatchType) -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
+
+        Self {
+            batch: scylla::batch::Batch::new(batch_type),
+            values: Vec::new(),
+            with_uniq_timestamp: false,
+            current_timestamp: now,
+        }
+    }
+
+    pub async fn chunked_insert<T: Model + ValueList>(
+        db_session: &CachingSession,
+        iter: &Vec<T>,
+    ) -> Result<(), CharybdisError> {
+        let chunks = iter.chunks(100);
+
+        for chunk in chunks {
+            let mut batch = Self::new();
+
+            batch.append_inserts(chunk).unwrap();
+
+            batch.execute(db_session).await.unwrap();
+        }
+
+        Ok(())
+    }
+
+    pub async fn chunked_update<T: Model + ValueList>(
+        db_session: &CachingSession,
+        iter: &Vec<T>,
+    ) -> Result<(), CharybdisError> {
+        let chunks = iter.chunks(100);
+
+        for chunk in chunks {
+            let mut batch = Self::new();
+
+            batch.append_updates(chunk).unwrap();
+
+            batch.execute(db_session).await.unwrap();
+        }
+
+        Ok(())
+    }
+
     pub async fn chunked_delete<T: Model + ValueList>(
         db_session: &CachingSession,
         iter: &Vec<T>,
@@ -97,7 +142,7 @@ impl CharybdisModelBatch {
         self.batch.append_statement(query.as_str());
     }
 
-    pub fn append_create<T: Model + ValueList>(&mut self, model: &T) -> Result<(), CharybdisError> {
+    pub fn append_insert<T: Model + ValueList>(&mut self, model: &T) -> Result<(), CharybdisError> {
         self.append_statement_to_batch(T::INSERT_QUERY);
         let values = model.serialized()?;
 
@@ -106,12 +151,12 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_creates<T: Model + ValueList>(
+    pub fn append_inserts<T: Model + ValueList>(
         &mut self,
-        iter: Vec<T>,
+        iter: &[T],
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            let result = self.append_create(&model);
+            let result = self.append_insert(model);
             result?
         }
 
@@ -132,10 +177,10 @@ impl CharybdisModelBatch {
 
     pub fn append_updates<T: Model + ValueList>(
         &mut self,
-        iter: Vec<T>,
+        iter: &[T],
     ) -> Result<(), CharybdisError> {
         for model in iter {
-            let result = self.append_update(&model);
+            let result = self.append_update(model);
             result?
         }
 
@@ -201,13 +246,14 @@ impl CharybdisModelBatch {
         self.append_statement_to_batch(statement);
 
         let values = values.serialized()?;
+
         self.values.push(values.into_owned());
 
         Ok(())
     }
 
     pub async fn execute(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
-        db_session.batch(&self.batch, self.values.clone()).await?;
+        db_session.batch(&self.batch, &self.values).await?;
 
         Ok(())
     }

@@ -96,15 +96,17 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<Option<Node>, NodecosmosError> {
-        match self.parent_id {
-            Some(parent_id) => {
-                let mut parent = Node::new();
-                parent.id = parent_id;
-
-                let parent = parent.find_by_primary_key(db_session).await?;
-                Ok(Some(parent))
+        if let Some(parent_id) = self.parent_id {
+            let node = Self {
+                id: parent_id,
+                ..Default::default()
             }
-            None => Ok(None),
+            .find_by_primary_key(db_session)
+            .await?;
+
+            Ok(Some(node))
+        } else {
+            Ok(None)
         }
     }
 
@@ -112,12 +114,8 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<Vec<NodeDescendant>, CharybdisError> {
-        let descendants = NodeDescendant {
-            root_id: self.id,
-            ..Default::default()
-        }
-        .find_by_partition_key(db_session)
-        .await?;
+        let descendants =
+            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
 
         Ok(descendants)
     }
@@ -134,7 +132,6 @@ impl Node {
         self.owner_id = Some(owner.id);
         self.owner_type = Some(owner.owner_type.clone());
 
-        // for now
         self.owner = Some(owner);
     }
 
@@ -153,8 +150,10 @@ impl Node {
             self.root_id = self.id;
         }
 
-        self.created_at = Some(Utc::now());
-        self.updated_at = Some(Utc::now());
+        let now = Utc::now();
+
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
 
         Ok(())
     }
@@ -183,6 +182,7 @@ impl ExtCallbacks<CbExtension> for Node {
     }
 }
 
+//----------------------------------------------------------------------------------------------------------------------
 partial_node!(
     BaseNode,
     root_id,
@@ -212,36 +212,48 @@ partial_node!(
 
 partial_node!(GetNodedescriptionBase64, id, description_base64);
 
-partial_node!(ReorderNode, id, parent_id, ancestor_ids);
+partial_node!(
+    ReorderNode,
+    root_id,
+    id,
+    parent_id,
+    ancestor_ids,
+    order_index
+);
 
 partial_node!(UpdateNodeAncestorIds, id, parent_id, ancestor_ids);
-partial_node!(UpdateNodeOrder, id, parent_id, order_index);
 
+partial_node!(UpdateNodeOrder, id, parent_id, order_index);
+//----------------------------------------------------------------------------------------------------------------------
 partial_node!(
     UpdateNodeTitle,
+    root_id,
+    parent_id,
     id,
     title,
     ancestor_ids,
     order_index,
     updated_at
 );
-impl ExtCallbacks<CbExtension> for UpdateNodeTitle {
-    async fn before_update(
-        &mut self,
-        _session: &CachingSession,
-        _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+
+impl UpdateNodeTitle {
+    pub fn set_defaults(&mut self, native_node: Node) {
         self.updated_at = Some(Utc::now());
 
-        Ok(())
+        self.root_id = native_node.root_id;
+        self.parent_id = native_node.parent_id;
+        self.order_index = native_node.order_index;
+        self.ancestor_ids = native_node.ancestor_ids;
     }
+}
 
+impl ExtCallbacks<CbExtension> for UpdateNodeTitle {
     async fn after_update(
         &mut self,
         session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        self.update_ancestors(session).await?;
+        self.update_node_descendants(session).await?;
 
         update_elastic_document(
             &ext.elastic_client,
@@ -255,6 +267,7 @@ impl ExtCallbacks<CbExtension> for UpdateNodeTitle {
     }
 }
 
+//----------------------------------------------------------------------------------------------------------------------
 partial_node!(
     UpdateNodeDescription,
     root_id,

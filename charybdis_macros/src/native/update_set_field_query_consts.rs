@@ -33,7 +33,7 @@ pub(crate) fn push_to_set_fields_query_consts(
 
             let query_str = if is_list {
                 format!(
-                    "UPDATE {} SET {} = {} + [?] WHERE {} = ?",
+                    "UPDATE {} SET {} = {} + ? WHERE {} = ?",
                     table_name.to_string(),
                     field_name,
                     field_name,
@@ -41,7 +41,7 @@ pub(crate) fn push_to_set_fields_query_consts(
                 )
             } else {
                 format!(
-                    "UPDATE {} SET {} = {} + {{?}} WHERE {} = ?",
+                    "UPDATE {} SET {} = {} + ? WHERE {} = ?",
                     table_name.to_string(),
                     field_name,
                     field_name,
@@ -98,7 +98,7 @@ pub(crate) fn pull_from_set_fields_query_consts(
 
             let query_str = if is_list {
                 format!(
-                    "UPDATE {} SET {} = {} - [?] WHERE {} = ?",
+                    "UPDATE {} SET {} = {} - ? WHERE {} = ?",
                     table_name.to_string(),
                     field_name,
                     field_name,
@@ -106,7 +106,7 @@ pub(crate) fn pull_from_set_fields_query_consts(
                 )
             } else {
                 format!(
-                    "UPDATE {} SET {} = {} - {{?}} WHERE {} = ?",
+                    "UPDATE {} SET {} = {} - ? WHERE {} = ?",
                     table_name.to_string(),
                     field_name,
                     field_name,

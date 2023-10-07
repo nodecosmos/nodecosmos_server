@@ -1,3 +1,3 @@
-pub(crate) mod cover_image_uploader;
-pub(crate) mod reorder;
-pub(crate) mod search;
+pub mod cover_image_uploader;
+pub mod reorder;
+pub mod search;

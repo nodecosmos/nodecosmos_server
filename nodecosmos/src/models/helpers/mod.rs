@@ -6,7 +6,7 @@ mod plucker;
 mod user_callbacks;
 
 pub(crate) use default_callbacks::*;
-pub(crate) use defaults::*;
+pub use defaults::*;
 pub(crate) use node_callbacks::*;
-pub(crate) use plucker::*;
+pub use plucker::*;
 pub(crate) use user_callbacks::*;

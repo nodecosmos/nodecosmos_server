@@ -1,4 +1,4 @@
-pub(crate) mod status;
+pub mod status;
 
 use crate::models::commit::Commit;
 use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};

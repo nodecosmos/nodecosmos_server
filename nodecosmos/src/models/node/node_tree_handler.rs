@@ -1,5 +1,5 @@
 use crate::models::node::{Node, UpdateNodeTitle};
-use crate::models::node_descendant::{NodeDescendant, UpdateNodeDescendantTitle};
+use crate::models::node_descendant::NodeDescendant;
 use charybdis::{CharybdisError, CharybdisModelBatch};
 use scylla::CachingSession;
 
@@ -8,27 +8,24 @@ impl Node {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
-        let mut batch = CharybdisModelBatch::new();
-
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            let ancestor_chunks = ancestor_ids.chunks(100);
+            let mut batch = CharybdisModelBatch::new();
 
-            for ancestor_ids in ancestor_chunks {
-                for ancestor_id in ancestor_ids {
-                    let node_descendant = NodeDescendant {
-                        root_id: ancestor_id.to_owned(),
-                        id: self.id,
-                        order_index: self.order_index,
-                        parent_id: self.parent_id,
-                        title: self.title.clone(),
-                    };
+            for ancestor_id in ancestor_ids {
+                let node_descendant = NodeDescendant {
+                    root_id: self.root_id,
+                    node_id: *ancestor_id,
+                    id: self.id,
+                    order_index: self.order_index.unwrap_or_default(),
+                    parent_id: self.parent_id,
+                    title: self.title.clone(),
+                };
 
-                    batch.append_create(&node_descendant)?;
-                }
+                batch.append_insert(&node_descendant)?;
             }
-        }
 
-        batch.execute(db_session).await?;
+            batch.execute(db_session).await?;
+        }
 
         Ok(())
     }
@@ -42,9 +39,10 @@ impl Node {
 
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
-                    root_id: ancestor_id.to_owned(),
+                    root_id: self.root_id,
+                    node_id: ancestor_id.to_owned(),
                     id: self.id,
-                    order_index: self.order_index,
+                    order_index: self.order_index.unwrap_or_default(),
                     ..Default::default()
                 };
 
@@ -59,21 +57,22 @@ impl Node {
 }
 
 impl UpdateNodeTitle {
-    /// Updates the title of the node for all ancestors.
-    pub async fn update_ancestors(
+    /// Updates the title of the node for node_descendant record within ancestor nodes.
+    pub async fn update_node_descendants(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), CharybdisError> {
         let mut batch = CharybdisModelBatch::new();
 
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            println!("ancestor_ids: {:?}", ancestor_ids);
             for ancestor_id in ancestor_ids {
-                let node_descendant = UpdateNodeDescendantTitle {
-                    root_id: ancestor_id.to_owned(),
+                let node_descendant = NodeDescendant {
+                    root_id: self.root_id,
+                    node_id: ancestor_id.to_owned(),
                     id: self.id,
+                    parent_id: self.parent_id,
                     title: self.title.clone(),
-                    order_index: self.order_index,
+                    order_index: self.order_index.unwrap_or_default(),
                 };
 
                 batch.append_update(&node_descendant)?;

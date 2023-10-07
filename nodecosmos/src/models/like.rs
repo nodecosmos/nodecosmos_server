@@ -117,7 +117,7 @@ impl Like {
     ) -> Result<(), CharybdisError> {
         let q = User::PUSH_TO_LIKED_OBJECT_IDS_QUERY;
 
-        execute(session, q, (self.object_id, self.user_id)).await?;
+        execute(session, q, (vec![self.object_id], self.user_id)).await?;
 
         Ok(())
     }
@@ -128,7 +128,7 @@ impl Like {
     ) -> Result<(), CharybdisError> {
         let q = User::PULL_FROM_LIKED_OBJECT_IDS_QUERY;
 
-        execute(session, q, (self.object_id, self.user_id)).await?;
+        execute(session, q, (vec![self.object_id], self.user_id)).await?;
 
         Ok(())
     }
