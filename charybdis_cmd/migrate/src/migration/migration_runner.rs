@@ -14,7 +14,7 @@ impl<'a> Migration<'a> {
         );
 
         // remove all colors from cql string
-        let stripped = strip(cql.as_bytes()).unwrap();
+        let stripped = strip(cql.as_bytes());
         let cql: String = String::from_utf8(stripped).unwrap();
 
         let res = self.session.query(cql.clone(), ()).await;
