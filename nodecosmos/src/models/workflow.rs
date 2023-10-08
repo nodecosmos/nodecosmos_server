@@ -2,7 +2,11 @@ use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::input_output::IoDelete;
-use charybdis::*;
+use charybdis::{
+    execute, Callbacks, CharybdisError, CharybdisModelBatch, List, Text, Timestamp, Uuid,
+};
+use charybdis_macros::{charybdis_model, partial_model_generator};
+use scylla::CachingSession;
 
 ///
 /// Workflow model
@@ -108,22 +112,32 @@ impl Callbacks for Workflow {
         if self.flow_ids.is_some() {
             let flow_steps =
                 FlowStepDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                    .await?
+                    .try_collect()
                     .await?;
 
-            let flows =
-                FlowDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+            let flows = FlowDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
             let input_outputs =
-                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                    .await?
+                    .try_collect()
+                    .await?;
 
-            CharybdisModelBatch::chunked_delete(session, &flow_steps).await?;
-            CharybdisModelBatch::chunked_delete(session, &flows).await?;
-            CharybdisModelBatch::chunked_delete(session, &input_outputs).await?;
+            CharybdisModelBatch::chunked_delete(session, &flow_steps, 100).await?;
+            CharybdisModelBatch::chunked_delete(session, &flows, 100).await?;
+            CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
         } else if self.initial_input_ids.is_some() {
             let input_outputs =
-                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                    .await?
+                    .try_collect()
+                    .await?;
 
-            CharybdisModelBatch::chunked_delete(session, &input_outputs).await?;
+            CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
         }
 
         Ok(())

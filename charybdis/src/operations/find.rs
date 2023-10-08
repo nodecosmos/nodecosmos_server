@@ -1,7 +1,6 @@
-use futures::TryStreamExt;
+use crate::CharybdisModelIterator;
 use scylla::frame::value::ValueList;
 use scylla::query::Query;
-use scylla::transport::iterator::TypedRowIterator;
 use scylla::transport::session::TypedRowIter;
 use scylla::{Bytes, IntoTypedRows};
 use scylla::{CachingSession, QueryResult};
@@ -27,7 +26,7 @@ pub trait Find: BaseModel {
         query: &'static str,
         values: impl ValueList,
         page_size: i32,
-    ) -> Result<TypedRowIterator<Self>, CharybdisError>;
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
 
     async fn find_paged(
         session: &CachingSession,
@@ -41,7 +40,7 @@ pub trait Find: BaseModel {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<Vec<Self>, CharybdisError>;
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
 }
 
 impl<T: BaseModel> Find for T {
@@ -75,13 +74,12 @@ impl<T: BaseModel> Find for T {
         query: &'static str,
         values: impl ValueList,
         page_size: i32,
-    ) -> Result<TypedRowIterator<Self>, CharybdisError> {
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
         let query = Query::new(query).with_page_size(page_size);
 
-        let rows = session.execute_iter(query, values).await?;
-        let typed_rows: TypedRowIterator<Self> = rows.into_typed();
+        let rows = session.execute_iter(query, values).await?.into_typed();
 
-        Ok(typed_rows)
+        Ok(CharybdisModelIterator::from(rows))
     }
 
     async fn find_paged(
@@ -115,25 +113,16 @@ impl<T: BaseModel> Find for T {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<Vec<Self>, CharybdisError> {
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
         let get_partition_key_values = self.get_partition_key_values().map_err(|e| {
             CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
         })?;
 
-        let rows_stream = session
+        let rows = session
             .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
             .await?
             .into_typed::<Self>();
 
-        let mut results = Vec::new();
-
-        rows_stream
-            .try_fold(&mut results, |acc, row| async {
-                acc.push(row);
-                Ok(acc)
-            })
-            .await?;
-
-        Ok(results)
+        Ok(CharybdisModelIterator::from(rows))
     }
 }

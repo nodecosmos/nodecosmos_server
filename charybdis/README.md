@@ -191,18 +191,22 @@ async fn main() {
 `find_by_partition_key`
 ```rust
   // partition_key results in multiple rows
-  let users: TypedRowIter<User> = user.find_by_partition_key(&session).await.unwrap();
+  let users: Vec<User> = user.find_by_partition_key(&session).await.unwrap();
 ```
 
 `find_<model>_query` & `find`
 
 ```rust
   let query = find_user_query!("id = ?");
-  let users: TypedRowIter<User> = User::find(&session, query, (id,)).await.unwrap();
+  let users: = User::find(&session, query, (id,)).await.unwrap();
 ```
 `find_one`
 ```rust
 let user = User::find_one(&session, find_user_query!("id = ?"), (id,)).await?;
+```
+`find_paged`
+```rust
+(users, paging_state) = User::find_paged(&session, find_user_query!("id = ?"), (id,), current_paging_state).await?;
 ```
 
 ### Update
@@ -231,26 +235,26 @@ Limitation is that it requires whole primary key fields to be added.
 Macro is defined by using `#[partial_model_generator]`.
 ```rust
 // auto-generated macro - available in crate::models::user
-partial_user!(OpsUser, id, username);
+partial_user!(PartUser, id, username);
 
 let id = Uuid::new_v4();
-let op_user: OpsUser = OpsUser { id, username: "scylla".to_string() };
+let partial_user = PartUser { id, username: "scylla".to_string() };
 
 // we can have same operations as on base model
 // INSERT into users (id, username) VALUES (?, ?)
-op_user.insert(&session).await;
+partial_user.insert(&session).await;
 
 // UPDATE users SET username = ? WHERE id = ?
-op_user.update(&session).await;
+partial_user.update(&session).await;
 
 // DELETE FROM users WHERE id = ?
-op_user.delete(&session).await;
+partial_user.delete(&session).await;
 
-// get partial user
-let op_user: OpsUser = user.find_by_primary_key(&:session).await.unwrap();
+// get partial PartUser
+let partial_user: OpsUser = partial_user.find_by_primary_key(&:session).await.unwrap();
 
-// get whole user by primary key
-let user = op_user.as_native().find_by_primary_key(&session).await.unwrap();
+// get native user model by primary key
+let user = partial_user.as_native().find_by_primary_key(&session).await.unwrap();
 ```
 
 Note that if you have custom attributes on your model fields,
@@ -270,6 +274,7 @@ pub struct Node {
 
     #[serde(rename = "rootId")]
     pub root_id: Uuid, 
+    
     pub title: String,
 }
 
@@ -305,22 +310,7 @@ It can be used to create custom filtering clauses like:
 ```rust
 // automatically generated macro rule
 let query = find_post_query!("created_at_day = ? AND title = ?");
-
-let created_at_day = Utc::now().date_naive();
-let title = "some title";
-
-let posts: TypedRowIter<Post> = Post::find(&session, query, (created_at_day, title)).await.unwrap();
-```
-
-For Custom update queries we have `update_<struct_name>_query!` macro.
-
-For value list we first pass the values that we want to update,
-and then we provide primary key values.
-```rust
-let query = update_post_query!("description = ?");
-let res = execute(&session, query, (new_desc, created_at_day, title))
-    .await
-    .unwrap();
+let posts = Post::find(&session, query, (created_at_day, title)).await.unwrap();
 ```
 
 Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and
@@ -347,26 +337,14 @@ let posts: TypedRowIter<OpsPost> = OpsPost::find(&session, query, (created_at, u
 let mut user_by_username: UsersByUsername = UsersByUsername::new();
 user_by_username.username = "test_username".to_string();
 
-let users_by_username: TypedRowIter<UsersByUsername> = user_by_username
+let users_by_username = user_by_username
     .find_by_partition_key(&session)
-    .awaite
-    .unwrap();
+    .await?;
 
 for user in users_by_username {
     println!("{:?}", user);
 }
 
-// custom queries
-let query = find_users_by_username_query!("username = ?");
-
-let users_by_username: TypedRowIter<UsersByUsername> =
-    UsersByUsername::find(&session, query, ("test_username",))
-        .await
-        .unwrap();
-
-for user in users_by_username {
-    println!("{:?}", user);
-}
 ```
 
 ## Callbacks
@@ -442,64 +420,83 @@ match res {
     }
 ```
 
+## ExtensionCallbacks
+We can also define callbacks that will be given custom extension if needed.
+
+Let's say we define custom extension that will be used to 
+update elastic document on every post update:
+```rust
+pub struct CustomExtension {
+    pub elastic_client: ElasticClient,
+}
+```
+
+We can define `after_update` callback on `Post`  
+that has custom extension as argument:
+```rust
+#[charybdis_model(...)]
+pub struct Post {}
+
+impl ExtCallbacks<CustomExtension> for Post {
+
+    async fn after_update(
+        &mut self,
+        _db_session: &CachingSession,
+        extension: &CustomExtension,
+    ) -> Result<(), CharybdisError> {
+        extension.elastic_client.update(...).await?;
+
+        Ok(())
+    }
+}
+```
+
+So to trigger callback we use same `update_cb` method:
+```rust
+let post = Post::from_json(json);
+let res = post.update_cb(&session, custom_extensions).await;
+```
+
 ## Batch Operations
 
-We can execute batch operations by using combination of native driver `Batch` and queries
-generated by `charybdis`:
+For batched operations we can make use of `CharybdisModelBatch`.
 
 ```rust
-  let id = Uuid::new_v4();
-  let mut user = User {
-      id,
-      username: "initial_username".to_string(),
-      email: "test@nodecosmos.com".to_string(),
-      password: "test".to_string(),
-      hashed_password: "test".to_string(),
-      first_name: "test".to_string(),
-      last_name: "test".to_string(),
-      created_at: Utc::now(),
-      updated_at: Utc::now(),
-      address: None,
-  };
+let mut batch = CharybdisModelBatch::new();
+let users: Vec<User> = Vec::from_json(json);
 
-  partial_user!(UpdateUser, id, username);
+// inserts
+batch.append_inserts(users);
 
-  let mut user2 = UpdateUser {
-      id,
-      username: "updated_username".to_string(),
-  };
+// or updates
+batch.append_updates(users);
 
-  let mut batch: Batch = Default::default();
+// or deletes
+batch.append_deletes(users);
 
-  batch.append_statement(User::INSERT_QUERY);
-  batch.append_statement(UpdateUser::UPDATE_QUERY);
-
-  let user2_update_values = user2.get_update_values().unwrap();
-
-  let batch_res = session
-      .batch(&batch, (&user, user2_update_values))
-      .await
-      .unwrap();
-
-  let user = user.find_by_primary_key(&session).await.unwrap();
-
-  assert_eq!(user.username, "updated_username".to_string());
+batch.execute(&session).await;
 ```
+
+It also supports chunked batch operations
+```rust
+chunk_size = 100;
+CharybdisModelBatch::chunked_inserts(&session, users, chunk_size).await?;
+```
+
 ## As Native
-In case you need native model in order to run calculations or other operations, you can use `as_native` method:
+In case you need to run operations on native model, you can use `as_native` method:
 ```rust
 partial_user!(UpdateUser, id, username);
 
-let mut user = UpdateUser {
+let mut update_user_username = UpdateUser {
     id,
     username: "updated_username".to_string(),
 };
 
-let native_user = user.as_native().find_by_primary_key(&session).await.unwrap();
+let native_user: User = update_user_username.as_native().find_by_primary_key(&session).await?;
 
 // action that requires native model
 authorize_user(&native_user);
-
 ```
 
 ## Collection queries
@@ -512,17 +509,17 @@ that can be used to push or pull elements from collection.
 pub struct User {
     id: Uuid,
     tags: Set<String>,
-    edited_posts: List<Uuid>,
+    post_ids: List<Uuid>,
 }
 
 let query = User::PUSH_TO_TAGS_QUERY;
-execute(query, ("new_tag", &user.id)).await;
+execute(query, (vec![tag], &user.id)).await;
 
-let query = User::PULL_FROM_EDITED_POSTS_QUERY;
-execute(query, (uuid, &user.id)).await;
+let query = User::PULL_FROM_POST_IDS_QUERY;
+execute(query, (post_ids_vec, &user.id)).await;
 ```
 
-## Limitations:
+## Considerations:
 1) `partial_models` don't implement same callbacks defined on base model so 
     `insert_cb`, `update_cb`, `delete_cb` will not work on partial models unless callbacks are
     manually implemented for partial models e.g.

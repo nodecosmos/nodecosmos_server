@@ -3,12 +3,12 @@ use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_node_likes_count_query, UpdateNodeLikesCount};
 use crate::models::user::User;
 use charybdis::{
-    execute, CharybdisError, Deserialize, ExtCallbacks, Find, New, Text, Timestamp,
-    UpdateWithExtCallbacks, Uuid,
+    execute, CharybdisError, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid,
 };
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use scylla::CachingSession;
+use serde::Deserialize;
 use std::fmt;
 
 // CQL limitation is to have counters in a separate table

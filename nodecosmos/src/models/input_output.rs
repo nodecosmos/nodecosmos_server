@@ -3,7 +3,6 @@ use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::*;
-use futures::StreamExt;
 
 #[derive(Clone)]
 #[partial_model_generator]
@@ -58,18 +57,15 @@ impl InputOutput {
         session: &CachingSession,
         original_id: Uuid,
     ) -> Result<Vec<InputOutput>, CharybdisError> {
-        let mut ios_iter = InputOutput::find_iter(
+        let ios = InputOutput::find_iter(
             session,
             find_input_output_query!("original_id = ?"),
             (original_id,),
             100,
         )
+        .await?
+        .try_collect()
         .await?;
-
-        let mut ios: Vec<InputOutput> = vec![];
-        while let Some(io_result) = ios_iter.next().await {
-            ios.push(io_result?);
-        }
 
         Ok(ios)
     }

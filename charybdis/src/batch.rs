@@ -1,4 +1,5 @@
-use crate::{CharybdisError, Model, SerializedValues, ValueList};
+use crate::{CharybdisError, Model};
+use crate::{SerializedValues, ValueList};
 use scylla::CachingSession;
 
 // Simple batch for Charybdis models
@@ -11,43 +12,29 @@ pub struct CharybdisModelBatch {
 
 impl CharybdisModelBatch {
     pub fn new() -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
-
         Self {
             batch: scylla::batch::Batch::default(),
             values: Vec::new(),
             with_uniq_timestamp: false,
-            current_timestamp: now,
+            current_timestamp: chrono::Utc::now().timestamp_micros(),
         }
     }
 
     pub fn unlogged() -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
-
         Self {
             batch: scylla::batch::Batch::new(scylla::batch::BatchType::Unlogged),
             values: Vec::new(),
             with_uniq_timestamp: false,
-            current_timestamp: now,
-        }
-    }
-
-    pub fn from_batch_type(batch_type: scylla::batch::BatchType) -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
-
-        Self {
-            batch: scylla::batch::Batch::new(batch_type),
-            values: Vec::new(),
-            with_uniq_timestamp: false,
-            current_timestamp: now,
+            current_timestamp: chrono::Utc::now().timestamp_micros(),
         }
     }
 
     pub async fn chunked_insert<T: Model + ValueList>(
         db_session: &CachingSession,
         iter: &Vec<T>,
+        chunk_size: usize,
     ) -> Result<(), CharybdisError> {
-        let chunks = iter.chunks(100);
+        let chunks = iter.chunks(chunk_size);
 
         for chunk in chunks {
             let mut batch = Self::unlogged();
@@ -63,8 +50,9 @@ impl CharybdisModelBatch {
     pub async fn chunked_update<T: Model + ValueList>(
         db_session: &CachingSession,
         iter: &Vec<T>,
+        chunk_size: usize,
     ) -> Result<(), CharybdisError> {
-        let chunks = iter.chunks(100);
+        let chunks = iter.chunks(chunk_size);
 
         for chunk in chunks {
             let mut batch = Self::unlogged();
@@ -80,8 +68,9 @@ impl CharybdisModelBatch {
     pub async fn chunked_delete<T: Model + ValueList>(
         db_session: &CachingSession,
         iter: &Vec<T>,
+        chunk_size: usize,
     ) -> Result<(), CharybdisError> {
-        let chunks = iter.chunks(100);
+        let chunks = iter.chunks(chunk_size);
 
         for chunk in chunks {
             let mut batch = Self::unlogged();
@@ -97,8 +86,9 @@ impl CharybdisModelBatch {
     pub async fn chunked_delete_by_partition_key<T: Model + ValueList>(
         db_session: &CachingSession,
         iter: &Vec<T>,
+        chunk_size: usize,
     ) -> Result<(), CharybdisError> {
-        let chunks = iter.chunks(100);
+        let chunks = iter.chunks(chunk_size);
 
         for chunk in chunks {
             let mut batch = Self::unlogged();

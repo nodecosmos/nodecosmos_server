@@ -21,6 +21,8 @@ pub async fn get_contribution_requests(
 
     let contribution_requests: Vec<BaseContributionRequest> = contribution_request
         .find_by_partition_key(&db_session)
+        .await?
+        .try_collect()
         .await?;
 
     Ok(HttpResponse::Ok().json(contribution_requests))

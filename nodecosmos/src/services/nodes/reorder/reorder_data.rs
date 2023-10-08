@@ -40,6 +40,8 @@ pub async fn find_reorder_data(
         ..Default::default()
     }
     .find_by_partition_key(&db_session)
+    .await?
+    .try_collect()
     .await?;
 
     let new_parent = ReorderNode {
@@ -50,7 +52,10 @@ pub async fn find_reorder_data(
     .await?;
 
     let descendants =
-        NodeDescendant::find_by_root_id_and_node_id(&db_session, node.root_id, node.id).await?;
+        NodeDescendant::find_by_root_id_and_node_id(&db_session, node.root_id, node.id)
+            .await?
+            .try_collect()
+            .await?;
 
     let new_upper_sibling = init_sibling(params.new_upper_sibling_id, &db_session).await?;
     let new_bottom_sibling = init_sibling(params.new_bottom_sibling_id, &db_session).await?;

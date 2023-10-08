@@ -175,7 +175,7 @@ impl<'a> Reorderer<'a> {
             descendants_to_delete.push(descendant);
         }
 
-        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete)
+        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("remove_node_from_old_ancestors: {:?}", err));
@@ -202,7 +202,7 @@ impl<'a> Reorderer<'a> {
             }
         }
 
-        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete)
+        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!(
@@ -231,7 +231,7 @@ impl<'a> Reorderer<'a> {
             descendants_to_add.push(descendant);
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add)
+        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
@@ -259,7 +259,7 @@ impl<'a> Reorderer<'a> {
             }
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add)
+        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));

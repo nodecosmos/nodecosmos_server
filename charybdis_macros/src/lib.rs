@@ -55,7 +55,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
     // Associated functions for finding by clustering keys
-    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named);
+    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -136,7 +136,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
 
     // Associated functions for finding by clustering keys
-    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named);
+    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
         use futures::TryStreamExt;

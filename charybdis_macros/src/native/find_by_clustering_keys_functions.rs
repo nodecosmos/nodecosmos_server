@@ -21,6 +21,7 @@ use syn::{parse_str, FieldsNamed};
 pub(crate) fn find_by_clustering_keys_functions(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
+    struct_name: &syn::Ident,
 ) -> TokenStream {
     let partition_keys = ch_args.partition_keys.clone().unwrap();
     let table_name = ch_args.table_name.clone().unwrap();
@@ -83,7 +84,7 @@ pub(crate) fn find_by_clustering_keys_functions(
             pub async fn #find_by_fun_name(
                 session: &charybdis::CachingSession,
                 #(#arguments),*
-            ) -> Result<Vec<Self>, charybdis::CharybdisError> {
+            ) -> Result<charybdis::CharybdisModelIterator<#struct_name>, charybdis::CharybdisError> {
                 use futures::TryStreamExt;
 
                 let mut serialized = charybdis::SerializedValues::with_capacity(#capacity);
@@ -93,16 +94,7 @@ pub(crate) fn find_by_clustering_keys_functions(
                 let query_result = session.execute_iter(#query_str, serialized).await?;
                 let rows = query_result.into_typed::<Self>();
 
-                let mut results = Vec::new();
-
-                rows
-                    .try_fold(&mut results, |acc, row| async {
-                        acc.push(row);
-                        Ok(acc)
-                    })
-                    .await?;
-
-                Ok(results)
+                Ok(charybdis::CharybdisModelIterator::from(rows))
             }
         };
 

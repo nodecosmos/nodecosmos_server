@@ -8,8 +8,9 @@ use crate::models::commit::Commit;
 use crate::models::node::{Node, UpdateNodeDescription, UpdateNodeTitle};
 use crate::models::workflow::Workflow;
 use actix_web::{post, web, HttpResponse};
-use charybdis::{Deserialize, Uuid};
+use charybdis::Uuid;
 use scylla::CachingSession;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct CommitParams {

@@ -115,7 +115,10 @@ impl Node {
         db_session: &CachingSession,
     ) -> Result<Vec<NodeDescendant>, CharybdisError> {
         let descendants =
-            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
+            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
         Ok(descendants)
     }
