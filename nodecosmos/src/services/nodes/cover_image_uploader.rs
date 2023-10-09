@@ -1,6 +1,6 @@
 use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
-use crate::models::node::{Node, UpdateNodeCoverImage};
+use crate::models::node::{Node, UpdateCoverImageNode};
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::services::image::*;
 use actix_multipart::Multipart;
@@ -68,7 +68,7 @@ pub async fn handle_cover_image_upload(
         )
         .await?;
 
-        let mut update_node_cover_img = UpdateNodeCoverImage::new();
+        let mut update_node_cover_img = UpdateCoverImageNode::new();
         update_node_cover_img.id = node.id;
         update_node_cover_img.cover_image_url = Some(url.clone());
         update_node_cover_img.cover_image_filename = Some(new_cover_image_filename);

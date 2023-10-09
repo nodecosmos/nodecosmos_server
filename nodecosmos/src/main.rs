@@ -31,6 +31,7 @@ async fn main() {
         elastic_client: elastic_client.clone(),
     };
     let s3_client = get_aws_s3_client().await;
+    let redis_pool: Pool = get_redis_pool(&nodecosmos).await;
 
     // web data
     let db_session_web_data = web::Data::new(db_session);
@@ -39,20 +40,20 @@ async fn main() {
     let s3_client_web_data = web::Data::new(s3_client.clone());
     let nodecosmos_web_data = web::Data::new(nodecosmos.clone());
     let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
+    let redis_pool_web_data = web::Data::new(redis_pool.clone());
 
-    let pool: Pool = get_redis_pool(&nodecosmos).await;
-    let pool_web_data = web::Data::new(pool.clone());
+    // resource locker
+    let redis_pool_arc = Arc::clone(&redis_pool_web_data);
+    let resource_locker = ResourceLocker::new(redis_pool_arc);
+    let resource_locker_web_data = web::Data::new(resource_locker);
 
     elastic::build(&elastic_client).await;
 
-    nodecosmos.init(&db_session_web_data).await;
+    nodecosmos
+        .init(&db_session_web_data, &resource_locker_web_data)
+        .await;
 
     HttpServer::new(move || {
-        let pool_arc = Arc::clone(&pool_web_data);
-
-        let resource_locker = ResourceLocker::new(pool_arc);
-        let resource_locker_web_data = web::Data::new(resource_locker);
-
         App::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(get_cors(&nodecosmos))
@@ -60,8 +61,8 @@ async fn main() {
             .app_data(db_session_web_data.clone())
             .app_data(elastic_client_web_data.clone())
             .app_data(cb_extension_web_data.clone())
-            .app_data(pool_web_data.clone())
-            .app_data(resource_locker_web_data)
+            .app_data(redis_pool_web_data.clone())
+            .app_data(resource_locker_web_data.clone())
             .app_data(s3_client_web_data.clone())
             .app_data(nodecosmos_web_data.clone())
             .app_data(desc_ws_conn_pool.clone())

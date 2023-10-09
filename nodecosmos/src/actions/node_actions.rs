@@ -65,7 +65,7 @@ pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetNodeDescription::new();
+    let mut node = GetDescriptionNode::new();
     node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
@@ -81,7 +81,7 @@ pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetNodedescriptionBase64::new();
+    let mut node = GetDescriptionBase64Node::new();
     node.id = *id;
 
     let node = node.find_by_primary_key(&db_session).await?;
@@ -115,7 +115,7 @@ pub async fn create_node(
 
 #[put("/title")]
 pub async fn update_node_title(
-    mut node: web::Json<UpdateNodeTitle>,
+    mut node: web::Json<UpdateTitleNode>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
@@ -133,7 +133,7 @@ pub async fn update_node_title(
 #[put("/description")]
 pub async fn update_node_description(
     db_session: web::Data<CachingSession>,
-    mut node: web::Json<UpdateNodeDescription>,
+    mut node: web::Json<UpdateDescriptionNode>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -173,10 +173,16 @@ pub async fn reorder_nodes(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
+    let mut node = Node::new();
+    node.id = params.node_id;
+
+    resource_locker.check_node_lock(&node).await?;
+
+    let node = node.find_by_primary_key(&db_session).await?;
+    auth_node_update(&node, &current_user).await?;
+
     let mut reorderer = Reorderer::new(&db_session, params.into_inner()).await?;
 
-    resource_locker.check_node_lock(&reorderer.node).await?;
-    auth_node_update(&reorderer.node, &current_user).await?;
     reorderer.reorder(&resource_locker).await?;
 
     Ok(HttpResponse::Ok().finish())
@@ -223,7 +229,7 @@ async fn delete_cover_image(
     nc_app: web::Data<crate::NodecosmosApp>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = UpdateNodeCoverImage::new();
+    let mut node = UpdateCoverImageNode::new();
     node.id = *id;
 
     let mut node = node.find_by_primary_key(&db_session).await?;

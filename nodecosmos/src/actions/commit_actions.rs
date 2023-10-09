@@ -5,7 +5,7 @@ use crate::models::commit::node_commit::NodeCommit;
 use crate::models::commit::types::{CommitObjectTypes, CommitTypes, Committable};
 use crate::models::commit::workflow_commit::WorkflowCommit;
 use crate::models::commit::Commit;
-use crate::models::node::{Node, UpdateNodeDescription, UpdateNodeTitle};
+use crate::models::node::{Node, UpdateDescriptionNode, UpdateTitleNode};
 use crate::models::workflow::Workflow;
 use actix_web::{post, web, HttpResponse};
 use charybdis::Uuid;
@@ -42,7 +42,7 @@ pub async fn create_node_commit(
 #[post("/nodes/{contribution_request_id}/{node_id}/title")]
 pub async fn update_node_commit_title(
     db_session: web::Data<CachingSession>,
-    node: web::Json<UpdateNodeTitle>,
+    node: web::Json<UpdateTitleNode>,
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -67,7 +67,7 @@ pub async fn update_node_commit_title(
 #[post("/nodes/{contribution_request_id}/{node_id}/description")]
 pub async fn update_node_commit_description(
     db_session: web::Data<CachingSession>,
-    node: web::Json<UpdateNodeDescription>,
+    node: web::Json<UpdateDescriptionNode>,
     current_user: CurrentUser,
     params: web::Path<CommitParams>,
 ) -> Result<HttpResponse, NodecosmosError> {

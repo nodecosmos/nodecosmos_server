@@ -1,4 +1,4 @@
-use crate::models::node::{Node, UpdateNodeTitle};
+use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::node_descendant::NodeDescendant;
 use charybdis::{CharybdisError, CharybdisModelBatch};
 use scylla::CachingSession;
@@ -56,7 +56,7 @@ impl Node {
     }
 }
 
-impl UpdateNodeTitle {
+impl UpdateTitleNode {
     /// Updates the title of the node for node_descendant record within ancestor nodes.
     pub async fn update_node_descendants(
         &mut self,

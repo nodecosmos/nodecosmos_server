@@ -6,7 +6,7 @@ use crate::actions::client_session::CurrentUser;
 use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{
-    default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb, impl_updated_at_cb,
+    default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
     sanitize_description_ext_cb_fn,
 };
 use crate::models::node_descendant::NodeDescendant;
@@ -39,7 +39,7 @@ pub struct Node {
     pub parent_id: Option<Uuid>,
 
     #[serde(rename = "ancestorIds")]
-    pub ancestor_ids: Option<List<Uuid>>,
+    pub ancestor_ids: Option<Set<Uuid>>,
 
     // node
     pub title: Option<Text>,
@@ -206,17 +206,17 @@ partial_node!(
 );
 
 partial_node!(
-    GetNodeDescription,
+    GetDescriptionNode,
     root_id,
     id,
     description,
     description_markdown
 );
 
-partial_node!(GetNodedescriptionBase64, id, description_base64);
+partial_node!(GetDescriptionBase64Node, id, description_base64);
 
 partial_node!(
-    ReorderNode,
+    GetStructureNode,
     root_id,
     id,
     parent_id,
@@ -224,12 +224,11 @@ partial_node!(
     order_index
 );
 
-partial_node!(UpdateNodeAncestorIds, id, parent_id, ancestor_ids);
-
-partial_node!(UpdateNodeOrder, id, parent_id, order_index);
 //----------------------------------------------------------------------------------------------------------------------
+partial_node!(UpdateOrderNode, id, parent_id, order_index);
+
 partial_node!(
-    UpdateNodeTitle,
+    UpdateTitleNode,
     root_id,
     parent_id,
     id,
@@ -239,7 +238,7 @@ partial_node!(
     updated_at
 );
 
-impl UpdateNodeTitle {
+impl UpdateTitleNode {
     pub fn set_defaults(&mut self, native_node: Node) {
         self.updated_at = Some(Utc::now());
 
@@ -250,7 +249,7 @@ impl UpdateNodeTitle {
     }
 }
 
-impl ExtCallbacks<CbExtension> for UpdateNodeTitle {
+impl ExtCallbacks<CbExtension> for UpdateTitleNode {
     async fn after_update(
         &mut self,
         session: &CachingSession,
@@ -272,7 +271,7 @@ impl ExtCallbacks<CbExtension> for UpdateNodeTitle {
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(
-    UpdateNodeDescription,
+    UpdateDescriptionNode,
     root_id,
     id,
     description,
@@ -281,7 +280,8 @@ partial_node!(
     description_base64,
     updated_at
 );
-impl ExtCallbacks<CbExtension> for UpdateNodeDescription {
+
+impl ExtCallbacks<CbExtension> for UpdateDescriptionNode {
     sanitize_description_ext_cb_fn!();
 
     // TODO: introduce bounce queue
@@ -302,19 +302,19 @@ impl ExtCallbacks<CbExtension> for UpdateNodeDescription {
     }
 }
 
-partial_node!(UpdateNodeOwner, id, owner_id, updated_at);
-impl_updated_at_cb!(UpdateNodeOwner);
+//----------------------------------------------------------------------------------------------------------------------
+partial_node!(UpdateLikesCountNode, id, likes_count, updated_at);
+impl_node_updated_at_with_elastic_ext_cb!(UpdateLikesCountNode);
 
-partial_node!(UpdateNodeLikesCount, id, likes_count, updated_at);
-impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeLikesCount);
-
+//----------------------------------------------------------------------------------------------------------------------
 partial_node!(
-    UpdateNodeCoverImage,
+    UpdateCoverImageNode,
     id,
     cover_image_url,
     cover_image_filename,
     updated_at
 );
-impl_node_updated_at_with_elastic_ext_cb!(UpdateNodeCoverImage);
+impl_node_updated_at_with_elastic_ext_cb!(UpdateCoverImageNode);
 
+//----------------------------------------------------------------------------------------------------------------------
 partial_node!(DeleteNode, id);

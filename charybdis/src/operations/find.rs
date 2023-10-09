@@ -1,4 +1,4 @@
-use crate::CharybdisModelIterator;
+use crate::CharybdisModelStream;
 use scylla::frame::value::ValueList;
 use scylla::query::Query;
 use scylla::transport::session::TypedRowIter;
@@ -26,7 +26,7 @@ pub trait Find: BaseModel {
         query: &'static str,
         values: impl ValueList,
         page_size: i32,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
 
     async fn find_paged(
         session: &CachingSession,
@@ -40,7 +40,7 @@ pub trait Find: BaseModel {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
 }
 
 impl<T: BaseModel> Find for T {
@@ -74,12 +74,12 @@ impl<T: BaseModel> Find for T {
         query: &'static str,
         values: impl ValueList,
         page_size: i32,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
         let query = Query::new(query).with_page_size(page_size);
 
         let rows = session.execute_iter(query, values).await?.into_typed();
 
-        Ok(CharybdisModelIterator::from(rows))
+        Ok(CharybdisModelStream::from(rows))
     }
 
     async fn find_paged(
@@ -113,7 +113,7 @@ impl<T: BaseModel> Find for T {
     async fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
         let get_partition_key_values = self.get_partition_key_values().map_err(|e| {
             CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
         })?;
@@ -123,6 +123,6 @@ impl<T: BaseModel> Find for T {
             .await?
             .into_typed::<Self>();
 
-        Ok(CharybdisModelIterator::from(rows))
+        Ok(CharybdisModelStream::from(rows))
     }
 }

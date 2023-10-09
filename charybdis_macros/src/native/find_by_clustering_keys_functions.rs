@@ -84,7 +84,7 @@ pub(crate) fn find_by_clustering_keys_functions(
             pub async fn #find_by_fun_name(
                 session: &charybdis::CachingSession,
                 #(#arguments),*
-            ) -> Result<charybdis::CharybdisModelIterator<#struct_name>, charybdis::CharybdisError> {
+            ) -> Result<charybdis::CharybdisModelStream<#struct_name>, charybdis::CharybdisError> {
                 use futures::TryStreamExt;
 
                 let mut serialized = charybdis::SerializedValues::with_capacity(#capacity);
@@ -94,7 +94,7 @@ pub(crate) fn find_by_clustering_keys_functions(
                 let query_result = session.execute_iter(#query_str, serialized).await?;
                 let rows = query_result.into_typed::<Self>();
 
-                Ok(charybdis::CharybdisModelIterator::from(rows))
+                Ok(charybdis::CharybdisModelStream::from(rows))
             }
         };
 

@@ -1,6 +1,6 @@
 use crate::app::CbExtension;
 use crate::models::likes_count::LikesCount;
-use crate::models::node::{find_update_node_likes_count_query, UpdateNodeLikesCount};
+use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
 use crate::models::user::User;
 use charybdis::{
     execute, CharybdisError, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid,
@@ -95,9 +95,9 @@ impl Like {
     ) -> Result<(), CharybdisError> {
         match ObjectTypes::from_string(self.object_type.as_str()) {
             Some(ObjectTypes::Node) => {
-                let nfq = find_update_node_likes_count_query!("id = ?");
+                let nfq = find_update_likes_count_node_query!("id = ?");
                 let mut node =
-                    UpdateNodeLikesCount::find_one(session, nfq, (self.object_id,)).await?;
+                    UpdateLikesCountNode::find_one(session, nfq, (self.object_id,)).await?;
                 let lc = self.likes_count(session).await?;
 
                 node.likes_count = Some(lc.count.0);

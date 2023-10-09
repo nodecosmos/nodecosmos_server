@@ -1,3 +1,5 @@
+use crate::services::nodes::reorder::Recovery;
+use crate::services::resource_locker::ResourceLocker;
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
 use actix_session::storage::RedisActorSessionStore;
@@ -5,8 +7,6 @@ use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{cookie, http};
 use deadpool_redis::{Config, Pool, Runtime};
-
-use crate::services::nodes::reorder::recover_reorder_failures;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
@@ -37,8 +37,8 @@ impl App {
     }
 
     /// Init processes that need to be run on startup
-    pub async fn init(&self, db_session: &CachingSession) {
-        recover_reorder_failures(db_session).await;
+    pub async fn init(&self, db_session: &CachingSession, locker: &ResourceLocker) {
+        Recovery::recover_from_stored_data(&db_session, locker).await;
     }
 }
 

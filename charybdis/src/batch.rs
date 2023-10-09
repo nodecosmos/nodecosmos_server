@@ -200,6 +200,18 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
+    pub fn append_deletes<T: Model + ValueList>(
+        &mut self,
+        iter: &[T],
+    ) -> Result<(), CharybdisError> {
+        for model in iter {
+            let result = self.append_delete(model);
+            result?
+        }
+
+        Ok(())
+    }
+
     pub fn append_delete_by_partition_key<T: Model + ValueList>(
         &mut self,
         model: &T,
@@ -211,18 +223,6 @@ impl CharybdisModelBatch {
             .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
 
         self.values.push(partition_key_values.into_owned());
-
-        Ok(())
-    }
-
-    pub fn append_deletes<T: Model + ValueList>(
-        &mut self,
-        iter: &[T],
-    ) -> Result<(), CharybdisError> {
-        for model in iter {
-            let result = self.append_delete(model);
-            result?
-        }
 
         Ok(())
     }

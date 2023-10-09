@@ -4,17 +4,17 @@ use scylla::transport::iterator::{NextRowError, TypedRowIterator};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub struct CharybdisModelIterator<T: BaseModel> {
+pub struct CharybdisModelStream<T: BaseModel> {
     inner: TypedRowIterator<T>,
 }
 
-impl<T: BaseModel> From<TypedRowIterator<T>> for CharybdisModelIterator<T> {
+impl<T: BaseModel> From<TypedRowIterator<T>> for CharybdisModelStream<T> {
     fn from(iter: TypedRowIterator<T>) -> Self {
-        CharybdisModelIterator { inner: iter }
+        CharybdisModelStream { inner: iter }
     }
 }
 
-impl<T: BaseModel> Stream for CharybdisModelIterator<T> {
+impl<T: BaseModel> Stream for CharybdisModelStream<T> {
     type Item = Result<T, NextRowError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -22,8 +22,7 @@ impl<T: BaseModel> Stream for CharybdisModelIterator<T> {
     }
 }
 
-impl<T: BaseModel> CharybdisModelIterator<T> {
-    // Looks like whole point of this function is to convert NextRowError to CharybdisError
+impl<T: BaseModel> CharybdisModelStream<T> {
     pub async fn try_collect(self) -> Result<Vec<T>, CharybdisError> {
         let results: Result<Vec<T>, NextRowError> = self.inner.try_collect().await;
 
