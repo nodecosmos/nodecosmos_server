@@ -6,8 +6,8 @@ mod native;
 use crate::macro_rules::*;
 use crate::model_impl::*;
 use crate::native::{
-    find_by_clustering_keys_functions, pull_from_set_fields_query_consts,
-    push_to_set_fields_query_consts,
+    delete_by_clustering_key_functions, find_by_primary_keys_functions,
+    pull_from_set_fields_query_consts, push_to_set_fields_query_consts,
 };
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
@@ -54,8 +54,9 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
-    // Associated functions for finding by clustering keys
-    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named, struct_name);
+    // Associated functions for finding by partial primary key
+    let find_by_key_funs = find_by_primary_keys_functions(&args, fields_named, struct_name);
+    let delete_by_cks_funs = delete_by_clustering_key_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
         #[derive(
@@ -69,7 +70,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         #input
 
         impl #struct_name {
-            #find_by_cks_funs
+            #find_by_key_funs
+            #delete_by_cks_funs
             #push_to_set_fields_query_consts
             #pull_from_set_fields_query_consts
         }
@@ -136,7 +138,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
 
     // Associated functions for finding by clustering keys
-    let find_by_cks_funs = find_by_clustering_keys_functions(&args, fields_named, struct_name);
+    let find_by_key_funs = find_by_primary_keys_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
         use futures::TryStreamExt;
@@ -152,7 +154,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
         #input
 
         impl #struct_name {
-            #find_by_cks_funs
+            #find_by_key_funs
         }
 
         impl charybdis::BaseModel for #struct_name {

@@ -14,7 +14,7 @@ use charybdis::{execute, CharybdisModelBatch, Update, Uuid};
 use scylla::CachingSession;
 use serde::Deserialize;
 
-pub(crate) use recovery::Recovery;
+pub(crate) use recovery::{Recovery, RECOVERY_DATA_DIR};
 
 #[derive(Deserialize)]
 pub struct ReorderParams {
@@ -36,7 +36,7 @@ pub struct Reorderer<'a> {
     pub reorder_data: ReorderData,
 }
 
-const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 10; // 10 minutes
+const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
 
 impl<'a> Reorderer<'a> {
     pub async fn new(
@@ -94,6 +94,7 @@ impl<'a> Reorderer<'a> {
             self.remove_old_ancestors_from_node().await?;
             self.remove_old_ancestors_from_descendants().await?;
             self.remove_node_descendants_from_old_ancestors().await?;
+
             self.add_new_ancestors_to_node().await?;
             self.add_new_ancestors_to_descendants().await?;
             self.add_node_descendants_to_new_ancestors().await?;

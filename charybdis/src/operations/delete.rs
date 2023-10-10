@@ -1,6 +1,7 @@
 use crate::callbacks::{Callbacks, ExtCallbacks};
 use crate::errors::CharybdisError;
 use crate::model::Model;
+use crate::CharybdisModelBatch;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
 
@@ -36,6 +37,24 @@ impl<T: Model + ValueList> Delete for T {
             .execute(T::DELETE_BY_PARTITION_KEY_QUERY, partition_key_values)
             .await
             .map_err(CharybdisError::QueryError)
+    }
+}
+
+pub trait DeleteAll<T, I>: Iterator<Item = T>
+where
+    T: Model + ValueList,
+{
+    async fn delete_all(
+        &mut self,
+        session: &CachingSession,
+    ) -> Result<QueryResult, CharybdisError> {
+        let mut batch = CharybdisModelBatch::unlogged();
+
+        batch.append_deletes(self)?;
+
+        let res = batch.execute(session).await?;
+
+        Ok(res)
     }
 }
 

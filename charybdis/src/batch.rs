@@ -1,6 +1,6 @@
 use crate::{CharybdisError, Model};
 use crate::{SerializedValues, ValueList};
-use scylla::CachingSession;
+use scylla::{CachingSession, QueryResult};
 
 // Simple batch for Charybdis models
 pub struct CharybdisModelBatch {
@@ -39,9 +39,9 @@ impl CharybdisModelBatch {
         for chunk in chunks {
             let mut batch = Self::unlogged();
 
-            batch.append_inserts(chunk).unwrap();
+            batch.append_inserts(chunk)?;
 
-            batch.execute(db_session).await.unwrap();
+            batch.execute(db_session).await?;
         }
 
         Ok(())
@@ -57,9 +57,9 @@ impl CharybdisModelBatch {
         for chunk in chunks {
             let mut batch = Self::unlogged();
 
-            batch.append_updates(chunk).unwrap();
+            batch.append_updates(chunk)?;
 
-            batch.execute(db_session).await.unwrap();
+            batch.execute(db_session).await?;
         }
 
         Ok(())
@@ -75,9 +75,11 @@ impl CharybdisModelBatch {
         for chunk in chunks {
             let mut batch = Self::unlogged();
 
-            batch.append_deletes(chunk).unwrap();
+            for model in chunk {
+                batch.append_delete(model)?;
+            }
 
-            batch.execute(db_session).await.unwrap();
+            batch.execute(db_session).await?;
         }
 
         Ok(())
@@ -110,8 +112,8 @@ impl CharybdisModelBatch {
         return if statement.contains("SET") {
             // insert timestamp before SET
             let mut parts = statement.split("SET");
-            let first_part = parts.next().unwrap();
-            let second_part = parts.next().unwrap();
+            let first_part = parts.next().unwrap_or_default();
+            let second_part = parts.next().unwrap_or_default();
             format!(
                 "{} USING TIMESTAMP {} SET{}",
                 first_part, self.current_timestamp, second_part
@@ -119,8 +121,8 @@ impl CharybdisModelBatch {
         } else if statement.contains("DELETE") {
             // insert timestamp before WHERE
             let mut parts = statement.split("WHERE");
-            let first_part = parts.next().unwrap();
-            let second_part = parts.next().unwrap();
+            let first_part = parts.next().unwrap_or_default();
+            let second_part = parts.next().unwrap_or_default();
 
             format!(
                 "{} USING TIMESTAMP {} WHERE{}",
@@ -200,13 +202,14 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_deletes<T: Model + ValueList>(
-        &mut self,
-        iter: &[T],
-    ) -> Result<(), CharybdisError> {
+    pub fn append_deletes<I, T>(&mut self, iter: I) -> Result<(), CharybdisError>
+    where
+        I: Iterator<Item = T>,
+        T: Model + ValueList,
+    {
         for model in iter {
-            let result = self.append_delete(model);
-            result?
+            let result = self.append_delete(&model);
+            result?;
         }
 
         Ok(())
@@ -253,10 +256,13 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub async fn execute(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
-        db_session.batch(&self.batch, &self.values).await?;
+    pub async fn execute(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<QueryResult, CharybdisError> {
+        let result = db_session.batch(&self.batch, &self.values).await?;
 
-        Ok(())
+        Ok(result)
     }
 }
 

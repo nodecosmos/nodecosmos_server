@@ -45,7 +45,7 @@ pub async fn add_elastic_document<T: Model + Serialize + Debug>(
     }
 }
 
-pub async fn update_elastic_document<T: Model + Serialize + Debug>(
+pub async fn update_elastic_document<T: Model + Serialize>(
     client: &Elasticsearch,
     index: &str,
     model: &T,

@@ -44,7 +44,6 @@ pub enum NodecosmosError {
     ActixError(actix_web::Error),
     Conflict(String),
     UnsupportedMediaType,
-    RecoveryError(String),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -62,7 +61,6 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
             NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
-            NodecosmosError::RecoveryError(e) => write!(f, "Recovery Error: {}", e),
         }
     }
 }
@@ -82,7 +80,6 @@ impl Error for NodecosmosError {
             NodecosmosError::Forbidden(_) => None,
             NodecosmosError::ActixError(e) => Some(e),
             NodecosmosError::Conflict(_) => None,
-            NodecosmosError::RecoveryError(_) => None,
         }
     }
 }

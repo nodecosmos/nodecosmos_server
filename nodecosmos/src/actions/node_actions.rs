@@ -3,6 +3,7 @@ use crate::app::CbExtension;
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
+use crate::models::node_descendant::NodeDescendant;
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
@@ -49,7 +50,12 @@ pub async fn get_node(
 
     auth_node_access(&node, opt_current_user).await?;
 
-    let descendants = node.as_native().descendants(&db_session).await?;
+    let descendants: Vec<NodeDescendant> = node
+        .as_native()
+        .descendants(&db_session)
+        .await?
+        .try_collect()
+        .await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -65,10 +71,7 @@ pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetDescriptionNode::new();
-    node.id = *id;
-
-    let node = node.find_by_primary_key(&db_session).await?;
+    let node = GetDescriptionNode::find_by_primary_key_value(&db_session, (*id,)).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -81,10 +84,7 @@ pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = GetDescriptionBase64Node::new();
-    node.id = *id;
-
-    let node = node.find_by_primary_key(&db_session).await?;
+    let node = GetDescriptionBase64Node::find_by_primary_key_value(&db_session, (*id,)).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -115,19 +115,24 @@ pub async fn create_node(
 
 #[put("/title")]
 pub async fn update_node_title(
-    mut node: web::Json<UpdateTitleNode>,
+    mut update_title_node: web::Json<UpdateTitleNode>,
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let native_node = node.as_native().find_by_primary_key(&db_session).await?;
+    let native_node = update_title_node
+        .as_native()
+        .find_by_primary_key(&db_session)
+        .await?;
 
     auth_node_update(&native_node, &current_user).await?;
 
-    node.set_defaults(native_node);
-    node.update_cb(&db_session, &cb_extension).await?;
+    update_title_node.set_defaults(native_node);
+    update_title_node
+        .update_cb(&db_session, &cb_extension)
+        .await?;
 
-    Ok(HttpResponse::Ok().json(node))
+    Ok(HttpResponse::Ok().json(update_title_node))
 }
 
 #[put("/description")]

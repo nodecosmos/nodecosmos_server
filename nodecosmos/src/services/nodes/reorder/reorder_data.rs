@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::helpers::clone_ref::ClonedRef;
-use crate::models::helpers::Pluckable;
+use crate::models::helpers::{ClonedRef, Pluckable};
 use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::nodes::reorder::helpers::{

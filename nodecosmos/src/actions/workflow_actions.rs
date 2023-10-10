@@ -4,9 +4,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::materialized_views::base_ios_by_root_node_id::InputOutputsByRootNodeId;
-use crate::models::workflow::{
-    find_workflow_query, UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow,
-};
+use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
 use scylla::CachingSession;
@@ -20,8 +18,7 @@ pub async fn get_workflow(
 ) -> Result<HttpResponse, NodecosmosError> {
     let node_id = node_id.into_inner();
 
-    let workflow =
-        Workflow::find_one(&db_session, find_workflow_query!("node_id = ?"), (node_id,)).await?;
+    let workflow = Workflow::find_one_by_partition_key_value(&db_session, (node_id,)).await?;
 
     // flows
     let mut flow = BaseFlow::new();
@@ -129,13 +126,9 @@ pub async fn delete_workflow(
     current_user: CurrentUser,
     params: web::Path<DeleteWfParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut workflow = Workflow {
-        node_id: params.node_id,
-        id: params.workflow_id,
-        ..Default::default()
-    }
-    .find_by_primary_key(&db_session)
-    .await?;
+    let mut workflow =
+        Workflow::find_by_primary_key_value(&db_session, (params.node_id, params.workflow_id))
+            .await?;
 
     auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
 

@@ -1,17 +1,19 @@
 mod create_node;
 mod delete_node;
-mod node_tree_handler;
+mod update_description_node;
+mod update_title_node;
+
+pub use update_description_node::*;
+pub use update_title_node::*;
 
 use crate::actions::client_session::CurrentUser;
 use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
-    sanitize_description_ext_cb_fn,
 };
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
-use crate::services::elastic::update_elastic_document;
 use charybdis::*;
 use chrono::Utc;
 
@@ -97,12 +99,7 @@ impl Node {
         db_session: &CachingSession,
     ) -> Result<Option<Node>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
-            let node = Self {
-                id: parent_id,
-                ..Default::default()
-            }
-            .find_by_primary_key(db_session)
-            .await?;
+            let node = Self::find_by_primary_key_value(db_session, (parent_id,)).await?;
 
             Ok(Some(node))
         } else {
@@ -113,12 +110,9 @@ impl Node {
     pub async fn descendants(
         &self,
         db_session: &CachingSession,
-    ) -> Result<Vec<NodeDescendant>, CharybdisError> {
+    ) -> Result<CharybdisModelStream<NodeDescendant>, CharybdisError> {
         let descendants =
-            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id)
-                .await?
-                .try_collect()
-                .await?;
+            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
 
         Ok(descendants)
     }
@@ -168,8 +162,7 @@ impl ExtCallbacks<CbExtension> for Node {
         db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        self.append_to_ancestors(db_session).await?;
-        self.add_to_elastic_index(ext).await;
+        self.add_related_data(db_session, ext).await?;
 
         Ok(())
     }
@@ -179,7 +172,7 @@ impl ExtCallbacks<CbExtension> for Node {
         db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
-        self.delete_related_data(db_session, ext).await?;
+        self.delete_dependent_data(db_session, ext).await?;
 
         Ok(())
     }
@@ -226,81 +219,6 @@ partial_node!(
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(UpdateOrderNode, id, parent_id, order_index);
-
-partial_node!(
-    UpdateTitleNode,
-    root_id,
-    parent_id,
-    id,
-    title,
-    ancestor_ids,
-    order_index,
-    updated_at
-);
-
-impl UpdateTitleNode {
-    pub fn set_defaults(&mut self, native_node: Node) {
-        self.updated_at = Some(Utc::now());
-
-        self.root_id = native_node.root_id;
-        self.parent_id = native_node.parent_id;
-        self.order_index = native_node.order_index;
-        self.ancestor_ids = native_node.ancestor_ids;
-    }
-}
-
-impl ExtCallbacks<CbExtension> for UpdateTitleNode {
-    async fn after_update(
-        &mut self,
-        session: &CachingSession,
-        ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        self.update_node_descendants(session).await?;
-
-        update_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
-
-        Ok(())
-    }
-}
-
-//----------------------------------------------------------------------------------------------------------------------
-partial_node!(
-    UpdateDescriptionNode,
-    root_id,
-    id,
-    description,
-    short_description,
-    description_markdown,
-    description_base64,
-    updated_at
-);
-
-impl ExtCallbacks<CbExtension> for UpdateDescriptionNode {
-    sanitize_description_ext_cb_fn!();
-
-    // TODO: introduce bounce queue
-    async fn after_update(
-        &mut self,
-        _db_session: &CachingSession,
-        ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        update_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
-
-        Ok(())
-    }
-}
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(UpdateLikesCountNode, id, likes_count, updated_at);

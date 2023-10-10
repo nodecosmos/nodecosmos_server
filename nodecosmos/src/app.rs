@@ -1,4 +1,4 @@
-use crate::services::nodes::reorder::Recovery;
+use crate::services::nodes::reorder::{Recovery, RECOVERY_DATA_DIR};
 use crate::services::resource_locker::ResourceLocker;
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
@@ -10,6 +10,7 @@ use deadpool_redis::{Config, Pool, Runtime};
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
+use std::fs::create_dir_all;
 use std::{env, fs, time::Duration};
 use toml::Value;
 
@@ -38,7 +39,13 @@ impl App {
 
     /// Init processes that need to be run on startup
     pub async fn init(&self, db_session: &CachingSession, locker: &ResourceLocker) {
+        self.create_tmp_directories();
+
         Recovery::recover_from_stored_data(&db_session, locker).await;
+    }
+
+    fn create_tmp_directories(&self) {
+        create_dir_all(RECOVERY_DATA_DIR).unwrap();
     }
 }
 

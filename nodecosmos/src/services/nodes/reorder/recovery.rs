@@ -6,8 +6,9 @@ use crate::services::nodes::reorder::reorder_data::ReorderData;
 use crate::services::resource_locker::ResourceLocker;
 use charybdis::{CharybdisModelBatch, Delete, Update};
 use scylla::CachingSession;
+use std::path::Path;
 
-const RECOVERY_DATA_DIR: &str = "tmp/recovery";
+pub const RECOVERY_DATA_DIR: &str = "tmp/recovery";
 
 /// Problem with using scylla batches for reordering tree structure is that they are
 /// basically unusable for large trees (1000s nodes). We get a timeout error.
@@ -79,9 +80,7 @@ impl<'a> Recovery<'a> {
             self.reorder_data.tree_root.id
         ));
 
-        let res = self.execute_recovery().await.map_err(|err| {
-            NodecosmosError::RecoveryError(format!("Recovery Error in updating tree_root: {}", err))
-        });
+        let res = self.execute_recovery().await;
 
         match res {
             Ok(_) => {
@@ -98,7 +97,7 @@ impl<'a> Recovery<'a> {
             Err(err) => {
                 self.serialize_and_store_to_disk();
 
-                log_error(format!("Recovery Error: {}", err));
+                log_error(format!("{}", err));
             }
         }
 
@@ -107,6 +106,7 @@ impl<'a> Recovery<'a> {
 
     async fn execute_recovery(&mut self) -> Result<(), NodecosmosError> {
         self.delete_tree().await?;
+
         self.restore_tree().await?;
         self.restore_node_order().await?;
         self.remove_new_ancestor_ids().await?;
@@ -123,10 +123,7 @@ impl<'a> Recovery<'a> {
         .delete_by_partition_key(self.db_session)
         .await
         .map_err(|err| {
-            log_error(format!(
-                "Recovery Error in deleting tree descendants: {}",
-                err
-            ));
+            log_error(format!("delete_tree: {}", err));
             return err;
         })?;
 
@@ -143,10 +140,7 @@ impl<'a> Recovery<'a> {
         )
         .await
         .map_err(|err| {
-            log_error(format!(
-                "Recovery Error in restore_tree_descendants: {}",
-                err
-            ));
+            log_error(format!("restore_tree_descendants: {}", err));
             return err;
         })?;
 
@@ -185,7 +179,7 @@ impl<'a> Recovery<'a> {
                     )
                     .map_err(|err| {
                         log_error(format!(
-                            "Recovery Error in append_statement for remove_new_ancestor_ids: {}",
+                            "append_statement for remove_new_ancestor_ids: {}",
                             err
                         ));
 
@@ -195,7 +189,7 @@ impl<'a> Recovery<'a> {
 
             batch.execute(self.db_session).await.map_err(|err| {
                 log_error(format!(
-                    "Recovery Error in removing new ancestor ids from node and its descendants: {}",
+                    "removing new ancestor ids from node and its descendants: {}",
                     err
                 ));
 
@@ -221,7 +215,7 @@ impl<'a> Recovery<'a> {
                     )
                     .map_err(|err| {
                         log_error(format!(
-                            "Recovery Error in append_statement for append_old_ancestor_ids: {}",
+                            "append_statement for append_old_ancestor_ids: {}",
                             err
                         ));
 
@@ -231,7 +225,7 @@ impl<'a> Recovery<'a> {
 
             batch.execute(self.db_session).await.map_err(|err| {
                 log_error(format!(
-                    "Recovery Error in adding old ancestor ids to node and its descendants: {}",
+                    "adding old ancestor ids to node and its descendants: {}",
                     err
                 ));
 
@@ -244,13 +238,22 @@ impl<'a> Recovery<'a> {
 
     fn serialize_and_store_to_disk(&mut self) {
         let serialized = serde_json::to_string(&self.reorder_data).unwrap();
-        let file_name = format!(
-            "{}/recovery_data_{}.json",
-            RECOVERY_DATA_DIR, self.reorder_data.tree_root.id
-        );
-        let res = std::fs::write(file_name.clone(), serialized);
+        let filename = format!("recovery_data_{}.json", self.reorder_data.tree_root.id);
+        let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
+        let path_buf = Path::new(&path);
+
+        if path_buf.exists() {
+            // we only preserve the first recovery data file
+            // as structure might be compromised later on if
+            // user try to reorder again
+            log_error(format!("Recovery data file already exists: {}", path));
+
+            return;
+        }
+
+        let res = std::fs::write(path.clone(), serialized);
         match res {
-            Ok(_) => log_warning(format!("Recovery data saved to file: {}", file_name)),
+            Ok(_) => log_warning(format!("Recovery data saved to file: {}", path)),
             Err(err) => log_fatal(format!("Error in saving recovery data: {}", err)),
         }
     }

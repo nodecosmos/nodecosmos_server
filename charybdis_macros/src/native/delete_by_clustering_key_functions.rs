@@ -1,10 +1,9 @@
-use crate::helpers::comma_sep_cols;
 use charybdis_parser::CharybdisArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_str, FieldsNamed};
 
-/// for each clustering key generate additional function that finds by clustering key
+/// for each clustering key generate additional function that finds by partition key & partial clustering key
 /// Example:
 /// ```ignore
 /// #[charybdis_model(
@@ -16,16 +15,15 @@ use syn::{parse_str, FieldsNamed};
 /// ```
 /// we would have a functions:
 /// ```ignore
-///  User::find_by_org_id(session: &Session, org_id: Uuid) -> Result<Vec<User>, CharybdisError>
-///  User::find_by_org_id_and_created_at(session: &Session, org_id: Uuid, created_at: Timestamp) -> Result<Vec<User>, CharybdisError>
-pub(crate) fn find_by_clustering_keys_functions(
+///  User::delete_by_id_and_org_id(session: &Session, org_id: Uuid) -> Result<Vec<User>, CharybdisError>
+///  User::delete_by_id_and_org_id_and_created_at(session: &Session, org_id: Uuid, created_at: Timestamp) -> Result<Vec<User>, CharybdisError>
+pub(crate) fn delete_by_clustering_key_functions(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
     struct_name: &syn::Ident,
 ) -> TokenStream {
     let partition_keys = ch_args.partition_keys.clone().unwrap();
     let table_name = ch_args.table_name.clone().unwrap();
-    let comma_sep_cols = comma_sep_cols(fields_named);
 
     let mut clustering_keys = ch_args.clustering_keys.clone().unwrap();
 
@@ -39,12 +37,12 @@ pub(crate) fn find_by_clustering_keys_functions(
         let primary_key_where_clause: String = query_keys.join(" = ? AND ");
 
         let query_str = format!(
-            "SELECT {} FROM {} WHERE {} = ?",
-            comma_sep_cols, table_name, primary_key_where_clause
+            "DELETE FROM {} WHERE {} = ?",
+            table_name, primary_key_where_clause
         );
 
-        let find_by_fun_name_str = format!(
-            "find_by_{}",
+        let delete_by_fun_name_str = format!(
+            "delete_by_{}",
             query_keys
                 .iter()
                 .map(|key| key.to_string())
@@ -52,8 +50,8 @@ pub(crate) fn find_by_clustering_keys_functions(
                 .join("_and_")
         );
 
-        let find_by_fun_name =
-            syn::Ident::new(&find_by_fun_name_str, proc_macro2::Span::call_site());
+        let delete_by_fun_name =
+            syn::Ident::new(&delete_by_fun_name_str, proc_macro2::Span::call_site());
 
         let arguments = query_keys
             .iter()
@@ -81,7 +79,7 @@ pub(crate) fn find_by_clustering_keys_functions(
         let serialized_adder: TokenStream = parse_str(&fields_str).unwrap();
 
         let generated_func = quote! {
-            pub async fn #find_by_fun_name(
+            pub async fn #delete_by_fun_name(
                 session: &charybdis::CachingSession,
                 #(#arguments),*
             ) -> Result<charybdis::CharybdisModelStream<#struct_name>, charybdis::CharybdisError> {

@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::helpers::clone_ref::ClonedRef;
+use crate::models::helpers::ClonedRef;
 use crate::models::node::GetStructureNode;
 use charybdis::{Find, Uuid};
 use scylla::CachingSession;

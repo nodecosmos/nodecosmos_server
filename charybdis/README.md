@@ -17,9 +17,10 @@ tool will detect type within option and create column with that type
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects `CachingSession` as a session arg for operations
-- Basic CRUD queries are macro generated str constants
+- CRUD queries are macro generated str constants (no concatenation at runtime)
 - By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time as `&'static str`
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
+
 
 ## Table of Contents
 - [Charybdis Models](#charybdis-models)
@@ -141,7 +142,8 @@ migrate --hosts <host> --keyspace <your_keyspace>
 definitions structure matches the database in respect to table names, column names, column types, partition keys, 
 clustering keys and secondary indexes so you don't alter structure accidentally.
 If structure is matched, it will not run any migrations. As mentioned above, 
-in case there is no model definition for table, it will **not** drop it.
+in case there is no model definition for table, it will **not** drop it. In future, 
+we will add `modelize` command that will generate `src/models` files from existing data source.
 
 ## Basic Operations:
 
@@ -158,7 +160,6 @@ async fn main() {
   let session: &CachingSession; // init session
   
   // init user
-  let id: Uuid = Uuid::new_v4();
   let user: User = User {
     id,
     email: "charybdis@nodecosmos.com".to_string(),
@@ -191,7 +192,7 @@ async fn main() {
 `find_by_partition_key`
 ```rust
   // partition_key results in multiple rows
-  let users: Vec<User> = user.find_by_partition_key(&session).await.unwrap();
+  let users = user.find_by_partition_key(&session).await;
 ```
 
 `find_<model>_query` & `find`
@@ -207,6 +208,33 @@ let user = User::find_one(&session, find_user_query!("id = ?"), (id,)).await?;
 `find_paged`
 ```rust
 (users, paging_state) = User::find_paged(&session, find_user_query!("id = ?"), (id,), current_paging_state).await?;
+```
+
+For each primary key we have additional associated functions that can query model by that name.
+Functions follow order of primary key definition.
+
+Lets say we have model:
+```rust
+#[charybdis_model(
+    table_name = posts,
+    partition_keys = [date],
+    clustering_keys = [categogry_id, title, id],
+    secondary_indexes = [])
+]
+pub struct Post {
+    date: Date,
+    category_id: Uuid,
+    title: String,
+    id: Uuid,
+    ...
+}
+```
+We will have the following functions:
+
+```rust
+Post::find_by_date(session: &Session, date: Date) -> CharybdisModelStream<Post>
+Post::find_by_date_and_category_id(session: &Session, date: Date, category_id: Uuid) -> CharybdisModelStream<Post>
+Post::find_by_date_and_category_id_and_title(session: &Session, date: Date, category_id: Uuid, title: String) -> CharybdisModelStream<Post>
 ```
 
 ### Update
@@ -290,62 +318,24 @@ Let's say we have a model:
 #[partial_model_generator]
 #[charybdis_model(
     table_name = posts, 
-    partition_keys = [created_at_day], 
-    clustering_keys = [title],
-    secondary_indexes = [id]
+    partition_keys = [date], 
+    clustering_keys = [category_id, title],
+    secondary_indexes = []
 )]
-pub struct Post {
-  pub id: Uuid,
-  pub title: Text,
-  pub description: Text,
-  pub tags: Vec<Text>,
-  pub created_at_day: Date,
-  pub created_at: Timestamp,
-  pub updated_at: Timestamp,
-}
+pub struct Post {...}
 ```
 We get automatically generated `find_post_query!` macro that follows convention `find_<struct_name>_query!`.
 It can be used to create custom filtering clauses like:
 
 ```rust
 // automatically generated macro rule
-let query = find_post_query!("created_at_day = ? AND title = ?");
-let posts = Post::find(&session, query, (created_at_day, title)).await.unwrap();
+let query = find_post_query!("date = ? AND category_id in ?");
+let posts = Post::find(&session, query, (date, category_ids)).await.unwrap();
 ```
 
 Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and
 `update_<struct_name>_query!`, rules
 
-models:
-```rust
-partial_post!(OpsPost, id, title, created_at_day);
-
-// automatically generated macro
-let query = find_ops_post_query!("created_at_day = ? AND title = ?");
-let posts: TypedRowIter<OpsPost> = OpsPost::find(&session, query, (created_at, updated_at))
-    .await
-    .unwrap();
-```
-
-**find_<struct_name>_query!** macro comes with some benefits like:
-- correct fields order in select clause
-- it builds query as `&'static str`
-- easy of use
-
-## View Operations:
-```rust
-let mut user_by_username: UsersByUsername = UsersByUsername::new();
-user_by_username.username = "test_username".to_string();
-
-let users_by_username = user_by_username
-    .find_by_partition_key(&session)
-    .await?;
-
-for user in users_by_username {
-    println!("{:?}", user);
-}
-
-```
 
 ## Callbacks
 We can define callbacks that will be executed before and after certain operations.
