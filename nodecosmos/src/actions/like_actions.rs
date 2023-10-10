@@ -1,9 +1,9 @@
 use crate::actions::client_session::{CurrentUser, OptCurrentUser};
-use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;
 use crate::models::user::LikedObjectIdsUser;
+use crate::CbExtension;
 use actix_web::{delete, get, post, web, HttpResponse};
 use charybdis::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, Uuid};
 use scylla::CachingSession;

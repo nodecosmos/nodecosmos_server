@@ -1,3 +1,4 @@
+use crate::errors::NodecosmosError;
 use charybdis::*;
 
 // CQL limitation is to have counters in a separate table
@@ -18,7 +19,7 @@ impl LikesCount {
     pub async fn increment(
         session: &CachingSession,
         object_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let query = update_likes_count_query!("count = count + 1");
 
         execute(session, query, (object_id,)).await?;
@@ -29,7 +30,7 @@ impl LikesCount {
     pub async fn decrement(
         session: &CachingSession,
         object_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let query = update_likes_count_query!("count = count - 1");
 
         execute(session, query, (object_id,)).await?;

@@ -1,11 +1,10 @@
-use crate::app::CbExtension;
+use crate::errors::NodecosmosError;
 use crate::models::helpers::ClonedRef;
 use crate::models::node::{partial_node, Node};
-use crate::models::node_descendant::NodeDescendant;
+use crate::models::node_descendant::update_node_descendant_query;
 use crate::services::elastic::update_elastic_document;
-use charybdis::{
-    CharybdisError, CharybdisModelBatch, Double, ExtCallbacks, Set, Text, Timestamp, Uuid,
-};
+use crate::CbExtension;
+use charybdis::{CharybdisModelBatch, Double, ExtCallbacks, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 
@@ -33,23 +32,34 @@ impl UpdateTitleNode {
     pub async fn update_node_descendants(
         &mut self,
         db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+        ext: &CbExtension,
+    ) -> Result<(), NodecosmosError> {
         let mut batch = CharybdisModelBatch::new();
 
-        for ancestor_id in self.ancestor_ids.cloned_ref() {
-            let node_descendant = NodeDescendant {
-                root_id: self.root_id,
-                node_id: ancestor_id,
-                id: self.id,
-                parent_id: self.parent_id,
-                title: self.title.clone(),
-                order_index: self.order_index.unwrap_or_default(),
-            };
+        ext.resource_locker
+            .lock(&self.root_id.to_string(), 1000)
+            .await?;
 
-            batch.append_update(&node_descendant)?;
+        for ancestor_id in self.ancestor_ids.cloned_ref() {
+            let update_title_query = update_node_descendant_query!("title = ?");
+
+            batch.append_statement(
+                update_title_query,
+                (
+                    self.title.clone(),
+                    self.root_id,
+                    ancestor_id,
+                    self.order_index,
+                    self.id,
+                ),
+            )?;
         }
 
         batch.execute(db_session).await?;
+
+        ext.resource_locker
+            .unlock(&self.root_id.to_string())
+            .await?;
 
         Ok(())
     }
@@ -65,13 +75,14 @@ impl UpdateTitleNode {
     }
 }
 
-impl ExtCallbacks<CbExtension> for UpdateTitleNode {
+impl ExtCallbacks<CbExtension, NodecosmosError> for UpdateTitleNode {
     async fn after_update(
         &mut self,
         session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        self.update_node_descendants(session).await?;
+    ) -> Result<(), NodecosmosError> {
+        self.update_node_descendants(session, ext).await?;
+
         self.update_elastic_index(ext).await;
 
         Ok(())

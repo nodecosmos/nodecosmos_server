@@ -1,3 +1,4 @@
+use crate::services::elastic;
 use crate::services::nodes::reorder::{Recovery, RECOVERY_DATA_DIR};
 use crate::services::resource_locker::ResourceLocker;
 use actix_cors::Cors;
@@ -38,7 +39,14 @@ impl App {
     }
 
     /// Init processes that need to be run on startup
-    pub async fn init(&self, db_session: &CachingSession, locker: &ResourceLocker) {
+    pub async fn init(
+        &self,
+        db_session: &CachingSession,
+        locker: &ResourceLocker,
+        elastic_client: &Elasticsearch,
+    ) {
+        elastic::build(&elastic_client).await;
+
         self.create_tmp_directories();
 
         Recovery::recover_from_stored_data(&db_session, locker).await;
@@ -47,11 +55,6 @@ impl App {
     fn create_tmp_directories(&self) {
         create_dir_all(RECOVERY_DATA_DIR).unwrap();
     }
-}
-
-#[derive(Clone)]
-pub struct CbExtension {
-    pub elastic_client: Elasticsearch,
 }
 
 pub async fn get_db_session(app: &App) -> CachingSession {

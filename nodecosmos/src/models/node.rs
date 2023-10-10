@@ -7,13 +7,14 @@ pub use update_description_node::*;
 pub use update_title_node::*;
 
 use crate::actions::client_session::CurrentUser;
-use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
 };
+use crate::models::node::delete_node::NodeDeleter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
+use crate::CbExtension;
 use charybdis::*;
 use chrono::Utc;
 
@@ -110,7 +111,7 @@ impl Node {
     pub async fn descendants(
         &self,
         db_session: &CachingSession,
-    ) -> Result<CharybdisModelStream<NodeDescendant>, CharybdisError> {
+    ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
         let descendants =
             NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
 
@@ -132,7 +133,7 @@ impl Node {
         self.owner = Some(owner);
     }
 
-    pub async fn set_defaults(&mut self, parent: Option<Self>) -> Result<(), CharybdisError> {
+    pub async fn set_defaults(&mut self, parent: Option<Self>) -> Result<(), NodecosmosError> {
         if let Some(parent) = parent {
             self.root_id = parent.root_id;
             self.editor_ids = parent.editor_ids;
@@ -156,13 +157,14 @@ impl Node {
     }
 }
 
-impl ExtCallbacks<CbExtension> for Node {
+impl ExtCallbacks<CbExtension, NodecosmosError> for Node {
     async fn after_insert(
         &mut self,
         db_session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        self.add_related_data(db_session, ext).await?;
+    ) -> Result<(), NodecosmosError> {
+        self.append_to_ancestors(db_session).await?;
+        self.add_to_elastic(ext).await?;
 
         Ok(())
     }
@@ -171,8 +173,8 @@ impl ExtCallbacks<CbExtension> for Node {
         &mut self,
         db_session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
-        self.delete_dependent_data(db_session, ext).await?;
+    ) -> Result<(), NodecosmosError> {
+        NodeDeleter::new(self, db_session, ext).run().await?;
 
         Ok(())
     }

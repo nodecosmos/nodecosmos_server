@@ -3,9 +3,10 @@ pub mod types;
 pub mod workflow_commit;
 
 use crate::actions::commit_actions::CommitParams;
+use crate::errors::NodecosmosError;
 use crate::models::commit::types::CommitTypes;
 use crate::models::helpers::impl_default_callbacks;
-use charybdis::{CharybdisError, Delete, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
+use charybdis::{Delete, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
 
@@ -50,7 +51,7 @@ impl Commit {
         object_id: Uuid,
         user_id: Uuid,
         commit_type: CommitTypes,
-    ) -> Result<Commit, CharybdisError> {
+    ) -> Result<Commit, NodecosmosError> {
         let mut commit = Commit::new();
 
         commit.node_id = params.node_id;
@@ -71,7 +72,7 @@ impl Commit {
         attribute: &str,
         value: Text,
         commit_type: CommitTypes,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
         let mut commit_data: Map<Text, Text> = Map::new();
 
@@ -89,7 +90,7 @@ impl Commit {
         user_id: Uuid,
         object_id: Uuid,
         commit_type: CommitTypes,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
 
         commit.insert_cb(session).await?;
@@ -100,7 +101,7 @@ impl Commit {
     pub async fn delete_contribution_request_commits(
         session: &CachingSession,
         contribution_request_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let mut commit = Commit::new();
         commit.contribution_request_id = contribution_request_id;
         commit.delete_by_partition_key(session).await?;

@@ -1,8 +1,9 @@
 use crate::actions::commit_actions::CommitParams;
+use crate::errors::NodecosmosError;
 use crate::models::commit::types::{CommitObjectTypes, Committable};
 use crate::models::commit::{Commit, CommitTypes};
 use crate::models::node::Node;
-use charybdis::{CharybdisError, InsertWithCallbacks, Map, Text, Uuid};
+use charybdis::{InsertWithCallbacks, Map, Text, Uuid};
 use scylla::CachingSession;
 
 pub trait NodeCommit {
@@ -11,7 +12,7 @@ pub trait NodeCommit {
         params: CommitParams,
         user_id: Uuid,
         node: &Node,
-    ) -> Result<(), CharybdisError>;
+    ) -> Result<(), NodecosmosError>;
 }
 
 impl NodeCommit for Commit {
@@ -20,7 +21,7 @@ impl NodeCommit for Commit {
         params: CommitParams,
         user_id: Uuid,
         node: &Node,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let mut commit = Commit::init(
             params,
             node.id,

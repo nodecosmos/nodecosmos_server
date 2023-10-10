@@ -112,7 +112,7 @@ pub async fn delete_elastic_document(client: &Elasticsearch, index: &str, id: St
     }
 }
 
-pub async fn bulk_delete_elastic_documents(client: &Elasticsearch, index: &str, ids: Vec<Uuid>) {
+pub async fn bulk_delete_elastic_documents(client: &Elasticsearch, index: &str, ids: &Vec<Uuid>) {
     let mut ops = BulkOperations::new();
 
     for id in ids {

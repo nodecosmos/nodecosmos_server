@@ -1,11 +1,12 @@
+use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
 };
 use crate::models::input_output::InputOutput;
 use charybdis::{
-    charybdis_model, partial_model_generator, AsNative, Callbacks, CharybdisError,
-    DeleteWithCallbacks, Find, Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
+    charybdis_model, partial_model_generator, AsNative, Callbacks, DeleteWithCallbacks, Find,
+    Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
 };
 use scylla::CachingSession;
 
@@ -51,20 +52,22 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    pub async fn flow(&self, session: &CachingSession) -> Result<Flow, CharybdisError> {
+    pub async fn flow(&self, session: &CachingSession) -> Result<Flow, NodecosmosError> {
         let mut flow = Flow::new();
         flow.node_id = self.node_id;
         flow.workflow_id = self.workflow_id;
         flow.id = self.flow_id;
 
-        flow.find_by_primary_key(session).await
+        let res = flow.find_by_primary_key(session).await?;
+
+        Ok(res)
     }
 
     pub async fn pull_output_id(
         &mut self,
         session: &CachingSession,
         output_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         // filter out output_id from output_ids_by_node_id
         let mut output_ids_by_node_id = self.output_ids_by_node_id.clone().unwrap_or_default();
 
@@ -83,7 +86,7 @@ impl FlowStep {
         &mut self,
         session: &CachingSession,
         input_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         // filter out input_id from input_ids_by_node_id
         let mut input_ids_by_node_id = self.input_ids_by_node_id.clone().unwrap_or_default();
 
@@ -98,7 +101,7 @@ impl FlowStep {
         Ok(())
     }
 
-    async fn delete_outputs(&self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn delete_outputs(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
             for (_, output_ids) in output_ids_by_node_id.iter() {
                 for output_id in output_ids.iter() {
@@ -120,7 +123,7 @@ impl FlowStep {
     async fn delete_outputs_from_non_existent_nodes(
         &mut self,
         session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let output_ids_by_node_id = self.output_ids_by_node_id.as_mut();
         let node_ids = self.node_ids.as_mut();
 
@@ -162,7 +165,7 @@ impl FlowStep {
     async fn disassociate_inputs_from_non_existent_nodes(
         &mut self,
         session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let input_ids_by_node_id = self.input_ids_by_node_id.as_mut();
         let node_ids = self.node_ids.as_mut();
 
@@ -189,10 +192,10 @@ impl FlowStep {
     }
 }
 
-impl Callbacks for FlowStep {
+impl Callbacks<NodecosmosError> for FlowStep {
     created_at_cb_fn!();
 
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow = Flow::new();
 
         flow.node_id = self.node_id;
@@ -206,7 +209,7 @@ impl Callbacks for FlowStep {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow = Flow::new();
 
         flow.node_id = self.node_id;
@@ -252,10 +255,10 @@ partial_flow_step!(
     updated_at
 );
 
-impl Callbacks for UpdateFlowStepNodeIds {
+impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
     updated_at_cb_fn!();
 
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.as_native().find_by_primary_key(session).await?;
 
         flow_step

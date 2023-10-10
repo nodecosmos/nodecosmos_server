@@ -1,4 +1,4 @@
-welcome to #nodecosmos ![](https://via.placeholder.com/15/c5f015/000000?text=+) ![](https://via.placeholder.com/15/f03c15/000000?text=+)
+welcome to #nodecosmos ![](https://via.placeholder.com/15/e91e63/000000?text=+) ![](https://via.placeholder.com/15/2adfff/000000?text=+)
 ---
 
 1) Install ScyllaDB Using Docker Compose

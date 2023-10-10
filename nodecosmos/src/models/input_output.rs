@@ -1,3 +1,4 @@
+use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
@@ -56,7 +57,7 @@ impl InputOutput {
     async fn ios_by_original_id(
         session: &CachingSession,
         original_id: Uuid,
-    ) -> Result<Vec<InputOutput>, CharybdisError> {
+    ) -> Result<Vec<InputOutput>, NodecosmosError> {
         let ios = InputOutput::find_iter(
             session,
             find_input_output_query!("original_id = ?"),
@@ -70,18 +71,20 @@ impl InputOutput {
         Ok(ios)
     }
 
-    async fn workflow(&self, session: &CachingSession) -> Result<Workflow, CharybdisError> {
+    async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
         let mut workflow = Workflow::new();
         workflow.node_id = self.node_id;
         workflow.id = self.workflow_id;
 
-        workflow.find_by_primary_key(session).await
+        let res = workflow.find_by_primary_key(session).await?;
+
+        Ok(res)
     }
 
     async fn flow_step(
         &self,
         session: &CachingSession,
-    ) -> Result<Option<FlowStep>, CharybdisError> {
+    ) -> Result<Option<FlowStep>, NodecosmosError> {
         let flow_step_id = self.flow_step_id.unwrap_or_default();
 
         if flow_step_id.is_nil() {
@@ -101,7 +104,7 @@ impl InputOutput {
     async fn next_flow_step(
         &self,
         session: &CachingSession,
-    ) -> Result<Option<FlowStep>, CharybdisError> {
+    ) -> Result<Option<FlowStep>, NodecosmosError> {
         let flow_step = self.flow_step(session).await?;
 
         if let Some(fs) = flow_step {
@@ -130,8 +133,8 @@ impl InputOutput {
     }
 }
 
-impl Callbacks for InputOutput {
-    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+impl Callbacks<NodecosmosError> for InputOutput {
+    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
         self.id = Uuid::new_v4();
@@ -158,7 +161,7 @@ impl Callbacks for InputOutput {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut workflow = self.workflow(session).await?;
         let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
 
@@ -192,12 +195,12 @@ partial_input_output!(
     description_markdown,
     updated_at
 );
-impl Callbacks for IoDescription {
+impl Callbacks<NodecosmosError> for IoDescription {
     sanitize_description_cb_fn!();
 
     /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
     /// while allowing IO to have it's own properties and value.
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let ios = InputOutput::ios_by_original_id(session, original_id).await?;
 
@@ -234,11 +237,11 @@ partial_input_output!(
     title,
     updated_at
 );
-impl Callbacks for IoTitle {
+impl Callbacks<NodecosmosError> for IoTitle {
     updated_at_cb_fn!();
 
     /// See IoDescription::after_update for explanation
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let ios = InputOutput::ios_by_original_id(session, original_id).await?;
 

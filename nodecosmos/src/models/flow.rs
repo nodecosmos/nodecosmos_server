@@ -1,3 +1,4 @@
+use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
@@ -87,10 +88,10 @@ impl Flow {
     }
 }
 
-impl Callbacks for Flow {
+impl Callbacks<NodecosmosError> for Flow {
     created_at_cb_fn!();
 
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let now = Utc::now();
         self.created_at = Some(now);
         self.updated_at = Some(now);
@@ -102,7 +103,7 @@ impl Callbacks for Flow {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         self.workflow().pull_flow_id(session, self.id).await?;
 
         if let Some(step_ids) = self.step_ids.as_ref() {

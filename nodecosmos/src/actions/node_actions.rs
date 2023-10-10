@@ -1,5 +1,4 @@
 use crate::actions::client_session::*;
-use crate::app::CbExtension;
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
@@ -9,6 +8,7 @@ use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
 use crate::services::resource_locker::ResourceLocker;
+use crate::CbExtension;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{
@@ -102,8 +102,8 @@ pub async fn create_node(
 ) -> Result<HttpResponse, NodecosmosError> {
     let parent = node.parent(&db_session).await?;
 
-    resource_locker.check_node_lock(&node).await?;
     auth_node_creation(&parent, &current_user).await?;
+    resource_locker.check_node_lock(&node).await?;
 
     node.set_owner(current_user);
     node.set_defaults(parent).await?;
@@ -119,6 +119,7 @@ pub async fn update_node_title(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
+    resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let native_node = update_title_node
         .as_native()
@@ -126,6 +127,11 @@ pub async fn update_node_title(
         .await?;
 
     auth_node_update(&native_node, &current_user).await?;
+
+    // we update title for all descendants,
+    // so we need to lock all of them in order to not introduce
+    // inconsistencies
+    resource_locker.check_node_lock(&native_node).await?;
 
     update_title_node.set_defaults(native_node);
     update_title_node

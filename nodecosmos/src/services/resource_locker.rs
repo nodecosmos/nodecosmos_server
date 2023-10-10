@@ -4,6 +4,7 @@ use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::{redis, Pool};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct ResourceLocker {
     pool: Arc<Pool>,
 }

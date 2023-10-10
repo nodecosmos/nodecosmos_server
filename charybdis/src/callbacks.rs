@@ -1,23 +1,23 @@
 use crate::errors::CharybdisError;
 use scylla::CachingSession;
 
-pub trait Callbacks {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+pub trait Callbacks<Err: From<CharybdisError>> {
+    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_insert(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_update(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_update(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
-    async fn before_delete(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn before_delete(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_delete(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, _session: &CachingSession) -> Result<(), Err> {
         Ok(())
     }
 }
@@ -48,7 +48,7 @@ pub trait Callbacks {
 ///    ...
 /// }
 ///
-/// impl ExtCallbacks<CbExtension> for User {
+/// impl ExtCallbacks<CbExtension, CharybdisError> for User {
 ///    async fn after_update(
 ///        &mut self,
 ///        session: &CachingSession,
@@ -61,47 +61,47 @@ pub trait Callbacks {
 /// }
 /// ```
 ///
-pub trait ExtCallbacks<E> {
+pub trait ExtCallbacks<Ext, Err: From<CharybdisError>> {
     async fn before_insert(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
     async fn after_insert(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
     async fn before_update(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
     async fn after_update(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
     async fn before_delete(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
     async fn after_delete(
         &mut self,
         _session: &CachingSession,
-        _extension: &E,
-    ) -> Result<(), CharybdisError> {
+        _extension: &Ext,
+    ) -> Result<(), Err> {
         Ok(())
     }
 }

@@ -1,15 +1,14 @@
-use crate::app::CbExtension;
 use crate::models::node::Node;
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic::add_elastic_document;
+use crate::CbExtension;
 use charybdis::{CharybdisError, CharybdisModelBatch};
 use scylla::CachingSession;
 
 impl Node {
-    pub async fn add_related_data(
-        &self,
+    pub async fn append_to_ancestors(
+        &mut self,
         db_session: &CachingSession,
-        ext: &CbExtension,
     ) -> Result<(), CharybdisError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut batch = CharybdisModelBatch::new();
@@ -30,6 +29,9 @@ impl Node {
             batch.execute(db_session).await?;
         }
 
+        Ok(())
+    }
+    pub async fn add_to_elastic(&self, ext: &CbExtension) -> Result<(), CharybdisError> {
         add_elastic_document(
             &ext.elastic_client,
             Node::ELASTIC_IDX_NAME,

@@ -1,9 +1,10 @@
 pub mod status;
 
+use crate::errors::NodecosmosError;
 use crate::models::commit::Commit;
 use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::Owner;
-use charybdis::{Callbacks, CharybdisError, List, Text, Timestamp, Uuid};
+use charybdis::{Callbacks, List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
 
@@ -55,8 +56,8 @@ impl ContributionRequest {
     }
 }
 
-impl Callbacks for ContributionRequest {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), CharybdisError> {
+impl Callbacks<NodecosmosError> for ContributionRequest {
+    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
         self.id = Uuid::new_v4();
@@ -66,7 +67,7 @@ impl Callbacks for ContributionRequest {
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         Commit::delete_contribution_request_commits(session, self.id).await?;
         Ok(())
     }

@@ -1,10 +1,10 @@
 use super::client_session::set_current_user;
 
 use crate::actions::client_session::CurrentUser;
-use crate::app::CbExtension;
 use crate::authorize::auth_user_update;
 use crate::errors::NodecosmosError;
 use crate::models::user::{GetUser, UpdateUser, User};
+use crate::CbExtension;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::{

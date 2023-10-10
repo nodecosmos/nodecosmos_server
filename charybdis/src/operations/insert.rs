@@ -15,38 +15,46 @@ impl<T: Model + ValueList> Insert for T {
     }
 }
 
-pub trait InsertWithCallbacks {
-    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
+pub trait InsertWithCallbacks<Err> {
+    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err>;
 }
 
-impl<T: Model + ValueList + Callbacks + Insert> InsertWithCallbacks for T {
-    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
+impl<Err, T> InsertWithCallbacks<Err> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Insert + Callbacks<Err>,
+{
+    async fn insert_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err> {
         self.before_insert(session).await?;
         let res = self.insert(session).await;
         self.after_insert(session).await?;
 
-        res
+        Ok(res?)
     }
 }
 
-pub trait InsertWithExtCallbacks<E> {
+pub trait InsertWithExtCallbacks<Ext, Err> {
     async fn insert_cb(
         &mut self,
         session: &CachingSession,
-        extension: &E,
-    ) -> Result<QueryResult, CharybdisError>;
+        extension: &Ext,
+    ) -> Result<QueryResult, Err>;
 }
 
-impl<T: Model + ValueList + Insert + ExtCallbacks<E>, E> InsertWithExtCallbacks<E> for T {
+impl<T, Ext, Err> InsertWithExtCallbacks<Ext, Err> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Insert + ExtCallbacks<Ext, Err>,
+{
     async fn insert_cb(
         &mut self,
         session: &CachingSession,
-        extension: &E,
-    ) -> Result<QueryResult, CharybdisError> {
+        extension: &Ext,
+    ) -> Result<QueryResult, Err> {
         self.before_insert(session, extension).await?;
         let res = self.insert(session).await;
         self.after_insert(session, extension).await?;
 
-        res
+        Ok(res?)
     }
 }

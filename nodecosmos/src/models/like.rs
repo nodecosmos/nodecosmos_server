@@ -1,7 +1,8 @@
-use crate::app::CbExtension;
+use crate::errors::NodecosmosError;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
 use crate::models::user::User;
+use crate::CbExtension;
 use charybdis::{
     execute, CharybdisError, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid,
 };
@@ -52,7 +53,10 @@ impl ObjectTypes {
 }
 
 impl Like {
-    pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), CharybdisError> {
+    pub async fn validate_not_liked(
+        &self,
+        session: &CachingSession,
+    ) -> Result<(), NodecosmosError> {
         let existing_like_query = find_like_query!("object_id = ? AND user_id = ?");
         let existing_like =
             Like::find_one(session, existing_like_query, (self.object_id, self.user_id))
@@ -60,10 +64,9 @@ impl Like {
                 .ok();
 
         if existing_like.is_some() {
-            return Err(CharybdisError::ValidationError((
-                "user".to_string(),
-                "already liked!".to_string(),
-            )));
+            return Err(NodecosmosError::CharybdisError(
+                CharybdisError::ValidationError(("user".to_string(), "already liked!".to_string())),
+            ));
         }
 
         Ok(())
@@ -79,7 +82,7 @@ impl Like {
     pub async fn likes_count(
         &self,
         session: &CachingSession,
-    ) -> Result<LikesCount, CharybdisError> {
+    ) -> Result<LikesCount, NodecosmosError> {
         let mut lc = LikesCount::new();
         lc.object_id = self.object_id;
 
@@ -92,7 +95,7 @@ impl Like {
         &self,
         session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         match ObjectTypes::from_string(self.object_type.as_str()) {
             Some(ObjectTypes::Node) => {
                 let nfq = find_update_likes_count_node_query!("id = ?");
@@ -105,16 +108,14 @@ impl Like {
 
                 Ok(())
             }
-            _ => Err(CharybdisError::CustomError(
-                "Unknown ObjectType".to_string(),
-            )),
+            _ => Err(CharybdisError::CustomError("Object type not supported".to_string()).into()),
         }
     }
 
     pub async fn push_to_user_liked_obj_ids(
         &self,
         session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let q = User::PUSH_TO_LIKED_OBJECT_IDS_QUERY;
 
         execute(session, q, (vec![self.object_id], self.user_id)).await?;
@@ -125,7 +126,7 @@ impl Like {
     pub async fn pull_from_user_liked_obj_ids(
         &self,
         session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         let q = User::PULL_FROM_LIKED_OBJECT_IDS_QUERY;
 
         execute(session, q, (vec![self.object_id], self.user_id)).await?;
@@ -134,12 +135,12 @@ impl Like {
     }
 }
 
-impl ExtCallbacks<CbExtension> for Like {
+impl ExtCallbacks<CbExtension, NodecosmosError> for Like {
     async fn before_insert(
         &mut self,
         session: &CachingSession,
         _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         self.validate_not_liked(session).await?;
         self.set_defaults();
 
@@ -152,7 +153,7 @@ impl ExtCallbacks<CbExtension> for Like {
         &mut self,
         session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         self.update_model_likes_count(session, ext).await?;
         self.push_to_user_liked_obj_ids(session).await?;
 
@@ -163,7 +164,7 @@ impl ExtCallbacks<CbExtension> for Like {
         &mut self,
         session: &CachingSession,
         _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         LikesCount::decrement(session, self.object_id).await?;
 
         Ok(())
@@ -173,7 +174,7 @@ impl ExtCallbacks<CbExtension> for Like {
         &mut self,
         session: &CachingSession,
         ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         self.update_model_likes_count(session, ext).await?;
         self.pull_from_user_liked_obj_ids(session).await?;
 

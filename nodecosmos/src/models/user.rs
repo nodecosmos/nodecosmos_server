@@ -1,9 +1,10 @@
 pub use super::udts::Address;
-use crate::app::CbExtension;
+use crate::errors::NodecosmosError;
 use crate::models::helpers::{default_to_false_bool, impl_user_updated_at_with_elastic_ext_cb};
 use crate::services::elastic::{add_elastic_document, delete_elastic_document};
+use crate::CbExtension;
 use bcrypt::{hash, verify};
-use charybdis::{Boolean, CharybdisError, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
+use charybdis::{Boolean, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use colored::Colorize;
@@ -69,16 +70,16 @@ impl User {
     pub async fn check_existing_user(
         &self,
         session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         if self.find_by_username(session).await.is_some() {
-            return Err(CharybdisError::ValidationError((
+            return Err(NodecosmosError::ValidationError((
                 "username".to_string(),
                 "is taken".to_string(),
             )));
         }
 
         if self.find_by_email(session).await.is_some() {
-            return Err(CharybdisError::ValidationError((
+            return Err(NodecosmosError::ValidationError((
                 "email".to_string(),
                 "is taken".to_string(),
             )));
@@ -87,9 +88,9 @@ impl User {
         Ok(())
     }
 
-    pub async fn verify_password(&self, password: &String) -> Result<bool, CharybdisError> {
+    pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
         let res = verify(password, &self.password).map_err(|_| {
-            CharybdisError::ValidationError(("password".to_string(), "is incorrect".to_string()))
+            NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string()))
         })?;
 
         Ok(res)
@@ -103,11 +104,11 @@ impl User {
         self.updated_at = Some(now);
     }
 
-    fn set_password(&mut self) -> Result<(), CharybdisError> {
+    fn set_password(&mut self) -> Result<(), NodecosmosError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
             println!("{}", "error hashing password".bright_red().bold());
 
-            CharybdisError::CustomError(
+            NodecosmosError::InternalServerError(
                 "There was an error processing your request. Please try again later.".to_string(),
             )
         })?;
@@ -116,12 +117,12 @@ impl User {
     }
 }
 
-impl ExtCallbacks<CbExtension> for User {
+impl ExtCallbacks<CbExtension, NodecosmosError> for User {
     async fn before_insert(
         &mut self,
         session: &CachingSession,
         _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         self.check_existing_user(session).await?;
 
         self.set_defaults();
@@ -134,7 +135,7 @@ impl ExtCallbacks<CbExtension> for User {
         &mut self,
         _session: &CachingSession,
         cb_extension: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         add_elastic_document(
             &cb_extension.elastic_client,
             User::ELASTIC_IDX_NAME,
@@ -150,7 +151,7 @@ impl ExtCallbacks<CbExtension> for User {
         &mut self,
         _: &CachingSession,
         _ext: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         self.updated_at = Some(Utc::now());
         Ok(())
     }
@@ -159,7 +160,7 @@ impl ExtCallbacks<CbExtension> for User {
         &mut self,
         _session: &CachingSession,
         cb_extension: &CbExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), NodecosmosError> {
         delete_elastic_document(
             &cb_extension.elastic_client,
             User::ELASTIC_IDX_NAME,

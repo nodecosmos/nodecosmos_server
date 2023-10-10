@@ -1,3 +1,4 @@
+use crate::errors::NodecosmosError;
 use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
@@ -103,12 +104,12 @@ impl Workflow {
     }
 }
 
-impl Callbacks for Workflow {
+impl Callbacks<NodecosmosError> for Workflow {
     created_at_cb_fn!();
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), CharybdisError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if self.flow_ids.is_some() {
             let flow_steps =
                 FlowStepDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)

@@ -44,6 +44,7 @@ pub enum NodecosmosError {
     ActixError(actix_web::Error),
     Conflict(String),
     UnsupportedMediaType,
+    ValidationError((String, String)),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -61,6 +62,9 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
             NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
+            NodecosmosError::ValidationError((field, message)) => {
+                write!(f, "Validation Error: {}: {}", field, message)
+            }
         }
     }
 }
@@ -80,6 +84,7 @@ impl Error for NodecosmosError {
             NodecosmosError::Forbidden(_) => None,
             NodecosmosError::ActixError(e) => Some(e),
             NodecosmosError::Conflict(_) => None,
+            NodecosmosError::ValidationError(_) => None,
         }
     }
 }
@@ -117,6 +122,9 @@ impl ResponseError for NodecosmosError {
                 "error": "Conflict",
                 "message": e
             })),
+            NodecosmosError::ValidationError((field, message)) => {
+                HttpResponse::BadRequest().json(json!({ "error": {field: message} }))
+            }
             _ => HttpResponse::InternalServerError().json(json!({
                 "error": "Internal Server Error",
                 "message": self.to_string()

@@ -1,7 +1,7 @@
 #[allow(unused_macros)]
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
-        impl charybdis::Callbacks for $struct_name {
+        impl charybdis::Callbacks<crate::errors::NodecosmosError> for $struct_name {
             crate::models::helpers::created_at_cb_fn!();
 
             crate::models::helpers::updated_at_cb_fn!();
@@ -17,7 +17,7 @@ macro_rules! created_at_cb_fn {
         async fn before_insert(
             &mut self,
             _session: &charybdis::CachingSession,
-        ) -> Result<(), charybdis::CharybdisError> {
+        ) -> Result<(), crate::errors::NodecosmosError> {
             let now = chrono::Utc::now();
 
             self.id = Uuid::new_v4();
@@ -32,7 +32,7 @@ pub(crate) use created_at_cb_fn;
 
 macro_rules! impl_updated_at_cb {
     ($struct_name:ident) => {
-        impl charybdis::Callbacks for $struct_name {
+        impl charybdis::Callbacks<crate::errors::NodecosmosError> for $struct_name {
             crate::models::helpers::updated_at_cb_fn!();
         }
     };
@@ -44,7 +44,7 @@ macro_rules! updated_at_cb_fn {
         async fn before_update(
             &mut self,
             _session: &charybdis::CachingSession,
-        ) -> Result<(), charybdis::CharybdisError> {
+        ) -> Result<(), crate::errors::NodecosmosError> {
             self.updated_at = Some(chrono::Utc::now());
 
             Ok(())
@@ -55,7 +55,7 @@ pub(crate) use updated_at_cb_fn;
 
 macro_rules! sanitize_description_cb {
     ($struct_name:ident) => {
-        impl charybdis::Callbacks for $struct_name {
+        impl charybdis::Callbacks<crate::errors::NodecosmosError> for $struct_name {
             crate::models::helpers::sanitize_description_cb_fn!();
         }
     };
@@ -67,7 +67,7 @@ macro_rules! sanitize_description_cb_fn {
         async fn before_update(
             &mut self,
             _session: &charybdis::CachingSession,
-        ) -> Result<(), charybdis::CharybdisError> {
+        ) -> Result<(), crate::errors::NodecosmosError> {
             use ammonia::clean;
 
             self.updated_at = Some(chrono::Utc::now());
@@ -90,8 +90,8 @@ macro_rules! sanitize_description_ext_cb_fn {
         async fn before_update(
             &mut self,
             _session: &charybdis::CachingSession,
-            _ext: &crate::app::CbExtension,
-        ) -> Result<(), charybdis::CharybdisError> {
+            _ext: &crate::CbExtension,
+        ) -> Result<(), crate::errors::NodecosmosError> {
             use ammonia::clean;
 
             self.updated_at = Some(chrono::Utc::now());

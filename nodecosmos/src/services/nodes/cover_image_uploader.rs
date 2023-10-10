@@ -1,8 +1,8 @@
-use crate::app::CbExtension;
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateCoverImageNode};
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::services::image::*;
+use crate::CbExtension;
 use actix_multipart::Multipart;
 use charybdis::{New, UpdateWithExtCallbacks};
 use futures::StreamExt;

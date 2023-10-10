@@ -22,38 +22,46 @@ impl<T: Model + ValueList> Update for T {
     }
 }
 
-pub trait UpdateWithCallbacks {
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
+pub trait UpdateWithCallbacks<Err> {
+    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err>;
 }
 
-impl<T: Model + ValueList + Update + Callbacks> UpdateWithCallbacks for T {
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
+impl<T, Err> UpdateWithCallbacks<Err> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Update + Callbacks<Err>,
+{
+    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err> {
         self.before_update(session).await?;
         let res = self.update(session).await;
         self.after_update(session).await?;
 
-        res
+        Ok(res?)
     }
 }
 
-pub trait UpdateWithExtCallbacks<E> {
+pub trait UpdateWithExtCallbacks<Ext, Err> {
     async fn update_cb(
         &mut self,
         session: &CachingSession,
-        extension: &E,
-    ) -> Result<QueryResult, CharybdisError>;
+        extension: &Ext,
+    ) -> Result<QueryResult, Err>;
 }
 
-impl<T: Model + ValueList + Update + ExtCallbacks<E>, E> UpdateWithExtCallbacks<E> for T {
+impl<T, Ext, Err> UpdateWithExtCallbacks<Ext, Err> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Update + ExtCallbacks<Ext, Err>,
+{
     async fn update_cb(
         &mut self,
         session: &CachingSession,
-        extension: &E,
-    ) -> Result<QueryResult, CharybdisError> {
+        extension: &Ext,
+    ) -> Result<QueryResult, Err> {
         self.before_update(session, extension).await?;
         let res = self.update(session).await;
         self.after_update(session, extension).await?;
 
-        res
+        Ok(res?)
     }
 }
