@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_str, FieldsNamed};
 
-pub(crate) fn push_to_set_fields_query_consts(
+pub(crate) fn push_to_collection_fields_query_consts(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
 ) -> TokenStream {
@@ -16,7 +16,6 @@ pub(crate) fn push_to_set_fields_query_consts(
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 
-    // for each field in the struct, generate a macro that adds query to append value to cql set
     let queries: Vec<TokenStream> = fields_named
         .named
         .iter()
@@ -31,23 +30,13 @@ pub(crate) fn push_to_set_fields_query_consts(
                 return None;
             }
 
-            let query_str = if is_list {
-                format!(
-                    "UPDATE {} SET {} = {} + ? WHERE {} = ?",
-                    table_name.to_string(),
-                    field_name,
-                    field_name,
-                    primary_key_where_clause,
-                )
-            } else {
-                format!(
-                    "UPDATE {} SET {} = {} + ? WHERE {} = ?",
-                    table_name.to_string(),
-                    field_name,
-                    field_name,
-                    primary_key_where_clause,
-                )
-            };
+            let query_str = format!(
+                "UPDATE {} SET {} = {} + ? WHERE {} = ?",
+                table_name.to_string(),
+                field_name,
+                field_name,
+                primary_key_where_clause,
+            );
 
             let field_name_upper = field_name.to_uppercase();
             let const_name = format!("PUSH_TO_{}_QUERY", field_name_upper);
@@ -68,7 +57,7 @@ pub(crate) fn push_to_set_fields_query_consts(
     expanded
 }
 
-pub(crate) fn pull_from_set_fields_query_consts(
+pub(crate) fn pull_from_collection_fields_query_consts(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
 ) -> TokenStream {
@@ -81,7 +70,6 @@ pub(crate) fn pull_from_set_fields_query_consts(
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 
-    // for each field in the struct, generate a macro that adds query to append value to cql set
     let queries: Vec<TokenStream> = fields_named
         .named
         .iter()
@@ -96,23 +84,13 @@ pub(crate) fn pull_from_set_fields_query_consts(
                 return None;
             }
 
-            let query_str = if is_list {
-                format!(
-                    "UPDATE {} SET {} = {} - ? WHERE {} = ?",
-                    table_name.to_string(),
-                    field_name,
-                    field_name,
-                    primary_key_where_clause,
-                )
-            } else {
-                format!(
-                    "UPDATE {} SET {} = {} - ? WHERE {} = ?",
-                    table_name.to_string(),
-                    field_name,
-                    field_name,
-                    primary_key_where_clause,
-                )
-            };
+            let query_str = format!(
+                "UPDATE {} SET {} = {} - ? WHERE {} = ?",
+                table_name.to_string(),
+                field_name,
+                field_name,
+                primary_key_where_clause,
+            );
 
             let field_name_upper = field_name.to_uppercase();
             let const_name = format!("PULL_FROM_{}_QUERY", field_name_upper);

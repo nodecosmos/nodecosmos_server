@@ -82,27 +82,3 @@ macro_rules! sanitize_description_cb_fn {
 }
 
 pub(crate) use sanitize_description_cb_fn;
-
-// ExtCallbacks trait
-// when model implements ExtCallbacks trait
-macro_rules! sanitize_description_ext_cb_fn {
-    () => {
-        async fn before_update(
-            &mut self,
-            _session: &charybdis::CachingSession,
-            _ext: &crate::CbExtension,
-        ) -> Result<(), crate::errors::NodecosmosError> {
-            use ammonia::clean;
-
-            self.updated_at = Some(chrono::Utc::now());
-
-            if let Some(description) = &self.description {
-                self.description = Some(clean(description));
-            }
-
-            Ok(())
-        }
-    };
-}
-
-pub(crate) use sanitize_description_ext_cb_fn;

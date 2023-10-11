@@ -11,6 +11,7 @@ mod models;
 mod services;
 
 use crate::app::*;
+use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic;
 use crate::services::resource_locker::ResourceLocker;
 use actions::*;
@@ -51,6 +52,12 @@ async fn main() {
 
     let cb_extension = CbExtension::new(elastic_client.clone(), resource_locker.clone());
     let cb_extension_web_data = web::Data::new(cb_extension.clone());
+
+    let vec_size = std::mem::size_of::<Vec<NodeDescendant>>();
+    let node_descendant_size = std::mem::size_of::<NodeDescendant>();
+
+    println!("Vec<NodeDescendant> size: {}", vec_size);
+    println!("NodeDescendant size: {}", node_descendant_size);
 
     nodecosmos
         .init(

@@ -43,8 +43,13 @@ impl<'a> NodeDeleter<'a> {
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        self.delete_and_populate().await.map_err(|err| {
+        self.delete_and_populate_desc_data().await.map_err(|err| {
             log_error(format!("delete_and_populate: {}", err));
+            return err;
+        })?;
+
+        self.delete_counter_data().await.map_err(|err| {
+            log_error(format!("delete_counter_data: {}", err));
             return err;
         })?;
 
@@ -61,7 +66,7 @@ impl<'a> NodeDeleter<'a> {
     /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node and all of its descendants.
     /// Here we also consume stream of descendants, so we populate children_by_parent_id that
     /// is used in self.delete_descendants.
-    pub async fn delete_and_populate(&mut self) -> Result<(), NodecosmosError> {
+    pub async fn delete_and_populate_desc_data(&mut self) -> Result<(), NodecosmosError> {
         let descendants = self.node.descendants(self.db_session).await?;
         let mut chunked_stream = descendants.chunks(100);
 
@@ -98,11 +103,6 @@ impl<'a> NodeDeleter<'a> {
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&LikesCount {
-                    object_id: descendant.id,
-                    ..Default::default()
-                })?;
-
                 batch.append_delete(&DeleteNode { id: descendant.id })?;
 
                 if let Some(parent_id) = descendant.parent_id {
@@ -111,6 +111,24 @@ impl<'a> NodeDeleter<'a> {
                         .or_default()
                         .push((descendant.id, descendant.order_index));
                 }
+            }
+
+            batch.execute(self.db_session).await?;
+        }
+
+        Ok(())
+    }
+
+    /// In Scylla counter and non-counter data can not be part of the same batch
+    pub async fn delete_counter_data(&mut self) -> Result<(), NodecosmosError> {
+        for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
+            let mut batch = CharybdisModelBatch::unlogged();
+
+            for node_id in node_ids_chunk {
+                batch.append_delete_by_partition_key(&LikesCount {
+                    object_id: *node_id,
+                    ..Default::default()
+                })?;
             }
 
             batch.execute(self.db_session).await?;

@@ -1,6 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::services::nodes::reorder::reorder_data::ReorderData;
-const REORDER_DESCENDANTS_LIMIT: usize = 15000;
+const TREE_DESCENDANTS_LIMIT: usize = 50000; //  5mb of node_descendants data loaded into memory
+const REORDER_DESCENDANTS_LIMIT: usize = 5000;
 
 pub struct ReorderValidator<'a> {
     pub reorder_data: &'a ReorderData,
@@ -55,6 +56,10 @@ impl<'a> ReorderValidator<'a> {
                 "Can not reorder more than {} descendants",
                 REORDER_DESCENDANTS_LIMIT
             )));
+        }
+
+        if self.reorder_data.tree_descendants.len() > TREE_DESCENDANTS_LIMIT {
+            return Err(NodecosmosError::Forbidden("Tree too large".to_string()));
         }
 
         Ok(())

@@ -101,9 +101,6 @@ impl ResponseError for NodecosmosError {
                     "error": "Not Found",
                     "message": e.to_string()
                 })),
-                CharybdisError::ValidationError((field, message)) => {
-                    HttpResponse::Forbidden().json(json!({ "error": {field: message} }))
-                }
                 _ => {
                     println!("Internal Server Error: {}", e.to_string().red());
 

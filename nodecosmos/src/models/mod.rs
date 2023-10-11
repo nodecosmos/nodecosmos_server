@@ -10,6 +10,7 @@ pub mod likes_count;
 pub mod materialized_views;
 pub mod node;
 pub mod node_descendant;
+pub mod node_partials;
 pub mod udts;
 pub mod user;
 pub mod workflow;

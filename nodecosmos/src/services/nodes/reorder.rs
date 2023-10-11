@@ -55,7 +55,7 @@ impl<'a> Reorderer<'a> {
         ReorderValidator::new(&self.reorder_data).validate()?;
 
         locker
-            .lock(
+            .lock_resource(
                 &self.reorder_data.tree_root.id.to_string(),
                 RESOURCE_LOCKER_TTL,
             )
@@ -66,7 +66,7 @@ impl<'a> Reorderer<'a> {
         return match res {
             Ok(_) => {
                 locker
-                    .unlock(&self.reorder_data.tree_root.id.to_string())
+                    .unlock_resource(&self.reorder_data.tree_root.id.to_string())
                     .await?;
                 Ok(())
             }

@@ -21,8 +21,6 @@ pub enum CharybdisError {
     NextRowError(NextRowError),
     // charybdis
     NotFoundError(String),
-    ValidationError((String, String)),
-    CustomError(String),
 }
 
 impl fmt::Display for CharybdisError {
@@ -51,10 +49,9 @@ impl fmt::Display for CharybdisError {
                 write!(f, "SerializeValuesError: {}\n{}", e, model)
             }
             CharybdisError::NextRowError(e) => write!(f, "NextRowError: {}", e),
+
             // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for query: {}", e),
-            CharybdisError::ValidationError(e) => write!(f, "ValidationError: {} {}", e.0, e.1),
-            CharybdisError::CustomError(e) => write!(f, "CustomError: {}", e),
         }
     }
 }
@@ -71,8 +68,6 @@ impl Error for CharybdisError {
             CharybdisError::FromRowError(e, _) => Some(e),
             CharybdisError::NextRowError(e) => Some(e),
             CharybdisError::SerializeValuesError(e, _) => Some(e),
-            CharybdisError::ValidationError(_) => None,
-            CharybdisError::CustomError(_) => None,
         }
     }
 }

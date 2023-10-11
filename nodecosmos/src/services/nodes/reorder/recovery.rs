@@ -85,13 +85,13 @@ impl<'a> Recovery<'a> {
         match res {
             Ok(_) => {
                 log_success(format!(
-                    "Recovery finished for tree_root: {} in {:?}",
+                    "Recovery finished for tree_root: {} in {:?}\n\n",
                     self.reorder_data.tree_root.id,
                     recovery_started.elapsed()
                 ));
 
                 self.resource_locker
-                    .unlock(&self.reorder_data.tree_root.id.to_string())
+                    .unlock_resource(&self.reorder_data.tree_root.id.to_string())
                     .await?;
             }
             Err(err) => {
@@ -106,7 +106,6 @@ impl<'a> Recovery<'a> {
 
     async fn execute_recovery(&mut self) -> Result<(), NodecosmosError> {
         self.delete_tree().await?;
-
         self.restore_tree().await?;
         self.restore_node_order().await?;
         self.remove_new_ancestor_ids().await?;
@@ -242,10 +241,10 @@ impl<'a> Recovery<'a> {
         let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
         let path_buf = Path::new(&path);
 
+        // We only preserve the first recovery data file
+        // as structure might be compromised later on if
+        // user try to reorder again.
         if path_buf.exists() {
-            // we only preserve the first recovery data file
-            // as structure might be compromised later on if
-            // user try to reorder again
             log_error(format!("Recovery data file already exists: {}", path));
 
             return;

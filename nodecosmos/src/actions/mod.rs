@@ -1,6 +1,8 @@
-mod attachment_actions;
 pub mod client_session;
 pub mod commit_actions;
+pub mod types;
+
+mod attachment_actions;
 mod contribution_request_actions;
 mod flow_actions;
 mod flow_step_actions;

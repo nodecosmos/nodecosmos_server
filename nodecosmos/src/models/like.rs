@@ -3,9 +3,7 @@ use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
 use crate::models::user::User;
 use crate::CbExtension;
-use charybdis::{
-    execute, CharybdisError, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid,
-};
+use charybdis::{execute, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use scylla::CachingSession;
@@ -64,9 +62,10 @@ impl Like {
                 .ok();
 
         if existing_like.is_some() {
-            return Err(NodecosmosError::CharybdisError(
-                CharybdisError::ValidationError(("user".to_string(), "already liked!".to_string())),
-            ));
+            return Err(NodecosmosError::ValidationError((
+                "user".to_string(),
+                "already liked!".to_string(),
+            )));
         }
 
         Ok(())
@@ -108,7 +107,10 @@ impl Like {
 
                 Ok(())
             }
-            _ => Err(CharybdisError::CustomError("Object type not supported".to_string()).into()),
+            _ => Err(
+                NodecosmosError::InternalServerError("Object type not supported".to_string())
+                    .into(),
+            ),
         }
     }
 

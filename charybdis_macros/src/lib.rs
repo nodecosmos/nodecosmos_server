@@ -7,7 +7,7 @@ use crate::macro_rules::*;
 use crate::model_impl::*;
 use crate::native::{
     delete_by_clustering_key_functions, find_by_primary_keys_functions,
-    pull_from_set_fields_query_consts, push_to_set_fields_query_consts,
+    pull_from_collection_fields_query_consts, push_to_collection_fields_query_consts,
 };
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
 use proc_macro::TokenStream;
@@ -41,8 +41,10 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let delete_by_partition_key_query_const = delete_by_partition_key_query_const(&args);
 
     // model specific operation consts
-    let push_to_set_fields_query_consts = push_to_set_fields_query_consts(&args, fields_named);
-    let pull_from_set_fields_query_consts = pull_from_set_fields_query_consts(&args, fields_named);
+    let push_to_collection_fields_query_consts =
+        push_to_collection_fields_query_consts(&args, fields_named);
+    let pull_from_collection_fields_query_consts =
+        pull_from_collection_fields_query_consts(&args, fields_named);
 
     // methods
     let get_primary_key_values = get_primary_key_values(&args);
@@ -72,8 +74,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         impl #struct_name {
             #find_by_key_funs
             #delete_by_cks_funs
-            #push_to_set_fields_query_consts
-            #pull_from_set_fields_query_consts
+            #push_to_collection_fields_query_consts
+            #pull_from_collection_fields_query_consts
         }
 
        impl charybdis::BaseModel for #struct_name {

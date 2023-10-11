@@ -1,17 +1,12 @@
-mod create_node;
-mod delete_node;
-mod update_description_node;
-mod update_title_node;
-
-pub use update_description_node::*;
-pub use update_title_node::*;
+mod create;
+mod delete;
 
 use crate::actions::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{
     default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
 };
-use crate::models::node::delete_node::NodeDeleter;
+use crate::models::node::delete::NodeDeleter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::CbExtension;
@@ -118,11 +113,11 @@ impl Node {
         Ok(descendants)
     }
 
-    pub fn set_owner(&mut self, current_user: CurrentUser) {
+    pub fn set_owner(&mut self, current_user: &CurrentUser) {
         let owner = Owner {
             id: current_user.id,
             name: current_user.full_name(),
-            username: Some(current_user.username),
+            username: Some(current_user.username.clone()),
             owner_type: OwnerTypes::User.into(),
             profile_image_url: None,
         };
@@ -133,13 +128,13 @@ impl Node {
         self.owner = Some(owner);
     }
 
-    pub async fn set_defaults(&mut self, parent: Option<Self>) -> Result<(), NodecosmosError> {
+    pub async fn set_defaults(&mut self, parent: &Option<Self>) -> Result<(), NodecosmosError> {
         if let Some(parent) = parent {
             self.root_id = parent.root_id;
-            self.editor_ids = parent.editor_ids;
+            self.editor_ids = parent.editor_ids.clone();
             self.is_public = parent.is_public;
 
-            let mut ancestor_ids = parent.ancestor_ids.unwrap_or_default();
+            let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or_default();
             ancestor_ids.push(parent.id);
 
             self.ancestor_ids = Some(ancestor_ids);
