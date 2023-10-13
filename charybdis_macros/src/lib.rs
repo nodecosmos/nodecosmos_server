@@ -54,6 +54,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
+    let find_model_rule = find_model_rule(&args, fields_named, struct_name);
+    let find_one_model_rule = find_one_model_rule(&args, fields_named, struct_name);
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
     // Associated functions for finding by partial primary key
@@ -106,6 +108,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         #find_model_query_rule
+        #find_model_rule
+        #find_one_model_rule
         #update_model_query_rule
     };
 

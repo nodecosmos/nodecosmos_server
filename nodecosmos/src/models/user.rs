@@ -56,15 +56,19 @@ impl User {
     pub const ELASTIC_IDX_NAME: &'static str = "users";
 
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-        let query = find_user_query!("username = ?");
-
-        Self::find_one(session, query, (&self.username,)).await.ok()
+        find_one_user!(session, "username = ?", (&self.username,))
+            .await
+            .ok()
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-        let query = find_user_query!("email = ?");
-
-        Self::find_one(session, query, (&self.email,)).await.ok()
+        find_one_user!(
+            session,
+            "date = ? AND category_id in  ? fasd asdf asdf ",
+            (&self.email,)
+        )
+        .await
+        .ok()
     }
 
     pub async fn check_existing_user(

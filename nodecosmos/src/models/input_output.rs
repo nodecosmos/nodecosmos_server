@@ -58,15 +58,10 @@ impl InputOutput {
         session: &CachingSession,
         original_id: Uuid,
     ) -> Result<Vec<InputOutput>, NodecosmosError> {
-        let ios = InputOutput::find_iter(
-            session,
-            find_input_output_query!("original_id = ?"),
-            (original_id,),
-            100,
-        )
-        .await?
-        .try_collect()
-        .await?;
+        let ios = find_input_output!(session, "original_id = ?", (original_id,))
+            .await?
+            .try_collect()
+            .await?;
 
         Ok(ios)
     }

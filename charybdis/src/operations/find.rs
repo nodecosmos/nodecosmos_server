@@ -12,7 +12,7 @@ pub trait Find: BaseModel {
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
 
     async fn find_one(
         session: &CachingSession,
@@ -20,19 +20,18 @@ pub trait Find: BaseModel {
         values: impl ValueList,
     ) -> Result<Self, CharybdisError>;
 
-    async fn find_iter(
-        session: &CachingSession,
-        query: &'static str,
-        values: impl ValueList,
-        page_size: i32,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
-
     async fn find_paged(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
         page_size: Option<Bytes>,
     ) -> Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError>;
+
+    async fn find_all(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
 
     async fn find_by_primary_key_value(
         session: &CachingSession,
@@ -58,17 +57,17 @@ pub trait Find: BaseModel {
 }
 
 impl<T: BaseModel> Find for T {
+    // find iter
     async fn find(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
-        let result: QueryResult = session.execute(query, values).await?;
+    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
+        let query = Query::new(query);
 
-        let rows = result.rows()?;
-        let typed_rows = CharybdisModelIterator::from(rows.into_typed());
+        let rows = session.execute_iter(query, values).await?.into_typed();
 
-        Ok(typed_rows)
+        Ok(CharybdisModelStream::from(rows))
     }
 
     async fn find_one(
@@ -80,20 +79,6 @@ impl<T: BaseModel> Find for T {
         let typed_row: Self = result.first_row_typed()?;
 
         Ok(typed_row)
-    }
-
-    // find iter
-    async fn find_iter(
-        session: &CachingSession,
-        query: &'static str,
-        values: impl ValueList,
-        page_size: i32,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
-        let query = Query::new(query).with_page_size(page_size);
-
-        let rows = session.execute_iter(query, values).await?.into_typed();
-
-        Ok(CharybdisModelStream::from(rows))
     }
 
     async fn find_paged(
@@ -110,12 +95,23 @@ impl<T: BaseModel> Find for T {
         Ok((typed_rows, paging_state))
     }
 
+    async fn find_all(
+        session: &CachingSession,
+        query: &'static str,
+        values: impl ValueList,
+    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
+        let result: QueryResult = session.execute(query, values).await?;
+
+        let rows = result.rows()?;
+        let typed_rows = CharybdisModelIterator::from(rows.into_typed());
+
+        Ok(typed_rows)
+    }
+
     async fn find_by_primary_key_value(
         session: &CachingSession,
         value: impl ValueList + std::fmt::Debug,
     ) -> Result<Self, CharybdisError> {
-        println!("find_by_primary_key_value {:?}", value);
-
         let result: QueryResult = session
             .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value)
             .await?;

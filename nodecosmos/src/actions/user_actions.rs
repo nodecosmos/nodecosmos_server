@@ -36,6 +36,7 @@ pub async fn create_user(
     mut user: web::Json<User>,
 ) -> Result<HttpResponse, NodecosmosError> {
     user.insert_cb(&db_session, &cb_extension).await?;
+
     let current_user = set_current_user(&client_session, &user)?;
 
     Ok(HttpResponse::Ok().json(json!({ "message": "User created", "user": current_user })))

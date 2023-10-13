@@ -1,24 +1,22 @@
-## 👾 Use Monstrous tandem of Scylla and Charybdis to build your next project
+## 👾 High-Performance ORM for ScyllaDB in Rust
 ⚠️ **WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release**
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
-#### Charybdis is a thin ORM layer on top of `scylla_rust_driver` focused on easy of use and performance
+#### Charybdis is a ORM layer on top of `scylla_rust_driver` focused on easy of use and performance
 
 ## Usage considerations:
 - Provide and expressive API for CRUD & Complex Query operations on model as a whole
 - Provide easy way to manipulate subset of model fields by using automatically generated `partial_<model>!` macro
-- Provide easy way to write complex queries by using automatically generated `find_<model>_query!` macro
+- Provide easy way to run complex queries by using automatically generated `find_<model>!` macro
 - Automatic migration tool that analyzes the `src/model/*.rs` files and runs migrations according to differences between the model definition and database
-- It works well with optional fields, and it's possible to use `Option<T>` as a field type, automatic migration
-tool will detect type within option and create column with that type
 
 ## Performance consideration:
 - It's build by nightly release, so it uses builtin support for `async/await` in traits
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects `CachingSession` as a session arg for operations
-- CRUD queries are macro generated str constants (no concatenation at runtime)
-- By using `find_<model>_query!` macro you can write complex queries that are also generated at compile time as `&'static str`
+- Queries are macro generated str constants (no concatenation at runtime)
+- By using `find_<model>!` macro we can run complex queries that are generated at compile time as `&'static str`
 - While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
 
@@ -31,10 +29,10 @@ tool will detect type within option and create column with that type
 - [Basic Operations](#basic-operations)
   - [Create](#create)
   - [Find](#find)
+    - [Custom filtering](#custom-filtering)
   - [Update](#update)
   - [Delete](#delete)
 - [Partial Model Operations](#partial-model-operations)
-- [Custom filtering](#custom-filtering)
 - [View Operations](#view-operations)
 - [Callbacks](#callbacks)
 - [Batch Operations](#batch-operations)
@@ -50,9 +48,6 @@ tool will detect type within option and create column with that type
 Declare model as a struct within `src/models` dir:
 ```rust
 // src/modles/user.rs
-use super::udts::Address;
-use charybdis::{charybdis_model, partial_model_generator, Text, Timestamp, Uuid};
-
 #[partial_model_generator] // required on top of the charybdis_model macro to generate partial_user helper
 #[charybdis_model(
     table_name = users,
@@ -62,10 +57,10 @@ use charybdis::{charybdis_model, partial_model_generator, Text, Timestamp, Uuid}
 )]
 pub struct User {
     pub id: Uuid,
-    pub username: Text,
-    pub email: Text,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
+    pub username: Option<Text>,
+    pub email: Option<Text>,
+    pub created_at: Option<Timestamp>,
+    pub updated_at: Option<Timestamp>,
     pub address: Option<Address>,
 }
 ```
@@ -75,15 +70,13 @@ pub struct User {
 Declare udt model as a struct within `src/models/udts` dir:
 ```rust
 // src/models/udts/address.rs
-use charybdis::*;
-
 #[charybdis_udt_model(type_name = address)]
 pub struct Address {
-    pub street: Text,
-    pub city: Text,
-    pub state: Text,
-    pub zip: Text,
-    pub country: Text,
+    pub street: Option<Text>,
+    pub city: Option<Text>,
+    pub state: Option<Text>,
+    pub zip: Option<Text>,
+    pub country: Option<Text>,
 }
 ```
 ### Define Materialized Views
@@ -101,7 +94,7 @@ use charybdis::*;
 pub struct UsersByUsername {
     pub username: Text,
     pub id: Uuid,
-    pub email: Text,
+    pub email: Option<Text>,
     pub created_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
 }
@@ -116,9 +109,12 @@ WHERE email IS NOT NULL AND id IS NOT NULL
 PRIMARY KEY (email, id)
   ```
 
+📝 As a rule of thumb, it's best if we wrap fields in option if they are not part of primary key as
+otherwise null values will result in serialization error.
+ 
 ## Automatic migration with `charybdis_cmd/migrate`:
 <a name="automatic-migration"></a>
-Smart migration tool that enables you to migrate your models to database without need to write migrations by hand.
+Smart migration tool that enables automatic migration to database without need to write migrations by hand.
 It expects `src/models` files and generates migrations based on differences between model definitions and database.
 
 It supports following operations:
@@ -130,8 +126,8 @@ It supports following operations:
 - Create UDTs (`src/models/udts`)
 - Create materialized views (`src/models/materialized_views`)
 
-🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir it will leave 
-db structure as it is.
+🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir 
+it will leave db structure as it is.
 ```bash
 cargo install charybdis_cmd/migrate
 
@@ -152,8 +148,8 @@ we will add `modelize` command that will generate `src/models` files from existi
 ```rust
 mod models;
 
-use charybdis::{CachingSession, Insert};
 use crate::models::user::*;
+use charybdis::{CachingSession, Insert};
 
 #[tokio::main]
 async fn main() {
@@ -182,37 +178,62 @@ async fn main() {
 }
 ```
 
-### Find
+## Find
 
 #### `find_by_primary_key`
+This is preferred way to query data rather then
+find_by_primary_key `associated fun`, as it will automatically provide correct order
+based on primary key definition.
 ```rust
   let user = User {id, ..Default::default()};
   let user: User = user.find_by_primary_key(&session).await.unwrap();
 ```
 `find_by_partition_key`
 ```rust
-  // partition_key results in multiple rows
-  let users = user.find_by_partition_key(&session).await;
+  let users =  User {id, ..Default::default()}.find_by_partition_key(&session).await;
 ```
 
-`find_<model>_query` & `find`
+### Custom filtering:
+Let's say we have a model:
+```rust 
+#[partial_model_generator]
+#[charybdis_model(
+    table_name = posts, 
+    partition_keys = [date], 
+    clustering_keys = [category_id, title],
+    secondary_indexes = []
+)]
+pub struct Post {...}
+```
+We get automatically generated `find_post!` macro that follows convention `find_<struct_name>!`.
+It can be used to create custom queries:
 
 ```rust
-  let query = find_user_query!("id = ?");
-  let users: = User::find(&session, query, (id,)).await.unwrap();
-```
-`find_one`
-```rust
-let user = User::find_one(&session, find_user_query!("id = ?"), (id,)).await?;
-```
-`find_paged`
-```rust
-(users, paging_state) = User::find_paged(&session, find_user_query!("id = ?"), (id,), current_paging_state).await?;
+// automatically generated macro rule
+let res = find_post!(
+    session,
+    "date = ? AND category_id in ?",
+    (date, categor_vec])
+).await.unwrap();
 ```
 
-For each primary key we have additional associated functions that can query model by that name.
-Functions follow order of primary key definition.
+```rust
+let res = find_one_post!(
+    session,
+    "date = ? AND category_id in ?",
+    (date, categor_vec]
+)  -> CharybdisModelStream<Post>
+```
+This will return stream of `Post` models. It's useful as query is generated at compile time.
 
+If we just need the `Query` and not the result, we can use `find_post_query!` macro:
+```rust
+let query = find_post_query!(
+    "date = ? AND category_id in ?",
+    (date, categor_vec])
+```
+
+### Additional helpers 
 Lets say we have model:
 ```rust
 #[charybdis_model(
@@ -229,15 +250,15 @@ pub struct Post {
     ...
 }
 ```
-We will have the following functions:
 
 ```rust
 Post::find_by_date(session: &Session, date: Date) -> CharybdisModelStream<Post>
 Post::find_by_date_and_category_id(session: &Session, date: Date, category_id: Uuid) -> CharybdisModelStream<Post>
 Post::find_by_date_and_category_id_and_title(session: &Session, date: Date, category_id: Uuid, title: String) -> CharybdisModelStream<Post>
 ```
+We generate functions for up to 3 fields.
 
-### Update
+## Update
 ```rust
 let user = User::from_json(json);
 
@@ -247,26 +268,24 @@ user.email = "some@email.com";
 user.update(&session).await;
 ```
 
-### Delete
+## Delete
 ```rust 
   let user = User::from_json(json);
 
   user.delete(&session).await;
 ```
 
-📝 Each of operations will do filtering based on primary key fields that will be taken from the model struct.
-
 ## Partial Model Operations:
-Use auto generated `partial_<model_name>!` macro to run operations on subset of the model fields.
+Use auto generated `partial_<model>!` macro to run operations on subset of the model fields.
 This macro generates a new struct with same structure as the original model, but only with provided fields.
-Limitation is that it requires whole primary key fields to be added.
+It requires whole primary key fields to be added.
 Macro is defined by using `#[partial_model_generator]`.
 ```rust
 // auto-generated macro - available in crate::models::user
-partial_user!(PartUser, id, username);
+partial_user!(UpdateUsernameUser, id, username);
 
 let id = Uuid::new_v4();
-let partial_user = PartUser { id, username: "scylla".to_string() };
+let partial_user = UpdateUsernameUser { id, username: "scylla".to_string() };
 
 // we can have same operations as on base model
 // INSERT into users (id, username) VALUES (?, ?)
@@ -279,13 +298,13 @@ partial_user.update(&session).await;
 partial_user.delete(&session).await;
 
 // get partial PartUser
-let partial_user: OpsUser = partial_user.find_by_primary_key(&:session).await.unwrap();
+let partial_user: UpdateUsernameUser = partial_user.find_by_primary_key(&:session).await.unwrap();
 
 // get native user model by primary key
 let user = partial_user.as_native().find_by_primary_key(&session).await.unwrap();
 ```
 
-Note that if you have custom attributes on your model fields,
+Note that if you have custom attributes on model fields,
 they will be automatically added to partial fields.
 
 ```rust
@@ -311,34 +330,14 @@ partial_node!(PartialNode, id, root_id);
 
 `PartialNode` will include serde attributes `#[serde(rename = "rootId")]` from `Node` model.
 
-
-## Custom filtering:
-Let's say we have a model:
-```rust 
-#[partial_model_generator]
-#[charybdis_model(
-    table_name = posts, 
-    partition_keys = [date], 
-    clustering_keys = [category_id, title],
-    secondary_indexes = []
-)]
-pub struct Post {...}
-```
-We get automatically generated `find_post_query!` macro that follows convention `find_<struct_name>_query!`.
-It can be used to create custom filtering clauses like:
-
-```rust
-// automatically generated macro rule
-let query = find_post_query!("date = ? AND category_id in ?");
-let posts = Post::find(&session, query, (date, category_ids)).await.unwrap();
-```
-
-Also, if we are working with **partial** models, we can use `find_<struct_name>_query` and
-`update_<struct_name>_query!`, rules
+Recommended convention for naming is Purpose + Original Struct Name, e.g:
+`UpdateAdresssUser`, `UpdateDescriptionPost`.
+So Idea is that those structs are used for partial updates.
 
 
 ## Callbacks
 We can define callbacks that will be executed before and after certain operations.
+Note that callbacks returns custom error class that implements `From<CharybdisError>`.
 
 ```rust
 use charybdis::*;
@@ -355,29 +354,29 @@ pub struct User {
 
 impl User {
   pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-    let query = find_user_query!("username = ?");
-
-    Self::find_one(session, query, (&self.username,)).await.ok()
+    find_one_user!(session, "username = ?", (&self.username,))
+        .await
+        .ok()
   }
 
   pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-    let query = find_user_query!("email = ?");
-
-    Self::find_one(session, query, (&self.email,)).await.ok()
+    find_one_user!(session, "email = ?", (&self.username,))
+        .await
+        .ok()
   }
 }
 
-impl Callbacks for User {
-  async fn before_insert(&self, session: &CachingSession) -> Result<(), CharybdisError> {
+impl Callbacks<CustomError> for User {
+  async fn before_insert(&self, session: &CachingSession) -> Result<(), CustomError> {
     if self.find_by_username(session).await.is_some() {
-      return Err(CharybdisError::ValidationError((
+      return Err(CustomError::ValidationError((
         "username".to_string(),
         "is taken".to_string(),
       )));
     }
 
     if self.find_by_email(session).await.is_some() {
-      return Err(CharybdisError::ValidationError((
+      return Err(CustomError::ValidationError((
         "email".to_string(),
         "is taken".to_string(),
       )));
@@ -395,7 +394,8 @@ Possible callbacks:
 - `before_delete`
 - `after_delete`
 
-In order to trigger callback, instead of calling `insert` method on model, we can call `insert_cb`:
+⚠️ In order to trigger callback, instead of calling `insert` method on model, we can call `insert_cb. 
+This enables us to have clear distinction between insert and insert with callbacks.
 ```rust
 let post = Post::from_json(json);
 let res = post.insert_cb(&session).await;
@@ -474,7 +474,7 @@ CharybdisModelBatch::chunked_inserts(&session, users, chunk_size).await?;
 ```
 
 ## As Native
-In case you need to run operations on native model, you can use `as_native` method:
+In case we need to run operations on native model, we can use `as_native` method:
 ```rust
 partial_user!(UpdateUser, id, username);
 
@@ -510,9 +510,10 @@ execute(query, (post_ids_vec, &user.id)).await;
 ```
 
 ## Considerations:
-1) `partial_models` don't implement same callbacks defined on base model so 
-    `insert_cb`, `update_cb`, `delete_cb` will not work on partial models unless callbacks are
-    manually implemented for partial models e.g.
+1) `partial_<model>` struct implement everything that is `internal` to native struct and library
+    traits that are required for basic operations. Unsurprisingly, it doesn't implement `Callbacks` or
+    other developer-defined traits. So if we want to use callbacks on partial models, 
+    we need to implement them manually:
     ```rust
     partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
     
@@ -523,15 +524,15 @@ execute(query, (post_ids_vec, &user.id)).await;
         }
     }
     ```
-    or you can always implement macro helper for this use case
+    or we can always implement macro helper for this use case
     ```rust
-    macro_rules! set_updated_at_cb {
+    macro_rules! impl_updated_at_cb {
         ($struct_name:ident) => {
-            impl Callbacks for $struct_name {
+            impl Callbacks<AppErr> for $struct_name {
                 async fn before_update(
                     &mut self,
                     _session: &CachingSession,
-                ) -> Result<(), CharybdisError> {
+                ) -> Result<(), AppErr> {
                     self.updated_at = Some(Utc::now());
                     Ok(())
                 }
@@ -543,14 +544,14 @@ execute(query, (post_ids_vec, &user.id)).await;
     ```
     and then only use it in partial model definition:
     ```rust
-    partial_user!(UpdateUserFirstName, id, first_name);
-    set_updated_at_cb!(UpdateUser);
-    
-    partial_user!(UpdateUserLastName, id, last_name);
-    set_updated_at_cb!(UpdateUser);
+    partial_user!(UpdateNameUser, id, first_name, last_name);
+    impl_updated_at_cb!(UpdateNameUser);
+   
+    partial_user!(UpdateAddressUser, id, address);
+    impl_updated_at_cb!(UpdateAddressUser);
     ```
 
-2) `partial_models` require complete primary key in definition
+2) `partial_<model>` require complete primary key in definition
 
 ## Roadmap:
 - [ ] Add tests

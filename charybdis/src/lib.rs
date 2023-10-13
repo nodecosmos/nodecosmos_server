@@ -33,7 +33,7 @@ pub use scylla::{
     },
     query::Query,
     transport::{errors::QueryError, session::TypedRowIter},
-    CachingSession, Session,
+    CachingSession, QueryResult, Session,
 };
 
 // scylla macros

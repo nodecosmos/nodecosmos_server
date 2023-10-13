@@ -10,7 +10,7 @@ use crate::models::workflow::WorkflowDelete;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use crate::services::logger::log_error;
 use crate::CbExtension;
-use charybdis::{CharybdisModelBatch, Uuid};
+use charybdis::{CharybdisModelBatch, Delete, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use std::collections::HashMap;
@@ -105,9 +105,9 @@ impl<'a> NodeDeleter<'a> {
 
                 batch.append_delete(&DeleteNode { id: descendant.id })?;
 
-                if let Some(parent_id) = descendant.parent_id {
+                if !self.node.is_root() {
                     self.children_by_parent_id
-                        .entry(parent_id)
+                        .entry(self.node.parent_id.unwrap_or_default())
                         .or_default()
                         .push((descendant.id, descendant.order_index));
                 }
@@ -142,16 +142,23 @@ impl<'a> NodeDeleter<'a> {
     /// It's important to remember that each node in tree has its own descendant records in node_descendants table,
     /// so we have to get all of them.
     pub async fn delete_descendants(&mut self) -> Result<(), NodecosmosError> {
-        let order_index = self.node.order_index.unwrap_or_default();
-        let start_from_parent_id = self.node.parent_id.unwrap_or(self.node.id);
+        let parent_id;
 
-        // populate with current node
-        self.children_by_parent_id
-            .entry(start_from_parent_id)
-            .or_default()
-            .push((self.node.id, order_index));
+        if self.node.is_root() {
+            self.delete_tree().await?;
+            return Ok(());
+        }
 
-        let mut delete_stack = vec![start_from_parent_id];
+        match self.node.parent_id {
+            Some(id) => parent_id = id,
+            None => {
+                return Err(NodecosmosError::InternalServerError(
+                    "NodeDeleter::delete_descendants: parent_id is None".to_string(),
+                ));
+            }
+        };
+
+        let mut delete_stack = vec![parent_id];
         let mut current_ancestor_ids = self.node.ancestor_ids.clone().unwrap_or_default();
 
         while let Some(parent_id) = delete_stack.pop() {
@@ -187,6 +194,17 @@ impl<'a> NodeDeleter<'a> {
         }
 
         Ok(())
+    }
+
+    async fn delete_tree(&self) -> Result<(), NodecosmosError> {
+        NodeDescendant {
+            root_id: self.node.id,
+            ..Default::default()
+        }
+        .delete_by_partition_key(self.db_session)
+        .await?;
+
+        return Ok(());
     }
 
     async fn delete_elastic_data(&self) {

@@ -2,3 +2,7 @@
 /.idea
 .env
 /tmp
+
+volumes/scylla1
+volumes/scylla2
+volumes/scylla3

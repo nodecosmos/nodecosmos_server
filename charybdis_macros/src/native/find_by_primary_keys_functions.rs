@@ -4,6 +4,8 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_str, FieldsNamed};
 
+const MAX_FIND_BY_FUNCTIONS: usize = 3;
+
 /// for each key in the clustering key, and for complete partition key, generate a function that
 /// finds a model by that keys in order defined.
 /// Scylla enables us to query by complete partition key and partial clustering key.
@@ -19,7 +21,15 @@ pub(crate) fn find_by_primary_keys_functions(
     let mut primary_key = ch_args.get_primary_key();
     let mut generated = quote! {};
 
+    let mut i = 0;
+
     while primary_key.len() >= partition_keys.len() {
+        if i > MAX_FIND_BY_FUNCTIONS {
+            break;
+        }
+
+        i += 1;
+
         let current_keys = primary_key.clone();
         let primary_key_where_clause: String = current_keys.join(" = ? AND ");
 

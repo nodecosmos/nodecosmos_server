@@ -48,12 +48,12 @@ pub trait Callbacks<Err: From<CharybdisError>> {
 ///    ...
 /// }
 ///
-/// impl ExtCallbacks<CbExtension, CharybdisError> for User {
+/// impl ExtCallbacks<CbExtension, CustomError> for User {
 ///    async fn after_update(
 ///        &mut self,
 ///        session: &CachingSession,
 ///        extension: &CbExtension
-///    ) -> Result<(), CharybdisError> {
+///    ) -> Result<(), CustomError> {
 ///        // do something with extension.elastic_client
 ///        extension.elastic_client.update(...).await?;
 ///        Ok(())

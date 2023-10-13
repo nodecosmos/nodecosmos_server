@@ -35,7 +35,18 @@ pub(crate) fn parse_file_as_string(path: &Path) -> String {
 }
 
 pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) -> SchemaObject {
-    let ast: syn::File = syn::parse_file(file_content).unwrap();
+    let ast: syn::File = syn::parse_file(file_content)
+        .map_err(|e| {
+            println!(
+                "{}\n",
+                format!("Error parsing file: {}", file_content)
+                    .bright_red()
+                    .bold()
+            );
+            e
+        })
+        .unwrap();
+
     let mut schema_object: SchemaObject = SchemaObject::new();
 
     for item in ast.items {

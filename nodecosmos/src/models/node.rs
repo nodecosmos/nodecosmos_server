@@ -113,6 +113,10 @@ impl Node {
         Ok(descendants)
     }
 
+    pub fn is_root(&self) -> bool {
+        self.is_root.unwrap_or(false)
+    }
+
     pub fn set_owner(&mut self, current_user: &CurrentUser) {
         let owner = Owner {
             id: current_user.id,
@@ -130,17 +134,19 @@ impl Node {
 
     pub async fn set_defaults(&mut self, parent: &Option<Self>) -> Result<(), NodecosmosError> {
         if let Some(parent) = parent {
+            self.is_root = Some(false);
             self.root_id = parent.root_id;
             self.editor_ids = parent.editor_ids.clone();
             self.is_public = parent.is_public;
 
-            let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or_default();
+            let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
             ancestor_ids.push(parent.id);
-
             self.ancestor_ids = Some(ancestor_ids);
         } else {
             self.is_root = Some(true);
             self.root_id = self.id;
+            self.order_index = Some(0.0);
+            self.ancestor_ids = Some(Set::new());
         }
 
         let now = Utc::now();

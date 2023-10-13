@@ -1,6 +1,7 @@
 use crate::models::node::Node;
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic::add_elastic_document;
+use crate::services::logger::log_error;
 use crate::CbExtension;
 use charybdis::{CharybdisError, CharybdisModelBatch};
 use scylla::CachingSession;
@@ -26,7 +27,14 @@ impl Node {
                 batch.append_insert(&node_descendant)?;
             }
 
-            batch.execute(db_session).await?;
+            batch.execute(db_session).await.map_err(|e| {
+                log_error(format!(
+                    "Error appending node {} to ancestors. {:?}",
+                    self.id, e
+                ));
+
+                e
+            })?;
         }
 
         Ok(())

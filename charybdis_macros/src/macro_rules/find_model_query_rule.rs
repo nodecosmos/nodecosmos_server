@@ -31,3 +31,59 @@ pub fn find_model_query_rule(
 
     expanded
 }
+
+pub fn find_model_rule(
+    args: &CharybdisArgs,
+    fields_named: &FieldsNamed,
+    struct_name: &Ident,
+) -> TokenStream {
+    let comma_sep_cols = comma_sep_cols(fields_named);
+    let table_name = args.table_name.clone().unwrap();
+    let struct_name_str = camel_to_snake_case(&struct_name.to_string());
+
+    let macro_name_str: String = format!("find_{}", struct_name_str);
+    let macro_name: TokenStream = parse_str::<TokenStream>(&macro_name_str).unwrap();
+
+    let query_str = format!("SELECT {} FROM {} WHERE ", comma_sep_cols, table_name);
+
+    let expanded = quote! {
+        #[allow(unused_macros)]
+        macro_rules! #macro_name {
+            ($session: ident, $query: literal, $values: expr) => {
+               #struct_name::find($session, concat!(#query_str, $query), $values)
+            }
+        }
+
+        pub(crate) use #macro_name;
+    };
+
+    expanded
+}
+
+pub fn find_one_model_rule(
+    args: &CharybdisArgs,
+    fields_named: &FieldsNamed,
+    struct_name: &Ident,
+) -> TokenStream {
+    let comma_sep_cols = comma_sep_cols(fields_named);
+    let table_name = args.table_name.clone().unwrap();
+    let struct_name_str = camel_to_snake_case(&struct_name.to_string());
+
+    let macro_name_str: String = format!("find_one_{}", struct_name_str);
+    let macro_name: TokenStream = parse_str::<TokenStream>(&macro_name_str).unwrap();
+
+    let query_str = format!("SELECT {} FROM {} WHERE ", comma_sep_cols, table_name);
+
+    let expanded = quote! {
+        #[allow(unused_macros)]
+        macro_rules! #macro_name {
+            ($session: ident, $query: literal, $values: expr) => {
+                #struct_name::find_one($session, concat!(#query_str, $query), $values)
+            }
+        }
+
+        pub(crate) use #macro_name;
+    };
+
+    expanded
+}
