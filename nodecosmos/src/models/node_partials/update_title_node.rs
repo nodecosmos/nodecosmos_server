@@ -4,6 +4,7 @@ use crate::models::helpers::ClonedRef;
 use crate::models::node::{partial_node, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic::update_elastic_document;
+use crate::services::logger::log_error;
 use crate::CbExtension;
 use charybdis::{CharybdisModelBatch, Double, ExtCallbacks, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
@@ -30,8 +31,8 @@ impl UpdateTitleNode {
         self.ancestor_ids = native_node.ancestor_ids;
     }
 
-    /// Update title for node_descendant record of current node for each ancestor
-    pub async fn update_node_descendants(
+    /// Update self reference in node_descendants for each ancestor
+    pub async fn update_ancestors(
         &mut self,
         db_session: &CachingSession,
         ext: &CbExtension,
@@ -55,15 +56,29 @@ impl UpdateTitleNode {
                 root_id: self.root_id,
                 node_id: ancestor_id,
                 id: self.id,
-                parent_id: self.parent_id,
-                title: self.title.clone(),
+                parent_id: self.parent_id.unwrap(),
+                title: self.title.clone().unwrap(),
                 order_index: self.order_index.unwrap_or_default(),
             };
 
             batch.append_update(&node_descendant)?;
         }
 
-        batch.execute(db_session).await?;
+        let res = batch.execute(db_session).await;
+
+        match res {
+            Ok(_) => {
+                ext.resource_locker
+                    .unlock_resource_action(
+                        ActionTypes::Reorder(ActionObject::Node),
+                        &self.root_id.to_string(),
+                    )
+                    .await?;
+            }
+            Err(e) => {
+                log_error(format!("Error updating title for node descendants: {}. Node reorder will remain locked", e));
+            }
+        }
 
         ext.resource_locker
             .unlock_resource_action(
@@ -92,7 +107,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for UpdateTitleNode {
         session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), NodecosmosError> {
-        self.update_node_descendants(session, ext).await?;
+        self.update_ancestors(session, ext).await?;
         self.update_elastic_index(ext).await;
 
         Ok(())

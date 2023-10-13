@@ -179,8 +179,8 @@ impl<'a> Reorderer<'a> {
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
-                title: self.reorder_data.node.title.clone(),
-                parent_id: Some(self.reorder_data.new_parent.id),
+                title: self.reorder_data.node.title.clone().unwrap_or_default(),
+                parent_id: self.reorder_data.new_parent.id,
             };
 
             descendants_to_add.push(descendant);

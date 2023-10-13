@@ -22,7 +22,7 @@ pub struct NodeDescendant {
     pub id: Uuid,
 
     #[serde(rename = "parentId")]
-    pub parent_id: Option<Uuid>,
+    pub parent_id: Uuid,
 
-    pub title: Option<Text>,
+    pub title: Text,
 }

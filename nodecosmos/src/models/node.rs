@@ -136,6 +136,7 @@ impl Node {
         if let Some(parent) = parent {
             self.is_root = Some(false);
             self.root_id = parent.root_id;
+            self.parent_id = Some(parent.id);
             self.editor_ids = parent.editor_ids.clone();
             self.is_public = parent.is_public;
 
@@ -145,6 +146,7 @@ impl Node {
         } else {
             self.is_root = Some(true);
             self.root_id = self.id;
+            self.parent_id = None;
             self.order_index = Some(0.0);
             self.ancestor_ids = Some(Set::new());
         }

@@ -107,7 +107,7 @@ impl<'a> NodeDeleter<'a> {
 
                 if !self.node.is_root() {
                     self.children_by_parent_id
-                        .entry(self.node.parent_id.unwrap_or_default())
+                        .entry(descendant.parent_id)
                         .or_default()
                         .push((descendant.id, descendant.order_index));
                 }
@@ -142,56 +142,61 @@ impl<'a> NodeDeleter<'a> {
     /// It's important to remember that each node in tree has its own descendant records in node_descendants table,
     /// so we have to get all of them.
     pub async fn delete_descendants(&mut self) -> Result<(), NodecosmosError> {
-        let parent_id;
-
         if self.node.is_root() {
             self.delete_tree().await?;
             return Ok(());
         }
 
         match self.node.parent_id {
-            Some(id) => parent_id = id,
+            Some(parent_id) => {
+                let order_index = self.node.order_index.unwrap();
+
+                self.children_by_parent_id
+                    .entry(parent_id)
+                    .or_default()
+                    .push((self.node.id, order_index));
+
+                let mut delete_stack = vec![parent_id];
+                let mut current_ancestor_ids = self.node.ancestor_ids.clone().unwrap_or(vec![]);
+
+                while let Some(parent_id) = delete_stack.pop() {
+                    current_ancestor_ids.push(parent_id);
+
+                    let child_ids_and_indices: Vec<(Id, OrderIndex)> = self
+                        .children_by_parent_id
+                        .get(&parent_id)
+                        .unwrap_or(&vec![])
+                        .clone();
+
+                    for child_ids_and_indices_chunk in child_ids_and_indices.chunks(100) {
+                        let mut batch = CharybdisModelBatch::unlogged();
+
+                        for (child_id, order_index) in child_ids_and_indices_chunk {
+                            // delete node descendants for all of its ancestors
+                            for ancestor_id in &current_ancestor_ids {
+                                batch.append_delete(&NodeDescendant {
+                                    root_id: self.node.root_id,
+                                    node_id: *ancestor_id,
+                                    order_index: *order_index,
+                                    id: *child_id,
+                                    ..Default::default()
+                                })?;
+                            }
+
+                            // populate delete stack with child ids
+                            delete_stack.push(*child_id);
+                        }
+
+                        batch.execute(self.db_session).await?;
+                    }
+                }
+            }
             None => {
                 return Err(NodecosmosError::InternalServerError(
                     "NodeDeleter::delete_descendants: parent_id is None".to_string(),
                 ));
             }
         };
-
-        let mut delete_stack = vec![parent_id];
-        let mut current_ancestor_ids = self.node.ancestor_ids.clone().unwrap_or_default();
-
-        while let Some(parent_id) = delete_stack.pop() {
-            current_ancestor_ids.push(parent_id);
-
-            let child_ids_and_indices: Vec<(Id, OrderIndex)> = self
-                .children_by_parent_id
-                .get(&parent_id)
-                .unwrap_or(&vec![])
-                .clone();
-
-            for child_ids_and_indices_chunk in child_ids_and_indices.chunks(100) {
-                let mut batch = CharybdisModelBatch::unlogged();
-
-                for (child_id, order_index) in child_ids_and_indices_chunk {
-                    // delete node descendants for all of its ancestors
-                    for ancestor_id in &current_ancestor_ids {
-                        batch.append_delete(&NodeDescendant {
-                            root_id: self.node.root_id,
-                            node_id: *ancestor_id,
-                            order_index: *order_index,
-                            id: *child_id,
-                            ..Default::default()
-                        })?;
-                    }
-
-                    // populate delete stack with child ids
-                    delete_stack.push(*child_id);
-                }
-
-                batch.execute(self.db_session).await?;
-            }
-        }
 
         Ok(())
     }
