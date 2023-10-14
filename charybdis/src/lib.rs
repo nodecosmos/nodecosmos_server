@@ -1,28 +1,22 @@
 #![allow(incomplete_features)]
 #![feature(async_fn_in_trait)]
 
-mod batch;
-mod callbacks;
-mod errors;
-mod iterator;
-mod model;
-mod operations;
-mod serializers;
-mod stream;
-mod types;
-
-// orm
-pub use crate::{
-    batch::CharybdisModelBatch, callbacks::*, errors::CharybdisError,
-    iterator::CharybdisModelIterator, model::*, operations::*, serializers::*,
-    stream::CharybdisModelStream, types::*,
-};
+pub mod batch;
+pub mod callbacks;
+pub mod errors;
+pub mod iterator;
+pub mod model;
+pub mod operations;
+pub mod serializers;
+pub mod stream;
+pub mod types;
 
 // orm macros
-pub use charybdis_macros::{
-    char_model_field_attrs_gen, charybdis_model, charybdis_udt_model, charybdis_view_model,
-    partial_model_generator,
-};
+pub mod macros {
+    pub use charybdis_macros::{
+        char_model_field_attrs_gen, charybdis_model, charybdis_udt_model, charybdis_view_model,
+    };
+}
 
 // scylla
 pub use scylla::{

@@ -1,9 +1,8 @@
 use crate::models::helpers::impl_default_callbacks;
-use charybdis::{Text, Timestamp, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::macros::charybdis_model;
+use charybdis::types::{Text, Timestamp, Uuid};
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = attachments,
     partition_keys = [node_id],

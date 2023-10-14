@@ -1,7 +1,8 @@
 use crate::errors::NodecosmosError;
 use crate::models::helpers::ClonedRef;
 use crate::models::node::GetStructureNode;
-use charybdis::{Find, Uuid};
+use charybdis::operations::Find;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 pub async fn init_sibling(

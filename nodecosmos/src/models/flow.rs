@@ -4,15 +4,15 @@ use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
 };
 use crate::models::workflow::Workflow;
-use charybdis::{
-    charybdis_model, execute, partial_model_generator, Callbacks, CharybdisError, Delete, Int,
-    List, New, Text, Timestamp, Uuid,
-};
+use charybdis::callbacks::Callbacks;
+use charybdis::errors::CharybdisError;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::{execute, Delete, New};
+use charybdis::types::{Int, List, Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = flows,
     partition_keys = [node_id],

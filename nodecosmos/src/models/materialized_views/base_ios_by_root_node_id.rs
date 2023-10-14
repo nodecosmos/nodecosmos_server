@@ -1,5 +1,5 @@
-use charybdis::{Text, Uuid};
-use charybdis_macros::charybdis_view_model;
+use charybdis::macros::charybdis_view_model;
+use charybdis::types::{Text, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_view_model(

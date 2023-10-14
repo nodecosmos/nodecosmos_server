@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, DeriveInput};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CharybdisArgs {
     pub table_name: Option<String>,
     pub type_name: Option<String>,
@@ -13,6 +13,7 @@ pub struct CharybdisArgs {
     pub partition_keys: Option<Vec<String>>,
     pub clustering_keys: Option<Vec<String>>,
     pub secondary_indexes: Option<Vec<String>>,
+    pub exclude_partial_model: Option<bool>,
     pub fields_names: Option<Vec<String>>,
     pub field_types_hash: Option<HashMap<String, TokenStream>>,
     pub field_attributes_hash: Option<HashMap<String, TokenStream>>,
@@ -88,6 +89,7 @@ impl Parse for CharybdisArgs {
         let mut field_types_hash = None;
         let mut field_attributes_hash = None;
         let mut table_options = None;
+        let mut exclude_partial_model = None;
 
         while !input.is_empty() {
             let key: syn::Ident = input.parse()?;
@@ -123,6 +125,10 @@ impl Parse for CharybdisArgs {
                     let parsed = parse_arr_expr_from_literals(array);
 
                     secondary_indexes = Some(parsed)
+                }
+                "exclude_partial_model" => {
+                    let value: syn::LitBool = input.parse()?;
+                    exclude_partial_model = Option::from(value.value());
                 }
                 "fields_names" => {
                     let array: syn::ExprArray = input.parse()?;
@@ -168,6 +174,7 @@ impl Parse for CharybdisArgs {
             field_types_hash,
             field_attributes_hash,
             table_options,
+            exclude_partial_model,
         })
     }
 }

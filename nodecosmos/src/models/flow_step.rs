@@ -4,14 +4,14 @@ use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
 };
 use crate::models::input_output::InputOutput;
-use charybdis::{
-    charybdis_model, partial_model_generator, AsNative, Callbacks, DeleteWithCallbacks, Find,
-    Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
-};
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::model::AsNative;
+use charybdis::operations::{DeleteWithCallbacks, Find, New, UpdateWithCallbacks};
+use charybdis::types::{Frozen, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = flow_steps,
     partition_keys = [node_id],

@@ -1,14 +1,16 @@
 use crate::authorize::auth_user_update;
 use crate::client_session::set_current_user;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
 use crate::models::user::{GetUser, UpdateUser, User};
 use crate::CbExtension;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::{
-    AsNative, DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks, Uuid,
+use charybdis::model::AsNative;
+use charybdis::operations::{
+    DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks,
 };
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
 

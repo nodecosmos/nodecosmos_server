@@ -1,11 +1,12 @@
-use crate::client_session::{CurrentUser, OptCurrentUser};
+use crate::client_session::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;
-use crate::models::user::LikedObjectIdsUser;
+use crate::models::user::{CurrentUser, LikedObjectIdsUser};
 use crate::CbExtension;
 use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, Uuid};
+use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New};
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;

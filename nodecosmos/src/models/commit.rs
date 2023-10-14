@@ -6,12 +6,12 @@ use crate::actions::commit_actions::CommitParams;
 use crate::errors::NodecosmosError;
 use crate::models::commit::types::CommitTypes;
 use crate::models::helpers::impl_default_callbacks;
-use charybdis::{Delete, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::macros::charybdis_model;
+use charybdis::operations::{Delete, InsertWithCallbacks, New};
+use charybdis::types::{Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = commits,
     partition_keys = [contribution_request_id],

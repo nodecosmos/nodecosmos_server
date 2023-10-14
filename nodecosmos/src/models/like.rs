@@ -3,8 +3,10 @@ use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
 use crate::models::user::User;
 use crate::CbExtension;
-use charybdis::{execute, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExtCallbacks, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::callbacks::ExtCallbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::{execute, Find, New, UpdateWithExtCallbacks};
+use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -12,7 +14,7 @@ use std::fmt;
 
 // CQL limitation is to have counters in a separate table
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
-#[partial_model_generator]
+
 #[charybdis_model(
     table_name = likes,
     partition_keys = [object_id],

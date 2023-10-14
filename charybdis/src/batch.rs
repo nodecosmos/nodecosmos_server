@@ -1,4 +1,5 @@
-use crate::{CharybdisError, Model};
+use crate::errors::CharybdisError;
+use crate::model::Model;
 use crate::{SerializedValues, ValueList};
 use scylla::{CachingSession, QueryResult};
 

@@ -1,10 +1,11 @@
 use crate::actions::types::{ActionObject, ActionTypes};
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
-use crate::client_session::{CurrentUser, OptCurrentUser};
+use crate::client_session::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::node_partials::*;
+use crate::models::user::CurrentUser;
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
 use crate::services::nodes::reorder::{ReorderParams, Reorderer};
@@ -13,10 +14,11 @@ use crate::services::resource_locker::ResourceLocker;
 use crate::CbExtension;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::{
-    AsNative, DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, UpdateWithExtCallbacks,
-    Uuid,
+use charybdis::model::AsNative;
+use charybdis::operations::{
+    DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, UpdateWithExtCallbacks,
 };
+use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde::Deserialize;

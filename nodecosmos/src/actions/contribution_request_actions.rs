@@ -1,13 +1,15 @@
 use crate::authorize::{auth_contribution_request_creation, auth_contribution_request_update};
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription,
     UpdateContributionRequestTitle,
 };
 use crate::models::udts::{Owner, OwnerTypes};
+use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::{AsNative, Delete, Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
+use charybdis::model::AsNative;
+use charybdis::operations::{Delete, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 

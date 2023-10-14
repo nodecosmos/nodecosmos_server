@@ -1,7 +1,10 @@
-use crate::client_session::{CurrentUser, OptCurrentUser};
+use crate::client_session::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
-use charybdis::{AsNative, Find, Uuid};
+use crate::models::user::CurrentUser;
+use charybdis::model::AsNative;
+use charybdis::operations::Find;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
 

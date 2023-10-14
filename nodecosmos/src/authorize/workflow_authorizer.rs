@@ -1,8 +1,8 @@
 use crate::authorize::auth_node_update_by_id;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
 
-use charybdis::Uuid;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 pub async fn auth_workflow_creation(

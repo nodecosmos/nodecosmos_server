@@ -3,7 +3,8 @@ use crate::errors::NodecosmosError;
 use crate::models::commit::types::{CommitObjectTypes, Committable};
 use crate::models::commit::{Commit, CommitTypes};
 use crate::models::workflow::Workflow;
-use charybdis::{InsertWithCallbacks, Map, Text, Uuid};
+use charybdis::operations::InsertWithCallbacks;
+use charybdis::types::{Map, Text, Uuid};
 use scylla::CachingSession;
 
 pub trait WorkflowCommit {

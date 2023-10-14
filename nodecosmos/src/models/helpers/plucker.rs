@@ -1,5 +1,5 @@
 use crate::models::node_descendant::NodeDescendant;
-use charybdis::Uuid;
+use charybdis::types::Uuid;
 
 pub trait Pluckable {
     fn pluck_id(&self) -> Vec<Uuid>;

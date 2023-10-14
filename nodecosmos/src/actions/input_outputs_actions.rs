@@ -1,10 +1,13 @@
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::{InputOutput, IoDescription, IoTitle};
+use crate::models::user::CurrentUser;
 
 use crate::authorize::auth_workflow_update;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks, Uuid};
+use charybdis::operations::{
+    DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks,
+};
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;

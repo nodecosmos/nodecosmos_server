@@ -15,8 +15,8 @@ use syn::{parse_str, FieldsNamed};
 /// ```
 /// we would have a functions:
 /// ```ignore
-///  User::delete_by_id_and_org_id(session: &Session, org_id: Uuid) -> Result<Vec<User>, CharybdisError>
-///  User::delete_by_id_and_org_id_and_created_at(session: &Session, org_id: Uuid, created_at: Timestamp) -> Result<Vec<User>, CharybdisError>
+///  User::delete_by_id_and_org_id(session: &Session, org_id: Uuid) -> Result<Vec<User>, errors::CharybdisError>
+///  User::delete_by_id_and_org_id_and_created_at(session: &Session, org_id: Uuid, created_at: Timestamp) -> Result<Vec<User>, errors::CharybdisError>
 pub(crate) fn delete_by_clustering_key_functions(
     ch_args: &CharybdisArgs,
     fields_named: &FieldsNamed,
@@ -82,7 +82,7 @@ pub(crate) fn delete_by_clustering_key_functions(
             pub async fn #delete_by_fun_name(
                 session: &charybdis::CachingSession,
                 #(#arguments),*
-            ) -> Result<charybdis::CharybdisModelStream<#struct_name>, charybdis::CharybdisError> {
+            ) -> Result<charybdis::stream::CharybdisModelStream<#struct_name>, charybdis::errors::CharybdisError> {
                 use futures::TryStreamExt;
 
                 let mut serialized = charybdis::SerializedValues::with_capacity(#capacity);
@@ -92,7 +92,7 @@ pub(crate) fn delete_by_clustering_key_functions(
                 let query_result = session.execute_iter(#query_str, serialized).await?;
                 let rows = query_result.into_typed::<Self>();
 
-                Ok(charybdis::CharybdisModelStream::from(rows))
+                Ok(charybdis::stream::CharybdisModelStream::from(rows))
             }
         };
 

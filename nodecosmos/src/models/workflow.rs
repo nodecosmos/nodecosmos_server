@@ -3,10 +3,12 @@ use crate::models::flow::FlowDelete;
 use crate::models::flow_step::FlowStepDelete;
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::input_output::IoDelete;
-use charybdis::{
-    execute, Callbacks, CharybdisError, CharybdisModelBatch, List, Text, Timestamp, Uuid,
-};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::callbacks::Callbacks;
+use charybdis::errors::CharybdisError;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::execute;
+use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +27,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// In future we will allow multiple workflows per node.
 /// Reasoning is that we want to allow users to describe multiple processes.
-#[partial_model_generator]
+
 #[charybdis_model(
     table_name = workflows,
     partition_keys = [node_id],

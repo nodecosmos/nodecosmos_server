@@ -1,7 +1,6 @@
-use crate::callbacks::Callbacks;
+use crate::callbacks::{Callbacks, ExtCallbacks};
 use crate::errors::CharybdisError;
 use crate::model::Model;
-use crate::ExtCallbacks;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
 

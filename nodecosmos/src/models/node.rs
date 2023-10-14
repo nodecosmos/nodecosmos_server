@@ -1,17 +1,21 @@
 mod create;
 mod delete;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{default_to_0, impl_node_updated_at_with_elastic_ext_cb};
 use crate::models::node::delete::NodeDeleter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
+use crate::models::user::CurrentUser;
 use crate::CbExtension;
-use charybdis::*;
+use charybdis::callbacks::ExtCallbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],

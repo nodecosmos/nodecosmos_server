@@ -1,7 +1,7 @@
+use crate::batch::CharybdisModelBatch;
 use crate::callbacks::{Callbacks, ExtCallbacks};
 use crate::errors::CharybdisError;
 use crate::model::Model;
-use crate::CharybdisModelBatch;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
 

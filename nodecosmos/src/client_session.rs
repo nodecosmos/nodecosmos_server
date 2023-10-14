@@ -1,30 +1,10 @@
 use crate::errors::NodecosmosError;
-use crate::models::helpers::default_to_false_bool;
-use crate::models::user::*;
+use crate::models::user::{CurrentUser, User};
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
-use charybdis::*;
 use futures::future::{ready, Ready};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-partial_user!(
-    CurrentUser,
-    id,
-    first_name,
-    last_name,
-    username,
-    email,
-    is_confirmed,
-    is_blocked
-);
-
-impl CurrentUser {
-    pub fn full_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
-    }
-}
 
 pub fn set_current_user(
     client_session: &Session,

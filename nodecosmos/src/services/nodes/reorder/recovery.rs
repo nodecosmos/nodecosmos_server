@@ -4,7 +4,8 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::services::logger::{log_error, log_fatal, log_success, log_warning};
 use crate::services::nodes::reorder::reorder_data::ReorderData;
 use crate::services::resource_locker::ResourceLocker;
-use charybdis::{CharybdisModelBatch, Delete, Update};
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::operations::{Delete, Update};
 use scylla::CachingSession;
 use std::path::Path;
 

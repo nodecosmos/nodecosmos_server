@@ -3,7 +3,8 @@ use crate::models::node::{partial_node, Node};
 use crate::services::elastic::update_elastic_document;
 use crate::CbExtension;
 use ammonia::clean;
-use charybdis::*;
+use charybdis::callbacks::ExtCallbacks;
+use charybdis::types::{Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 

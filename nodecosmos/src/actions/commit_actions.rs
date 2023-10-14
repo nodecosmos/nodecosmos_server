@@ -1,5 +1,4 @@
 use crate::authorize::auth_commit;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::commit::node_commit::NodeCommit;
 use crate::models::commit::types::{CommitObjectTypes, CommitTypes, Committable};
@@ -7,9 +6,10 @@ use crate::models::commit::workflow_commit::WorkflowCommit;
 use crate::models::commit::Commit;
 use crate::models::node::Node;
 use crate::models::node_partials::{UpdateDescriptionNode, UpdateTitleNode};
+use crate::models::user::CurrentUser;
 use crate::models::workflow::Workflow;
 use actix_web::{post, web, HttpResponse};
-use charybdis::Uuid;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 

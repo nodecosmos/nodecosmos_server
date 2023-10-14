@@ -1,9 +1,8 @@
-use charybdis::{Double, Text, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::macros::charybdis_model;
+use charybdis::types::{Double, Text, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
-#[partial_model_generator]
 #[charybdis_model(
     table_name = node_descendants,
     partition_keys = [root_id],

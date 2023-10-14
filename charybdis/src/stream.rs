@@ -1,4 +1,5 @@
-use crate::{BaseModel, CharybdisError};
+use crate::errors::CharybdisError;
+use crate::model::BaseModel;
 use futures::{Stream, StreamExt, TryStreamExt};
 use scylla::transport::iterator::{NextRowError, TypedRowIterator};
 use std::pin::Pin;

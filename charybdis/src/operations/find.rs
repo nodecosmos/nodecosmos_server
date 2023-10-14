@@ -1,11 +1,12 @@
-use crate::{CharybdisModelIterator, CharybdisModelStream};
 use scylla::frame::value::ValueList;
 use scylla::query::Query;
 use scylla::{Bytes, IntoTypedRows};
 use scylla::{CachingSession, QueryResult};
 
 use crate::errors::CharybdisError;
+use crate::iterator::CharybdisModelIterator;
 use crate::model::BaseModel;
+use crate::stream::CharybdisModelStream;
 
 pub trait Find: BaseModel {
     async fn find(

@@ -1,4 +1,5 @@
-use crate::{BaseModel, CharybdisError};
+use crate::errors::CharybdisError;
+use crate::model::BaseModel;
 use scylla::transport::session::TypedRowIter;
 
 pub struct CharybdisModelIterator<T: BaseModel> {

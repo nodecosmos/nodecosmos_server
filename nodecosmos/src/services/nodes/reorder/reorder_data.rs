@@ -6,7 +6,8 @@ use crate::services::nodes::reorder::helpers::{
     build_new_ancestor_ids, build_new_index, init_sibling,
 };
 use crate::services::nodes::reorder::ReorderParams;
-use charybdis::{Find, Uuid};
+use charybdis::operations::Find;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 

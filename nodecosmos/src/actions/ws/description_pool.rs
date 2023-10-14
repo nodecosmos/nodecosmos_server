@@ -1,11 +1,11 @@
 use crate::authorize::auth_node_update_by_id;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
 use actix::prelude::*;
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use actix_web_actors::ws::WsResponseBuilder;
-use charybdis::Uuid;
+use charybdis::types::Uuid;
 use dashmap::DashMap;
 use scylla::CachingSession;
 use serde::Deserialize;

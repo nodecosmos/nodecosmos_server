@@ -1,6 +1,5 @@
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
-use crate::models::user::User;
+use crate::models::user::{CurrentUser, User};
 use serde_json::json;
 
 pub async fn auth_user_update(

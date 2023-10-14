@@ -1,6 +1,6 @@
 macro_rules! impl_node_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
-        impl charybdis::ExtCallbacks<crate::CbExtension, crate::errors::NodecosmosError>
+        impl charybdis::callbacks::ExtCallbacks<crate::CbExtension, crate::errors::NodecosmosError>
             for $struct_name
         {
             async fn before_update(

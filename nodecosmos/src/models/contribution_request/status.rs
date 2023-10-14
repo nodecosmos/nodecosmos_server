@@ -1,4 +1,4 @@
-use charybdis::Text;
+use charybdis::types::Text;
 use std::fmt::Display;
 
 pub enum ContributionRequestStatus {

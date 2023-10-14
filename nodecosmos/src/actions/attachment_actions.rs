@@ -1,12 +1,13 @@
 use crate::authorize::auth_node_update_by_id;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::attachment::Attachment;
+use crate::models::user::CurrentUser;
 use crate::services::attachments::upload_image::{upload_image_attachment, ImageAttachmentParams};
 use crate::services::aws::s3::get_s3_presigned_url;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
-use charybdis::{InsertWithCallbacks, Uuid};
+use charybdis::operations::InsertWithCallbacks;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;

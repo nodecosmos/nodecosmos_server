@@ -62,6 +62,8 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let find_by_key_funs = find_by_primary_keys_functions(&args, fields_named, struct_name);
     let delete_by_cks_funs = delete_by_clustering_key_functions(&args, fields_named, struct_name);
 
+    let partial_model_generator = partial_model_macro_generator(args, &input);
+
     let expanded = quote! {
         #[derive(charybdis::ValueList, charybdis::FromRow)]
         #input
@@ -73,7 +75,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #pull_from_collection_fields_query_consts
         }
 
-       impl charybdis::BaseModel for #struct_name {
+       impl charybdis::model::BaseModel for #struct_name {
             // consts
             #db_model_name_const
             #clustering_keys_const
@@ -88,7 +90,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #get_clustering_key_values
         }
 
-        impl charybdis::Model for #struct_name {
+        impl charybdis::model::Model for #struct_name {
             // consts
             #secondary_indexes_const
             // operation consts
@@ -104,6 +106,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         #find_model_rule
         #find_one_model_rule
         #update_model_query_rule
+        #partial_model_generator
     };
 
     TokenStream::from(expanded)
@@ -147,7 +150,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
             #find_by_key_funs
         }
 
-        impl charybdis::BaseModel for #struct_name {
+        impl charybdis::model::BaseModel for #struct_name {
             // consts
             #db_model_name_const
             #clustering_keys_const
@@ -162,7 +165,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
             #get_clustering_key_values
         }
 
-        impl charybdis::MaterializedView for #struct_name {}
+        impl charybdis::model::MaterializedView for #struct_name {}
 
         #find_model_query_rule
     };
@@ -194,11 +197,11 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn partial_model_generator(_: TokenStream, input: TokenStream) -> TokenStream {
-    partial_model_macro_generator(input)
-}
-
-#[proc_macro_attribute]
 pub fn char_model_field_attrs_gen(args: TokenStream, input: TokenStream) -> TokenStream {
-    char_model_field_attrs_macro_gen(args, input)
+    let args: CharybdisArgs = parse_macro_input!(args);
+    let input: DeriveInput = parse_macro_input!(input);
+
+    let tkn_2 = char_model_field_attrs_macro_gen(args, input);
+
+    tkn_2.into()
 }

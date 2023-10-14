@@ -4,8 +4,10 @@ use crate::models::helpers::{default_to_false_bool, impl_user_updated_at_with_el
 use crate::services::elastic::{add_elastic_document, delete_elastic_document};
 use crate::CbExtension;
 use bcrypt::{hash, verify};
-use charybdis::{Boolean, ExtCallbacks, Find, Set, Text, Timestamp, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::callbacks::ExtCallbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
+use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use scylla::CachingSession;
@@ -13,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 const BCRYPT_COST: u32 = 6;
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = users,
     partition_keys = [id],
@@ -180,3 +181,20 @@ partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 
 partial_user!(LikedObjectIdsUser, id, liked_object_ids);
+
+partial_user!(
+    CurrentUser,
+    id,
+    first_name,
+    last_name,
+    username,
+    email,
+    is_confirmed,
+    is_blocked
+);
+
+impl CurrentUser {
+    pub fn full_name(&self) -> String {
+        format!("{} {}", self.first_name, self.last_name)
+    }
+}

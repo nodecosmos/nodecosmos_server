@@ -1,4 +1,4 @@
-use charybdis::{BigInt, Boolean};
+use charybdis::types::{BigInt, Boolean};
 
 #[allow(dead_code)]
 pub fn default_to_true() -> Option<Boolean> {

@@ -10,7 +10,9 @@ use crate::services::logger::log_fatal;
 use crate::services::nodes::reorder::reorder_data::ReorderData;
 use crate::services::nodes::reorder::validator::ReorderValidator;
 use crate::services::resource_locker::ResourceLocker;
-use charybdis::{execute, CharybdisModelBatch, Update, Uuid};
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::operations::{execute, Update};
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 

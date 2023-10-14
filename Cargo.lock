@@ -2508,7 +2508,6 @@ dependencies = [
  "bcrypt",
  "bytestring",
  "charybdis",
- "charybdis_macros",
  "chrono",
  "colored",
  "dashmap",

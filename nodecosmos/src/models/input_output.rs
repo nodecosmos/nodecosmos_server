@@ -3,11 +3,15 @@ use crate::models::flow_step::FlowStep;
 use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
-use charybdis::*;
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::{Find, New};
+use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
-#[partial_model_generator]
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [node_id],

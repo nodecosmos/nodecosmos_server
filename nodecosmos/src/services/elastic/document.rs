@@ -1,4 +1,5 @@
-use charybdis::{Model, Uuid};
+use charybdis::model::Model;
+use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::{
     BulkOperation, BulkOperations, BulkParts, DeleteParts, Elasticsearch, IndexParts, UpdateParts,

@@ -3,7 +3,8 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic::add_elastic_document;
 use crate::services::logger::log_error;
 use crate::CbExtension;
-use charybdis::{CharybdisError, CharybdisModelBatch};
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::errors::CharybdisError;
 use scylla::CachingSession;
 
 impl Node {

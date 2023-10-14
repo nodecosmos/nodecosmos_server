@@ -4,12 +4,12 @@ use crate::errors::NodecosmosError;
 use crate::models::commit::Commit;
 use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::Owner;
-use charybdis::{Callbacks, List, Text, Timestamp, Uuid};
-use charybdis_macros::{charybdis_model, partial_model_generator};
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[partial_model_generator]
 #[charybdis_model(
     table_name = contribution_requests,
     partition_keys = [node_id],

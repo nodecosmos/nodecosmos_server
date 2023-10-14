@@ -1,9 +1,9 @@
 use crate::helpers::camel_to_snake_case;
 use charybdis_parser::{parse_named_fields, CharybdisArgs};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::collections::HashMap;
-use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
+use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 
 ///
 /// ## Generates macro rule for partial model generation
@@ -117,9 +117,15 @@ use syn::{parse_macro_input, parse_str, Attribute, DeriveInput, FieldsNamed};
 /// keys.
 ///
 
-pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+pub(crate) fn partial_model_macro_generator(
+    args: CharybdisArgs,
+    input: &DeriveInput,
+) -> TokenStream {
     let fields_named = parse_named_fields(&input);
+
+    if args.exclude_partial_model.unwrap_or(false) {
+        return TokenStream::new();
+    }
 
     // TODO: For models without all clustering keys, this will panic!
     //       we should add support for partial clustering keys.
@@ -132,19 +138,16 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
     let struct_name_str = camel_to_snake_case(&native_struct.to_string());
 
     let macro_name_str = format!("partial_{}", struct_name_str);
-    let macro_name = parse_str::<proc_macro2::TokenStream>(&macro_name_str).unwrap();
+    let macro_name = parse_str::<TokenStream>(&macro_name_str).unwrap();
 
     let field_types_hash = build_field_types_hash(fields_named);
     let field_attributes_hash = build_field_attributes_hash(fields_named);
 
-    // This way they don't have to bring charybdis_model macro into scope.
-    let char_args = CharybdisArgs::from_derive(&input);
+    let table_name = args.table_name.unwrap().to_token_stream();
 
-    let table_name = char_args.table_name.unwrap().to_token_stream();
-
-    let cks = char_args.clustering_keys.unwrap_or(vec![]);
-    let pks = char_args.partition_keys.unwrap_or(vec![]);
-    let sec_idxes = char_args.secondary_indexes.unwrap_or(vec![]);
+    let cks = args.clustering_keys.unwrap_or(vec![]);
+    let pks = args.partition_keys.unwrap_or(vec![]);
+    let sec_idxes = args.secondary_indexes.unwrap_or(vec![]);
 
     let cks: Vec<syn::Ident> = cks
         .into_iter()
@@ -168,27 +171,26 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         .filter(|attr| !attr.path().is_ident("charybdis_model"))
         .collect::<Vec<&Attribute>>();
 
-    let expanded: proc_macro2::TokenStream = quote! {
-        #input
-
+    let expanded: TokenStream = quote! {
         #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($struct_name:ident, $($field:ident),*) => {
-                #[charybdis::char_model_field_attrs_gen(
+                #[charybdis::macros::char_model_field_attrs_gen(
                     fields_names=[$($field),*],
                     field_types_hash=#field_types_hash,
                     field_attributes_hash=#field_attributes_hash
                 )]
-                #[charybdis::charybdis_model(
+                #[charybdis::macros::charybdis_model(
                     table_name=#table_name,
                     partition_keys=[ #(#pks),* ],
                     clustering_keys=[ #(#cks),* ],
-                    secondary_indexes=[ #(#sec_idxes),* ]
+                    secondary_indexes=[ #(#sec_idxes),* ],
+                    exclude_partial_model=true
                 )]
                 #(#other_attrs)*
                 pub struct $struct_name {}
 
-                impl charybdis::AsNative<#native_struct> for $struct_name {
+                impl charybdis::model::AsNative<#native_struct> for $struct_name {
                     fn as_native(&self) -> #native_struct {
                         #native_struct {
                             $($field: self.$field.clone(),)*
@@ -201,7 +203,7 @@ pub(crate) fn partial_model_macro_generator(input: TokenStream) -> TokenStream {
         pub(crate) use #macro_name;
     };
 
-    TokenStream::from(expanded)
+    expanded
 }
 
 /// field_types_hash -> key is field name and value is field attributes.
@@ -237,9 +239,7 @@ fn build_field_attributes_hash(fields_named: &FieldsNamed) -> String {
 /// `charybdis_macros::partial_model_macro_generator` macro.
 /// field_attributes_hash -> key is field name and value is field attributes.
 /// field_types_hash -> key is field name and value is field type and generates a struct with
-pub fn char_model_field_attrs_macro_gen(args: TokenStream, input: TokenStream) -> TokenStream {
-    let args: CharybdisArgs = parse_macro_input!(args);
-    let input: DeriveInput = parse_macro_input!(input);
+pub fn char_model_field_attrs_macro_gen(args: CharybdisArgs, input: DeriveInput) -> TokenStream {
     let input_attributes = &input.attrs;
 
     let struct_name = &input.ident;
@@ -259,7 +259,7 @@ pub fn char_model_field_attrs_macro_gen(args: TokenStream, input: TokenStream) -
     let fields_tokens = field_names
         .iter()
         .map(|field_name| {
-            let field_name_token: proc_macro2::TokenStream = parse_str(field_name).unwrap();
+            let field_name_token: TokenStream = parse_str(field_name).unwrap();
             let field_type = field_types_hash.get(field_name).unwrap_or_else(|| {
                 panic!(
                     "failed to parse field type for field: {} in struct: {}",
@@ -275,7 +275,7 @@ pub fn char_model_field_attrs_macro_gen(args: TokenStream, input: TokenStream) -
                 pub #field_name_token: #field_type
             }
         })
-        .collect::<Vec<proc_macro2::TokenStream>>();
+        .collect::<Vec<TokenStream>>();
 
     let expanded = quote! {
         #(#input_attributes)*
@@ -284,5 +284,5 @@ pub fn char_model_field_attrs_macro_gen(args: TokenStream, input: TokenStream) -
         }
     };
 
-    TokenStream::from(expanded)
+    expanded
 }

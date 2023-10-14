@@ -1,12 +1,12 @@
 use crate::authorize::auth_workflow_update;
-use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
     FlowStep, FlowStepDescription, UpdateFlowStepInputIds, UpdateFlowStepNodeIds,
     UpdateFlowStepOutputIds,
 };
+use crate::models::user::CurrentUser;
 use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
 use serde_json::json;
 
