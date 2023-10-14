@@ -50,7 +50,7 @@ pub fn find_model_rule(
         #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($session: ident, $query: literal, $values: expr) => {
-               #struct_name::find($session, concat!(#query_str, $query), $values)
+               <#struct_name as charybdis::operations::Find>::find($session, concat!(#query_str, $query), $values)
             }
         }
 
@@ -78,7 +78,7 @@ pub fn find_one_model_rule(
         #[allow(unused_macros)]
         macro_rules! #macro_name {
             ($session: ident, $query: literal, $values: expr) => {
-                #struct_name::find_one($session, concat!(#query_str, $query), $values)
+                <#struct_name as charybdis::operations::Find>::find_one($session, concat!(#query_str, $query), $values)
             }
         }
 

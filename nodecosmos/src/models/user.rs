@@ -6,7 +6,6 @@ use crate::CbExtension;
 use bcrypt::{hash, verify};
 use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;

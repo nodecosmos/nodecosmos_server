@@ -19,6 +19,7 @@ pub mod macros {
 }
 
 // scylla
+// TODO: Lets reorganize this later
 pub use scylla::{
     cql_to_rust::{FromCqlVal, FromRow, FromRowError},
     frame::{
