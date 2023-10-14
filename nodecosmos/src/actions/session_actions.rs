@@ -30,13 +30,11 @@ pub async fn login(
     } else if let Some(user_by_email) = user.find_by_email(&db_session).await {
         user = user_by_email;
     } else {
-        return Ok(
-            HttpResponse::NotFound().json(json!({"error": {"username_or_email": "is not found"}}))
-        );
+        return Ok(HttpResponse::NotFound().finish());
     }
 
     if !user.verify_password(&login_form.password).await? {
-        return Ok(HttpResponse::NotFound().json(json!({"error": {"password": "is incorrect"}})));
+        return Ok(HttpResponse::NotFound().finish());
     }
 
     let current_user = set_current_user(&client_session, &user)?;

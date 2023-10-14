@@ -6,11 +6,11 @@ use crate::services::nodes::reorder::helpers::{
     build_new_ancestor_ids, build_new_index, init_sibling,
 };
 use crate::services::nodes::reorder::ReorderParams;
-use charybdis::{Deserialize, Find, Uuid};
+use charybdis::{Find, Uuid};
 use scylla::CachingSession;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ReorderData {
     pub node: Node,
     pub descendants: Vec<NodeDescendant>,
@@ -72,7 +72,7 @@ impl ReorderData {
         let new_bottom_sibling = init_sibling(params.new_bottom_sibling_id, &db_session).await?;
 
         let old_order_index = node.order_index.unwrap_or_default();
-        let new_order_index = build_new_index(&new_upper_sibling, &new_bottom_sibling).await?;
+        let new_order_index = build_new_index(&new_upper_sibling, &new_bottom_sibling);
 
         let tree_root = GetStructureNode {
             id: node.root_id,

@@ -9,6 +9,7 @@ use charybdis::{
     Frozen, List, Map, New, Text, Timestamp, UpdateWithCallbacks, Uuid,
 };
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -17,6 +18,7 @@ use scylla::CachingSession;
     clustering_keys = [workflow_id, id],
     secondary_indexes = []
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

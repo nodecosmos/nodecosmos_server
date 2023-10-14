@@ -10,6 +10,7 @@ use charybdis::{
 };
 use chrono::Utc;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -18,6 +19,7 @@ use scylla::CachingSession;
     clustering_keys = [workflow_id, id],
     secondary_indexes = [id]
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

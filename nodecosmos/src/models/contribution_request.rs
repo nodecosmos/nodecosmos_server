@@ -7,6 +7,7 @@ use crate::models::udts::Owner;
 use charybdis::{Callbacks, List, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -15,6 +16,7 @@ use scylla::CachingSession;
     clustering_keys = [id],
     secondary_indexes = []
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct ContributionRequest {
     #[serde(rename = "nodeId")] // node where the contribution request was created
     pub node_id: Uuid,

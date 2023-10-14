@@ -1,5 +1,5 @@
-use crate::actions::client_session::CurrentUser;
 use crate::authorize::{auth_contribution_request_creation, auth_contribution_request_update};
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription,

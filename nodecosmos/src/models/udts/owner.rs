@@ -1,6 +1,8 @@
 use charybdis::*;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
+#[derive(Serialize, Deserialize, Default)]
 #[charybdis_udt_model(type_name = owner)]
 pub struct Owner {
     pub id: Uuid,

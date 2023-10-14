@@ -1,7 +1,6 @@
-use super::client_session::set_current_user;
-
-use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_user_update;
+use crate::client_session::set_current_user;
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::user::{GetUser, UpdateUser, User};
 use crate::CbExtension;

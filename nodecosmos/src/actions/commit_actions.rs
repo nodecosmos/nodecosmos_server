@@ -1,5 +1,5 @@
-use crate::actions::client_session::CurrentUser;
 use crate::authorize::auth_commit;
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::commit::node_commit::NodeCommit;
 use crate::models::commit::types::{CommitObjectTypes, CommitTypes, Committable};

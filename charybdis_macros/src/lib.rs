@@ -63,14 +63,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let delete_by_cks_funs = delete_by_clustering_key_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
-        #[derive(
-            charybdis::Serialize,
-            charybdis::Deserialize,
-            charybdis::ValueList,
-            charybdis::FromRow,
-            Default,
-            Debug
-        )]
+        #[derive(charybdis::ValueList, charybdis::FromRow)]
         #input
 
         impl #struct_name {
@@ -147,16 +140,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_by_key_funs = find_by_primary_keys_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {
-        use futures::TryStreamExt;
-
-        #[derive(
-            charybdis::Serialize,
-            charybdis::Deserialize,
-            charybdis::ValueList,
-            charybdis::FromRow,
-            Default,
-            Debug
-        )]
+        #[derive(charybdis::ValueList, charybdis::FromRow)]
         #input
 
         impl #struct_name {
@@ -200,16 +184,7 @@ pub fn charybdis_udt_model(_: TokenStream, input: TokenStream) -> TokenStream {
     sorted_fields.sort_by(|a, b| a.ident.as_ref().unwrap().cmp(b.ident.as_ref().unwrap()));
 
     let gen = quote! {
-        #[derive(
-            charybdis::Serialize,
-            charybdis::Deserialize,
-            charybdis::FromUserType,
-            charybdis::IntoUserType,
-            Clone,
-            PartialEq,
-            Default,
-            Debug,
-        )]
+        #[derive(charybdis::FromUserType, charybdis::IntoUserType, Clone)]
         pub struct #struct_name {
             #(#sorted_fields),*
         }

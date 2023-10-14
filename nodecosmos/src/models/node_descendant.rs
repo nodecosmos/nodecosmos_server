@@ -1,5 +1,6 @@
 use charybdis::{Double, Text, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 #[partial_model_generator]
@@ -9,6 +10,7 @@ use charybdis_macros::{charybdis_model, partial_model_generator};
     clustering_keys = [node_id, order_index, id],
     secondary_indexes = [],
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct NodeDescendant {
     #[serde(rename = "rootId")]
     pub root_id: Uuid,

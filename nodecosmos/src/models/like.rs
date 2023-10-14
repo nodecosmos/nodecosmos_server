@@ -7,7 +7,7 @@ use charybdis::{execute, ExtCallbacks, Find, New, Text, Timestamp, UpdateWithExt
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use scylla::CachingSession;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // CQL limitation is to have counters in a separate table
@@ -19,6 +19,7 @@ use std::fmt;
     clustering_keys = [user_id],
     secondary_indexes = []
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Like {
     pub object_id: Uuid,
     pub object_type: Text,

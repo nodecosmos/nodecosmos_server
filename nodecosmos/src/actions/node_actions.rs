@@ -1,6 +1,6 @@
-use crate::actions::client_session::*;
 use crate::actions::types::{ActionObject, ActionTypes};
 use crate::authorize::{auth_node_access, auth_node_creation, auth_node_update};
+use crate::client_session::{CurrentUser, OptCurrentUser};
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::node_descendant::NodeDescendant;

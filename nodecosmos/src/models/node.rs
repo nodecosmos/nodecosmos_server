@@ -1,17 +1,15 @@
 mod create;
 mod delete;
-
-use crate::actions::client_session::CurrentUser;
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
-use crate::models::helpers::{
-    default_to_0, default_to_false, impl_node_updated_at_with_elastic_ext_cb,
-};
+use crate::models::helpers::{default_to_0, impl_node_updated_at_with_elastic_ext_cb};
 use crate::models::node::delete::NodeDeleter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::CbExtension;
 use charybdis::*;
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -20,17 +18,18 @@ use chrono::Utc;
     clustering_keys = [],
     secondary_indexes = [],
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Node {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(default, rename = "rootId")]
+    #[serde(rename = "rootId")]
     pub root_id: Uuid,
 
     #[serde(rename = "isPublic")]
     pub is_public: Option<Boolean>,
 
-    #[serde(rename = "isRoot", default = "default_to_false")]
+    #[serde(rename = "isRoot")]
     pub is_root: Option<Boolean>,
 
     #[serde(rename = "parentId")]
@@ -182,6 +181,8 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for Node {
         Ok(())
     }
 }
+//----------------------------------------------------------------------------------------------------------------------
+partial_node!(CreateNode, id, title, is_public);
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(

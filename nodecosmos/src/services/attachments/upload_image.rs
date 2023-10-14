@@ -1,4 +1,4 @@
-use crate::actions::client_session::CurrentUser;
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::attachment::Attachment;
 use crate::services::aws::s3::upload_s3_object;

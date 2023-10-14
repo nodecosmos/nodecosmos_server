@@ -1,6 +1,6 @@
-use crate::actions::client_session::CurrentUser;
 use crate::actions::commit_actions::CommitParams;
 use crate::authorize::{auth_node_update, auth_node_update_by_id};
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::Node;

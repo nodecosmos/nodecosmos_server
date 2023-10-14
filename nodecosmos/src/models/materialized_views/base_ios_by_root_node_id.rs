@@ -1,5 +1,6 @@
 use charybdis::{Text, Uuid};
 use charybdis_macros::charybdis_view_model;
+use serde::{Deserialize, Serialize};
 
 #[charybdis_view_model(
     table_name=input_outputs_by_root_node_id,
@@ -7,6 +8,7 @@ use charybdis_macros::charybdis_view_model;
     partition_keys=[root_node_id],
     clustering_keys=[node_id, workflow_id, id]
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct InputOutputsByRootNodeId {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,

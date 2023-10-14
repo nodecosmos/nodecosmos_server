@@ -6,6 +6,7 @@ use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
 use charybdis::*;
 use futures::future::{ready, Ready};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 partial_user!(

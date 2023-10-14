@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::{BaseNode, Node};
-use charybdis::Deserialize;
 use elasticsearch::{Elasticsearch, SearchParts};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 const PAGE_SIZE: i16 = 10;

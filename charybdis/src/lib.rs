@@ -38,7 +38,3 @@ pub use scylla::{
 
 // scylla macros
 pub use scylla::macros::{FromRow, FromUserType, IntoUserType, ValueList};
-
-// additional
-pub use serde::{Deserialize, Serialize};
-pub use std::collections::HashMap;

@@ -32,12 +32,12 @@ pub fn build_new_ancestor_ids(new_parent: &GetStructureNode) -> Vec<Uuid> {
     new_ancestors
 }
 
-pub async fn build_new_index(
+pub fn build_new_index(
     new_upper_sibling: &Option<GetStructureNode>,
     new_bottom_sibling: &Option<GetStructureNode>,
-) -> Result<f64, NodecosmosError> {
+) -> f64 {
     if new_upper_sibling.is_none() && new_bottom_sibling.is_none() {
-        return Ok(0.0);
+        return 0.0;
     }
 
     let upper_sibling_index = if let Some(new_upper_sibling) = new_upper_sibling {
@@ -54,17 +54,17 @@ pub async fn build_new_index(
 
     // If only the bottom sibling exists, return its order index minus 1
     if new_upper_sibling.is_none() {
-        return Ok(bottom_sibling_index - 1.0);
+        return bottom_sibling_index - 1.0;
     }
 
     // If only the upper sibling exists, return its order index plus 1
     if new_bottom_sibling.is_none() {
-        return Ok(upper_sibling_index + 1.0);
+        return upper_sibling_index + 1.0;
     }
 
     // If both siblings exist, return the average of their order indices
     // TODO: This is not ideal, as it has limited precision.
     //  after around of 1000 reorders between 0 and 1 the correct decimal point will be lost.
     //  Let's consider fractional index values in the future
-    Ok((upper_sibling_index + bottom_sibling_index) / 2.0)
+    (upper_sibling_index + bottom_sibling_index) / 2.0
 }

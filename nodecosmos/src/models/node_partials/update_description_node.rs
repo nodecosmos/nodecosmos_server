@@ -5,10 +5,10 @@ use crate::CbExtension;
 use ammonia::clean;
 use charybdis::*;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 partial_node!(
     UpdateDescriptionNode,
-    root_id,
     id,
     description,
     short_description,

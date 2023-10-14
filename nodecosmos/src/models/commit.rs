@@ -9,6 +9,7 @@ use crate::models::helpers::impl_default_callbacks;
 use charybdis::{Delete, InsertWithCallbacks, Map, New, Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -18,6 +19,7 @@ use scylla::CachingSession;
     secondary_indexes = [],
     table_options = "WITH CLUSTERING ORDER BY (created_at DESC)"
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Commit {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

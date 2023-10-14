@@ -6,6 +6,7 @@ mod actions;
 mod app;
 mod authorize;
 mod callback_extension;
+mod client_session;
 mod errors;
 mod models;
 mod services;
@@ -13,11 +14,12 @@ mod services;
 use crate::app::*;
 use crate::services::elastic;
 use crate::services::resource_locker::ResourceLocker;
+
 use actions::*;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use app::App as NodecosmosApp;
-pub use callback_extension::CbExtension;
+use callback_extension::CbExtension;
 use deadpool_redis::Pool;
 use std::sync::Arc;
 

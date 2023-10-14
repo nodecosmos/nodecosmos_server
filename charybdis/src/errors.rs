@@ -8,7 +8,7 @@ use scylla::transport::query_result::{
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum CharybdisError {
     // scylla
     QueryError(QueryError),
@@ -21,6 +21,8 @@ pub enum CharybdisError {
     NextRowError(NextRowError),
     // charybdis
     NotFoundError(String),
+    // serde
+    JsonError(serde_json::Error),
 }
 
 impl fmt::Display for CharybdisError {
@@ -52,6 +54,9 @@ impl fmt::Display for CharybdisError {
 
             // charybdis
             CharybdisError::NotFoundError(e) => write!(f, "Records not found for query: {}", e),
+
+            // serde
+            CharybdisError::JsonError(e) => write!(f, "JsonError: {}", e),
         }
     }
 }
@@ -68,6 +73,7 @@ impl Error for CharybdisError {
             CharybdisError::FromRowError(e, _) => Some(e),
             CharybdisError::NextRowError(e) => Some(e),
             CharybdisError::SerializeValuesError(e, _) => Some(e),
+            CharybdisError::JsonError(e) => Some(e),
         }
     }
 }

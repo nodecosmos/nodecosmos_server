@@ -1,4 +1,4 @@
-use crate::actions::client_session::CurrentUser;
+use crate::client_session::CurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::{InputOutput, IoDescription, IoTitle};
 

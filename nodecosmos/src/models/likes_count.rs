@@ -1,5 +1,6 @@
 use crate::errors::NodecosmosError;
 use charybdis::*;
+use serde::{Deserialize, Serialize};
 
 // CQL limitation is to have counters in a separate table
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
@@ -10,6 +11,7 @@ use charybdis::*;
     clustering_keys = [],
     secondary_indexes = []
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct LikesCount {
     pub object_id: Uuid,
     pub count: Counter,

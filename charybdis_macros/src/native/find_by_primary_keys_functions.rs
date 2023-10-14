@@ -31,6 +31,7 @@ pub(crate) fn find_by_primary_keys_functions(
         i += 1;
 
         let current_keys = primary_key.clone();
+
         let primary_key_where_clause: String = current_keys.join(" = ? AND ");
 
         let query_str = format!(

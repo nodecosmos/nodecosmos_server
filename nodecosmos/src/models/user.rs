@@ -9,6 +9,7 @@ use charybdis_macros::{charybdis_model, partial_model_generator};
 use chrono::Utc;
 use colored::Colorize;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 const BCRYPT_COST: u32 = 6;
 
@@ -19,6 +20,7 @@ const BCRYPT_COST: u32 = 6;
     clustering_keys = [],
     secondary_indexes = [username, email]
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct User {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -62,13 +64,9 @@ impl User {
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-        find_one_user!(
-            session,
-            "date = ? AND category_id in  ? fasd asdf asdf ",
-            (&self.email,)
-        )
-        .await
-        .ok()
+        find_one_user!(session, "email = ?", (&self.email,))
+            .await
+            .ok()
     }
 
     pub async fn check_existing_user(

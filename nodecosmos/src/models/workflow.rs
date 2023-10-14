@@ -8,6 +8,7 @@ use charybdis::{
 };
 use charybdis_macros::{charybdis_model, partial_model_generator};
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 ///
 /// Workflow model
@@ -31,6 +32,7 @@ use scylla::CachingSession;
     clustering_keys = [id],
     secondary_indexes = []
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

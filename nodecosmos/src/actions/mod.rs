@@ -1,4 +1,3 @@
-pub mod client_session;
 pub mod commit_actions;
 pub mod types;
 

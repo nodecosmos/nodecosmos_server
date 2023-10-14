@@ -1,4 +1,4 @@
-use crate::actions::client_session::{CurrentUser, OptCurrentUser};
+use crate::client_session::{CurrentUser, OptCurrentUser};
 use crate::errors::NodecosmosError;
 use crate::models::like::{Like, ObjectTypes};
 use crate::models::likes_count::LikesCount;

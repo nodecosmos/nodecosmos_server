@@ -5,9 +5,8 @@ use elasticsearch::{
 };
 use serde::Serialize;
 use serde_json::json;
-use std::fmt::Debug;
 
-pub async fn add_elastic_document<T: Model + Serialize + Debug>(
+pub async fn add_elastic_document<T: Model + Serialize>(
     client: &Elasticsearch,
     index: &str,
     model: &T,
@@ -34,7 +33,7 @@ pub async fn add_elastic_document<T: Model + Serialize + Debug>(
                     .unwrap_or("No Body!".to_string())
                     .red(),
                 "Model:".bright_red().bold(),
-                model
+                serde_json::to_string(&model).unwrap_or("No Model!".to_string())
             );
         }
     } else {

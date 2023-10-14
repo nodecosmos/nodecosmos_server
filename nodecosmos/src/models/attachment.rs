@@ -1,6 +1,7 @@
 use crate::models::helpers::impl_default_callbacks;
 use charybdis::{Text, Timestamp, Uuid};
 use charybdis_macros::{charybdis_model, partial_model_generator};
+use serde::{Deserialize, Serialize};
 
 #[partial_model_generator]
 #[charybdis_model(
@@ -9,6 +10,7 @@ use charybdis_macros::{charybdis_model, partial_model_generator};
     clustering_keys = [object_id, id],
     secondary_indexes = [],
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Attachment {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

@@ -9,6 +9,7 @@ use crate::CbExtension;
 use charybdis::{CharybdisModelBatch, Double, ExtCallbacks, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 partial_node!(
     UpdateTitleNode,

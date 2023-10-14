@@ -1,7 +1,7 @@
 use crate::SerializedResult;
 use scylla::FromRow;
 
-pub trait BaseModel: FromRow + Sized + Default {
+pub trait BaseModel: FromRow + Sized {
     const DB_MODEL_NAME: &'static str;
 
     const PARTITION_KEYS: &'static [&'static str];

@@ -1,5 +1,6 @@
-## 👾 High-Performance ORM for ScyllaDB in Rust
-⚠️ **WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release**
+# High-Performance ORM for ScyllaDB in Rust
+### Use monstrous tandem of scylla and charybdis for your next project
+⚠️ *WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release*
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
@@ -25,7 +26,7 @@
   - [Define Tables](#define-tables)
   - [Define UDTs](#Define-UDT)
   - [Define Materialized Views](#Define-Materialized-Views)
-- [Automatic migration tool with `charybdis_cmd/migrate`](#automatic-migration)
+- [Automatic migration with `charybdis_cmd/migrate`](#automatic-migration-with-charybdiscmdmigrate)
 - [Basic Operations](#basic-operations)
   - [Create](#create)
   - [Find](#find)
@@ -57,11 +58,11 @@ Declare model as a struct within `src/models` dir:
 )]
 pub struct User {
     pub id: Uuid,
-    pub username: Option<Text>,
-    pub email: Option<Text>,
-    pub created_at: Option<Timestamp>,
-    pub updated_at: Option<Timestamp>,
-    pub address: Option<Address>,
+    pub username: Text,
+    pub email: Text,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub address: Address,
 }
 ```
 (Note we use `src/models` as automatic migration tool expects that dir)
@@ -72,11 +73,11 @@ Declare udt model as a struct within `src/models/udts` dir:
 // src/models/udts/address.rs
 #[charybdis_udt_model(type_name = address)]
 pub struct Address {
-    pub street: Option<Text>,
-    pub city: Option<Text>,
+    pub street: Text,
+    pub city: Text,
     pub state: Option<Text>,
-    pub zip: Option<Text>,
-    pub country: Option<Text>,
+    pub zip: Text,
+    pub country: Text,
 }
 ```
 ### Define Materialized Views
@@ -94,9 +95,9 @@ use charybdis::*;
 pub struct UsersByUsername {
     pub username: Text,
     pub id: Uuid,
-    pub email: Option<Text>,
-    pub created_at: Option<Timestamp>,
-    pub updated_at: Option<Timestamp>,
+    pub email: Text,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 ```
@@ -109,8 +110,7 @@ WHERE email IS NOT NULL AND id IS NOT NULL
 PRIMARY KEY (email, id)
   ```
 
-📝 As a rule of thumb, it's best if we wrap fields in option if they are not part of primary key as
-otherwise null values will result in serialization error.
+📝 Primary key fields should not be wrapped in Option<> as they are mandatory.
  
 ## Automatic migration with `charybdis_cmd/migrate`:
 <a name="automatic-migration"></a>
@@ -343,41 +343,26 @@ Note that callbacks returns custom error class that implements `From<CharybdisEr
 use charybdis::*;
 
 #[charybdis_model(
-    table_name = users, 
+    table_name = organizations, 
     partition_keys = [id], 
     clustering_keys = [],
-    secondary_indexes = [username, email]
+    secondary_indexes = [name]
 )]
-pub struct User {
+pub struct Organization {
     ...
 }
 
-impl User {
-  pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-    find_one_user!(session, "username = ?", (&self.username,))
-        .await
-        .ok()
-  }
-
-  pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-    find_one_user!(session, "email = ?", (&self.username,))
-        .await
-        .ok()
+impl Organization {
+  pub async fn find_by_name(&self, session: &CachingSession) -> Option<Organization> {
+    find_one_organization!(session, "name = ?", (&self.name,)).await.ok()
   }
 }
 
-impl Callbacks<CustomError> for User {
+impl Callbacks<CustomError> for Organization {
   async fn before_insert(&self, session: &CachingSession) -> Result<(), CustomError> {
-    if self.find_by_username(session).await.is_some() {
+    if self.find_by_name(session).await.is_some() {
       return Err(CustomError::ValidationError((
-        "username".to_string(),
-        "is taken".to_string(),
-      )));
-    }
-
-    if self.find_by_email(session).await.is_some() {
-      return Err(CustomError::ValidationError((
-        "email".to_string(),
+        "name".to_string(),
         "is taken".to_string(),
       )));
     }
@@ -488,6 +473,8 @@ let native_user: User = update_user_username.as_native().find_by_primary_key(&se
 // action that requires native model
 authorize_user(&native_user);
 ```
+`as_native` works by returning new instance of native model with fields from partial model.
+For other fields it uses default values.
 
 ## Collection queries
 For every field that is defined with `List<T> `type or `Set<T>`, we have macro generated queries:

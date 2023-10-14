@@ -4,6 +4,7 @@ use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 #[partial_model_generator]
@@ -13,6 +14,7 @@ use charybdis::*;
     clustering_keys = [workflow_id, id],
     secondary_indexes = [original_id, id]
 )]
+#[derive(Serialize, Deserialize, Default)]
 pub struct InputOutput {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

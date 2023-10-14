@@ -1,11 +1,13 @@
 use serde::Serialize;
 
-pub trait ToJSON {
-    fn to_json(&self) -> String;
+use crate::CharybdisError;
+
+pub trait ToJson<T: Serialize> {
+    fn from_json(json: &str) -> Result<String, CharybdisError>;
 }
 
-impl<T: Serialize> ToJSON for T {
-    fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
+impl<T: Serialize> ToJson<T> for T {
+    fn from_json(json: &str) -> Result<String, CharybdisError> {
+        serde_json::to_string(json).map_err(|e| CharybdisError::JsonError(e))
     }
 }
