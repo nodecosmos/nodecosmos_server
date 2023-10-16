@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
     partition_keys = [root_id],
     clustering_keys = [node_id, order_index, id],
     secondary_indexes = [],
+    table_options = r#"
+        gc_grace_seconds = 432000
+    "#,
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct NodeDescendant {

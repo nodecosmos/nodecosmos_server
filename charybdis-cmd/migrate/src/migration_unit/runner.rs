@@ -2,6 +2,7 @@ use crate::migration_unit::fields::MigrationUnitFields;
 use crate::migration_unit::{MigrationObjectType, MigrationUnit, MigrationUnitData};
 use crate::schema::SchemaObjectTrait;
 use colored::*;
+use regex::Regex;
 use scylla::Session;
 use strip_ansi_escapes::strip;
 
@@ -67,11 +68,7 @@ impl<'a> MigrationUnitRunner<'a> {
                     "".to_string()
                 };
                 let table_options = self.data.current_code_schema.table_options.clone();
-                let table_options_clause = if table_options.is_some() {
-                    format!("\n {}", table_options.unwrap().to_string())
-                } else {
-                    "".to_string()
-                };
+                let table_options_clause = table_options.unwrap_or_default().to_string();
 
                 let cql = format!(
                     "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n) \n {}",
@@ -88,11 +85,7 @@ impl<'a> MigrationUnitRunner<'a> {
                 let mut primary_key = self.data.current_code_schema.partition_keys.clone();
                 primary_key.append(&mut self.data.current_code_schema.clustering_keys.clone());
                 let table_options = self.data.current_code_schema.table_options.clone();
-                let table_options_clause = if table_options.is_some() {
-                    format!("\n {}", table_options.unwrap().to_string())
-                } else {
-                    "".to_string()
-                };
+                let table_options_clause = table_options.unwrap_or_default().to_string();
 
                 let materialized_view_where_clause = format!(
                     "WHERE {}",
@@ -228,6 +221,45 @@ impl<'a> MigrationUnitRunner<'a> {
             let cql = format!("DROP INDEX {}", index,);
 
             self.execute(&cql).await;
+        }
+    }
+
+    pub(crate) async fn run_table_options_change_migration(&self) {
+        if self.data.migration_object_type == MigrationObjectType::Table
+            || self.data.migration_object_type == MigrationObjectType::MaterializedView
+        {
+            if let Some(alter_table_options) = self.extract_alter_table_options() {
+                let cql = format!(
+                    "\n ALTER TABLE {} WITH {}",
+                    self.data.migration_object_name, alter_table_options
+                );
+
+                self.execute(&cql).await;
+            }
+        }
+    }
+
+    fn extract_alter_table_options(&self) -> Option<String> {
+        // strip clustering order and compact storage options from table options
+        // because they are not supported by ALTER TABLE
+        if let Some(table_options) = &self.data.current_code_schema.table_options {
+            let table_options = table_options.replace("WITH", "").trim().to_string();
+            let compact_storage_re = Regex::new(r"(?i)\bCOMPACT STORAGE\b\s*(AND\s*)?").unwrap();
+            let clustering_order_re =
+                Regex::new(r"(?i)\bCLUSTERING ORDER BY\b[^)]+\)\s*(AND\s*)?").unwrap();
+
+            let stripped_co_string = compact_storage_re.replace_all(table_options.as_str(), "");
+            let alter_table_options = clustering_order_re
+                .replace_all(&stripped_co_string, "")
+                .to_string();
+
+            if alter_table_options.is_empty() {
+                return None;
+            }
+
+            Some(alter_table_options.to_string())
+        } else {
+            None
         }
     }
 }

@@ -7,7 +7,7 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-charybdis_parser = { path = "../charybdis_parser" }
+charybdis_parser = { path = "../charybdis-parser" }
 proc-macro2 = "1.0.64"
 syn = { version = "2.0.10", features = ["full"] }
 quote = "1.0.26"

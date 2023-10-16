@@ -63,6 +63,8 @@ impl<'a> MigrationUnit<'a> {
             runner.run_index_added_migration().await;
 
             return;
+        } else {
+            runner.run_table_options_change_migration().await;
         }
 
         if self.fields.field_type_changed() {

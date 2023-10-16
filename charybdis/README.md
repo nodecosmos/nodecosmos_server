@@ -125,6 +125,23 @@ It supports following operations:
 - Delete secondary indexes
 - Create UDTs (`src/models/udts`)
 - Create materialized views (`src/models/materialized_views`)
+- Table options (*expermiental*)
+  ```rust
+    #[charybdis_model(
+        table_name = commits,
+        partition_keys = [object_id],
+        clustering_keys = [created_at, id],
+        secondary_indexes = [],
+        table_options = #r"
+            WITH CLUSTERING ORDER BY (created_at DESC) 
+            AND gc_grace_seconds = 86400
+        ";
+    )]
+    #[derive(Serialize, Deserialize, Default)]
+    pub struct Commit {
+    ```
+    - ⚠️ If table exists, table options will result in alter table query that will
+    strip off `CLUSTERING ORDER` and `COMPACT STORAGE` options.
 
 🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir 
 it will leave db structure as it is.

@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
     partition_keys = [contribution_request_id],
     clustering_keys = [created_at, id],
     secondary_indexes = [],
-    table_options = "WITH CLUSTERING ORDER BY (created_at DESC)"
+    table_options = r#"
+        CLUSTERING ORDER BY (created_at DESC)
+    "#
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Commit {

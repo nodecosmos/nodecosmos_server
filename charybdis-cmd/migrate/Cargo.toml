@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 charybdis = { path = "../../charybdis" }
-charybdis_parser = { path = "../../charybdis_parser" }
+charybdis_parser = { path = "../../charybdis-parser" }
 dotenv = "0.15.0"
 scylla = "0.10.0"
 tokio = { version = "1.27.0", features = ["full"] }
@@ -18,6 +18,7 @@ syn = { version = "2.0.10", features = ["full"] }
 futures = "0.3.28"
 strip-ansi-escapes = "0.2.0"
 clap = { version="4.2.1", features = ["derive"]}
+regex = "1.10.1"
 
 [[bin]]
 name = "migrate"
