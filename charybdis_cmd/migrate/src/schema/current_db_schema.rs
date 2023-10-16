@@ -1,4 +1,5 @@
 use crate::schema::{SchemaObject, SchemaObjects};
+use charybdis::errors::CharybdisError;
 use scylla::Session;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
@@ -22,7 +23,7 @@ impl CurrentDbSchema {
     pub(crate) async fn new(
         session: &Session,
         keyspace_name: String,
-    ) -> Result<CurrentDbSchema, Box<dyn std::error::Error>> {
+    ) -> Result<CurrentDbSchema, CharybdisError> {
         let mut current_schema = CurrentDbSchema {
             tables: HashMap::new(),
             udts: HashMap::new(),
@@ -44,7 +45,7 @@ impl CurrentDbSchema {
     async fn get_tables_from_system_schema(
         &mut self,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -79,7 +80,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get columns and types for provided table
         let cql = r#"
             SELECT
@@ -111,7 +112,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -143,7 +144,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -175,7 +176,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT index_name
@@ -205,7 +206,7 @@ impl CurrentDbSchema {
     async fn get_udts_from_system_schema(
         &mut self,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -242,7 +243,7 @@ impl CurrentDbSchema {
     async fn get_materialized_views_from_system_schema(
         &mut self,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         let cql = r#"
             SELECT view_name
@@ -273,7 +274,7 @@ impl CurrentDbSchema {
         &mut self,
         view_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         // get columns and types for views
         let cql = r#"
             SELECT column_name, type
@@ -303,7 +304,7 @@ impl CurrentDbSchema {
         &mut self,
         view_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -334,7 +335,7 @@ impl CurrentDbSchema {
         &mut self,
         view_name: &String,
         session: &Session,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CharybdisError> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -361,24 +362,21 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    pub(crate) async fn get_current_schema_as_json(
-        &self,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let json = to_string_pretty(&self)?;
-        Ok(json)
-    }
-
-    pub(crate) async fn write_schema_to_json(
-        &self,
-        project_root: PathBuf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let json = self.get_current_schema_as_json().await.unwrap_or_else(|e| {
+    pub(crate) fn get_current_schema_as_json(&self) -> String {
+        let json = to_string_pretty(&self).unwrap_or_else(|e| {
             panic!("Error serializing schema to json: {}", e);
         });
 
+        json
+    }
+
+    pub(crate) fn write_schema_to_json(&self, project_root: PathBuf) {
+        let json = self.get_current_schema_as_json();
+
         let path = project_root.to_str().unwrap().to_string() + "/current_schema.json";
 
-        std::fs::write(path, json)?;
-        Ok(())
+        std::fs::write(path, json).unwrap_or_else(|e| {
+            panic!("Error writing schema to json: {}", e);
+        });
     }
 }

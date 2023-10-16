@@ -6,7 +6,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SchemaObject {
     pub fields: HashMap<String, String>,
     pub type_name: String,

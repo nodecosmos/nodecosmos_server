@@ -2392,6 +2392,7 @@ dependencies = [
 name = "migrate"
 version = "0.1.0"
 dependencies = [
+ "charybdis",
  "charybdis_parser",
  "clap",
  "colored",

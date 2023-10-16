@@ -1,11 +1,27 @@
-use crate::migration::{Migration, MigrationObjectType};
+use crate::migration_unit::fields::MigrationUnitFields;
+use crate::migration_unit::{MigrationObjectType, MigrationUnit, MigrationUnitData};
 use crate::schema::SchemaObjectTrait;
 use colored::*;
+use scylla::Session;
 use strip_ansi_escapes::strip;
 
 pub(crate) const INDEX_SUFFIX: &str = "idx";
 
-impl<'a> Migration<'a> {
+pub(crate) struct MigrationUnitRunner<'a> {
+    data: &'a MigrationUnitData<'a>,
+    fields: &'a MigrationUnitFields<'a>,
+    session: &'a Session,
+}
+
+impl<'a> MigrationUnitRunner<'a> {
+    pub fn new(unit: &'a MigrationUnit<'a>) -> Self {
+        Self {
+            data: &unit.data,
+            fields: &unit.fields,
+            session: unit.session,
+        }
+    }
+
     async fn execute(&self, cql: &String) {
         println!(
             "{} {}",
@@ -29,28 +45,28 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}!",
             "Detected first migration for:".bright_cyan(),
-            self.migration_object_name.bright_yellow(),
-            self.migration_obj_type_str().bright_magenta()
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        match self.migration_object_type {
+        match self.data.migration_object_type {
             MigrationObjectType::Udt => {
                 let cql = format!(
                     "CREATE TYPE IF NOT EXISTS {}\n(\n{}\n);\n",
-                    self.migration_object_name,
-                    self.current_code_schema.get_cql_fields()
+                    self.data.migration_object_name,
+                    self.data.current_code_schema.get_cql_fields()
                 );
 
                 self.execute(&cql).await;
             }
             MigrationObjectType::Table => {
-                let clustering_keys = self.current_code_schema.clustering_keys.join(", ");
+                let clustering_keys = self.data.current_code_schema.clustering_keys.join(", ");
                 let clustering_keys_clause = if !clustering_keys.is_empty() {
                     format!(",{}", clustering_keys)
                 } else {
                     "".to_string()
                 };
-                let table_options = self.current_code_schema.table_options.clone();
+                let table_options = self.data.current_code_schema.table_options.clone();
                 let table_options_clause = if table_options.is_some() {
                     format!("\n {}", table_options.unwrap().to_string())
                 } else {
@@ -59,9 +75,9 @@ impl<'a> Migration<'a> {
 
                 let cql = format!(
                     "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n) \n {}",
-                    self.migration_object_name,
-                    self.current_code_schema.get_cql_fields(),
-                    self.current_code_schema.partition_keys.join(", "),
+                    self.data.migration_object_name,
+                    self.data.current_code_schema.get_cql_fields(),
+                    self.data.current_code_schema.partition_keys.join(", "),
                     clustering_keys_clause,
                     table_options_clause,
                 );
@@ -69,9 +85,9 @@ impl<'a> Migration<'a> {
                 self.execute(&cql).await;
             }
             MigrationObjectType::MaterializedView => {
-                let mut primary_key = self.current_code_schema.partition_keys.clone();
-                primary_key.append(&mut self.current_code_schema.clustering_keys.clone());
-                let table_options = self.current_code_schema.table_options.clone();
+                let mut primary_key = self.data.current_code_schema.partition_keys.clone();
+                primary_key.append(&mut self.data.current_code_schema.clustering_keys.clone());
+                let table_options = self.data.current_code_schema.table_options.clone();
                 let table_options_clause = if table_options.is_some() {
                     format!("\n {}", table_options.unwrap().to_string())
                 } else {
@@ -88,6 +104,7 @@ impl<'a> Migration<'a> {
                 );
 
                 let mv_fields_without_types = self
+                    .data
                     .current_code_schema
                     .fields
                     .keys()
@@ -97,7 +114,7 @@ impl<'a> Migration<'a> {
                 let materialized_view_select_clause = format!(
                     "SELECT {} \nFROM {}\n{}\n",
                     mv_fields_without_types.join(", "),
-                    self.current_code_schema.base_table.clone(),
+                    self.data.current_code_schema.base_table.clone(),
                     materialized_view_where_clause
                 );
 
@@ -105,7 +122,7 @@ impl<'a> Migration<'a> {
 
                 let cql = format!(
                     "CREATE MATERIALIZED VIEW IF NOT EXISTS {}\nAS {} {} {}\n",
-                    self.migration_object_name,
+                    self.data.migration_object_name,
                     materialized_view_select_clause,
                     primary_key_clause,
                     table_options_clause
@@ -120,11 +137,11 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}",
             "Detected new fields in".bright_cyan(),
-            self.migration_object_name.bright_blue(),
-            self.migration_obj_type_str().bright_yellow()
+            self.data.migration_object_name.bright_blue(),
+            self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        if self.migration_object_type == MigrationObjectType::Table {
+        if self.data.migration_object_type == MigrationObjectType::Table {
             self.run_table_field_added_migration().await;
         } else {
             self.run_udt_field_added_migration().await;
@@ -133,7 +150,8 @@ impl<'a> Migration<'a> {
 
     async fn run_table_field_added_migration(&self) {
         let add_fields_clause = self
-            .new_fields()
+            .fields
+            .new_fields
             .iter()
             .map(|(field_name, field_type)| format!("{} {}", field_name, field_type))
             .collect::<Vec<String>>()
@@ -141,19 +159,17 @@ impl<'a> Migration<'a> {
 
         let cql = format!(
             "ALTER {} {} ADD ({})",
-            self.migration_obj_type_str(),
-            self.migration_object_name,
-            add_fields_clause,
+            self.data.migration_object_type, self.data.migration_object_name, add_fields_clause,
         );
 
         self.execute(&cql).await;
     }
 
     async fn run_udt_field_added_migration(&self) {
-        for (field_name, field_type) in self.new_fields() {
+        for (field_name, field_type) in self.fields.new_fields.iter() {
             let cql = format!(
                 "ALTER TYPE {} ADD {} {}",
-                self.migration_object_name, field_name, field_type
+                self.data.migration_object_name, field_name, field_type
             );
 
             self.execute(&cql).await;
@@ -164,16 +180,16 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}",
             "Detected removed fields in".bright_cyan(),
-            self.migration_object_name.bright_yellow(),
-            self.migration_obj_type_str().bright_yellow()
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        let removed_fields = self.removed_fields().join(", ");
+        let removed_fields = self.fields.removed_fields.join(", ");
 
         let cql = format!(
             "ALTER {} {} DROP ({})",
-            self.migration_obj_type_str(),
-            self.migration_object_name,
+            self.data.migration_object_type.to_string(),
+            self.data.migration_object_name,
             removed_fields,
         );
 
@@ -184,18 +200,16 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}",
             "Detected new indexes in ".bright_cyan(),
-            self.migration_object_name.bright_yellow(),
-            self.migration_obj_type_str().bright_yellow()
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        let new_indexes = self.new_secondary_indexes();
-
-        for column_name in new_indexes {
-            let index_name: String = self.construct_index_name(&column_name);
+        for column_name in &self.fields.new_secondary_indexes {
+            let index_name: String = self.fields.construct_index_name(&column_name);
 
             let cql = format!(
                 "CREATE INDEX IF NOT EXISTS {} ON {} ({})",
-                index_name, self.migration_object_name, column_name,
+                index_name, self.data.migration_object_name, column_name,
             );
 
             self.execute(&cql).await;
@@ -206,13 +220,11 @@ impl<'a> Migration<'a> {
         println!(
             "\n{} {} {}",
             "Detected removed indexes for ".bright_cyan(),
-            self.migration_object_name.bright_yellow(),
-            self.migration_obj_type_str().bright_yellow()
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        let removed_indexes = self.removed_secondary_indexes();
-
-        for index in removed_indexes {
+        for index in &self.fields.removed_secondary_indexes {
             let cql = format!("DROP INDEX {}", index,);
 
             self.execute(&cql).await;

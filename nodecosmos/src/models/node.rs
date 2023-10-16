@@ -11,7 +11,7 @@ use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
+use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid, Varchar};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ pub struct Node {
     pub cover_image_url: Option<Text>,
 
     #[serde(rename = "coverImageKey")]
-    pub cover_image_filename: Option<Text>,
+    pub cover_image_filename: Option<Varchar>,
 
     #[serde(rename = "order")]
     pub order_index: Option<Double>,

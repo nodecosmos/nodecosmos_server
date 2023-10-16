@@ -1,6 +1,117 @@
 {
-  "tables": {},
-  "udts": {},
-  "materialized_views": {},
+  "tables": {
+    "users": {
+      "fields": {
+        "address": "address",
+        "first_name": "text",
+        "password": "text",
+        "bio": "text",
+        "liked_object_ids": "set<uuid>",
+        "email": "text",
+        "id": "uuid",
+        "is_blocked": "boolean",
+        "created_at": "timestamp",
+        "is_confirmed": "boolean",
+        "updated_at": "timestamp",
+        "username": "text",
+        "last_name": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "id"
+      ],
+      "clustering_keys": [],
+      "secondary_indexes": [
+        "users_email_idx",
+        "users_username_idx"
+      ],
+      "table_options": null
+    },
+    "workflows": {
+      "fields": {
+        "title": "text",
+        "updated_at": "timestamp",
+        "node_id": "uuid",
+        "id": "uuid",
+        "description": "text",
+        "description_markdown": "text",
+        "root_node_id": "uuid",
+        "initial_input_ids": "list<uuid>",
+        "created_at": "timestamp",
+        "flow_ids": "list<uuid>"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "node_id"
+      ],
+      "clustering_keys": [
+        "id"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "udts": {
+    "address": {
+      "fields": {
+        "zip": "text",
+        "country": "text",
+        "state": "text",
+        "street": "text",
+        "city": "text"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [],
+      "clustering_keys": [],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
+  "materialized_views": {
+    "users_email_idx_index": {
+      "fields": {
+        "id": "uuid",
+        "email": "text",
+        "idx_token": "bigint"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "email"
+      ],
+      "clustering_keys": [
+        "id",
+        "idx_token"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    },
+    "users_username_idx_index": {
+      "fields": {
+        "username": "text",
+        "id": "uuid",
+        "idx_token": "bigint"
+      },
+      "type_name": "",
+      "table_name": "",
+      "base_table": "",
+      "partition_keys": [
+        "username"
+      ],
+      "clustering_keys": [
+        "id",
+        "idx_token"
+      ],
+      "secondary_indexes": [],
+      "table_options": null
+    }
+  },
   "keyspace_name": "nodecosmos"
 }

@@ -1,19 +1,18 @@
 mod migration;
+mod migration_unit;
 mod schema;
 mod session;
 
-use crate::migration::migration_plan::MigrationPlan;
+use crate::migration::Migration;
+use crate::schema::current_code_schema::CurrentCodeSchema;
+use crate::schema::current_db_schema::CurrentDbSchema;
+use clap::Parser;
 use scylla::Session;
 use session::initialize_session;
-
 use std::fs::read_dir;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::{env, io};
-
-use crate::schema::current_code_schema::CurrentCodeSchema;
-use crate::schema::current_db_schema::CurrentDbSchema;
-use clap::Parser;
 
 /// Automatic Migration Tool
 #[derive(Parser, Debug)]
@@ -44,19 +43,14 @@ async fn main() {
 
     let session: Session = initialize_session(&args).await;
 
-    let current_db_schema: CurrentDbSchema =
-        CurrentDbSchema::new(&session, args.keyspace).await.unwrap();
-    let current_code_schema: CurrentCodeSchema = CurrentCodeSchema::new(&project_root);
-    let migration_plan = MigrationPlan::new(&current_db_schema, &current_code_schema, &session);
+    let current_db_schema = CurrentDbSchema::new(&session, args.keyspace).await.unwrap();
+    let current_code_schema = CurrentCodeSchema::new(&project_root);
 
-    migration_plan.run().await;
+    let migration = Migration::new(&current_db_schema, &current_code_schema, &session);
 
-    current_db_schema
-        .write_schema_to_json(project_root)
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Error writing schema to json: {}", e);
-        });
+    migration.run().await;
+
+    current_db_schema.write_schema_to_json(project_root);
 }
 
 pub(crate) fn get_project_root() -> io::Result<PathBuf> {
