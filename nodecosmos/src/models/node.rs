@@ -84,7 +84,7 @@ pub struct Node {
     pub cover_image_url: Option<Text>,
 
     #[serde(rename = "coverImageKey")]
-    pub cover_image_filename: Option<Varchar>,
+    pub cover_image_filename: Option<Text>,
 
     #[serde(rename = "order")]
     pub order_index: Option<Double>,
