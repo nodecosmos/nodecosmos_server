@@ -72,7 +72,7 @@ impl ReorderData {
         let new_upper_sibling = init_sibling(params.new_upper_sibling_id, &db_session).await?;
         let new_bottom_sibling = init_sibling(params.new_bottom_sibling_id, &db_session).await?;
 
-        let old_order_index = node.order_index.unwrap_or_default();
+        let old_order_index = node.order_index;
         let new_order_index = build_new_index(&new_upper_sibling, &new_bottom_sibling);
 
         let tree_root = GetStructureNode {

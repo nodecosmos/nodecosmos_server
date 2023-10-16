@@ -192,10 +192,15 @@ pub(crate) fn partial_model_macro_generator(
 
                 impl charybdis::model::AsNative<#native_struct> for $struct_name {
                     fn as_native(&self) -> #native_struct {
-                        #native_struct {
-                            $($field: self.$field.clone(),)*
-                            ..Default::default()
-                        }
+                        use charybdis::operations::New;
+
+                        let mut new_model = #native_struct::new();
+
+                        $(
+                            new_model.$field = self.$field.clone();
+                        )*
+
+                        new_model
                     }
                 }
             };

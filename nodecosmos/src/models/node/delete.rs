@@ -107,7 +107,7 @@ impl<'a> NodeDeleter<'a> {
 
                 batch.append_delete(&DeleteNode { id: descendant.id })?;
 
-                if !self.node.is_root() {
+                if !self.node.is_root {
                     self.children_by_parent_id
                         .entry(descendant.parent_id)
                         .or_default()
@@ -144,14 +144,14 @@ impl<'a> NodeDeleter<'a> {
     /// It's important to remember that each node in tree has its own descendant records in node_descendants table,
     /// so we have to get all of them.
     pub async fn delete_descendants(&mut self) -> Result<(), NodecosmosError> {
-        if self.node.is_root() {
+        if self.node.is_root {
             self.delete_tree().await?;
             return Ok(());
         }
 
         match self.node.parent_id {
             Some(parent_id) => {
-                let order_index = self.node.order_index.unwrap();
+                let order_index = self.node.order_index;
 
                 self.children_by_parent_id
                     .entry(parent_id)

@@ -109,7 +109,7 @@ impl<'a> Reorderer<'a> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
             parent_id: Some(self.reorder_data.new_parent.id),
-            order_index: Some(self.reorder_data.new_order_index),
+            order_index: self.reorder_data.new_order_index,
         };
 
         update_order_node.update(&self.db_session).await?;
@@ -181,7 +181,7 @@ impl<'a> Reorderer<'a> {
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
-                title: self.reorder_data.node.title.clone().unwrap_or_default(),
+                title: self.reorder_data.node.title.clone(),
                 parent_id: self.reorder_data.new_parent.id,
             };
 

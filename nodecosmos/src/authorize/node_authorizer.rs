@@ -12,7 +12,7 @@ pub async fn auth_node_access(
     node: &BaseNode,
     opt_current_user: OptCurrentUser,
 ) -> Result<(), NodecosmosError> {
-    if node.is_public.is_some_and(|is_public| is_public) {
+    if node.is_public {
         Ok(())
     } else if let Some(current_user) = opt_current_user.0 {
         if can_edit_node(&current_user, &node.as_native()) {

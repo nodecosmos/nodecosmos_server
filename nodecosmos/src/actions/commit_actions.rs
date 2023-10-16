@@ -57,7 +57,7 @@ pub async fn update_node_commit_title(
         current_user.id,
         node.id,
         "title",
-        node.title.clone().unwrap_or_default(),
+        node.title.clone(),
         CommitTypes::Update(CommitObjectTypes::Node(Committable::Title)),
     )
     .await?;

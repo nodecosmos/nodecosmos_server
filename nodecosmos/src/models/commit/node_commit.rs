@@ -33,9 +33,8 @@ impl NodeCommit for Commit {
 
         let mut commit_data: Map<Text, Text> = Map::new();
 
-        if let Some(title) = node.title.clone() {
-            commit_data.insert("title".to_string(), title);
-        }
+        commit_data.insert("title".to_string(), node.title.clone());
+
         if let Some(parent_id) = node.parent_id {
             commit_data.insert("parent_id".to_string(), parent_id.to_string());
         }

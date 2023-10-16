@@ -156,7 +156,7 @@ impl<'a> Recovery<'a> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
             parent_id: Some(self.reorder_data.old_parent.id),
-            order_index: Some(self.reorder_data.old_order_index),
+            order_index: self.reorder_data.old_order_index,
         };
 
         update_order_node.update(&self.db_session).await?;

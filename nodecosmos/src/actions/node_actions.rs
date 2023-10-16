@@ -15,9 +15,7 @@ use crate::CbExtension;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{
-    DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, UpdateWithExtCallbacks,
-};
+use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, UpdateWithExtCallbacks};
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
@@ -35,9 +33,7 @@ pub async fn get_nodes(
     elastic_client: web::Data<Elasticsearch>,
     query: web::Query<NodeSearchQuery>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let nodes = NodeSearchService::new(&elastic_client, &query)
-        .index()
-        .await?;
+    let nodes = NodeSearchService::new(&elastic_client, &query).index().await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 
@@ -54,12 +50,7 @@ pub async fn get_node(
 
     auth_node_access(&node, opt_current_user).await?;
 
-    let descendants: Vec<NodeDescendant> = node
-        .as_native()
-        .descendants(&db_session)
-        .await?
-        .try_collect()
-        .await?;
+    let descendants: Vec<NodeDescendant> = node.as_native().descendants(&db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -125,22 +116,13 @@ pub async fn update_node_title(
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let native_node = update_title_node
-        .as_native()
-        .find_by_primary_key(&db_session)
-        .await?;
+    let native_node = update_title_node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
 
-    // we update title for all descendants,
-    // so we need to lock all of them in order to not introduce
-    // inconsistencies
     resource_locker.check_node_lock(&native_node).await?;
 
-    update_title_node.set_defaults(native_node);
-    update_title_node
-        .update_cb(&db_session, &cb_extension)
-        .await?;
+    update_title_node.update_cb(&db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(update_title_node))
 }
@@ -222,15 +204,7 @@ async fn upload_cover_image(
     let node = node.find_by_primary_key(&db_session).await?;
     auth_node_update(&node, &current_user).await?;
 
-    let image_url = handle_cover_image_upload(
-        payload,
-        &s3_client,
-        &nc_app,
-        node,
-        &db_session,
-        &cb_extension,
-    )
-    .await?;
+    let image_url = handle_cover_image_upload(payload, &s3_client, &nc_app, node, &db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -256,9 +230,10 @@ async fn delete_cover_image(
     auth_node_update(&native_node, &current_user).await?;
 
     if node.cover_image_url.is_some() {
-        let key = node.cover_image_filename.clone().ok_or_else(|| {
-            NodecosmosError::InternalServerError("Missing cover image key".to_string())
-        })?;
+        let key = node
+            .cover_image_filename
+            .clone()
+            .ok_or_else(|| NodecosmosError::InternalServerError("Missing cover image key".to_string()))?;
 
         println!("Deleting cover image from S3: {}", key);
 
@@ -267,11 +242,9 @@ async fn delete_cover_image(
         let s3_client = s3_client.clone();
 
         tokio::spawn(async move {
-            let _ = delete_s3_object(&s3_client, &bucket, &key)
-                .await
-                .map_err(|e| {
-                    println!("Failed to delete cover image from S3: {:?}", e);
-                });
+            let _ = delete_s3_object(&s3_client, &bucket, &key).await.map_err(|e| {
+                println!("Failed to delete cover image from S3: {:?}", e);
+            });
         });
     }
 

@@ -42,13 +42,13 @@ pub fn build_new_index(
     }
 
     let upper_sibling_index = if let Some(new_upper_sibling) = new_upper_sibling {
-        new_upper_sibling.order_index.unwrap_or_default()
+        new_upper_sibling.order_index
     } else {
         0.0
     };
 
     let bottom_sibling_index = if let Some(new_bottom_sibling) = new_bottom_sibling {
-        new_bottom_sibling.order_index.unwrap_or_default()
+        new_bottom_sibling.order_index
     } else {
         0.0
     };

@@ -19,7 +19,7 @@ pub async fn auth_contribution_request_creation(
     .find_by_primary_key(db_session)
     .await?;
 
-    if node.is_public.unwrap_or(false) {
+    if node.is_public {
         return Ok(());
     }
 

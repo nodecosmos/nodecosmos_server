@@ -10,9 +10,9 @@ pub trait Update {
 
 impl<T: Model + ValueList> Update for T {
     async fn update(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
-        let update_values = self.get_update_values().map_err(|e| {
-            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
-        })?;
+        let update_values = self
+            .get_update_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
         session
             .execute(Self::UPDATE_QUERY, update_values)
@@ -40,11 +40,7 @@ where
 }
 
 pub trait UpdateWithExtCallbacks<Ext, Err> {
-    async fn update_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &Ext,
-    ) -> Result<QueryResult, Err>;
+    async fn update_cb(&mut self, session: &CachingSession, extension: &Ext) -> Result<QueryResult, Err>;
 }
 
 impl<T, Ext, Err> UpdateWithExtCallbacks<Ext, Err> for T
@@ -52,11 +48,7 @@ where
     Err: From<CharybdisError>,
     T: Model + ValueList + Update + ExtCallbacks<Ext, Err>,
 {
-    async fn update_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &Ext,
-    ) -> Result<QueryResult, Err> {
+    async fn update_cb(&mut self, session: &CachingSession, extension: &Ext) -> Result<QueryResult, Err> {
         self.before_update(session, extension).await?;
         let res = self.update(session).await;
         self.after_update(session, extension).await?;

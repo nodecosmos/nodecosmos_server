@@ -20,9 +20,9 @@ impl Node {
                     root_id: self.root_id,
                     node_id: *ancestor_id,
                     id: self.id,
-                    order_index: self.order_index.unwrap(),
+                    order_index: self.order_index,
                     parent_id: self.parent_id.unwrap(),
-                    title: self.title.clone().unwrap(),
+                    title: self.title.clone(),
                 };
 
                 batch.append_insert(&node_descendant)?;

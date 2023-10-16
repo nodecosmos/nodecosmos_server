@@ -22,12 +22,10 @@ impl<'a> ReorderValidator<'a> {
     }
 
     fn validate_no_root(&mut self) -> Result<(), NodecosmosError> {
-        if let Some(is_root) = self.reorder_data.node.is_root {
-            if is_root {
-                return Err(NodecosmosError::Forbidden(
-                    "Reorder is not allowed for root nodes".to_string(),
-                ));
-            }
+        if self.reorder_data.node.is_root {
+            return Err(NodecosmosError::Forbidden(
+                "Reorder is not allowed for root nodes".to_string(),
+            ));
         }
 
         Ok(())
@@ -82,8 +80,8 @@ impl<'a> ReorderValidator<'a> {
             }
 
             if let Some(new_upper_sibling) = &self.reorder_data.new_upper_sibling {
-                let new_bottom_sibling_index = new_bottom_sibling.order_index.unwrap_or_default();
-                let new_upper_sibling_index = new_upper_sibling.order_index.unwrap_or_default();
+                let new_bottom_sibling_index = new_bottom_sibling.order_index;
+                let new_upper_sibling_index = new_upper_sibling.order_index;
 
                 if new_bottom_sibling_index < new_upper_sibling_index {
                     return Err(NodecosmosError::Conflict("Siblings Reordered!".to_string()));

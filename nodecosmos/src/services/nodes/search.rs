@@ -66,7 +66,17 @@ impl<'a> NodeSearchService<'a> {
             "sort": [
                 { "isRoot": { "order": "desc" } },
                 { "likesCount": { "order": "desc" } },
-                { "createdAt": { "order": "desc" } }
+                {
+                    "_script": {
+                        "type": "number",
+                        "script": {
+                            "lang": "painless",
+                            "source": "doc['ancestorIds'].size()"
+                        },
+                        "order":"asc"
+                    }
+                },
+                { "createdAt": { "order": "desc" } },
             ],
             "from": self.node_search_query.page * PAGE_SIZE,
             "size": PAGE_SIZE

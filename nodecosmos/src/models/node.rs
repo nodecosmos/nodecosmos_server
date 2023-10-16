@@ -1,5 +1,6 @@
 mod create;
 mod delete;
+
 use crate::errors::NodecosmosError;
 use crate::models::helpers::{default_to_0, impl_node_updated_at_with_elastic_ext_cb};
 use crate::models::node::delete::NodeDeleter;
@@ -7,6 +8,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::models::user::CurrentUser;
 use crate::CbExtension;
+
 use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
@@ -27,14 +29,19 @@ pub struct Node {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "rootId")]
+    #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
 
     #[serde(rename = "isPublic")]
-    pub is_public: Option<Boolean>,
+    pub is_public: Boolean,
 
     #[serde(rename = "isRoot")]
-    pub is_root: Option<Boolean>,
+    pub is_root: Boolean,
+
+    #[serde(rename = "order")]
+    pub order_index: Double,
+
+    pub title: Text,
 
     #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
@@ -42,8 +49,6 @@ pub struct Node {
     #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
 
-    // node
-    pub title: Option<Text>,
     pub description: Option<Text>,
 
     #[serde(rename = "shortDescription")]
@@ -85,18 +90,12 @@ pub struct Node {
 
     #[serde(rename = "coverImageKey")]
     pub cover_image_filename: Option<Text>,
-
-    #[serde(rename = "order")]
-    pub order_index: Option<Double>,
 }
 
 impl Node {
     pub const ELASTIC_IDX_NAME: &'static str = "nodes";
 
-    pub async fn parent(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<Option<Node>, NodecosmosError> {
+    pub async fn parent(&self, db_session: &CachingSession) -> Result<Option<Node>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
             let node = Self::find_by_primary_key_value(db_session, (parent_id,)).await?;
 
@@ -110,14 +109,9 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-        let descendants =
-            NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
+        let descendants = NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
 
         Ok(descendants)
-    }
-
-    pub fn is_root(&self) -> bool {
-        self.is_root.unwrap_or(false)
     }
 
     pub fn set_owner(&mut self, current_user: &CurrentUser) {
@@ -137,7 +131,6 @@ impl Node {
 
     pub async fn set_defaults(&mut self, parent: &Option<Self>) -> Result<(), NodecosmosError> {
         if let Some(parent) = parent {
-            self.is_root = Some(false);
             self.root_id = parent.root_id;
             self.parent_id = Some(parent.id);
             self.editor_ids = parent.editor_ids.clone();
@@ -147,11 +140,10 @@ impl Node {
             ancestor_ids.push(parent.id);
             self.ancestor_ids = Some(ancestor_ids);
         } else {
-            self.is_root = Some(true);
             self.root_id = self.id;
             self.parent_id = None;
-            self.order_index = Some(0.0);
-            self.ancestor_ids = Some(Set::new());
+            self.order_index = 0.0;
+            self.ancestor_ids = None;
         }
 
         let now = Utc::now();
@@ -161,38 +153,55 @@ impl Node {
 
         Ok(())
     }
+
+    pub async fn validate_root(&mut self) -> Result<(), NodecosmosError> {
+        if self.is_root {
+            if self.root_id != self.id {
+                return Err(NodecosmosError::ValidationError((
+                    "root_id".to_string(),
+                    "must be equal to id".to_string(),
+                )));
+            }
+        } else {
+            if self.root_id == Uuid::default() || self.root_id == self.id {
+                return Err(NodecosmosError::ValidationError((
+                    "root_id".to_string(),
+                    "is invalid".to_string(),
+                )));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl ExtCallbacks<CbExtension, NodecosmosError> for Node {
-    async fn after_insert(
-        &mut self,
-        db_session: &CachingSession,
-        ext: &CbExtension,
-    ) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, _: &CachingSession, _: &CbExtension) -> Result<(), NodecosmosError> {
+        self.validate_root().await?;
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.append_to_ancestors(db_session).await?;
         self.add_to_elastic(ext).await?;
 
         Ok(())
     }
 
-    async fn before_delete(
-        &mut self,
-        db_session: &CachingSession,
-        ext: &CbExtension,
-    ) -> Result<(), NodecosmosError> {
+    async fn before_delete(&mut self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         NodeDeleter::new(self, db_session, ext).run().await?;
 
         Ok(())
     }
 }
-//----------------------------------------------------------------------------------------------------------------------
-partial_node!(CreateNode, id, title, is_public);
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(
     BaseNode,
     root_id,
     id,
+    is_root,
     short_description,
     ancestor_ids,
     order_index,
@@ -213,19 +222,13 @@ partial_node!(
     root_id,
     id,
     description,
-    description_markdown
+    description_markdown,
+    cover_image_url
 );
 
 partial_node!(GetDescriptionBase64Node, id, description_base64);
 
-partial_node!(
-    GetStructureNode,
-    root_id,
-    id,
-    parent_id,
-    ancestor_ids,
-    order_index
-);
+partial_node!(GetStructureNode, root_id, id, parent_id, ancestor_ids, order_index);
 
 //----------------------------------------------------------------------------------------------------------------------
 partial_node!(UpdateOrderNode, id, parent_id, order_index);

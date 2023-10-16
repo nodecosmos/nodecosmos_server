@@ -47,6 +47,10 @@ fn mappings_json() -> Value {
         {
             "dynamic": false,
             "properties": {
+                "ancestorIds": {
+                    "type": "keyword",
+                    "index": false
+                },
                 "rootId": { "type": "keyword", "index": false },
                 "id": { "type": "keyword", "index": false },
                 "title": { "type": "text", "analyzer": "english" },
@@ -58,8 +62,7 @@ fn mappings_json() -> Value {
                 "isRoot": { "type": "boolean" },
                 "isPublic": { "type": "boolean" },
                 "createdAt": { "type": "date" },
-                "likesCount": { "type": "integer" },
-                "coverImageUrl": { "type": "keyword", "index": false },
+                "likesCount": { "type": "integer" }
             }
         }
     )
