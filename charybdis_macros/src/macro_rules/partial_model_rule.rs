@@ -213,6 +213,7 @@ fn build_field_types_hash(fields_named: &FieldsNamed) -> String {
     for field in fields_named.named.iter() {
         let name = field.ident.as_ref().unwrap();
         let ty = &field.ty;
+
         field_types.extend(quote! { #name => #ty; });
     }
 

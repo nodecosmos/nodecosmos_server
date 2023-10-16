@@ -19,7 +19,7 @@ pub mod macros {
 }
 
 // scylla
-// TODO: Lets reorganize this later
+// TODO: Lets reorganize this according to: https://github.com/scylladb/scylla-rust-driver/pull/817
 pub use scylla::{
     cql_to_rust::{FromCqlVal, FromRow, FromRowError},
     frame::{

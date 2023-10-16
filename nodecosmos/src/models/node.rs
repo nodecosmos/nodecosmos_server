@@ -11,7 +11,7 @@ use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid, Varchar};
+use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};

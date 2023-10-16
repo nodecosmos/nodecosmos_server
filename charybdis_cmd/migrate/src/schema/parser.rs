@@ -91,17 +91,22 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
 
 fn type_with_arguments(type_path: &syn::TypePath) -> String {
     let first_segment = &type_path.path.segments[0];
+    let mut type_name = quote::quote! { #type_path }.to_string();
 
     // Check if the type is an Option<T>
     if first_segment.ident == "Option" {
         if let PathArguments::AngleBracketed(angle_bracketed_args) = &first_segment.arguments {
             if let Some(GenericArgument::Type(inner_type)) = angle_bracketed_args.args.first() {
                 // Return the inner type of Option<T>
-                return quote::quote! { #inner_type }.to_string();
+                type_name = quote::quote! { #inner_type }.to_string();
             }
         }
     }
 
-    // If not an Option<T>, return the type with arguments as a string
-    quote::quote! { #type_path }.to_string()
+    // strip if full path is provided
+    if type_name.contains("::") {
+        type_name = type_name.split("::").last().unwrap().to_string();
+    }
+
+    type_name
 }
