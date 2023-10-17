@@ -41,10 +41,7 @@ pub struct Reorderer<'a> {
 const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
 
 impl<'a> Reorderer<'a> {
-    pub async fn new(
-        db_session: &'a CachingSession,
-        params: ReorderParams,
-    ) -> Result<Reorderer<'a>, NodecosmosError> {
+    pub async fn new(db_session: &'a CachingSession, params: ReorderParams) -> Result<Reorderer<'a>, NodecosmosError> {
         let reorder_data = ReorderData::from_params(&params, &db_session).await?;
 
         Ok(Self {
@@ -57,10 +54,7 @@ impl<'a> Reorderer<'a> {
         ReorderValidator::new(&self.reorder_data).validate()?;
 
         locker
-            .lock_resource(
-                &self.reorder_data.tree_root.id.to_string(),
-                RESOURCE_LOCKER_TTL,
-            )
+            .lock_resource(&self.reorder_data.tree_root.id.to_string(), RESOURCE_LOCKER_TTL)
             .await?;
 
         let res = self.execute_reorder().await;
@@ -162,10 +156,7 @@ impl<'a> Reorderer<'a> {
         CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!(
-                    "remove_node_descendants_from_old_ancestors: {:?}",
-                    err
-                ));
+                log_fatal(format!("remove_node_descendants_from_old_ancestors: {:?}", err));
                 return err;
             })?;
 
@@ -247,10 +238,7 @@ impl<'a> Reorderer<'a> {
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PULL_FROM_ANCESTOR_IDS_QUERY,
-                    (
-                        self.reorder_data.old_node_ancestor_ids.clone(),
-                        descendant_id,
-                    ),
+                    (self.reorder_data.old_node_ancestor_ids.clone(), descendant_id),
                 )?;
             }
 
@@ -281,10 +269,7 @@ impl<'a> Reorderer<'a> {
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-                    (
-                        self.reorder_data.new_node_ancestor_ids.clone(),
-                        descendant_id,
-                    ),
+                    (self.reorder_data.new_node_ancestor_ids.clone(), descendant_id),
                 )?;
             }
 

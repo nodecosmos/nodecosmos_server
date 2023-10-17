@@ -33,10 +33,7 @@ impl<'a> MigrationUnitFields<'a> {
     }
 
     pub(crate) fn construct_index_name(&self, column_name: &String) -> String {
-        format!(
-            "{}_{}_{}",
-            self.data.migration_object_name, column_name, INDEX_SUFFIX
-        )
+        format!("{}_{}_{}", self.data.migration_object_name, column_name, INDEX_SUFFIX)
     }
 
     // Checks if any field of db schema has changed type in code schema.
@@ -62,8 +59,7 @@ impl<'a> MigrationUnitFields<'a> {
     }
 
     pub(crate) fn partition_key_changed(&self) -> bool {
-        let mut code_partition_keys: Vec<String> =
-            self.data.current_code_schema.partition_keys.clone();
+        let mut code_partition_keys: Vec<String> = self.data.current_code_schema.partition_keys.clone();
         let mut db_partition_keys = self.data.current_db_schema.partition_keys.clone();
 
         code_partition_keys.sort();
@@ -85,20 +81,14 @@ impl<'a> MigrationUnitFields<'a> {
     fn fetch_new_fields(&mut self) {
         for (field_name, field_type) in self.data.current_code_schema.fields.iter() {
             if !self.data.current_db_schema.fields.contains_key(field_name) {
-                self.new_fields
-                    .push((field_name.clone(), field_type.clone()));
+                self.new_fields.push((field_name.clone(), field_type.clone()));
             }
         }
     }
 
     fn fetch_removed_fields(&mut self) {
         for (field_name, _) in self.data.current_db_schema.fields.iter() {
-            if !self
-                .data
-                .current_code_schema
-                .fields
-                .contains_key(field_name)
-            {
+            if !self.data.current_code_schema.fields.contains_key(field_name) {
                 self.removed_fields.push(field_name.clone());
             }
         }
@@ -112,12 +102,7 @@ impl<'a> MigrationUnitFields<'a> {
             .for_each(|sec_index_column| {
                 let index_name: String = self.construct_index_name(sec_index_column);
 
-                if !self
-                    .data
-                    .current_db_schema
-                    .secondary_indexes
-                    .contains(&index_name)
-                {
+                if !self.data.current_db_schema.secondary_indexes.contains(&index_name) {
                     self.new_secondary_indexes.push(sec_index_column.clone());
                 }
             });
@@ -132,14 +117,10 @@ impl<'a> MigrationUnitFields<'a> {
             .map(|sec_idx_col| self.construct_index_name(sec_idx_col))
             .collect();
 
-        self.data
-            .current_db_schema
-            .secondary_indexes
-            .iter()
-            .for_each(|index| {
-                if !code_sec_indexes.contains(index) {
-                    self.removed_secondary_indexes.push(index.clone());
-                }
-            });
+        self.data.current_db_schema.secondary_indexes.iter().for_each(|index| {
+            if !code_sec_indexes.contains(index) {
+                self.removed_secondary_indexes.push(index.clone());
+            }
+        });
     }
 }

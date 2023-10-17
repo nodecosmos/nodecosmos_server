@@ -19,9 +19,7 @@ impl<T: BaseModel> Stream for CharybdisModelStream<T> {
     type Item = Result<T, CharybdisError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.inner
-            .poll_next_unpin(cx)
-            .map_err(|e| CharybdisError::from(e))
+        self.inner.poll_next_unpin(cx).map_err(|e| CharybdisError::from(e))
     }
 }
 

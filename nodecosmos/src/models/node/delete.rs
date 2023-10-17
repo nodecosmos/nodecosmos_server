@@ -30,11 +30,7 @@ pub struct NodeDeleter<'a> {
 }
 
 impl<'a> NodeDeleter<'a> {
-    pub fn new(
-        node: &'a Node,
-        db_session: &'a CachingSession,
-        ext: &'a CbExtension,
-    ) -> NodeDeleter<'a> {
+    pub fn new(node: &'a Node, db_session: &'a CachingSession, ext: &'a CbExtension) -> NodeDeleter<'a> {
         Self {
             node,
             db_session,
@@ -164,11 +160,8 @@ impl<'a> NodeDeleter<'a> {
                 while let Some(parent_id) = delete_stack.pop() {
                     current_ancestor_ids.push(parent_id);
 
-                    let child_ids_and_indices: Vec<(Id, OrderIndex)> = self
-                        .children_by_parent_id
-                        .get(&parent_id)
-                        .unwrap_or(&vec![])
-                        .clone();
+                    let child_ids_and_indices: Vec<(Id, OrderIndex)> =
+                        self.children_by_parent_id.get(&parent_id).unwrap_or(&vec![]).clone();
 
                     for child_ids_and_indices_chunk in child_ids_and_indices.chunks(100) {
                         let mut batch = CharybdisModelBatch::unlogged();

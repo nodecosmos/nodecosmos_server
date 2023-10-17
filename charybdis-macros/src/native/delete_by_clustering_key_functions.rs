@@ -36,10 +36,7 @@ pub(crate) fn delete_by_clustering_key_functions(
 
         let primary_key_where_clause: String = query_keys.join(" = ? AND ");
 
-        let query_str = format!(
-            "DELETE FROM {} WHERE {} = ?",
-            table_name, primary_key_where_clause
-        );
+        let query_str = format!("DELETE FROM {} WHERE {} = ?", table_name, primary_key_where_clause);
 
         let delete_by_fun_name_str = format!(
             "delete_by_{}",
@@ -50,8 +47,7 @@ pub(crate) fn delete_by_clustering_key_functions(
                 .join("_and_")
         );
 
-        let delete_by_fun_name =
-            syn::Ident::new(&delete_by_fun_name_str, proc_macro2::Span::call_site());
+        let delete_by_fun_name = syn::Ident::new(&delete_by_fun_name_str, proc_macro2::Span::call_site());
 
         let arguments = query_keys
             .iter()
@@ -64,8 +60,7 @@ pub(crate) fn delete_by_clustering_key_functions(
                     .ty
                     .clone();
 
-                parse_str::<syn::FnArg>(&format!("{}: {}", key, key_type.to_token_stream()))
-                    .unwrap()
+                parse_str::<syn::FnArg>(&format!("{}: {}", key, key_type.to_token_stream())).unwrap()
             })
             .collect::<Vec<syn::FnArg>>();
 

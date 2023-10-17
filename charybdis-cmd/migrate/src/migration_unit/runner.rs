@@ -24,11 +24,7 @@ impl<'a> MigrationUnitRunner<'a> {
     }
 
     async fn execute(&self, cql: &String) {
-        println!(
-            "{} {}",
-            "Running CQL:".on_bright_green().black(),
-            cql.bright_purple()
-        );
+        println!("{} {}", "Running CQL:".on_bright_green().black(), cql.bright_purple());
 
         // remove all colors from cql string
         let stripped = strip(cql.as_bytes());
@@ -245,13 +241,10 @@ impl<'a> MigrationUnitRunner<'a> {
         if let Some(table_options) = &self.data.current_code_schema.table_options {
             let table_options = table_options.replace("WITH", "").trim().to_string();
             let compact_storage_re = Regex::new(r"(?i)\bCOMPACT STORAGE\b\s*(AND\s*)?").unwrap();
-            let clustering_order_re =
-                Regex::new(r"(?i)\bCLUSTERING ORDER BY\b[^)]+\)\s*(AND\s*)?").unwrap();
+            let clustering_order_re = Regex::new(r"(?i)\bCLUSTERING ORDER BY\b[^)]+\)\s*(AND\s*)?").unwrap();
 
             let stripped_co_string = compact_storage_re.replace_all(table_options.as_str(), "");
-            let alter_table_options = clustering_order_re
-                .replace_all(&stripped_co_string, "")
-                .to_string();
+            let alter_table_options = clustering_order_re.replace_all(&stripped_co_string, "").to_string();
 
             if alter_table_options.is_empty() {
                 return None;

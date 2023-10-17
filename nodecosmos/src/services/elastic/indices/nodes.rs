@@ -111,11 +111,7 @@ pub async fn build_nodes_index(client: &Elasticsearch) {
         panic!(
             "Failed to handle node index: {}! Response body: {}",
             response.status_code(),
-            response
-                .text()
-                .await
-                .unwrap_or("No Body!".to_string())
-                .bright_red()
+            response.text().await.unwrap_or("No Body!".to_string()).bright_red()
         );
     }
 }

@@ -20,9 +20,8 @@ pub async fn handle_cover_image_upload(
     cb_extension: &CbExtension,
 ) -> Result<String, NodecosmosError> {
     if let Some(item) = payload.next().await {
-        let mut field = item.map_err(|e| {
-            NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
-        })?;
+        let mut field =
+            item.map_err(|e| NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e)))?;
 
         let buffer = read_image_buffer(&mut field).await?;
         let decoded_img = decode_image(&buffer)?;
@@ -37,20 +36,18 @@ pub async fn handle_cover_image_upload(
         let timestamp = chrono::Utc::now().timestamp();
 
         if node.cover_image_url.is_some() {
-            let key = node.cover_image_filename.ok_or_else(|| {
-                NodecosmosError::InternalServerError("Missing cover image key".to_string())
-            })?;
+            let key = node
+                .cover_image_filename
+                .ok_or_else(|| NodecosmosError::InternalServerError("Missing cover image key".to_string()))?;
 
             // delete s3 object asynchronously
             let bucket = nc_app.bucket.clone();
             let key = key.clone();
             let s3_client = s3_client.clone();
             tokio::spawn(async move {
-                let _ = delete_s3_object(&s3_client, &bucket, &key)
-                    .await
-                    .map_err(|e| {
-                        println!("Failed to delete existing cover image from S3: {:?}", e);
-                    });
+                let _ = delete_s3_object(&s3_client, &bucket, &key).await.map_err(|e| {
+                    println!("Failed to delete existing cover image from S3: {:?}", e);
+                });
             });
         }
 
@@ -60,22 +57,14 @@ pub async fn handle_cover_image_upload(
             nc_app.bucket, new_cover_image_filename
         );
 
-        upload_s3_object(
-            s3_client,
-            compressed,
-            &nc_app.bucket,
-            &new_cover_image_filename,
-        )
-        .await?;
+        upload_s3_object(s3_client, compressed, &nc_app.bucket, &new_cover_image_filename).await?;
 
         let mut update_node_cover_img = UpdateCoverImageNode::new();
         update_node_cover_img.id = node.id;
         update_node_cover_img.cover_image_url = Some(url.clone());
         update_node_cover_img.cover_image_filename = Some(new_cover_image_filename);
 
-        update_node_cover_img
-            .update_cb(db_session, cb_extension)
-            .await?;
+        update_node_cover_img.update_cb(db_session, cb_extension).await?;
 
         return Ok(url);
     }

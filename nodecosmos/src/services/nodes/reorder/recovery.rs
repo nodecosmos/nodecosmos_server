@@ -37,10 +37,7 @@ impl<'a> Recovery<'a> {
 
     // Recovers Tree from recovery data stored on disk.
     // This may be needed in case of connection loss during reorder.
-    pub async fn recover_from_stored_data(
-        db_session: &CachingSession,
-        resource_locker: &ResourceLocker,
-    ) {
+    pub async fn recover_from_stored_data(db_session: &CachingSession, resource_locker: &ResourceLocker) {
         let mut file_names = vec![];
         for entry in std::fs::read_dir(RECOVERY_DATA_DIR).unwrap() {
             let entry = entry.unwrap();
@@ -65,12 +62,10 @@ impl<'a> Recovery<'a> {
             std::fs::remove_file(full_name.clone()).unwrap();
 
             let mut recovery = Recovery::new(&recovery_data, db_session, resource_locker);
-            let _ = recovery.recover().await.map_err(|err| {
-                log_fatal(format!(
-                    "Error in recovery from file {}: {}",
-                    full_name, err
-                ))
-            });
+            let _ = recovery
+                .recover()
+                .await
+                .map_err(|err| log_fatal(format!("Error in recovery from file {}: {}", full_name, err)));
         }
     }
 
@@ -133,21 +128,14 @@ impl<'a> Recovery<'a> {
     async fn restore_tree(&mut self) -> Result<(), NodecosmosError> {
         let now = std::time::Instant::now();
 
-        CharybdisModelBatch::chunked_insert(
-            self.db_session,
-            &self.reorder_data.tree_descendants,
-            100,
-        )
-        .await
-        .map_err(|err| {
-            log_error(format!("restore_tree_descendants: {}", err));
-            return err;
-        })?;
+        CharybdisModelBatch::chunked_insert(self.db_session, &self.reorder_data.tree_descendants, 100)
+            .await
+            .map_err(|err| {
+                log_error(format!("restore_tree_descendants: {}", err));
+                return err;
+            })?;
 
-        log_warning(format!(
-            "Tree descendants stored after: {:?}",
-            now.elapsed()
-        ));
+        log_warning(format!("Tree descendants stored after: {:?}", now.elapsed()));
 
         Ok(())
     }
@@ -178,10 +166,7 @@ impl<'a> Recovery<'a> {
                         (&self.reorder_data.new_node_ancestor_ids, id),
                     )
                     .map_err(|err| {
-                        log_error(format!(
-                            "append_statement for remove_new_ancestor_ids: {}",
-                            err
-                        ));
+                        log_error(format!("append_statement for remove_new_ancestor_ids: {}", err));
 
                         return err;
                     })?;
@@ -214,20 +199,14 @@ impl<'a> Recovery<'a> {
                         (&self.reorder_data.old_node_ancestor_ids, id),
                     )
                     .map_err(|err| {
-                        log_error(format!(
-                            "append_statement for append_old_ancestor_ids: {}",
-                            err
-                        ));
+                        log_error(format!("append_statement for append_old_ancestor_ids: {}", err));
 
                         return err;
                     })?;
             }
 
             batch.execute(self.db_session).await.map_err(|err| {
-                log_error(format!(
-                    "adding old ancestor ids to node and its descendants: {}",
-                    err
-                ));
+                log_error(format!("adding old ancestor ids to node and its descendants: {}", err));
 
                 return err;
             })?;

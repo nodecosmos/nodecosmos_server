@@ -32,12 +32,7 @@ pub async fn get_likes_count(
         cu_like.object_id = object_id;
         cu_like.user_id = opt_current_user.id;
 
-        if cu_like
-            .find_by_primary_key(&db_session)
-            .await
-            .ok()
-            .is_some()
-        {
+        if cu_like.find_by_primary_key(&db_session).await.ok().is_some() {
             liked_by_current_user = true;
         }
     }

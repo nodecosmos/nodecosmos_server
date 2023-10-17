@@ -6,9 +6,7 @@ use crate::models::materialized_views::base_ios_by_root_node_id::InputOutputsByR
 use crate::models::user::CurrentUser;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::operations::{
-    DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks,
-};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -27,11 +25,7 @@ pub async fn get_workflow(
     let mut flow = BaseFlow::new();
     flow.node_id = node_id;
     flow.workflow_id = workflow.id;
-    let flows = flow
-        .find_by_partition_key(&db_session)
-        .await?
-        .try_collect()
-        .await?;
+    let flows = flow.find_by_partition_key(&db_session).await?.try_collect().await?;
 
     // flow steps
     let mut flow_step = FlowStep::new();
@@ -46,11 +40,7 @@ pub async fn get_workflow(
     // input outputs
     let mut base_ios = InputOutputsByRootNodeId::new();
     base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs = base_ios
-        .find_by_partition_key(&db_session)
-        .await?
-        .try_collect()
-        .await?;
+    let input_outputs = base_ios.find_by_partition_key(&db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
@@ -72,11 +62,7 @@ pub async fn create_workflow(
 
     let mut base_ios = InputOutputsByRootNodeId::new();
     base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs = base_ios
-        .find_by_partition_key(&db_session)
-        .await?
-        .try_collect()
-        .await?;
+    let input_outputs = base_ios.find_by_partition_key(&db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -129,9 +115,7 @@ pub async fn delete_workflow(
     current_user: CurrentUser,
     params: web::Path<DeleteWfParams>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut workflow =
-        Workflow::find_by_primary_key_value(&db_session, (params.node_id, params.workflow_id))
-            .await?;
+    let mut workflow = Workflow::find_by_primary_key_value(&db_session, (params.node_id, params.workflow_id)).await?;
 
     auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
 

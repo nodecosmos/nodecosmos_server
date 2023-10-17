@@ -29,13 +29,7 @@ pub async fn create_node_commit(
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_commit(&db_session, &params, &current_user).await?;
 
-    <Commit as NodeCommit>::create_node_commit(
-        &db_session,
-        params.into_inner(),
-        current_user.id,
-        &node,
-    )
-    .await?;
+    <Commit as NodeCommit>::create_node_commit(&db_session, params.into_inner(), current_user.id, &node).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -123,13 +117,8 @@ pub async fn create_workflow_commit(
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_commit(&db_session, &params, &current_user).await?;
 
-    <Commit as WorkflowCommit>::create_workflow_commit(
-        &db_session,
-        params.into_inner(),
-        current_user.id,
-        &workflow,
-    )
-    .await?;
+    <Commit as WorkflowCommit>::create_workflow_commit(&db_session, params.into_inner(), current_user.id, &workflow)
+        .await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }

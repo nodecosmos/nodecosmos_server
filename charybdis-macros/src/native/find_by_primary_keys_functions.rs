@@ -48,8 +48,7 @@ pub(crate) fn find_by_primary_keys_functions(
                 .join("_and_")
         );
 
-        let find_by_fun_name =
-            syn::Ident::new(&find_by_fun_name_str, proc_macro2::Span::call_site());
+        let find_by_fun_name = syn::Ident::new(&find_by_fun_name_str, proc_macro2::Span::call_site());
 
         let arguments = current_keys
             .iter()
@@ -62,8 +61,7 @@ pub(crate) fn find_by_primary_keys_functions(
                     .ty
                     .clone();
 
-                parse_str::<syn::FnArg>(&format!("{}: {}", key, key_type.to_token_stream()))
-                    .unwrap()
+                parse_str::<syn::FnArg>(&format!("{}: {}", key, key_type.to_token_stream())).unwrap()
             })
             .collect::<Vec<syn::FnArg>>();
 

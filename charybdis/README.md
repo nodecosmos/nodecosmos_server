@@ -140,8 +140,8 @@ It supports following operations:
     #[derive(Serialize, Deserialize, Default)]
     pub struct Commit {
     ```
-    - ⚠️ If table exists, table options will result in alter table query that will
-    strip off `CLUSTERING ORDER` and `COMPACT STORAGE` options.
+    ⚠️ If table exists, table options will result in alter table query that without
+    `CLUSTERING ORDER` and `COMPACT STORAGE` options.
 
 🟢 Tables, Types and UDT dropping is not added. If you don't define model within `src/model` dir 
 it will leave db structure as it is.
@@ -159,13 +159,12 @@ in case there is no model definition for table, it will **not** drop it. In futu
 we will add `modelize` command that will generate `src/models` files from existing data source.
 
 ## Basic Operations:
+For each operation you need to bring respective trait into scope. They are defined
+in `charybdis::operations` module.
 
 ### Create
 
 ```rust
-mod models;
-
-use crate::models::user::*;
 use charybdis::{CachingSession, Insert};
 
 #[tokio::main]
@@ -199,7 +198,7 @@ async fn main() {
 
 #### `find_by_primary_key`
 This is preferred way to query data rather then
-find_by_primary_key `associated fun`, as it will automatically provide correct order
+find_by_primary_key_val `associated fun`, as it will automatically provide correct order
 based on primary key definition.
 ```rust
   let user = User {id, ..Default::default()};
@@ -230,8 +229,9 @@ let res = find_post!(
     session,
     "date = ? AND category_id in ?",
     (date, categor_vec])
-).await.unwrap();
+).await?;
 ```
+This will return stream of `Post` models, and query will be constructed at compile time as `&'static str`.
 
 ```rust
 let res = find_one_post!(
@@ -240,7 +240,6 @@ let res = find_one_post!(
     (date, categor_vec]
 )  -> CharybdisModelStream<Post>
 ```
-This will return stream of `Post` models. It's useful as query is generated at compile time.
 
 If we just need the `Query` and not the result, we can use `find_post_query!` macro:
 ```rust
@@ -292,6 +291,7 @@ user.update(&session).await;
 
   user.delete(&session).await;
 ```
+
 
 ## Partial Model Operations:
 Use auto generated `partial_<model>!` macro to run operations on subset of the model fields.

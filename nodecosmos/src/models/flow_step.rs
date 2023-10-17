@@ -1,8 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
-use crate::models::helpers::{
-    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
-};
+use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use crate::models::input_output::InputOutput;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -65,11 +63,7 @@ impl FlowStep {
         Ok(res)
     }
 
-    pub async fn pull_output_id(
-        &mut self,
-        session: &CachingSession,
-        output_id: Uuid,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn pull_output_id(&mut self, session: &CachingSession, output_id: Uuid) -> Result<(), NodecosmosError> {
         // filter out output_id from output_ids_by_node_id
         let mut output_ids_by_node_id = self.output_ids_by_node_id.clone().unwrap_or_default();
 
@@ -84,11 +78,7 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn pull_input_id(
-        &mut self,
-        session: &CachingSession,
-        input_id: Uuid,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn pull_input_id(&mut self, session: &CachingSession, input_id: Uuid) -> Result<(), NodecosmosError> {
         // filter out input_id from input_ids_by_node_id
         let mut input_ids_by_node_id = self.input_ids_by_node_id.clone().unwrap_or_default();
 
@@ -263,13 +253,9 @@ impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.as_native().find_by_primary_key(session).await?;
 
-        flow_step
-            .delete_outputs_from_non_existent_nodes(session)
-            .await?;
+        flow_step.delete_outputs_from_non_existent_nodes(session).await?;
 
-        flow_step
-            .disassociate_inputs_from_non_existent_nodes(session)
-            .await?;
+        flow_step.disassociate_inputs_from_non_existent_nodes(session).await?;
 
         Ok(())
     }

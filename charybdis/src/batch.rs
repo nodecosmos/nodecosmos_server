@@ -155,10 +155,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_inserts<T: Model + ValueList>(
-        &mut self,
-        iter: &[T],
-    ) -> Result<(), CharybdisError> {
+    pub fn append_inserts<T: Model + ValueList>(&mut self, iter: &[T]) -> Result<(), CharybdisError> {
         for model in iter {
             let result = self.append_insert(model);
             result?
@@ -179,10 +176,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_updates<T: Model + ValueList>(
-        &mut self,
-        iter: &[T],
-    ) -> Result<(), CharybdisError> {
+    pub fn append_updates<T: Model + ValueList>(&mut self, iter: &[T]) -> Result<(), CharybdisError> {
         for model in iter {
             let result = self.append_update(model);
             result?
@@ -216,10 +210,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_delete_by_partition_key<T: Model + ValueList>(
-        &mut self,
-        model: &T,
-    ) -> Result<(), CharybdisError> {
+    pub fn append_delete_by_partition_key<T: Model + ValueList>(&mut self, model: &T) -> Result<(), CharybdisError> {
         self.append_statement_to_batch(T::DELETE_BY_PARTITION_KEY_QUERY);
 
         let partition_key_values = model
@@ -231,10 +222,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_deletes_by_partition_key<T: Model + ValueList>(
-        &mut self,
-        iter: &[T],
-    ) -> Result<(), CharybdisError> {
+    pub fn append_deletes_by_partition_key<T: Model + ValueList>(&mut self, iter: &[T]) -> Result<(), CharybdisError> {
         for model in iter {
             let result = self.append_delete_by_partition_key(model);
             result?
@@ -243,11 +231,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn append_statement(
-        &mut self,
-        statement: &str,
-        values: impl ValueList,
-    ) -> Result<(), CharybdisError> {
+    pub fn append_statement(&mut self, statement: &str, values: impl ValueList) -> Result<(), CharybdisError> {
         self.append_statement_to_batch(statement);
 
         let values = values.serialized()?;
@@ -257,10 +241,7 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub async fn execute(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<QueryResult, CharybdisError> {
+    pub async fn execute(&self, db_session: &CachingSession) -> Result<QueryResult, CharybdisError> {
         let result = db_session.batch(&self.batch, &self.values).await?;
 
         Ok(result)

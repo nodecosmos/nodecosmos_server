@@ -62,11 +62,7 @@ pub struct Workflow {
 }
 
 impl Workflow {
-    pub async fn append_flow_id(
-        &mut self,
-        session: &CachingSession,
-        flow_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    pub async fn append_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
         execute(
             session,
             Workflow::PUSH_TO_FLOW_IDS_QUERY,
@@ -77,11 +73,7 @@ impl Workflow {
         Ok(())
     }
 
-    pub async fn pull_flow_id(
-        &mut self,
-        session: &CachingSession,
-        flow_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    pub async fn pull_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
         execute(
             session,
             Workflow::PULL_FROM_FLOW_IDS_QUERY,
@@ -115,32 +107,29 @@ impl Callbacks<NodecosmosError> for Workflow {
 
     async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if self.flow_ids.is_some() {
-            let flow_steps =
-                FlowStepDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                    .await?
-                    .try_collect()
-                    .await?;
+            let flow_steps = FlowStepDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
             let flows = FlowDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
                 .await?
                 .try_collect()
                 .await?;
 
-            let input_outputs =
-                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                    .await?
-                    .try_collect()
-                    .await?;
+            let input_outputs = IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
             CharybdisModelBatch::chunked_delete(session, &flow_steps, 100).await?;
             CharybdisModelBatch::chunked_delete(session, &flows, 100).await?;
             CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
         } else if self.initial_input_ids.is_some() {
-            let input_outputs =
-                IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                    .await?
-                    .try_collect()
-                    .await?;
+            let input_outputs = IoDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
             CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
         }
@@ -149,13 +138,7 @@ impl Callbacks<NodecosmosError> for Workflow {
     }
 }
 
-partial_workflow!(
-    UpdateInitialInputsWorkflow,
-    node_id,
-    id,
-    initial_input_ids,
-    updated_at
-);
+partial_workflow!(UpdateInitialInputsWorkflow, node_id, id, initial_input_ids, updated_at);
 impl_updated_at_cb!(UpdateInitialInputsWorkflow);
 
 // used by node deletion

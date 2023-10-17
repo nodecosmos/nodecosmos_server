@@ -39,12 +39,7 @@ impl CurrentCodeSchema {
                         continue;
                     }
 
-                    if entry
-                        .path()
-                        .to_str()
-                        .unwrap()
-                        .contains("materialized_views")
-                    {
+                    if entry.path().to_str().unwrap().contains("materialized_views") {
                         self.populate_materialized_views(entry);
                     } else if entry.path().to_str().unwrap().contains("udts") {
                         self.populate_udts(entry);
@@ -60,8 +55,7 @@ impl CurrentCodeSchema {
 
     pub fn populate_materialized_views(&mut self, entry: DirEntry) {
         let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject =
-            parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
+        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {
@@ -93,8 +87,7 @@ impl CurrentCodeSchema {
 
     pub fn populate_tables(&mut self, entry: DirEntry) {
         let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject =
-            parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
+        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {

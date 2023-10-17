@@ -22,7 +22,7 @@ impl UpdateTitleNode {
         db_session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), NodecosmosError> {
-        // Here, we lock reorder action for current actions as in Scylla, updates can result in
+        // Here, we lock reorder action for current actions as updates can result in
         // insertion of new records if they don't exist.
         // This would be problematic as if ancestor changes in the middle of update, it would result
         // in wrong order_index and wrong title for node_descendant record.

@@ -14,10 +14,7 @@ pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
         if entry.file_type().is_dir() && entry.file_name().to_string_lossy() == "models" {
             let parent_dir = entry.path().parent()?;
             if parent_dir.file_name().unwrap().to_string_lossy() == "src" {
-                println!(
-                    "{}\n",
-                    "Detected 'src/models' directory".bright_green().bold()
-                );
+                println!("{}\n", "Detected 'src/models' directory".bright_green().bold());
                 return Some(entry.into_path());
             }
         }
@@ -27,10 +24,7 @@ pub(crate) fn find_src_models_dir(project_root: &PathBuf) -> Option<PathBuf> {
 
 pub(crate) fn parse_file_as_string(path: &Path) -> String {
     let mut file_content = String::new();
-    File::open(path)
-        .unwrap()
-        .read_to_string(&mut file_content)
-        .unwrap();
+    File::open(path).unwrap().read_to_string(&mut file_content).unwrap();
     file_content
 }
 
@@ -39,9 +33,7 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
         .map_err(|e| {
             println!(
                 "{}\n",
-                format!("Error parsing file: {}", file_content)
-                    .bright_red()
-                    .bold()
+                format!("Error parsing file: {}", file_content).bright_red().bold()
             );
             e
         })

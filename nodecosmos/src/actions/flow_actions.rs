@@ -4,9 +4,7 @@ use crate::models::flow::{Flow, FlowDescription, UpdateFlowTitle};
 use crate::models::user::CurrentUser;
 
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::operations::{
-    DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks,
-};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;

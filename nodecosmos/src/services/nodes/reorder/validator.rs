@@ -38,18 +38,14 @@ impl<'a> ReorderValidator<'a> {
             .contains(&self.reorder_data.new_parent.id)
             || self.reorder_data.node.id == self.reorder_data.new_parent.id
         {
-            return Err(NodecosmosError::Forbidden(
-                "Can not reorder within self".to_string(),
-            ));
+            return Err(NodecosmosError::Forbidden("Can not reorder within self".to_string()));
         }
 
         Ok(())
     }
 
     fn validate_reorder_limit(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.is_parent_changed()
-            && self.reorder_data.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT
-        {
+        if self.reorder_data.is_parent_changed() && self.reorder_data.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
             return Err(NodecosmosError::Forbidden(format!(
                 "Can not reorder more than {} descendants",
                 REORDER_DESCENDANTS_LIMIT
@@ -66,17 +62,13 @@ impl<'a> ReorderValidator<'a> {
     fn validate_no_conflicts(&mut self) -> Result<(), NodecosmosError> {
         if let Some(new_upper_sibling) = &self.reorder_data.new_upper_sibling {
             if new_upper_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
-                return Err(NodecosmosError::Conflict(
-                    "Upper Sibling Moved!".to_string(),
-                ));
+                return Err(NodecosmosError::Conflict("Upper Sibling Moved!".to_string()));
             }
         }
 
         if let Some(new_bottom_sibling) = &self.reorder_data.new_bottom_sibling {
             if new_bottom_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
-                return Err(NodecosmosError::Conflict(
-                    "Bottom Sibling Moved!".to_string(),
-                ));
+                return Err(NodecosmosError::Conflict("Bottom Sibling Moved!".to_string()));
             }
 
             if let Some(new_upper_sibling) = &self.reorder_data.new_upper_sibling {

@@ -8,10 +8,7 @@ use charybdis::errors::CharybdisError;
 use scylla::CachingSession;
 
 impl Node {
-    pub async fn append_to_ancestors(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<(), CharybdisError> {
+    pub async fn append_to_ancestors(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut batch = CharybdisModelBatch::new();
 
@@ -29,10 +26,7 @@ impl Node {
             }
 
             batch.execute(db_session).await.map_err(|e| {
-                log_error(format!(
-                    "Error appending node {} to ancestors. {:?}",
-                    self.id, e
-                ));
+                log_error(format!("Error appending node {} to ancestors. {:?}", self.id, e));
 
                 e
             })?;
@@ -41,13 +35,7 @@ impl Node {
         Ok(())
     }
     pub async fn add_to_elastic(&self, ext: &CbExtension) -> Result<(), CharybdisError> {
-        add_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
+        add_elastic_document(&ext.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
 
         Ok(())
     }

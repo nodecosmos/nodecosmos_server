@@ -62,46 +62,22 @@ pub trait Callbacks<Err: From<CharybdisError>> {
 /// ```
 ///
 pub trait ExtCallbacks<Ext, Err: From<CharybdisError>> {
-    async fn before_insert(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn before_insert(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_insert(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn after_insert(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
-    async fn before_update(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn before_update(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_update(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn after_update(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
-    async fn before_delete(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn before_delete(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
-    async fn after_delete(
-        &mut self,
-        _session: &CachingSession,
-        _extension: &Ext,
-    ) -> Result<(), Err> {
+    async fn after_delete(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
         Ok(())
     }
 }

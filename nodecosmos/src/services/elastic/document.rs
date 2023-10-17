@@ -1,23 +1,12 @@
 use charybdis::model::Model;
 use charybdis::types::Uuid;
 use colored::Colorize;
-use elasticsearch::{
-    BulkOperation, BulkOperations, BulkParts, DeleteParts, Elasticsearch, IndexParts, UpdateParts,
-};
+use elasticsearch::{BulkOperation, BulkOperations, BulkParts, DeleteParts, Elasticsearch, IndexParts, UpdateParts};
 use serde::Serialize;
 use serde_json::json;
 
-pub async fn add_elastic_document<T: Model + Serialize>(
-    client: &Elasticsearch,
-    index: &str,
-    model: &T,
-    id: String,
-) {
-    let response = client
-        .index(IndexParts::IndexId(index, &id))
-        .body(&model)
-        .send()
-        .await;
+pub async fn add_elastic_document<T: Model + Serialize>(client: &Elasticsearch, index: &str, model: &T, id: String) {
+    let response = client.index(IndexParts::IndexId(index, &id)).body(&model).send().await;
 
     if let Ok(response) = response {
         if !response.status_code().is_success() {
@@ -28,11 +17,7 @@ pub async fn add_elastic_document<T: Model + Serialize>(
                 "Status:".bright_red().bold(),
                 response.status_code(),
                 "Response body:".bright_red(),
-                response
-                    .text()
-                    .await
-                    .unwrap_or("No Body!".to_string())
-                    .red(),
+                response.text().await.unwrap_or("No Body!".to_string()).red(),
                 "Model:".bright_red().bold(),
                 serde_json::to_string(&model).unwrap_or("No Model!".to_string())
             );
@@ -45,12 +30,7 @@ pub async fn add_elastic_document<T: Model + Serialize>(
     }
 }
 
-pub async fn update_elastic_document<T: Model + Serialize>(
-    client: &Elasticsearch,
-    index: &str,
-    model: &T,
-    id: String,
-) {
+pub async fn update_elastic_document<T: Model + Serialize>(client: &Elasticsearch, index: &str, model: &T, id: String) {
     let response = client
         .update(UpdateParts::IndexId(index, &id))
         .body(json!({
@@ -68,11 +48,7 @@ pub async fn update_elastic_document<T: Model + Serialize>(
                 "Status:".bright_red().bold(),
                 response.status_code(),
                 "Response body:".bright_red(),
-                response
-                    .text()
-                    .await
-                    .unwrap_or("No Body!".to_string())
-                    .red(),
+                response.text().await.unwrap_or("No Body!".to_string()).red(),
                 "Model:".bright_red().bold(),
                 serde_json::to_string(&model).unwrap_or("No Model!".to_string())
             );
@@ -97,11 +73,7 @@ pub async fn delete_elastic_document(client: &Elasticsearch, index: &str, id: St
                 "Status:".bright_red().bold(),
                 response.status_code(),
                 "Response body:".bright_red(),
-                response
-                    .text()
-                    .await
-                    .unwrap_or("No Body!".to_string())
-                    .red(),
+                response.text().await.unwrap_or("No Body!".to_string()).red(),
             );
         }
     } else {
@@ -125,11 +97,7 @@ pub async fn bulk_delete_elastic_documents(client: &Elasticsearch, index: &str, 
             });
     }
 
-    let bulk_response = client
-        .bulk(BulkParts::Index(index))
-        .body(vec![ops])
-        .send()
-        .await;
+    let bulk_response = client.bulk(BulkParts::Index(index)).body(vec![ops]).send().await;
 
     if let Ok(bulk_response) = bulk_response {
         if !bulk_response.status_code().is_success() {
@@ -140,11 +108,7 @@ pub async fn bulk_delete_elastic_documents(client: &Elasticsearch, index: &str, 
                 "Status:".bright_red().bold(),
                 bulk_response.status_code(),
                 "Response body:".bright_red(),
-                bulk_response
-                    .text()
-                    .await
-                    .unwrap_or("No Body!".to_string())
-                    .red(),
+                bulk_response.text().await.unwrap_or("No Body!".to_string()).red(),
             );
         }
     } else {

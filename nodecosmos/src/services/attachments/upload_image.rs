@@ -2,9 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::attachment::Attachment;
 use crate::models::user::CurrentUser;
 use crate::services::aws::s3::upload_s3_object;
-use crate::services::image::{
-    compress_image, convert_image_to_rgb, decode_image, read_image_buffer, resize_image,
-};
+use crate::services::image::{compress_image, convert_image_to_rgb, decode_image, read_image_buffer, resize_image};
 use actix_multipart::Multipart;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::Uuid;
@@ -29,9 +27,8 @@ pub async fn upload_image_attachment(
     mut payload: Multipart,
 ) -> Result<Attachment, NodecosmosError> {
     if let Some(item) = payload.next().await {
-        let mut field = item.map_err(|e| {
-            NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
-        })?;
+        let mut field =
+            item.map_err(|e| NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e)))?;
 
         let buffer = read_image_buffer(&mut field).await?;
         let decoded_img = decode_image(&buffer)?;
@@ -41,8 +38,7 @@ pub async fn upload_image_attachment(
 
         if width > MAX_IMAGE_WIDTH {
             width = MAX_IMAGE_WIDTH;
-            height =
-                (width as f32 * (decoded_img.height() as f32 / decoded_img.width() as f32)) as u32;
+            height = (width as f32 * (decoded_img.height() as f32 / decoded_img.width() as f32)) as u32;
         }
 
         let resized_image = resize_image(decoded_img, width, height)?;

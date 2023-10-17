@@ -59,11 +59,7 @@ impl<'a> Migration<'a> {
                 migration_object_name: name,
                 migration_object_type: MigrationObjectType::Table,
                 current_code_schema: table,
-                current_db_schema: self
-                    .current_db_schema
-                    .tables
-                    .get(name)
-                    .unwrap_or(&empty_table),
+                current_db_schema: self.current_db_schema.tables.get(name).unwrap_or(&empty_table),
             };
 
             let migration = MigrationUnit::new(&migration_unit_data, self.session);
@@ -82,11 +78,7 @@ impl<'a> Migration<'a> {
                 migration_object_name: name,
                 migration_object_type: MigrationObjectType::MaterializedView,
                 current_code_schema: materialized_view,
-                current_db_schema: self
-                    .current_db_schema
-                    .materialized_views
-                    .get(name)
-                    .unwrap_or(&empty_mv),
+                current_db_schema: self.current_db_schema.materialized_views.get(name).unwrap_or(&empty_mv),
             };
 
             let migration = MigrationUnit::new(&migration_unit_data, self.session);

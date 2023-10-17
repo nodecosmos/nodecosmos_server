@@ -19,11 +19,7 @@ partial_node!(
 );
 
 impl ExtCallbacks<CbExtension, NodecosmosError> for UpdateDescriptionNode {
-    async fn before_update(
-        &mut self,
-        _db_session: &CachingSession,
-        ext: &CbExtension,
-    ) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         // sanitize description
         if let Some(description) = &self.description {
             self.description = Some(clean(description));
@@ -31,13 +27,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for UpdateDescriptionNode {
 
         self.updated_at = Some(chrono::Utc::now());
 
-        update_elastic_document(
-            &ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
+        update_elastic_document(&ext.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
         Ok(())
     }
 }

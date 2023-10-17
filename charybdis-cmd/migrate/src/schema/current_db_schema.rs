@@ -20,10 +20,7 @@ pub struct CurrentDbSchema {
  * It is used to compare the current state to the desired state of the database schema.
  */
 impl CurrentDbSchema {
-    pub(crate) async fn new(
-        session: &Session,
-        keyspace_name: String,
-    ) -> Result<CurrentDbSchema, CharybdisError> {
+    pub(crate) async fn new(session: &Session, keyspace_name: String) -> Result<CurrentDbSchema, CharybdisError> {
         let mut current_schema = CurrentDbSchema {
             tables: HashMap::new(),
             udts: HashMap::new(),
@@ -31,9 +28,7 @@ impl CurrentDbSchema {
             keyspace_name,
         };
 
-        current_schema
-            .get_tables_from_system_schema(session)
-            .await?;
+        current_schema.get_tables_from_system_schema(session).await?;
         current_schema.get_udts_from_system_schema(session).await?;
         current_schema
             .get_materialized_views_from_system_schema(session)
@@ -42,10 +37,7 @@ impl CurrentDbSchema {
         Ok(current_schema)
     }
 
-    async fn get_tables_from_system_schema(
-        &mut self,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn get_tables_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -55,32 +47,20 @@ impl CurrentDbSchema {
             ALLOW FILTERING
         "#;
 
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(),))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),)).await?.rows {
             for row in rows {
                 let table_name: (String,) = row.into_typed::<(String,)>()?;
-                self.tables
-                    .insert(table_name.0.clone(), SchemaObject::new());
+                self.tables.insert(table_name.0.clone(), SchemaObject::new());
                 self.populate_table_columns(&table_name.0, session).await?;
-                self.populate_table_partition_keys(&table_name.0, session)
-                    .await?;
-                self.populate_table_clustering_keys(&table_name.0, session)
-                    .await?;
-                self.populate_table_secondary_indexes(&table_name.0, session)
-                    .await?;
+                self.populate_table_partition_keys(&table_name.0, session).await?;
+                self.populate_table_clustering_keys(&table_name.0, session).await?;
+                self.populate_table_secondary_indexes(&table_name.0, session).await?;
             }
         }
         Ok(())
     }
 
-    async fn populate_table_columns(
-        &mut self,
-        table_name: &String,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn populate_table_columns(&mut self, table_name: &String, session: &Session) -> Result<(), CharybdisError> {
         // get columns and types for provided table
         let cql = r#"
             SELECT
@@ -203,10 +183,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn get_udts_from_system_schema(
-        &mut self,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn get_udts_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -217,14 +194,9 @@ impl CurrentDbSchema {
             FROM system_schema.types
             WHERE keyspace_name = ?"#;
 
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(),))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),)).await?.rows {
             for row in rows {
-                let (type_name, field_names, field_types) =
-                    row.into_typed::<(String, Vec<String>, Vec<String>)>()?;
+                let (type_name, field_names, field_types) = row.into_typed::<(String, Vec<String>, Vec<String>)>()?;
 
                 let mut schema_object = SchemaObject::new();
 
@@ -240,27 +212,18 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn get_materialized_views_from_system_schema(
-        &mut self,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn get_materialized_views_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         let cql = r#"
             SELECT view_name
             FROM system_schema.views
             WHERE keyspace_name = ?
             ALLOW FILTERING"#;
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(),))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(),)).await?.rows {
             for row in rows {
                 let view_name: (String,) = row.into_typed::<(String,)>()?;
-                self.materialized_views
-                    .insert(view_name.0.clone(), SchemaObject::new());
-                self.populate_materialized_view_columns(&view_name.0, session)
-                    .await?;
+                self.materialized_views.insert(view_name.0.clone(), SchemaObject::new());
+                self.populate_materialized_view_columns(&view_name.0, session).await?;
                 self.populate_materialized_view_partition_key(&view_name.0, session)
                     .await?;
                 self.populate_materialized_view_clustering_keys(&view_name.0, session)
@@ -282,11 +245,7 @@ impl CurrentDbSchema {
             WHERE keyspace_name = ?
             AND table_name = ?
             ALLOW FILTERING"#;
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name)).await?.rows {
             for row in rows {
                 let str_value: (String, String) = row.into_typed::<(String, String)>()?;
                 self.materialized_views
@@ -313,11 +272,7 @@ impl CurrentDbSchema {
             AND kind = 'partition_key'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name)).await?.rows {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
                 self.materialized_views
@@ -344,11 +299,7 @@ impl CurrentDbSchema {
             AND kind = 'clustering'
             ALLOW FILTERING"#;
 
-        if let Some(rows) = session
-            .query(cql, (self.keyspace_name.clone(), &view_name))
-            .await?
-            .rows
-        {
+        if let Some(rows) = session.query(cql, (self.keyspace_name.clone(), &view_name)).await?.rows {
             for row in rows {
                 let str_value: (String,) = row.into_typed::<(String,)>()?;
                 self.materialized_views

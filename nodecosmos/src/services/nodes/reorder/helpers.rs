@@ -65,7 +65,5 @@ pub fn build_new_index(
 
     // If both siblings exist, return the average of their order indices
     // TODO: This is not ideal, as it has limited precision.
-    //  after around of 1000 reorders between 0 and 1 the correct decimal point will be lost.
-    //  Let's consider fractional index values in the future
     (upper_sibling_index + bottom_sibling_index) / 2.0
 }

@@ -39,10 +39,7 @@ impl CharybdisArgs {
         primary_key
     }
 
-    pub fn hash_expr_lit_to_hash(
-        expr: syn::Expr,
-        cha_attr_name: String,
-    ) -> HashMap<String, TokenStream> {
+    pub fn hash_expr_lit_to_hash(expr: syn::Expr, cha_attr_name: String) -> HashMap<String, TokenStream> {
         // parse ruby style hash
         let hash = match expr {
             syn::Expr::Lit(syn::ExprLit {
@@ -138,8 +135,7 @@ impl Parse for CharybdisArgs {
                 }
                 "field_types_hash" => {
                     let hash: syn::Expr = input.parse()?;
-                    let parsed_field_types_hash =
-                        Self::hash_expr_lit_to_hash(hash, "field_types_hash".to_string());
+                    let parsed_field_types_hash = Self::hash_expr_lit_to_hash(hash, "field_types_hash".to_string());
 
                     field_types_hash = Some(parsed_field_types_hash);
                 }

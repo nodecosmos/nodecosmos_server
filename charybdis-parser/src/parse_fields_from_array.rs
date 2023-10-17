@@ -13,11 +13,7 @@ pub fn parse_fields_from_array_ref(array_ref_expr: &Expr) -> Vec<String> {
 }
 
 pub fn parse_array_expr(array_expr: ExprArray) -> Vec<String> {
-    array_expr
-        .elems
-        .into_iter()
-        .filter_map(parse_string_literal)
-        .collect()
+    array_expr.elems.into_iter().filter_map(parse_string_literal).collect()
 }
 
 pub fn parse_arr_expr_from_literals(array_expr: ExprArray) -> Vec<String> {

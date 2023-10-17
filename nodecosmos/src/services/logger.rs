@@ -13,9 +13,5 @@ pub fn log_error(message: String) {
 }
 
 pub fn log_fatal(message: String) {
-    println!(
-        "{}: {}",
-        "FATAL".bright_red().bold(),
-        message.bright_red().bold()
-    );
+    println!("{}: {}", "FATAL".bright_red().bold(), message.bright_red().bold());
 }

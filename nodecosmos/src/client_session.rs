@@ -6,10 +6,7 @@ use actix_web::{FromRequest, HttpRequest};
 use futures::future::{ready, Ready};
 use serde_json::json;
 
-pub fn set_current_user(
-    client_session: &Session,
-    user: &User,
-) -> Result<CurrentUser, NodecosmosError> {
+pub fn set_current_user(client_session: &Session, user: &User) -> Result<CurrentUser, NodecosmosError> {
     let current_user = CurrentUser {
         id: user.id,
         first_name: user.first_name.clone(),
@@ -22,9 +19,7 @@ pub fn set_current_user(
 
     client_session
         .insert("current_user", &current_user)
-        .map_err(|e| {
-            NodecosmosError::ClientSessionError(format!("Could not set current user. {}", e))
-        })?;
+        .map_err(|e| NodecosmosError::ClientSessionError(format!("Could not set current user. {}", e)))?;
 
     Ok(current_user)
 }
@@ -32,9 +27,7 @@ pub fn set_current_user(
 pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
     let current_user = client_session
         .get::<CurrentUser>("current_user")
-        .map_err(|e| {
-            NodecosmosError::ClientSessionError(format!("Could not get current user. {}", e))
-        });
+        .map_err(|e| NodecosmosError::ClientSessionError(format!("Could not get current user. {}", e)));
 
     match current_user {
         Ok(Some(user)) => {

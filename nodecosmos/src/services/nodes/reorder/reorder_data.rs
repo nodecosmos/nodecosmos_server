@@ -2,9 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::helpers::{ClonedRef, Pluckable};
 use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::services::nodes::reorder::helpers::{
-    build_new_ancestor_ids, build_new_index, init_sibling,
-};
+use crate::services::nodes::reorder::helpers::{build_new_ancestor_ids, build_new_index, init_sibling};
 use crate::services::nodes::reorder::ReorderParams;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
@@ -34,10 +32,7 @@ pub struct ReorderData {
 }
 
 impl ReorderData {
-    pub async fn from_params(
-        params: &ReorderParams,
-        db_session: &CachingSession,
-    ) -> Result<Self, NodecosmosError> {
+    pub async fn from_params(params: &ReorderParams, db_session: &CachingSession) -> Result<Self, NodecosmosError> {
         let node = Node {
             id: params.node_id,
             ..Default::default()
@@ -45,11 +40,10 @@ impl ReorderData {
         .find_by_primary_key(&db_session)
         .await?;
 
-        let descendants =
-            NodeDescendant::find_by_root_id_and_node_id(&db_session, node.root_id, node.id)
-                .await?
-                .try_collect()
-                .await?;
+        let descendants = NodeDescendant::find_by_root_id_and_node_id(&db_session, node.root_id, node.id)
+            .await?
+            .try_collect()
+            .await?;
         let descendant_ids = descendants.pluck_id();
 
         let old_parent = GetStructureNode {

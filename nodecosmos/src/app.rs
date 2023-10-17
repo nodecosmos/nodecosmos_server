@@ -30,21 +30,13 @@ impl App {
 
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let config = contents.parse::<Value>().expect("Unable to parse TOML");
-        let bucket = config["aws"]["bucket"]
-            .as_str()
-            .expect("Missing bucket")
-            .to_string();
+        let bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
 
         Self { config, bucket }
     }
 
     /// Init processes that need to be run on startup
-    pub async fn init(
-        &self,
-        db_session: &CachingSession,
-        locker: &ResourceLocker,
-        elastic_client: &Elasticsearch,
-    ) {
+    pub async fn init(&self, db_session: &CachingSession, locker: &ResourceLocker, elastic_client: &Elasticsearch) {
         elastic::build(&elastic_client).await;
 
         self.create_tmp_directories();
@@ -58,13 +50,9 @@ impl App {
 }
 
 pub async fn get_db_session(app: &App) -> CachingSession {
-    let hosts = app.config["scylla"]["hosts"]
-        .as_array()
-        .expect("Missing hosts");
+    let hosts = app.config["scylla"]["hosts"].as_array().expect("Missing hosts");
 
-    let keyspace = app.config["scylla"]["keyspace"]
-        .as_str()
-        .expect("Missing keyspace");
+    let keyspace = app.config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
 
     let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
 
@@ -74,12 +62,7 @@ pub async fn get_db_session(app: &App) -> CachingSession {
         .use_keyspace(keyspace, false)
         .build()
         .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "Unable to connect to scylla hosts: {:?}. \nError: {}",
-                known_nodes, e
-            )
-        });
+        .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
 
     CachingSession::from(session, 1000)
 }
@@ -118,10 +101,7 @@ pub fn get_cors(app: &App) -> Cors {
             http::header::CONTENT_TYPE,
             http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
         ])
-        .expose_headers(vec![
-            http::header::LOCATION,
-            http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        ])
+        .expose_headers(vec![http::header::LOCATION, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
         .max_age(86400)
 }
 
@@ -139,9 +119,7 @@ pub fn get_secret_key(app: &App) -> Key {
 }
 
 pub fn get_redis_actor_session_store(app: &App) -> RedisActorSessionStore {
-    let redis_host = app.config["redis"]["host"]
-        .as_str()
-        .expect("Missing redis url");
+    let redis_host = app.config["redis"]["host"].as_str().expect("Missing redis url");
 
     RedisActorSessionStore::new(redis_host)
 }
@@ -161,14 +139,11 @@ pub fn get_session_middleware(app: &App) -> SessionMiddleware<RedisActorSessionS
 }
 
 pub async fn get_redis_pool(app: &App) -> Pool {
-    let redis_url = app.config["redis"]["url"]
-        .as_str()
-        .expect("Missing redis url");
+    let redis_url = app.config["redis"]["url"].as_str().expect("Missing redis url");
 
     let cfg = Config::from_url(redis_url);
 
-    cfg.create_pool(Some(Runtime::Tokio1))
-        .expect("Failed to create pool.")
+    cfg.create_pool(Some(Runtime::Tokio1)).expect("Failed to create pool.")
 }
 
 pub async fn get_aws_s3_client() -> aws_sdk_s3::Client {

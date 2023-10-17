@@ -1,8 +1,7 @@
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    FlowStep, FlowStepDescription, UpdateFlowStepInputIds, UpdateFlowStepNodeIds,
-    UpdateFlowStepOutputIds,
+    FlowStep, FlowStepDescription, UpdateFlowStepInputIds, UpdateFlowStepNodeIds, UpdateFlowStepOutputIds,
 };
 use crate::models::user::CurrentUser;
 use actix_web::{delete, post, put, web, HttpResponse};

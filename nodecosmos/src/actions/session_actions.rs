@@ -47,9 +47,7 @@ pub async fn sync(client_session: Session) -> impl Responder {
     let current_user = get_current_user(&client_session);
 
     match current_user {
-        Some(current_user) => {
-            HttpResponse::Ok().json(json!({"success": true, "user": current_user}))
-        }
+        Some(current_user) => HttpResponse::Ok().json(json!({"success": true, "user": current_user})),
         None => HttpResponse::Ok().json(json!({"success": false})),
     }
 }

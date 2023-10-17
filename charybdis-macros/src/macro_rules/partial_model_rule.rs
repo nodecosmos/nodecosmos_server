@@ -117,10 +117,7 @@ use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 /// keys.
 ///
 
-pub(crate) fn partial_model_macro_generator(
-    args: CharybdisArgs,
-    input: &DeriveInput,
-) -> TokenStream {
+pub(crate) fn partial_model_macro_generator(args: CharybdisArgs, input: &DeriveInput) -> TokenStream {
     let fields_named = parse_named_fields(&input);
 
     if args.exclude_partial_model.unwrap_or(false) {
@@ -253,12 +250,9 @@ pub fn char_model_field_attrs_macro_gen(args: CharybdisArgs, input: DeriveInput)
         .fields_names
         .unwrap_or_else(|| panic!("failed to parse field names: {}", struct_name));
 
-    let field_types_hash = args.field_types_hash.unwrap_or_else(|| {
-        panic!(
-            "failed to parse field types hash for struct: {}",
-            struct_name
-        )
-    });
+    let field_types_hash = args
+        .field_types_hash
+        .unwrap_or_else(|| panic!("failed to parse field types hash for struct: {}", struct_name));
 
     let field_attributes_hash = args.field_attributes_hash.unwrap_or(HashMap::new());
 

@@ -48,11 +48,7 @@ impl<'a> MigrationUnit<'a> {
     pub(crate) fn new(data: &'a MigrationUnitData, session: &'a Session) -> Self {
         let fields = MigrationUnitFields::new(data);
 
-        Self {
-            data,
-            fields,
-            session,
-        }
+        Self { data, fields, session }
     }
 
     pub(crate) async fn run(&self) {
@@ -147,13 +143,8 @@ impl<'a> MigrationUnit<'a> {
     }
 
     fn panic_on_udt_fields_removal(&self) {
-        if self.data.migration_object_type == MigrationObjectType::Udt
-            && !self.fields.removed_fields.is_empty()
-        {
-            panic!(
-                "\n{}\n",
-                "UDT fields removal is not allowed!".bold().bright_red()
-            );
+        if self.data.migration_object_type == MigrationObjectType::Udt && !self.fields.removed_fields.is_empty() {
+            panic!("\n{}\n", "UDT fields removal is not allowed!".bold().bright_red());
         }
     }
 
@@ -161,9 +152,7 @@ impl<'a> MigrationUnit<'a> {
         if self.data.migration_object_type == MigrationObjectType::MaterializedView {
             panic!(
                 "\n{}\n",
-                "Materialized view fields change is not allowed!"
-                    .bold()
-                    .bright_red()
+                "Materialized view fields change is not allowed!".bold().bright_red()
             );
         }
     }

@@ -4,11 +4,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{parse_str, FieldsNamed};
 
-pub fn find_model_query_rule(
-    args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-    struct_name: &Ident,
-) -> TokenStream {
+pub fn find_model_query_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
     let comma_sep_cols = comma_sep_cols(fields_named);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
@@ -32,11 +28,7 @@ pub fn find_model_query_rule(
     expanded
 }
 
-pub fn find_model_rule(
-    args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-    struct_name: &Ident,
-) -> TokenStream {
+pub fn find_model_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
     let comma_sep_cols = comma_sep_cols(fields_named);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
@@ -60,11 +52,7 @@ pub fn find_model_rule(
     expanded
 }
 
-pub fn find_one_model_rule(
-    args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-    struct_name: &Ident,
-) -> TokenStream {
+pub fn find_one_model_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
     let comma_sep_cols = comma_sep_cols(fields_named);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());

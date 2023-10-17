@@ -18,7 +18,7 @@ const BCRYPT_COST: u32 = 6;
     table_name = users,
     partition_keys = [id],
     clustering_keys = [],
-    secondary_indexes = [username, email]
+    secondary_indexes = [username, email],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct User {
@@ -58,21 +58,14 @@ impl User {
     pub const ELASTIC_IDX_NAME: &'static str = "users";
 
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-        find_one_user!(session, "username = ?", (&self.username,))
-            .await
-            .ok()
+        find_one_user!(session, "username = ?", (&self.username,)).await.ok()
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-        find_one_user!(session, "email = ?", (&self.email,))
-            .await
-            .ok()
+        find_one_user!(session, "email = ?", (&self.email,)).await.ok()
     }
 
-    pub async fn check_existing_user(
-        &self,
-        session: &CachingSession,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn check_existing_user(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if self.find_by_username(session).await.is_some() {
             return Err(NodecosmosError::ValidationError((
                 "username".to_string(),
@@ -91,9 +84,8 @@ impl User {
     }
 
     pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
-        let res = verify(password, &self.password).map_err(|_| {
-            NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string()))
-        })?;
+        let res = verify(password, &self.password)
+            .map_err(|_| NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string())))?;
 
         Ok(res)
     }
@@ -120,11 +112,7 @@ impl User {
 }
 
 impl ExtCallbacks<CbExtension, NodecosmosError> for User {
-    async fn before_insert(
-        &mut self,
-        session: &CachingSession,
-        _ext: &CbExtension,
-    ) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, session: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.check_existing_user(session).await?;
 
         self.set_defaults();
@@ -149,11 +137,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for User {
         Ok(())
     }
 
-    async fn before_update(
-        &mut self,
-        _: &CachingSession,
-        _ext: &CbExtension,
-    ) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.updated_at = Some(Utc::now());
         Ok(())
     }

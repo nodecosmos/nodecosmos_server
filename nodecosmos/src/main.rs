@@ -55,11 +55,7 @@ async fn main() {
     let cb_extension_web_data = web::Data::new(cb_extension.clone());
 
     nodecosmos
-        .init(
-            &db_session_web_data,
-            &resource_locker_web_data,
-            &elastic_client,
-        )
+        .init(&db_session_web_data, &resource_locker_web_data, &elastic_client)
         .await;
 
     HttpServer::new(move || {
@@ -83,12 +79,7 @@ async fn main() {
                     .service(update_user)
                     .service(delete_user),
             )
-            .service(
-                web::scope("/sessions")
-                    .service(login)
-                    .service(sync)
-                    .service(logout),
-            )
+            .service(web::scope("/sessions").service(login).service(sync).service(logout))
             .service(
                 web::scope("/nodes")
                     .service(get_nodes)

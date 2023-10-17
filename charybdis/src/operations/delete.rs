@@ -7,17 +7,14 @@ use scylla::{CachingSession, QueryResult};
 
 pub trait Delete {
     async fn delete(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
-    async fn delete_by_partition_key(
-        &self,
-        session: &CachingSession,
-    ) -> Result<QueryResult, CharybdisError>;
+    async fn delete_by_partition_key(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
 }
 
 impl<T: Model + ValueList> Delete for T {
     async fn delete(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
-        let primary_key_values = self.get_primary_key_values().map_err(|e| {
-            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
-        })?;
+        let primary_key_values = self
+            .get_primary_key_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
         session
             .execute(T::DELETE_QUERY, primary_key_values)
@@ -25,13 +22,10 @@ impl<T: Model + ValueList> Delete for T {
             .map_err(CharybdisError::QueryError)
     }
 
-    async fn delete_by_partition_key(
-        &self,
-        session: &CachingSession,
-    ) -> Result<QueryResult, CharybdisError> {
-        let partition_key_values = self.get_partition_key_values().map_err(|e| {
-            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
-        })?;
+    async fn delete_by_partition_key(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
+        let partition_key_values = self
+            .get_partition_key_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
         session
             .execute(T::DELETE_BY_PARTITION_KEY_QUERY, partition_key_values)
@@ -44,10 +38,7 @@ pub trait DeleteAll<T, I>: Iterator<Item = T>
 where
     T: Model + ValueList,
 {
-    async fn delete_all(
-        &mut self,
-        session: &CachingSession,
-    ) -> Result<QueryResult, CharybdisError> {
+    async fn delete_all(&mut self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
         let mut batch = CharybdisModelBatch::unlogged();
 
         batch.append_deletes(self)?;
@@ -77,11 +68,7 @@ where
 }
 
 pub trait DeleteWithExtCallbacks<E, Err> {
-    async fn delete_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &E,
-    ) -> Result<QueryResult, Err>;
+    async fn delete_cb(&mut self, session: &CachingSession, extension: &E) -> Result<QueryResult, Err>;
 }
 
 impl<T, Ext, Err> DeleteWithExtCallbacks<Ext, Err> for T
@@ -89,11 +76,7 @@ where
     Err: From<CharybdisError>,
     T: Model + ValueList + Delete + ExtCallbacks<Ext, Err>,
 {
-    async fn delete_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &Ext,
-    ) -> Result<QueryResult, Err> {
+    async fn delete_cb(&mut self, session: &CachingSession, extension: &Ext) -> Result<QueryResult, Err> {
         self.before_delete(session, extension).await?;
         let res = self.delete(session).await;
         self.after_delete(session, extension).await?;

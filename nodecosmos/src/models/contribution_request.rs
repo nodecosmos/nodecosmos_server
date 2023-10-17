@@ -75,24 +75,9 @@ impl Callbacks<NodecosmosError> for ContributionRequest {
     }
 }
 
-partial_contribution_request!(
-    BaseContributionRequest,
-    node_id,
-    id,
-    owner,
-    title,
-    created_at,
-    status
-);
+partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title, created_at, status);
 
-partial_contribution_request!(
-    UpdateContributionRequestTitle,
-    node_id,
-    id,
-    owner_id,
-    title,
-    updated_at
-);
+partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, owner_id, title, updated_at);
 impl_updated_at_cb!(UpdateContributionRequestTitle);
 
 partial_contribution_request!(

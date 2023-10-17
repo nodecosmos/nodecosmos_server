@@ -8,10 +8,7 @@ use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
 
-pub async fn auth_node_access(
-    node: &BaseNode,
-    opt_current_user: OptCurrentUser,
-) -> Result<(), NodecosmosError> {
+pub async fn auth_node_access(node: &BaseNode, opt_current_user: OptCurrentUser) -> Result<(), NodecosmosError> {
     if node.is_public {
         Ok(())
     } else if let Some(current_user) = opt_current_user.0 {
@@ -31,10 +28,7 @@ pub async fn auth_node_access(
     }
 }
 
-pub async fn auth_node_creation(
-    parent: &Option<Node>,
-    current_user: &CurrentUser,
-) -> Result<(), NodecosmosError> {
+pub async fn auth_node_creation(parent: &Option<Node>, current_user: &CurrentUser) -> Result<(), NodecosmosError> {
     if let Some(parent) = parent {
         if can_edit_node(current_user, parent) {
             Ok(())
@@ -66,10 +60,7 @@ pub async fn auth_node_update_by_id(
     Ok(())
 }
 
-pub async fn auth_node_update(
-    node: &Node,
-    current_user: &CurrentUser,
-) -> Result<(), NodecosmosError> {
+pub async fn auth_node_update(node: &Node, current_user: &CurrentUser) -> Result<(), NodecosmosError> {
     if can_edit_node(current_user, node) {
         Ok(())
     } else {

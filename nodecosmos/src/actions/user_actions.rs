@@ -7,9 +7,7 @@ use crate::CbExtension;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{
-    DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks,
-};
+use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;

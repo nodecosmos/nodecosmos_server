@@ -4,10 +4,7 @@ use syn::{FieldsNamed, ImplItem};
 
 use crate::helpers::comma_sep_cols;
 
-pub(crate) fn find_by_primary_key_query_const(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-) -> ImplItem {
+pub(crate) fn find_by_primary_key_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let primary_key = ch_args.get_primary_key();
     let table_name = ch_args.table_name.clone().unwrap();
 
@@ -26,10 +23,7 @@ pub(crate) fn find_by_primary_key_query_const(
     syn::parse_quote!(#generated)
 }
 
-pub(crate) fn find_by_partition_key_query_const(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-) -> ImplItem {
+pub(crate) fn find_by_partition_key_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
     let partition_keys = ch_args.partition_keys.clone().unwrap();
     let table_name = ch_args.table_name.clone().unwrap();
     let comma_sep_cols = comma_sep_cols(fields_named);

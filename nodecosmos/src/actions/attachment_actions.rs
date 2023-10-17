@@ -23,15 +23,7 @@ pub async fn upload_image(
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_node_update_by_id(&params.node_id, &db_session, &current_user).await?;
 
-    let attachment = upload_image_attachment(
-        &params,
-        &nc_app,
-        &s3_client,
-        &db_session,
-        &current_user,
-        payload,
-    )
-    .await?;
+    let attachment = upload_image_attachment(&params, &nc_app, &s3_client, &db_session, &current_user, payload).await?;
 
     Ok(HttpResponse::Ok().json(attachment))
 }

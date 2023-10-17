@@ -1,8 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{
-    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn,
-};
+use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::errors::CharybdisError;
@@ -59,11 +57,7 @@ impl Flow {
         workflow
     }
 
-    pub async fn append_step(
-        &mut self,
-        session: &CachingSession,
-        step_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    pub async fn append_step(&mut self, session: &CachingSession, step_id: Uuid) -> Result<(), CharybdisError> {
         execute(
             session,
             Flow::PUSH_TO_STEP_IDS_QUERY,
@@ -74,11 +68,7 @@ impl Flow {
         Ok(())
     }
 
-    pub async fn remove_step(
-        &mut self,
-        session: &CachingSession,
-        step_id: Uuid,
-    ) -> Result<(), CharybdisError> {
+    pub async fn remove_step(&mut self, session: &CachingSession, step_id: Uuid) -> Result<(), CharybdisError> {
         execute(
             session,
             Flow::PULL_FROM_STEP_IDS_QUERY,

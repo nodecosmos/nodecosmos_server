@@ -18,11 +18,7 @@ impl ResourceLocker {
     }
 
     /// Lock complete resource
-    pub async fn lock_resource(
-        &self,
-        resource_id: &str,
-        ttl: usize,
-    ) -> Result<bool, NodecosmosError> {
+    pub async fn lock_resource(&self, resource_id: &str, ttl: usize) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
         let key = format!("{}:{}", LOCK_NAMESPACE, resource_id);
 
@@ -107,26 +103,20 @@ impl ResourceLocker {
     pub async fn check_node_lock(&self, node: &Node) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(&node.root_id.to_string()).await? {
             return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked: Reorder in progress. If issue persist contact support"
-                    .to_string(),
+                "Resource Locked: Reorder in progress. If issue persist contact support".to_string(),
             ));
         }
 
         Ok(())
     }
 
-    pub async fn check_node_action_lock(
-        &self,
-        action_type: ActionTypes,
-        node: &Node,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn check_node_action_lock(&self, action_type: ActionTypes, node: &Node) -> Result<(), NodecosmosError> {
         if self
             .is_resource_action_locked(action_type, &node.root_id.to_string())
             .await?
         {
             return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked: Reorder in progress. If issue persist contact support"
-                    .to_string(),
+                "Resource Locked: Reorder in progress. If issue persist contact support".to_string(),
             ));
         }
 

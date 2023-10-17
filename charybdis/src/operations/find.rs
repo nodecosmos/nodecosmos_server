@@ -113,9 +113,7 @@ impl<T: BaseModel> Find for T {
         session: &CachingSession,
         value: impl ValueList + std::fmt::Debug,
     ) -> Result<Self, CharybdisError> {
-        let result: QueryResult = session
-            .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value)
-            .await?;
+        let result: QueryResult = session.execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value).await?;
 
         let res = result.first_row_typed()?;
 
@@ -138,9 +136,7 @@ impl<T: BaseModel> Find for T {
         session: &CachingSession,
         value: impl ValueList,
     ) -> Result<Self, CharybdisError> {
-        let result: QueryResult = session
-            .execute(Self::FIND_BY_PARTITION_KEY_QUERY, value)
-            .await?;
+        let result: QueryResult = session.execute(Self::FIND_BY_PARTITION_KEY_QUERY, value).await?;
 
         let res = result.first_row_typed()?;
 
@@ -149,9 +145,9 @@ impl<T: BaseModel> Find for T {
 
     /// Preferred way to find by partition key, as keys will be in correct order
     async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError> {
-        let primary_key_values = self.get_primary_key_values().map_err(|e| {
-            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
-        })?;
+        let primary_key_values = self
+            .get_primary_key_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
         let result: QueryResult = session
             .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, &primary_key_values)
@@ -167,9 +163,9 @@ impl<T: BaseModel> Find for T {
         &self,
         session: &CachingSession,
     ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
-        let get_partition_key_values = self.get_partition_key_values().map_err(|e| {
-            CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string())
-        })?;
+        let get_partition_key_values = self
+            .get_partition_key_values()
+            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
         let rows = session
             .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)

@@ -93,9 +93,7 @@ impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
             NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
-            NodecosmosError::ResourceLocked(e) => {
-                HttpResponseBuilder::new(StatusCode::LOCKED).json(e)
-            }
+            NodecosmosError::ResourceLocked(e) => HttpResponseBuilder::new(StatusCode::LOCKED).json(e),
             NodecosmosError::CharybdisError(e) => match e {
                 CharybdisError::NotFoundError(e) => HttpResponse::NotFound().json(json!({
                     "error": "Not Found",

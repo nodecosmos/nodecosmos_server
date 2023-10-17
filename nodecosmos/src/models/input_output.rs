@@ -82,10 +82,7 @@ impl InputOutput {
         Ok(res)
     }
 
-    async fn flow_step(
-        &self,
-        session: &CachingSession,
-    ) -> Result<Option<FlowStep>, NodecosmosError> {
+    async fn flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
         let flow_step_id = self.flow_step_id.unwrap_or_default();
 
         if flow_step_id.is_nil() {
@@ -102,10 +99,7 @@ impl InputOutput {
         Ok(Some(fs))
     }
 
-    async fn next_flow_step(
-        &self,
-        session: &CachingSession,
-    ) -> Result<Option<FlowStep>, NodecosmosError> {
+    async fn next_flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
         let flow_step = self.flow_step(session).await?;
 
         if let Some(fs) = flow_step {
@@ -144,8 +138,7 @@ impl Callbacks<NodecosmosError> for InputOutput {
 
         if let Some(original_id) = self.original_id {
             let original_io =
-                InputOutput::find_one(session, find_input_output_query!("id = ?"), (original_id,))
-                    .await?;
+                InputOutput::find_one(session, find_input_output_query!("id = ?"), (original_id,)).await?;
 
             self.title = original_io.title;
             self.unit = original_io.unit;
@@ -229,15 +222,7 @@ impl Callbacks<NodecosmosError> for IoDescription {
     }
 }
 
-partial_input_output!(
-    IoTitle,
-    node_id,
-    workflow_id,
-    id,
-    original_id,
-    title,
-    updated_at
-);
+partial_input_output!(IoTitle, node_id, workflow_id, id, original_id, title, updated_at);
 impl Callbacks<NodecosmosError> for IoTitle {
     updated_at_cb_fn!();
 

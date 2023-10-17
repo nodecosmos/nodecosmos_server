@@ -2,23 +2,19 @@ use crate::errors::NodecosmosError;
 use futures::StreamExt;
 use image::RgbImage;
 
-pub async fn read_image_buffer(
-    field: &mut actix_multipart::Field,
-) -> Result<Vec<u8>, NodecosmosError> {
+pub async fn read_image_buffer(field: &mut actix_multipart::Field) -> Result<Vec<u8>, NodecosmosError> {
     let mut buffer: Vec<u8> = Vec::new();
     while let Some(chunk) = field.next().await {
-        let data = chunk.map_err(|e| {
-            NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
-        })?;
+        let data = chunk
+            .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e)))?;
         buffer.extend_from_slice(&data);
     }
     Ok(buffer)
 }
 
 pub fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
-    let image_format = image::guess_format(buffer).map_err(|e| {
-        NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e))
-    })?;
+    let image_format = image::guess_format(buffer)
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e)))?;
 
     if image_format != image::ImageFormat::Png && image_format != image::ImageFormat::Jpeg {
         return Err(NodecosmosError::UnsupportedMediaType);
@@ -34,9 +30,8 @@ pub fn decode_image(buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosErro
         return Err(NodecosmosError::UnsupportedMediaType);
     }
 
-    let img = image::load_from_memory(buffer).map_err(|e| {
-        NodecosmosError::InternalServerError(format!("Failed to decode image: {:?}", e))
-    })?;
+    let img = image::load_from_memory(buffer)
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to decode image: {:?}", e)))?;
 
     Ok(img)
 }
@@ -73,17 +68,17 @@ pub fn compress_image(image_src: RgbImage) -> Result<Vec<u8>, NodecosmosError> {
     compress.set_size(image_src.width() as usize, image_src.height() as usize);
     compress.set_quality(90f32);
 
-    let mut compress = compress.start_compress(compressed).map_err(|e| {
-        NodecosmosError::InternalServerError(format!("Failed to start compressing image: {:?}", e))
-    })?;
+    let mut compress = compress
+        .start_compress(compressed)
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to start compressing image: {:?}", e)))?;
 
-    compress.write_scanlines(&image_src).map_err(|e| {
-        NodecosmosError::InternalServerError(format!("Failed to compress image: {:?}", e))
-    })?;
+    compress
+        .write_scanlines(&image_src)
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to compress image: {:?}", e)))?;
 
-    let compressed = compress.finish().map_err(|e| {
-        NodecosmosError::InternalServerError(format!("Failed to finish compressing image: {:?}", e))
-    })?;
+    let compressed = compress
+        .finish()
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to finish compressing image: {:?}", e)))?;
 
     Ok(compressed)
 }

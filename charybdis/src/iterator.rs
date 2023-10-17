@@ -16,8 +16,6 @@ impl<T: BaseModel> Iterator for CharybdisModelIterator<T> {
     type Item = Result<T, CharybdisError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|row| row.map_err(|e| CharybdisError::from(e)))
+        self.inner.next().map(|row| row.map_err(|e| CharybdisError::from(e)))
     }
 }

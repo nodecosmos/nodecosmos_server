@@ -1,8 +1,7 @@
 use crate::authorize::{auth_contribution_request_creation, auth_contribution_request_update};
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::{
-    BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription,
-    UpdateContributionRequestTitle,
+    BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
 use crate::models::udts::{Owner, OwnerTypes};
 use crate::models::user::CurrentUser;
@@ -47,9 +46,7 @@ pub async fn get_contribution_request(
     contribution_request.node_id = params.node_id;
     contribution_request.id = params.id;
 
-    let contribution_request = contribution_request
-        .find_by_primary_key(&db_session)
-        .await?;
+    let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }
@@ -123,9 +120,7 @@ pub async fn delete_contribution_request(
     contribution_request.node_id = params.node_id;
     contribution_request.id = params.id;
 
-    let contribution_request = contribution_request
-        .find_by_primary_key(&db_session)
-        .await?;
+    let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
 
     auth_contribution_request_update(&db_session, &contribution_request, &current_user).await?;
 
