@@ -33,7 +33,7 @@ pub async fn create_io(
     })))
 }
 
-#[get("/{node_id}/{workflow_id}/{id}/description")]
+#[get("/{node_id}/{workflow_id}/{workflowIndex}/{id}/description")]
 pub async fn get_io_description(
     db_session: web::Data<CachingSession>,
     params: web::Path<PrimaryKeyParams>,
@@ -85,17 +85,12 @@ pub async fn update_io_description(
     })))
 }
 
-#[delete("/{node_id}/{workflow_id}/{id}")]
+#[delete("/{nodeId}/{workflowId}/{workflowIndex}/{id}")]
 pub async fn delete_io(
     db_session: web::Data<CachingSession>,
-    params: web::Path<PrimaryKeyParams>,
+    input_output: web::Path<InputOutput>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = InputOutput::new();
-    input_output.node_id = params.node_id;
-    input_output.workflow_id = params.workflow_id;
-    input_output.id = params.id;
-
     let mut input_output = input_output.find_by_primary_key(&db_session).await?;
 
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;

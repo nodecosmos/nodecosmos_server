@@ -1,19 +1,23 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
+use crate::models::helpers::{
+    created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn, ClonedRef,
+};
 use crate::models::input_output::InputOutput;
+use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, New, UpdateWithCallbacks};
-use charybdis::types::{Frozen, List, Map, Text, Timestamp, Uuid};
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Frozen, Int, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = flow_steps,
     partition_keys = [node_id],
-    clustering_keys = [workflow_id, id],
+    clustering_keys = [workflow_id, workflow_index, id],
     secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
@@ -24,11 +28,14 @@ pub struct FlowStep {
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
 
-    #[serde(rename = "flowId")]
-    pub flow_id: Uuid,
+    #[serde(rename = "workflowIndex")]
+    pub workflow_index: Int,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
+    #[serde(rename = "flowId")]
+    pub flow_id: Uuid,
 
     #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
@@ -39,10 +46,10 @@ pub struct FlowStep {
     pub description_markdown: Option<Text>,
 
     #[serde(rename = "inputIdsByNodeId")]
-    pub input_ids_by_node_id: Option<Map<Uuid, Frozen<List<Uuid>>>>,
+    pub input_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
 
     #[serde(rename = "outputIdsByNodeId")]
-    pub output_ids_by_node_id: Option<Map<Uuid, Frozen<List<Uuid>>>>,
+    pub output_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -52,132 +59,99 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    pub async fn flow(&self, session: &CachingSession) -> Result<Flow, NodecosmosError> {
-        let mut flow = Flow::new();
-        flow.node_id = self.node_id;
-        flow.workflow_id = self.workflow_id;
-        flow.id = self.flow_id;
-
-        let res = flow.find_by_primary_key(session).await?;
+    pub async fn flow_steps_by_workflow_index(
+        session: &CachingSession,
+        workflow: &Workflow,
+        index: Int,
+    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
+        let res =
+            FlowStep::find_by_node_id_and_workflow_id_and_workflow_index(session, workflow.node_id, workflow.id, index)
+                .await?;
 
         Ok(res)
     }
 
     pub async fn pull_output_id(&mut self, session: &CachingSession, output_id: Uuid) -> Result<(), NodecosmosError> {
-        // filter out output_id from output_ids_by_node_id
-        let mut output_ids_by_node_id = self.output_ids_by_node_id.clone().unwrap_or_default();
+        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
+            for (_, input_ids) in output_ids_by_node_id.iter_mut() {
+                input_ids.retain(|id| id != &output_id);
+            }
 
-        for (_, output_ids) in output_ids_by_node_id.iter_mut() {
-            output_ids.retain(|id| id != &output_id);
+            self.update_cb(session).await?;
         }
-
-        self.output_ids_by_node_id = Some(output_ids_by_node_id);
-
-        self.update_cb(session).await?;
 
         Ok(())
     }
 
     pub async fn pull_input_id(&mut self, session: &CachingSession, input_id: Uuid) -> Result<(), NodecosmosError> {
-        // filter out input_id from input_ids_by_node_id
-        let mut input_ids_by_node_id = self.input_ids_by_node_id.clone().unwrap_or_default();
+        if let Some(input_ids_by_node_id) = self.input_ids_by_node_id.as_mut() {
+            for (_, input_ids) in input_ids_by_node_id.iter_mut() {
+                input_ids.retain(|id| id != &input_id);
+            }
 
-        for (_, input_ids) in input_ids_by_node_id.iter_mut() {
-            input_ids.retain(|id| id != &input_id);
+            self.update_cb(session).await?;
         }
-
-        self.input_ids_by_node_id = Some(input_ids_by_node_id);
-
-        self.update_cb(session).await?;
 
         Ok(())
     }
 
-    async fn delete_outputs(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
+    async fn delete_fs_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id.clone() {
             for (_, output_ids) in output_ids_by_node_id.iter() {
-                for output_id in output_ids.iter() {
-                    let mut output = InputOutput::new();
-
-                    output.node_id = self.node_id;
-                    output.workflow_id = self.workflow_id;
-                    output.id = *output_id;
-
-                    output.find_by_primary_key(session).await?;
-                    output.delete_cb(session).await?;
-                }
+                self.delete_outputs_by_ids(session, output_ids).await?;
             }
         }
 
         Ok(())
     }
 
-    async fn delete_outputs_from_non_existent_nodes(
-        &mut self,
-        session: &CachingSession,
-    ) -> Result<(), NodecosmosError> {
-        let output_ids_by_node_id = self.output_ids_by_node_id.as_mut();
-        let node_ids = self.node_ids.as_mut();
+    async fn delete_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node_ids = self.node_ids.cloned_ref();
+        let mut node_ids_to_remove = vec![];
 
-        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-            if let Some(node_ids) = node_ids {
-                let mut node_ids_to_remove = vec![];
+        // delete outputs from db
+        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_ref() {
+            for (node_id, output_ids) in output_ids_by_node_id.iter() {
+                if !node_ids.contains(node_id) {
+                    self.delete_outputs_by_ids(session, output_ids).await?;
 
-                for (node_id, output_ids) in output_ids_by_node_id.iter() {
-                    if !node_ids.contains(node_id) {
-                        for output_id in output_ids.iter() {
-                            let mut output = InputOutput::new();
-
-                            output.node_id = self.node_id;
-                            output.workflow_id = self.workflow_id;
-                            output.id = *output_id;
-
-                            output.find_by_primary_key(session).await?;
-                            output.delete_cb(session).await?;
-                        }
-
-                        node_ids_to_remove.push(*node_id);
-                    }
+                    node_ids_to_remove.push(*node_id);
                 }
-
-                for node_id in node_ids_to_remove {
-                    output_ids_by_node_id.remove(&node_id);
-                }
-
-                self.update_cb(session).await?;
-            } else {
-                self.output_ids_by_node_id = None;
-                self.update_cb(session).await?;
             }
+        }
+
+        // delete outputs from output_ids_by_node_id
+        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
+            for node_id in node_ids_to_remove {
+                output_ids_by_node_id.remove(&node_id);
+            }
+            self.update_cb(session).await?;
         }
 
         Ok(())
     }
 
-    async fn disassociate_inputs_from_non_existent_nodes(
-        &mut self,
-        session: &CachingSession,
-    ) -> Result<(), NodecosmosError> {
-        let input_ids_by_node_id = self.input_ids_by_node_id.as_mut();
-        let node_ids = self.node_ids.as_mut();
+    async fn remove_inputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node_ids = self.node_ids.cloned_ref();
 
-        if let Some(input_ids_by_node_id) = input_ids_by_node_id {
-            if let Some(node_ids) = node_ids {
-                let node_ids_to_remove = input_ids_by_node_id
-                    .keys()
-                    .cloned()
-                    .filter(|node_id| !node_ids.contains(node_id))
-                    .collect::<Vec<_>>();
+        if let Some(input_ids_by_node_id) = self.input_ids_by_node_id.as_mut() {
+            input_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
+            self.update_cb(session).await?;
+        }
 
-                for node_id in node_ids_to_remove {
-                    input_ids_by_node_id.remove(&node_id);
-                }
+        Ok(())
+    }
 
-                self.update_cb(session).await?;
-            } else {
-                self.input_ids_by_node_id = None;
-                self.update_cb(session).await?;
-            }
+    async fn delete_outputs_by_ids(&self, session: &CachingSession, ids: &Vec<Uuid>) -> Result<(), NodecosmosError> {
+        for output_id in ids.iter() {
+            let mut output = InputOutput::new();
+
+            output.node_id = self.node_id;
+            output.workflow_id = self.workflow_id;
+            output.flow_step_id = Some(self.id);
+            output.id = *output_id;
+
+            output.delete_cb(session).await?;
         }
 
         Ok(())
@@ -209,7 +183,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
         flow.id = self.flow_id;
 
         flow.remove_step(session, self.id).await?;
-        self.delete_outputs(session).await?;
+        self.delete_fs_outputs(session).await?;
 
         Ok(())
     }
@@ -219,6 +193,7 @@ partial_flow_step!(
     UpdateFlowStepInputIds,
     node_id,
     workflow_id,
+    workflow_index,
     flow_id,
     id,
     input_ids_by_node_id,
@@ -230,6 +205,7 @@ partial_flow_step!(
     UpdateFlowStepOutputIds,
     node_id,
     workflow_id,
+    workflow_index,
     flow_id,
     id,
     output_ids_by_node_id,
@@ -241,6 +217,7 @@ partial_flow_step!(
     UpdateFlowStepNodeIds,
     node_id,
     workflow_id,
+    workflow_index,
     flow_id,
     id,
     node_ids,
@@ -253,9 +230,9 @@ impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.as_native().find_by_primary_key(session).await?;
 
-        flow_step.delete_outputs_from_non_existent_nodes(session).await?;
+        flow_step.delete_outputs_from_removed_nodes(session).await?;
 
-        flow_step.disassociate_inputs_from_non_existent_nodes(session).await?;
+        flow_step.remove_inputs_from_removed_nodes(session).await?;
 
         Ok(())
     }
@@ -265,6 +242,7 @@ partial_flow_step!(
     FlowStepDescription,
     node_id,
     workflow_id,
+    workflow_index,
     id,
     description,
     description_markdown,
@@ -272,4 +250,4 @@ partial_flow_step!(
 );
 sanitize_description_cb!(FlowStepDescription);
 
-partial_flow_step!(FlowStepDelete, node_id, workflow_id, id);
+partial_flow_step!(FlowStepDelete, node_id, workflow_id, workflow_index, id);

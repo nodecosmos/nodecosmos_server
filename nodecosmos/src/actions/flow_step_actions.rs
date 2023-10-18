@@ -89,7 +89,7 @@ pub async fn update_flow_step_description(
     })))
 }
 
-#[delete("{nodeId}/{workflowId}/{flowId}/{id}")]
+#[delete("{nodeId}/{workflowId}/{workflowIndex}/{id}")]
 pub async fn delete_flow_step(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,

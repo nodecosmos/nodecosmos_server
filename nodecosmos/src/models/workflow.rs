@@ -7,7 +7,6 @@ use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::errors::CharybdisError;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::execute;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -63,38 +62,19 @@ pub struct Workflow {
 
 impl Workflow {
     pub async fn append_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
-        execute(
-            session,
-            Workflow::PUSH_TO_FLOW_IDS_QUERY,
-            (vec![flow_id], self.node_id, self.id),
-        )
-        .await?;
+        self.push_to_flow_ids(session, &vec![flow_id]).await?;
 
         Ok(())
     }
 
     pub async fn pull_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
-        execute(
-            session,
-            Workflow::PULL_FROM_FLOW_IDS_QUERY,
-            (vec![flow_id], self.node_id, self.id),
-        )
-        .await?;
+        self.pull_from_flow_ids(session, &vec![flow_id]).await?;
 
         Ok(())
     }
 
-    pub async fn pull_initial_input_id(
-        &mut self,
-        session: &CachingSession,
-        initial_input_id: Uuid,
-    ) -> Result<(), CharybdisError> {
-        execute(
-            session,
-            Workflow::PULL_FROM_INITIAL_INPUT_IDS_QUERY,
-            (vec![initial_input_id], self.node_id, self.id),
-        )
-        .await?;
+    pub async fn pull_initial_input_id(&mut self, session: &CachingSession, id: Uuid) -> Result<(), CharybdisError> {
+        self.pull_from_initial_input_ids(session, &vec![id]).await?;
 
         Ok(())
     }

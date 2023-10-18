@@ -9,8 +9,8 @@ pub fn update_model_query_rule(args: &CharybdisArgs, struct_name: &Ident) -> Tok
     let primary_key = args.get_primary_key();
 
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
-    let macro_name_str: String = format!("update_{}_query", struct_name_str);
-    let macro_name: TokenStream = parse_str::<TokenStream>(&macro_name_str).unwrap();
+    let macro_name_str = format!("update_{}_query", struct_name_str);
+    let macro_name = parse_str::<TokenStream>(&macro_name_str).unwrap();
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
     let update = format!("UPDATE {} SET ", table_name);

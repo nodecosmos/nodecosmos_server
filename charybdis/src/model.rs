@@ -129,7 +129,7 @@ pub trait TableOptions {
 ///     username: "updated_username".to_string(),
 /// };
 ///
-/// let native_user = user.as_native().find_by_primary_key(&session).await.unwrap();
+/// let native_user = user.as_native().find_by_primary_key(&session).await?;
 ///
 /// // action that requires native model
 /// authorize_user(&native_user);

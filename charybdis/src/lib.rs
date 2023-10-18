@@ -24,7 +24,7 @@ pub use scylla::{
     cql_to_rust::{FromCqlVal, FromRow, FromRowError},
     frame::{
         response::result::Row,
-        value::{SerializedResult, SerializedValues, ValueList},
+        value::{SerializedResult, SerializedValues, Value, ValueList},
     },
     query::Query,
     transport::{errors::QueryError, session::TypedRowIter},

@@ -7,7 +7,9 @@ use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
-use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Frozen, Int, List, Text, Timestamp, Uuid};
+use futures::TryStreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +17,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [node_id],
-    clustering_keys = [workflow_id, id],
+    clustering_keys = [workflow_id, workflow_index, id],
     secondary_indexes = [original_id, id]
 )]
 #[derive(Serialize, Deserialize, Default)]
@@ -26,15 +28,19 @@ pub struct InputOutput {
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
 
+    #[serde(rename = "workflowIndex")]
+    pub workflow_index: Int,
+
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
     #[serde(rename = "rootNodeId")]
-    pub root_node_id: Uuid,
+    pub root_node_id: Option<Uuid>,
 
     #[serde(rename = "originalId")]
     pub original_id: Option<Uuid>,
 
+    /// outputted by flow step
     #[serde(rename = "flowStepId")]
     pub flow_step_id: Option<Uuid>,
 
@@ -60,7 +66,7 @@ pub struct InputOutput {
 }
 
 impl InputOutput {
-    async fn ios_by_original_id(
+    pub async fn ios_by_original_id(
         session: &CachingSession,
         original_id: Uuid,
     ) -> Result<Vec<InputOutput>, NodecosmosError> {
@@ -92,6 +98,7 @@ impl InputOutput {
         let mut flow_step = FlowStep::new();
         flow_step.node_id = self.node_id;
         flow_step.workflow_id = self.workflow_id;
+        flow_step.workflow_index = self.workflow_index;
         flow_step.id = self.flow_step_id.unwrap_or_default();
 
         let fs = flow_step.find_by_primary_key(session).await?;
@@ -99,32 +106,14 @@ impl InputOutput {
         Ok(Some(fs))
     }
 
-    async fn next_flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
-        let flow_step = self.flow_step(session).await?;
+    async fn next_flow_steps(
+        &self,
+        session: &CachingSession,
+    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
+        let next_wf_idx = self.workflow_index + 1;
+        let workflow = self.workflow(session).await?;
 
-        if let Some(fs) = flow_step {
-            let flow = fs.flow(session).await?;
-            let flow_step_ids = flow.step_ids.unwrap_or_default();
-            let flow_step_index = flow_step_ids.iter().position(|&x| x == fs.id);
-
-            if let Some(idx) = flow_step_index {
-                let next_idx = idx + 1;
-                let next_flow_step_id = flow_step_ids.get(next_idx);
-
-                if let Some(id) = next_flow_step_id {
-                    let mut next_flow_step = FlowStep::new();
-                    next_flow_step.node_id = self.node_id;
-                    next_flow_step.workflow_id = self.workflow_id;
-                    next_flow_step.id = *id;
-
-                    let next_fs = next_flow_step.find_by_primary_key(session).await?;
-
-                    return Ok(Some(next_fs));
-                }
-            }
-        }
-
-        Ok(None)
+        FlowStep::flow_steps_by_workflow_index(session, &workflow, next_wf_idx).await
     }
 }
 
@@ -137,8 +126,7 @@ impl Callbacks<NodecosmosError> for InputOutput {
         self.updated_at = Some(now);
 
         if let Some(original_id) = self.original_id {
-            let original_io =
-                InputOutput::find_one(session, find_input_output_query!("id = ?"), (original_id,)).await?;
+            let original_io = find_one_input_output!(session, "id = ?", (original_id,)).await?;
 
             self.title = original_io.title;
             self.unit = original_io.unit;
@@ -169,10 +157,10 @@ impl Callbacks<NodecosmosError> for InputOutput {
             fs.pull_output_id(session, self.id).await?;
         }
 
-        let next_flow_step = self.next_flow_step(session).await?;
+        let mut next_flow_steps = self.next_flow_steps(session).await?;
 
-        if let Some(mut next_fs) = next_flow_step {
-            next_fs.pull_input_id(session, self.id).await?;
+        while let Some(mut fs) = next_flow_steps.try_next().await? {
+            fs.pull_input_id(session, self.id).await?;
         }
 
         Ok(())
@@ -183,6 +171,7 @@ partial_input_output!(
     IoDescription,
     node_id,
     workflow_id,
+    workflow_index,
     id,
     original_id,
     description,
@@ -222,7 +211,17 @@ impl Callbacks<NodecosmosError> for IoDescription {
     }
 }
 
-partial_input_output!(IoTitle, node_id, workflow_id, id, original_id, title, updated_at);
+partial_input_output!(
+    IoTitle,
+    node_id,
+    workflow_id,
+    workflow_index,
+    id,
+    original_id,
+    title,
+    updated_at
+);
+
 impl Callbacks<NodecosmosError> for IoTitle {
     updated_at_cb_fn!();
 
@@ -253,4 +252,4 @@ impl Callbacks<NodecosmosError> for IoTitle {
     }
 }
 
-partial_input_output!(IoDelete, node_id, workflow_id, id);
+partial_input_output!(IoDelete, node_id, workflow_id, workflow_index, id);

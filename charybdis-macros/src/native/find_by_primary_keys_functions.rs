@@ -1,8 +1,8 @@
 use crate::helpers::comma_sep_cols;
 use charybdis_parser::CharybdisArgs;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse_str, FieldsNamed};
+use quote::quote;
+use syn::{parse_str, FieldsNamed, GenericArgument, PathArguments, Type};
 
 const MAX_FIND_BY_FUNCTIONS: usize = 3;
 
@@ -57,11 +57,17 @@ pub(crate) fn find_by_primary_keys_functions(
                     .named
                     .iter()
                     .find(|field| field.ident.as_ref().unwrap() == key)
-                    .unwrap()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Key {} not found in struct {}. Partial models need to have complete primary key!",
+                            key, struct_name
+                        )
+                    })
                     .ty
                     .clone();
 
-                parse_str::<syn::FnArg>(&format!("{}: {}", key, key_type.to_token_stream())).unwrap()
+                let type_wo_options = type_without_options(&key_type);
+                parse_str::<syn::FnArg>(&format!("{}: {}", key, type_wo_options)).unwrap()
             })
             .collect::<Vec<syn::FnArg>>();
 
@@ -98,4 +104,25 @@ pub(crate) fn find_by_primary_keys_functions(
     }
 
     generated
+}
+
+fn type_without_options(o_type: &Type) -> TokenStream {
+    let mut type_name = quote::quote! { #o_type };
+
+    match o_type {
+        Type::Path(type_path) => {
+            let first_segment = &type_path.path.segments[0];
+            if first_segment.ident == "Option" {
+                if let PathArguments::AngleBracketed(angle_bracketed_args) = &first_segment.arguments {
+                    if let Some(GenericArgument::Type(inner_type)) = angle_bracketed_args.args.first() {
+                        // Return the inner type of Option<T>
+                        type_name = quote::quote! { #inner_type };
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    type_name
 }

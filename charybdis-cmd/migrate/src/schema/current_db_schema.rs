@@ -30,9 +30,7 @@ impl CurrentDbSchema {
 
         current_schema.get_tables_from_system_schema(session).await?;
         current_schema.get_udts_from_system_schema(session).await?;
-        current_schema
-            .get_materialized_views_from_system_schema(session)
-            .await?;
+        current_schema.get_mvs_from_system_schema(session).await?;
 
         Ok(current_schema)
     }
@@ -212,7 +210,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn get_materialized_views_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
+    async fn get_mvs_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
         // get tables as a HashMap of column_name => column_type
         let cql = r#"
             SELECT view_name
@@ -223,21 +221,15 @@ impl CurrentDbSchema {
             for row in rows {
                 let view_name: (String,) = row.into_typed::<(String,)>()?;
                 self.materialized_views.insert(view_name.0.clone(), SchemaObject::new());
-                self.populate_materialized_view_columns(&view_name.0, session).await?;
-                self.populate_materialized_view_partition_key(&view_name.0, session)
-                    .await?;
-                self.populate_materialized_view_clustering_keys(&view_name.0, session)
-                    .await?;
+                self.populate_mv_columns(&view_name.0, session).await?;
+                self.populate_mv_partition_key(&view_name.0, session).await?;
+                self.populate_mv_clustering_keys(&view_name.0, session).await?;
             }
         }
         Ok(())
     }
 
-    async fn populate_materialized_view_columns(
-        &mut self,
-        view_name: &String,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn populate_mv_columns(&mut self, view_name: &String, session: &Session) -> Result<(), CharybdisError> {
         // get columns and types for views
         let cql = r#"
             SELECT column_name, type
@@ -259,11 +251,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn populate_materialized_view_partition_key(
-        &mut self,
-        view_name: &String,
-        session: &Session,
-    ) -> Result<(), CharybdisError> {
+    async fn populate_mv_partition_key(&mut self, view_name: &String, session: &Session) -> Result<(), CharybdisError> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -286,7 +274,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn populate_materialized_view_clustering_keys(
+    async fn populate_mv_clustering_keys(
         &mut self,
         view_name: &String,
         session: &Session,

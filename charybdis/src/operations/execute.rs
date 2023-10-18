@@ -1,5 +1,5 @@
 use crate::errors::CharybdisError;
-use scylla::_macro_internal::ValueList;
+use crate::ValueList;
 use scylla::query::Query;
 use scylla::{CachingSession, QueryResult};
 

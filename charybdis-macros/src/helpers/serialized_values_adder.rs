@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use syn::parse_str;
 
-pub(crate) fn serialized_values_fields_adder(fields: Vec<String>) -> TokenStream {
+pub(crate) fn serialized_field_value_adder(fields: Vec<String>) -> TokenStream {
     let fields_str: String = fields
         .iter()
         .map(|key| format!("serialized.add_value(&self.{})?;", key))

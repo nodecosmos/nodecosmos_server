@@ -1,5 +1,4 @@
-use crate::migration_unit::fields::MigrationUnitFields;
-use crate::migration_unit::{MigrationObjectType, MigrationUnit, MigrationUnitData};
+use crate::migration_unit::{MigrationObjectType, MigrationUnitData};
 use crate::schema::SchemaObjectTrait;
 use colored::*;
 use regex::Regex;
@@ -9,18 +8,13 @@ use strip_ansi_escapes::strip;
 pub(crate) const INDEX_SUFFIX: &str = "idx";
 
 pub(crate) struct MigrationUnitRunner<'a> {
-    data: &'a MigrationUnitData<'a>,
-    fields: &'a MigrationUnitFields<'a>,
     session: &'a Session,
+    data: &'a MigrationUnitData<'a>,
 }
 
 impl<'a> MigrationUnitRunner<'a> {
-    pub fn new(unit: &'a MigrationUnit<'a>) -> Self {
-        Self {
-            data: &unit.data,
-            fields: &unit.fields,
-            session: unit.session,
-        }
+    pub fn new(session: &'a Session, data: &'a MigrationUnitData) -> Self {
+        Self { session, data }
     }
 
     async fn execute(&self, cql: &String) {
@@ -139,7 +133,7 @@ impl<'a> MigrationUnitRunner<'a> {
 
     async fn run_table_field_added_migration(&self) {
         let add_fields_clause = self
-            .fields
+            .data
             .new_fields
             .iter()
             .map(|(field_name, field_type)| format!("{} {}", field_name, field_type))
@@ -155,7 +149,7 @@ impl<'a> MigrationUnitRunner<'a> {
     }
 
     async fn run_udt_field_added_migration(&self) {
-        for (field_name, field_type) in self.fields.new_fields.iter() {
+        for (field_name, field_type) in self.data.new_fields.iter() {
             let cql = format!(
                 "ALTER TYPE {} ADD {} {}",
                 self.data.migration_object_name, field_name, field_type
@@ -173,7 +167,7 @@ impl<'a> MigrationUnitRunner<'a> {
             self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        let removed_fields = self.fields.removed_fields.join(", ");
+        let removed_fields = self.data.removed_fields.join(", ");
 
         let cql = format!(
             "ALTER {} {} DROP ({})",
@@ -193,8 +187,8 @@ impl<'a> MigrationUnitRunner<'a> {
             self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        for column_name in &self.fields.new_secondary_indexes {
-            let index_name: String = self.fields.construct_index_name(&column_name);
+        for column_name in &self.data.new_secondary_indexes {
+            let index_name: String = self.data.construct_index_name(&column_name);
 
             let cql = format!(
                 "CREATE INDEX IF NOT EXISTS {} ON {} ({})",
@@ -213,7 +207,7 @@ impl<'a> MigrationUnitRunner<'a> {
             self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        for index in &self.fields.removed_secondary_indexes {
+        for index in &self.data.removed_secondary_indexes {
             let cql = format!("DROP INDEX {}", index,);
 
             self.execute(&cql).await;

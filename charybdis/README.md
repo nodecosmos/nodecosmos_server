@@ -202,7 +202,7 @@ find_by_primary_key_val `associated fun`, as it will automatically provide corre
 based on primary key definition.
 ```rust
   let user = User {id, ..Default::default()};
-  let user: User = user.find_by_primary_key(&session).await.unwrap();
+  let user: User = user.find_by_primary_key(&session).await?;
 ```
 `find_by_partition_key`
 ```rust
@@ -317,10 +317,10 @@ partial_user.update(&session).await;
 partial_user.delete(&session).await;
 
 // get partial PartUser
-let partial_user = partial_user.find_by_primary_key(&:session).await.unwrap();
+let partial_user = partial_user.find_by_primary_key(&:session).await?;
 
 // get native user model by primary key
-let user = partial_user.as_native().find_by_primary_key(&session).await.unwrap();
+let user = partial_user.as_native().find_by_primary_key(&session).await?;
 ```
 
 Note that if you have custom attributes on model fields,

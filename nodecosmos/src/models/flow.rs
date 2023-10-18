@@ -5,7 +5,7 @@ use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::errors::CharybdisError;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{execute, Delete, New};
+use charybdis::operations::{Delete, New};
 use charybdis::types::{Int, List, Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
     table_name = flows,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, id],
-    secondary_indexes = [id]
+    secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Flow {
@@ -58,23 +58,13 @@ impl Flow {
     }
 
     pub async fn append_step(&mut self, session: &CachingSession, step_id: Uuid) -> Result<(), CharybdisError> {
-        execute(
-            session,
-            Flow::PUSH_TO_STEP_IDS_QUERY,
-            (vec![step_id], self.node_id, self.workflow_id, self.id),
-        )
-        .await?;
+        self.push_to_step_ids(session, &vec![step_id]).await?;
 
         Ok(())
     }
 
     pub async fn remove_step(&mut self, session: &CachingSession, step_id: Uuid) -> Result<(), CharybdisError> {
-        execute(
-            session,
-            Flow::PULL_FROM_STEP_IDS_QUERY,
-            (vec![step_id], self.node_id, self.workflow_id, self.id),
-        )
-        .await?;
+        self.pull_from_step_ids(session, &vec![step_id]).await?;
 
         Ok(())
     }
