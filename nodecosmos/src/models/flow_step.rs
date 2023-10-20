@@ -21,10 +21,9 @@ use serde::{Deserialize, Serialize};
     partition_keys = [node_id],
     clustering_keys = [workflow_id, workflow_index, id],
     global_secondary_indexes = [],
-    local_secondary_indexes = [{
-      "pk": ["node_id"],
-      "ck": ["id"]
-    }]
+    local_secondary_indexes = [
+        ([node_id], [id])
+    ]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct FlowStep {

@@ -159,10 +159,31 @@ If structure is matched, it will not run any migrations. As mentioned above,
 in case there is no model definition for table, it will **not** drop it. In future, 
 we will add `modelize` command that will generate `src/models` files from existing data source.
 
-⚠️ For secondary indexes, charybids lib uses its own naming convention, where each global
-secondary index is prefixed with `global_` and each local secondary index is prefixed with `local_`.
-if you don't provide these values, automatic migration tool will not try to change them.
-However, if you provide secondary index definition, it will try match code definition with database definition.
+#### Global secondary indexes
+They are simply defined as are array of strings:
+```rust
+#[charybdis_model(
+    table_name = users,
+    partition_keys = [id],
+    clustering_keys = [],
+    global_secondary_indexes = ["email"]
+)]
+```
+#### Local secondary Indexes
+
+They are defined as array of tuples
+- first element is array of partition keys
+- second element is array of clustering keys
+```rust
+#[charybdis_model(
+    table_name = menus,
+    partition_keys = [location],
+    clustering_keys = [name, price, dish_type],
+    global_secondary_indexes = [],
+    local_secondary_indexes = [([location], [dish_type])]
+)]
+```
+resulting query will be: `CREATE INDEX ON menus((location), dish_type);`
 
 ## Basic Operations:
 For each operation you need to bring respective trait into scope. They are defined

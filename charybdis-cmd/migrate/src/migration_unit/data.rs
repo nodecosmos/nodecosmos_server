@@ -144,11 +144,11 @@ impl<'a> MigrationUnitData<'a> {
     }
 
     fn fetch_new_global_secondary_indexes(&mut self) {
-        &self
+        let _ = &self
             .current_code_schema
             .global_secondary_indexes
             .iter()
-            .for_each(|(index_name, index_target)| {
+            .for_each(|(_index_name, index_target)| {
                 if !self
                     .current_db_schema
                     .global_secondary_indexes
@@ -161,7 +161,7 @@ impl<'a> MigrationUnitData<'a> {
     }
 
     fn fetch_removed_global_secondary_indexes(&mut self) {
-        &self
+        let _ = &self
             .current_db_schema
             .global_secondary_indexes
             .iter()
@@ -170,7 +170,7 @@ impl<'a> MigrationUnitData<'a> {
                     .current_code_schema
                     .global_secondary_indexes
                     .iter()
-                    .any(|(index_name, target)| target == index_target)
+                    .any(|(_index_name, target)| target == index_target)
                 {
                     self.removed_global_secondary_indexes.push(index_name.clone());
                 }
@@ -178,11 +178,11 @@ impl<'a> MigrationUnitData<'a> {
     }
 
     fn fetch_new_local_secondary_indexes(&mut self) {
-        &self
+        let _ = &self
             .current_code_schema
             .local_secondary_indexes
             .iter()
-            .for_each(|(index_name, index_target)| {
+            .for_each(|(_index_name, index_target)| {
                 if !self
                     .current_db_schema
                     .local_secondary_indexes
@@ -195,7 +195,7 @@ impl<'a> MigrationUnitData<'a> {
     }
 
     fn fetch_removed_local_secondary_indexes(&mut self) {
-        &self
+        let _ = &self
             .current_db_schema
             .local_secondary_indexes
             .iter()
@@ -204,7 +204,7 @@ impl<'a> MigrationUnitData<'a> {
                     .current_code_schema
                     .local_secondary_indexes
                     .iter()
-                    .any(|(index_name, target)| target == index_target)
+                    .any(|(_index_name, target)| target == index_target)
                 {
                     self.removed_local_secondary_indexes.push(index_name.clone());
                 }

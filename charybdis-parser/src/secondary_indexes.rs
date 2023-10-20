@@ -29,9 +29,19 @@ impl FromCqlVal<CqlValue> for IndexTarget {
                 let target_value = map[0].1.clone();
                 let target_val_string = target_value.into_string().unwrap();
 
-                let parsed: IndexTarget = serde_json::from_str(&target_val_string).unwrap();
+                if target_val_string.starts_with('{') {
+                    println!("target_val_string: {}", target_val_string);
 
-                return Ok(parsed);
+                    let parsed: LocalIndexTarget = serde_json::from_str(&target_val_string).unwrap();
+
+                    return Ok(IndexTarget {
+                        target: Target::LocalIndexTarget(parsed),
+                    });
+                }
+
+                return Ok(IndexTarget {
+                    target: Target::GlobalSecondaryIndex(target_val_string),
+                });
             }
             _ => Err(FromCqlValError::BadVal),
         }
