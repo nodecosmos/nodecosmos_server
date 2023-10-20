@@ -57,8 +57,13 @@ impl<'a> MigrationUnitRunner<'a> {
                 } else {
                     "".to_string()
                 };
-                let table_options = self.data.current_code_schema.table_options.clone();
-                let table_options_clause = table_options.unwrap_or_default().to_string();
+
+                let table_options = &self.data.current_code_schema.table_options;
+                let mut table_options_clause = String::new();
+
+                if let Some(table_options) = table_options {
+                    table_options_clause = format!("WITH {}", table_options);
+                }
 
                 let cql = format!(
                     "CREATE TABLE IF NOT EXISTS {}\n(\n{}, \n    PRIMARY KEY (({}) {})\n) \n {}",
@@ -74,8 +79,13 @@ impl<'a> MigrationUnitRunner<'a> {
             MigrationObjectType::MaterializedView => {
                 let mut primary_key = self.data.current_code_schema.partition_keys.clone();
                 primary_key.append(&mut self.data.current_code_schema.clustering_keys.clone());
-                let table_options = self.data.current_code_schema.table_options.clone();
-                let table_options_clause = table_options.unwrap_or_default().to_string();
+
+                let table_options = &self.data.current_code_schema.table_options;
+                let mut table_options_clause = String::new();
+
+                if let Some(table_options) = table_options {
+                    table_options_clause = format!("WITH {}", table_options);
+                }
 
                 let materialized_view_where_clause = format!(
                     "WHERE {}",
@@ -179,7 +189,7 @@ impl<'a> MigrationUnitRunner<'a> {
         self.execute(&cql).await;
     }
 
-    pub(crate) async fn run_index_added_migration(&self) {
+    pub(crate) async fn run_global_index_added_migration(&self) {
         println!(
             "\n{} {} {}",
             "Detected new indexes in ".bright_cyan(),
@@ -187,7 +197,7 @@ impl<'a> MigrationUnitRunner<'a> {
             self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        for column_name in &self.data.new_secondary_indexes {
+        for column_name in &self.data.new_global_secondary_indexes {
             let index_name: String = self.data.construct_index_name(&column_name);
 
             let cql = format!(
@@ -199,7 +209,7 @@ impl<'a> MigrationUnitRunner<'a> {
         }
     }
 
-    pub(crate) async fn run_index_removed_migration(&self) {
+    pub(crate) async fn run_global_index_removed_migration(&self) {
         println!(
             "\n{} {} {}",
             "Detected removed indexes for ".bright_cyan(),
@@ -207,7 +217,48 @@ impl<'a> MigrationUnitRunner<'a> {
             self.data.migration_object_type.to_string().bright_yellow()
         );
 
-        for index in &self.data.removed_secondary_indexes {
+        for index in &self.data.removed_global_secondary_indexes {
+            let cql = format!("DROP INDEX {}", index,);
+
+            self.execute(&cql).await;
+        }
+    }
+
+    pub(crate) async fn run_local_index_added_migration(&self) {
+        println!(
+            "\n{} {} {}",
+            "Detected new local indexes in ".bright_cyan(),
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
+        );
+
+        for local_secondary_index in &self.data.new_local_secondary_indexes {
+            let mut idx_name = local_secondary_index.pk.join("_");
+            idx_name.push_str("_");
+            idx_name.push_str(&local_secondary_index.ck.join("_"));
+
+            let index_name: String = self.data.construct_index_name(&idx_name);
+
+            let pks = local_secondary_index.pk.join(", ");
+            let cks = local_secondary_index.ck.join(", ");
+            let cql = format!(
+                "CREATE INDEX IF NOT EXISTS {} ON {} (({}), {})",
+                index_name, self.data.migration_object_name, pks, cks,
+            );
+
+            self.execute(&cql).await;
+        }
+    }
+
+    pub(crate) async fn run_local_index_removed_migration(&self) {
+        println!(
+            "\n{} {} {}",
+            "Detected removed local indexes for ".bright_cyan(),
+            self.data.migration_object_name.bright_yellow(),
+            self.data.migration_object_type.to_string().bright_yellow()
+        );
+
+        for index in &self.data.removed_local_secondary_indexes {
             let cql = format!("DROP INDEX {}", index,);
 
             self.execute(&cql).await;

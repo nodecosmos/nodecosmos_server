@@ -54,7 +54,7 @@ Declare model as a struct within `src/models` dir:
     table_name = users,
     partition_keys = [id],
     clustering_keys = [],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 pub struct User {
     pub id: Uuid,
@@ -131,7 +131,8 @@ It supports following operations:
         table_name = commits,
         partition_keys = [object_id],
         clustering_keys = [created_at, id],
-        secondary_indexes = [],
+        global_secondary_indexes = [],
+        local_secondary_indexes = [],
         table_options = #r"
             WITH CLUSTERING ORDER BY (created_at DESC) 
             AND gc_grace_seconds = 86400
@@ -157,6 +158,11 @@ clustering keys and secondary indexes so you don't alter structure accidentally.
 If structure is matched, it will not run any migrations. As mentioned above, 
 in case there is no model definition for table, it will **not** drop it. In future, 
 we will add `modelize` command that will generate `src/models` files from existing data source.
+
+⚠️ For secondary indexes, charybids lib uses its own naming convention, where each global
+secondary index is prefixed with `global_` and each local secondary index is prefixed with `local_`.
+if you don't provide these values, automatic migration tool will not try to change them.
+However, if you provide secondary index definition, it will try match code definition with database definition.
 
 ## Basic Operations:
 For each operation you need to bring respective trait into scope. They are defined
@@ -216,7 +222,7 @@ Let's say we have a model:
     table_name = posts, 
     partition_keys = [date], 
     clustering_keys = [category_id, title],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 pub struct Post {...}
 ```
@@ -257,7 +263,7 @@ Lets say we have model:
     table_name = posts,
     partition_keys = [date],
     clustering_keys = [categogry_id, title, id],
-    secondary_indexes = [])
+    global_secondary_indexes = [])
 ]
 pub struct Post {
     date: Date,
@@ -331,7 +337,7 @@ they will be automatically added to partial fields.
     table_name = nodes,
     partition_keys = [root_id],
     clustering_keys = [id],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Node {
@@ -375,7 +381,7 @@ use charybdis::*;
     table_name = organizations, 
     partition_keys = [id], 
     clustering_keys = [],
-    secondary_indexes = [name]
+    global_secondary_indexes = [name]
 )]
 pub struct Organization {
     ...
@@ -506,10 +512,11 @@ authorize_user(&native_user);
 For other fields it uses default values.
 
 ## Collection queries
-For every field that is defined with `List<T> `type or `Set<T>`, we have macro generated queries:
+For every field that is defined with `List<T> `type or `Set<T>`, we get following operations:
 - `PUSH_TO_<field_name>_QUERY`
 - `PULL_FROM_<field_name>_QUERY`
-that can be used to push or pull elements from collection.
+- `push_to_<field_name>` method
+- `pull_from_<field_name>` method
 
 ```rust
 pub struct User {
@@ -524,6 +531,14 @@ execute(query, (vec![tag], &user.id)).await;
 let query = User::PULL_FROM_POST_IDS_QUERY;
 execute(query, (post_ids_vec, &user.id)).await;
 ```
+
+Methods take session and value as arguments:
+```rust
+let user = User::from_json(json);
+user.push_to_tags(&session, vec![tag]).await;
+user.pull_from_post_ids(&session, post_ids_vec).await;
+```
+
 
 ## Roadmap:
 - [ ] Add tests

@@ -5,12 +5,14 @@ use crate::models::helpers::{
 };
 use crate::models::input_output::InputOutput;
 use crate::models::workflow::Workflow;
+use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithCallbacks, Find, New, UpdateWithCallbacks};
+use charybdis::operations::{Find, New, UpdateWithCallbacks};
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Frozen, Int, List, Map, Text, Timestamp, Uuid};
+use futures::TryStreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +20,11 @@ use serde::{Deserialize, Serialize};
     table_name = flow_steps,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, workflow_index, id],
-    secondary_indexes = []
+    global_secondary_indexes = [],
+    local_secondary_indexes = [{
+      "pk": ["node_id"],
+      "ck": ["id"]
+    }]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct FlowStep {
@@ -97,9 +103,8 @@ impl FlowStep {
 
     async fn delete_fs_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id.clone() {
-            for (_, output_ids) in output_ids_by_node_id.iter() {
-                self.delete_outputs_by_ids(session, output_ids).await?;
-            }
+            let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
+            self.delete_outputs_by_ids(session, &output_ids).await?;
         }
 
         Ok(())
@@ -143,6 +148,8 @@ impl FlowStep {
     }
 
     async fn delete_outputs_by_ids(&self, session: &CachingSession, ids: &Vec<Uuid>) -> Result<(), NodecosmosError> {
+        let mut batch = CharybdisModelBatch::new();
+
         for output_id in ids.iter() {
             let mut output = InputOutput::new();
 
@@ -151,7 +158,31 @@ impl FlowStep {
             output.flow_step_id = Some(self.id);
             output.id = *output_id;
 
-            output.delete_cb(session).await?;
+            batch.append_delete(&output)?;
+        }
+
+        batch.execute(session).await?;
+
+        Ok(())
+    }
+
+    async fn disassociate_outputs_from_subsequent_step(
+        &self,
+        session: &CachingSession,
+        output_ids: &Vec<Uuid>,
+    ) -> Result<(), NodecosmosError> {
+        let mut next_flow_steps = FlowStep::find_by_node_id_and_workflow_id_and_workflow_index(
+            session,
+            self.node_id,
+            self.workflow_id,
+            self.workflow_index + 1,
+        )
+        .await?;
+
+        while let Some(mut fs) = next_flow_steps.try_next().await? {
+            for output_id in output_ids.iter() {
+                fs.pull_input_id(session, *output_id).await?;
+            }
         }
 
         Ok(())
@@ -175,7 +206,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow = Flow::new();
 
         flow.node_id = self.node_id;
@@ -190,7 +221,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
 }
 
 partial_flow_step!(
-    UpdateFlowStepInputIds,
+    UpdateInputIdsFlowStep,
     node_id,
     workflow_id,
     workflow_index,
@@ -199,10 +230,10 @@ partial_flow_step!(
     input_ids_by_node_id,
     updated_at
 );
-impl_updated_at_cb!(UpdateFlowStepInputIds);
+impl_updated_at_cb!(UpdateInputIdsFlowStep);
 
 partial_flow_step!(
-    UpdateFlowStepOutputIds,
+    UpdateOutputIdsFlowStep,
     node_id,
     workflow_id,
     workflow_index,
@@ -211,7 +242,7 @@ partial_flow_step!(
     output_ids_by_node_id,
     updated_at
 );
-impl_updated_at_cb!(UpdateFlowStepOutputIds);
+impl_updated_at_cb!(UpdateOutputIdsFlowStep);
 
 partial_flow_step!(
     UpdateFlowStepNodeIds,
@@ -239,7 +270,7 @@ impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
 }
 
 partial_flow_step!(
-    FlowStepDescription,
+    UpdateDescriptionFlowStep,
     node_id,
     workflow_id,
     workflow_index,
@@ -248,6 +279,8 @@ partial_flow_step!(
     description_markdown,
     updated_at
 );
-sanitize_description_cb!(FlowStepDescription);
+sanitize_description_cb!(UpdateDescriptionFlowStep);
 
-partial_flow_step!(FlowStepDelete, node_id, workflow_id, workflow_index, id);
+partial_flow_step!(UpdateWorkflowIndexFlowStep, node_id, workflow_id, workflow_index, id);
+
+partial_flow_step!(DeleteFlowStep, node_id, workflow_id, workflow_index, id);

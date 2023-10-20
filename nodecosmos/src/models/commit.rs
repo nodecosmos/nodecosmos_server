@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
     table_name = commits,
     partition_keys = [contribution_request_id],
     clustering_keys = [created_at, id],
-    secondary_indexes = [],
+    global_secondary_indexes = [],
     table_options = r#"
         CLUSTERING ORDER BY (created_at DESC)
     "#

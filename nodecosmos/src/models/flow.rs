@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
     table_name = flows,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, id],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Flow {

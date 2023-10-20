@@ -40,8 +40,12 @@ impl<'a> MigrationUnit<'a> {
         if self.data.is_first_migration() {
             self.runner.run_first_migration().await;
 
-            if self.data.has_new_secondary_indexes() {
-                self.runner.run_index_added_migration().await;
+            if self.data.has_new_global_secondary_indexes() {
+                self.runner.run_global_index_added_migration().await;
+            }
+
+            if self.data.has_new_local_secondary_indexes() {
+                self.runner.run_local_index_added_migration().await;
             }
 
             return;
@@ -71,14 +75,24 @@ impl<'a> MigrationUnit<'a> {
         }
 
         if self.data.migration_object_type != MigrationObjectType::Udt {
-            if self.data.has_new_secondary_indexes() {
+            if self.data.has_new_global_secondary_indexes() {
                 is_any_field_changed = true;
-                self.runner.run_index_added_migration().await;
+                self.runner.run_global_index_added_migration().await;
             }
 
-            if self.data.has_removed_secondary_indexes() {
+            if self.data.has_new_local_secondary_indexes() {
                 is_any_field_changed = true;
-                self.runner.run_index_removed_migration().await;
+                self.runner.run_local_index_added_migration().await;
+            }
+
+            if self.data.has_removed_global_secondary_indexes() {
+                is_any_field_changed = true;
+                self.runner.run_global_index_removed_migration().await;
+            }
+
+            if self.data.has_removed_local_secondary_indexes() {
+                is_any_field_changed = true;
+                self.runner.run_local_index_removed_migration().await;
             }
         }
 

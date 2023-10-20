@@ -1,5 +1,6 @@
 use crate::schema::{SchemaObject, SchemaObjects};
 use charybdis::errors::CharybdisError;
+use charybdis_parser::{IndexTarget, Target};
 use scylla::Session;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
@@ -157,7 +158,7 @@ impl CurrentDbSchema {
     ) -> Result<(), CharybdisError> {
         // get partition keys for provided table
         let cql = r#"
-            SELECT index_name
+            SELECT index_name, options
             FROM system_schema.indexes
             WHERE keyspace_name = ?
             AND table_name = ?
@@ -169,12 +170,20 @@ impl CurrentDbSchema {
             .rows
         {
             for row in rows {
-                let str_value: (String,) = row.into_typed::<(String,)>()?;
-                self.tables
-                    .get_mut(table_name)
-                    .unwrap()
-                    .secondary_indexes
-                    .push(str_value.0);
+                let value: (String, IndexTarget) = row.into_typed()?;
+                let table_schema = self.tables.get_mut(table_name).unwrap();
+
+                let index_name = value.0;
+                let index_target = value.1;
+
+                match index_target.target {
+                    Target::GlobalSecondaryIndex(target) => {
+                        table_schema.global_secondary_indexes.push((index_name, target));
+                    }
+                    Target::LocalIndexTarget(target) => {
+                        table_schema.local_secondary_indexes.push((index_name, target));
+                    }
+                }
             }
         }
 

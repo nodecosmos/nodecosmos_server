@@ -2,7 +2,7 @@ use crate::authorize::{auth_workflow_creation, auth_workflow_update};
 use crate::errors::NodecosmosError;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
-use crate::models::materialized_views::base_ios_by_root_node_id::InputOutputsByRootNodeId;
+use crate::models::materialized_views::input_outputs_by_root_node_id::InputOutputsByRootNodeId;
 use crate::models::user::CurrentUser;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};

@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow::FlowDelete;
-use crate::models::flow_step::FlowStepDelete;
-use crate::models::input_output::IoDelete;
+use crate::models::flow_step::DeleteFlowStep;
+use crate::models::input_output::DeleteInputOutput;
 use crate::models::like::Like;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
@@ -41,6 +41,11 @@ impl<'a> NodeDeleter<'a> {
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
+        self.delete_node_data().await.map_err(|err| {
+            log_error(format!("delete_node_data: {}", err));
+            return err;
+        })?;
+
         self.delete_and_populate_desc_data().await.map_err(|err| {
             log_error(format!("delete_and_populate: {}", err));
             return err;
@@ -57,6 +62,41 @@ impl<'a> NodeDeleter<'a> {
         })?;
 
         self.delete_elastic_data().await;
+
+        Ok(())
+    }
+
+    pub async fn delete_node_data(&mut self) -> Result<(), NodecosmosError> {
+        let mut batch = CharybdisModelBatch::unlogged();
+
+        batch.append_delete_by_partition_key(&WorkflowDelete {
+            node_id: self.node.id,
+            ..Default::default()
+        })?;
+
+        batch.append_delete_by_partition_key(&FlowDelete {
+            node_id: self.node.id,
+            ..Default::default()
+        })?;
+
+        batch.append_delete_by_partition_key(&DeleteFlowStep {
+            node_id: self.node.id,
+            ..Default::default()
+        })?;
+
+        batch.append_delete_by_partition_key(&DeleteInputOutput {
+            node_id: self.node.id,
+            ..Default::default()
+        })?;
+
+        batch.append_delete_by_partition_key(&Like {
+            object_id: self.node.id,
+            ..Default::default()
+        })?;
+
+        batch.append_delete(&DeleteNode { id: self.node.id })?;
+
+        batch.execute(self.db_session).await?;
 
         Ok(())
     }
@@ -86,12 +126,12 @@ impl<'a> NodeDeleter<'a> {
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&FlowStepDelete {
+                batch.append_delete_by_partition_key(&DeleteFlowStep {
                     node_id: descendant.id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&IoDelete {
+                batch.append_delete_by_partition_key(&DeleteInputOutput {
                     node_id: descendant.id,
                     ..Default::default()
                 })?;

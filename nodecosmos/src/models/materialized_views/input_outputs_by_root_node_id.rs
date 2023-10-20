@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
     table_name=input_outputs_by_root_node_id,
     base_table=input_outputs,
     partition_keys=[root_node_id],
-    clustering_keys=[node_id, workflow_index, workflow_id, id]
+    clustering_keys=[node_id, workflow_id, id]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct InputOutputsByRootNodeId {
@@ -15,9 +15,6 @@ pub struct InputOutputsByRootNodeId {
 
     #[serde(rename = "nodeId")]
     pub node_id: Option<Uuid>,
-
-    #[serde(rename = "workflowIndex")]
-    pub workflow_index: Int,
 
     #[serde(rename = "workflowId")]
     pub workflow_id: Option<Uuid>,

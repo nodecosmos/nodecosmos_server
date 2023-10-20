@@ -100,6 +100,14 @@ impl ResourceLocker {
         Ok(res)
     }
 
+    pub async fn check_resource_lock(&self, resource_id: &str) -> Result<(), NodecosmosError> {
+        if self.is_resource_locked(resource_id).await? {
+            return Err(NodecosmosError::ResourceLocked("Resource Locked!".to_string()));
+        }
+
+        Ok(())
+    }
+
     pub async fn check_node_lock(&self, node: &Node) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(&node.root_id.to_string()).await? {
             return Err(NodecosmosError::ResourceLocked(

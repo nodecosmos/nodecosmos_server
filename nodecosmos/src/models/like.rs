@@ -19,7 +19,7 @@ use std::fmt;
     table_name = likes,
     partition_keys = [object_id],
     clustering_keys = [user_id],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Like {

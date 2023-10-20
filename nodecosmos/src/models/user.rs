@@ -18,7 +18,7 @@ const BCRYPT_COST: u32 = 6;
     table_name = users,
     partition_keys = [id],
     clustering_keys = [],
-    secondary_indexes = [username, email],
+    global_secondary_indexes = [username, email],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct User {

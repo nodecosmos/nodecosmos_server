@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::input_output::{InputOutput, IoDescription, IoTitle};
+use crate::models::input_output::{InputOutput, UpdateDescriptionInputOutput, UpdateTitleInputOutput};
 use crate::models::user::CurrentUser;
 
 use crate::authorize::auth_workflow_update;
@@ -33,16 +33,11 @@ pub async fn create_io(
     })))
 }
 
-#[get("/{node_id}/{workflow_id}/{workflowIndex}/{id}/description")]
+#[get("/{nodeId}/{workflowId}/{id}/description")]
 pub async fn get_io_description(
     db_session: web::Data<CachingSession>,
-    params: web::Path<PrimaryKeyParams>,
+    input_output: web::Path<UpdateDescriptionInputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = IoDescription::new();
-    input_output.node_id = params.node_id;
-    input_output.workflow_id = params.workflow_id;
-    input_output.id = params.id;
-
     let input_output = input_output.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
@@ -55,7 +50,7 @@ pub async fn get_io_description(
 pub async fn update_io_title(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    input_output: web::Json<IoTitle>,
+    input_output: web::Json<UpdateTitleInputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut input_output = input_output.into_inner();
 
@@ -73,7 +68,7 @@ pub async fn update_io_title(
 pub async fn update_io_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    mut input_output: web::Json<IoDescription>,
+    mut input_output: web::Json<UpdateDescriptionInputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;
 
@@ -85,7 +80,7 @@ pub async fn update_io_description(
     })))
 }
 
-#[delete("/{nodeId}/{workflowId}/{workflowIndex}/{id}")]
+#[delete("/{nodeId}/{workflowId}/{id}")]
 pub async fn delete_io(
     db_session: web::Data<CachingSession>,
     input_output: web::Path<InputOutput>,

@@ -7,7 +7,6 @@ use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Frozen, Int, List, Text, Timestamp, Uuid};
 use futures::TryStreamExt;
 use scylla::CachingSession;
@@ -17,8 +16,8 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [node_id],
-    clustering_keys = [workflow_id, workflow_index, id],
-    secondary_indexes = [original_id, id]
+    clustering_keys = [workflow_id, id],
+    global_secondary_indexes = [original_id, id]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct InputOutput {
@@ -27,9 +26,6 @@ pub struct InputOutput {
 
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
-
-    #[serde(rename = "workflowIndex")]
-    pub workflow_index: Int,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -98,22 +94,11 @@ impl InputOutput {
         let mut flow_step = FlowStep::new();
         flow_step.node_id = self.node_id;
         flow_step.workflow_id = self.workflow_id;
-        flow_step.workflow_index = self.workflow_index;
         flow_step.id = self.flow_step_id.unwrap_or_default();
 
         let fs = flow_step.find_by_primary_key(session).await?;
 
         Ok(Some(fs))
-    }
-
-    async fn next_flow_steps(
-        &self,
-        session: &CachingSession,
-    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        let next_wf_idx = self.workflow_index + 1;
-        let workflow = self.workflow(session).await?;
-
-        FlowStep::flow_steps_by_workflow_index(session, &workflow, next_wf_idx).await
     }
 }
 
@@ -157,10 +142,16 @@ impl Callbacks<NodecosmosError> for InputOutput {
             fs.pull_output_id(session, self.id).await?;
         }
 
-        let mut next_flow_steps = self.next_flow_steps(session).await?;
+        // Remove IO from all flow steps on next workflow index
+        // we get flows from the workflow
+        // workflow index is calculated by following:
+        // flow.start_index + flow.stepIds.iter().position(|&id| id == self.flow_step_id).unwrap(); + 1
 
-        while let Some(mut fs) = next_flow_steps.try_next().await? {
-            fs.pull_input_id(session, self.id).await?;
+        let mut flows = workflow.flows(session).await?;
+
+        while let Some(flow) = flows.try_next().await? {
+            let mut flow_step_ids = flow.step_ids.unwrap_or_default();
+            let mut flow_start_index = flow.start_index;
         }
 
         Ok(())
@@ -168,17 +159,16 @@ impl Callbacks<NodecosmosError> for InputOutput {
 }
 
 partial_input_output!(
-    IoDescription,
+    UpdateDescriptionInputOutput,
     node_id,
     workflow_id,
-    workflow_index,
     id,
     original_id,
     description,
     description_markdown,
     updated_at
 );
-impl Callbacks<NodecosmosError> for IoDescription {
+impl Callbacks<NodecosmosError> for UpdateDescriptionInputOutput {
     sanitize_description_cb_fn!();
 
     /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
@@ -212,20 +202,19 @@ impl Callbacks<NodecosmosError> for IoDescription {
 }
 
 partial_input_output!(
-    IoTitle,
+    UpdateTitleInputOutput,
     node_id,
     workflow_id,
-    workflow_index,
     id,
     original_id,
     title,
     updated_at
 );
 
-impl Callbacks<NodecosmosError> for IoTitle {
+impl Callbacks<NodecosmosError> for UpdateTitleInputOutput {
     updated_at_cb_fn!();
 
-    /// See IoDescription::after_update for explanation
+    /// See UpdateDescriptionInputOutput::after_update for explanation
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let ios = InputOutput::ios_by_original_id(session, original_id).await?;
@@ -252,4 +241,6 @@ impl Callbacks<NodecosmosError> for IoTitle {
     }
 }
 
-partial_input_output!(IoDelete, node_id, workflow_id, workflow_index, id);
+partial_input_output!(UpdateWorkflowIndexInputOutput, node_id, workflow_id, id, workflow_index);
+
+partial_input_output!(DeleteInputOutput, node_id, workflow_id, id);

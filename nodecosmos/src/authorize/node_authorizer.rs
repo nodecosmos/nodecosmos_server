@@ -34,7 +34,7 @@ pub async fn auth_node_creation(parent: &Option<Node>, current_user: &CurrentUse
             Ok(())
         } else {
             Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized! Make sure you are logged in.",
+                "error": "Unauthorized!",
                 "message": "Not authorized to create node for provided parent!"
             })))
         }

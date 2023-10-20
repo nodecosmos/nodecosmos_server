@@ -7,7 +7,7 @@ use scylla::{CachingSession, QueryResult};
 pub struct CharybdisModelBatch {
     batch: scylla::batch::Batch,
     values: Vec<SerializedValues>,
-    with_uniq_timestamp: bool,
+    with_unique_timestamp: bool,
     current_timestamp: i64,
 }
 
@@ -16,7 +16,7 @@ impl CharybdisModelBatch {
         Self {
             batch: scylla::batch::Batch::default(),
             values: Vec::new(),
-            with_uniq_timestamp: false,
+            with_unique_timestamp: false,
             current_timestamp: chrono::Utc::now().timestamp_micros(),
         }
     }
@@ -25,7 +25,7 @@ impl CharybdisModelBatch {
         Self {
             batch: scylla::batch::Batch::new(scylla::batch::BatchType::Unlogged),
             values: Vec::new(),
-            with_uniq_timestamp: false,
+            with_unique_timestamp: false,
             current_timestamp: chrono::Utc::now().timestamp_micros(),
         }
     }
@@ -104,8 +104,8 @@ impl CharybdisModelBatch {
         Ok(())
     }
 
-    pub fn with_uniq_timestamp(mut self) -> Self {
-        self.with_uniq_timestamp = true;
+    pub fn with_unique_timestamp(mut self) -> Self {
+        self.with_unique_timestamp = true;
         self
     }
 
@@ -138,7 +138,7 @@ impl CharybdisModelBatch {
     fn append_statement_to_batch(&mut self, statement: &str) {
         let mut query = statement.to_string();
 
-        if self.with_uniq_timestamp {
+        if self.with_unique_timestamp {
             query = self.inject_timestamp(statement);
             self.current_timestamp += 1;
         }

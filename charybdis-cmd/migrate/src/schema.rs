@@ -1,10 +1,14 @@
+pub(crate) mod code_schema_parser;
 pub(crate) mod current_code_schema;
 pub(crate) mod current_db_schema;
-pub(crate) mod parser;
 
+use charybdis_parser::LocalIndexTarget;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+pub type IndexName = String;
+pub type GlobalIndexTarget = String;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SchemaObject {
@@ -14,7 +18,8 @@ pub struct SchemaObject {
     pub base_table: String,
     pub partition_keys: Vec<String>,
     pub clustering_keys: Vec<String>,
-    pub secondary_indexes: Vec<String>,
+    pub global_secondary_indexes: Vec<(IndexName, GlobalIndexTarget)>,
+    pub local_secondary_indexes: Vec<(IndexName, LocalIndexTarget)>,
     pub table_options: Option<String>,
 }
 
@@ -27,7 +32,8 @@ impl SchemaObject {
             base_table: String::new(),
             partition_keys: Vec::new(),
             clustering_keys: Vec::new(),
-            secondary_indexes: Vec::new(),
+            global_secondary_indexes: Vec::new(),
+            local_secondary_indexes: Vec::new(),
             table_options: None,
         }
     }

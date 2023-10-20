@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
     table_name = attachments,
     partition_keys = [node_id],
     clustering_keys = [object_id, id],
-    secondary_indexes = [],
+    global_secondary_indexes = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Attachment {

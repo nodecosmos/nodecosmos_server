@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
     table_name = contribution_requests,
     partition_keys = [node_id],
     clustering_keys = [id],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct ContributionRequest {

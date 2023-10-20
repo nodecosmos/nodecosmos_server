@@ -30,7 +30,7 @@ pub trait BaseModel: FromRow + Sized {
 ///     table_name = users,
 ///     partition_keys = [id],
 ///     clustering_keys = [],
-///     secondary_indexes = []
+///     global_secondary_indexes = []
 /// )]
 /// pub struct User {
 ///     pub id: Uuid,
@@ -53,8 +53,6 @@ pub trait BaseModel: FromRow + Sized {
 /// migrate the database schema without having to write any CQL queries.
 ///
 pub trait Model: BaseModel {
-    const SECONDARY_INDEXES: &'static [&'static str];
-
     const INSERT_QUERY: &'static str;
     const UPDATE_QUERY: &'static str;
     const DELETE_QUERY: &'static str;

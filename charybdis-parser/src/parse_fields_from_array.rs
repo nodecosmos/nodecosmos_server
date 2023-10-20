@@ -1,4 +1,4 @@
-use crate::parse_string_literal;
+use crate::{parse_string_literal, LocalIndexTarget};
 use quote::ToTokens;
 use syn::{Expr, ExprArray};
 
@@ -21,5 +21,18 @@ pub fn parse_arr_expr_from_literals(array_expr: ExprArray) -> Vec<String> {
         .elems
         .into_iter()
         .map(|elem| elem.to_token_stream().to_string())
+        .collect()
+}
+
+pub fn parse_loc_sec_idx_array_expr(array_expr: ExprArray) -> Vec<LocalIndexTarget> {
+    array_expr
+        .elems
+        .into_iter()
+        .map(|elem| {
+            let string = elem.to_token_stream().to_string();
+            let parsed: LocalIndexTarget = serde_json::from_str(&string).unwrap();
+
+            parsed
+        })
         .collect()
 }

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
     table_name = likes_count,
     partition_keys = [object_id],
     clustering_keys = [],
-    secondary_indexes = []
+    global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct LikesCount {

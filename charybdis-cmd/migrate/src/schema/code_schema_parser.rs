@@ -70,7 +70,22 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
 
                     schema_object.partition_keys = args.partition_keys.unwrap_or(vec![]);
                     schema_object.clustering_keys = args.clustering_keys.unwrap_or(vec![]);
-                    schema_object.secondary_indexes = args.secondary_indexes.unwrap_or(vec![]);
+
+                    if let Some(gsi) = args.global_secondary_indexes {
+                        gsi.iter().for_each(|global_idx| {
+                            schema_object
+                                .global_secondary_indexes
+                                .push(("".to_string(), global_idx.to_string()));
+                        });
+                    }
+
+                    if let Some(lsi) = args.local_secondary_indexes {
+                        lsi.iter().for_each(|local_idx| {
+                            schema_object
+                                .local_secondary_indexes
+                                .push(("".to_string(), local_idx.clone()));
+                        });
+                    }
 
                     schema_object.table_options = args.table_options;
                 }

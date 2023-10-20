@@ -10,7 +10,7 @@ use syn::{parse_str, FieldsNamed};
 ///     table_name = users,
 ///     partition_keys = [id],
 ///     clustering_keys = [org_id, created_at],
-///     secondary_indexes = [])]
+///     global_secondary_indexes = [])]
 /// pub struct UserOps {...}
 /// ```
 /// we would have a functions:

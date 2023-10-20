@@ -29,7 +29,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
     let primary_key_const = primary_key_const(&args);
-    let secondary_indexes_const = secondary_indexes_const(&args);
     let select_fields_clause = select_fields_clause(&args, fields_named);
 
     // operation consts
@@ -95,8 +94,6 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl charybdis::model::Model for #struct_name {
-            // consts
-            #secondary_indexes_const
             // operation consts
             #insert_query_const
             #update_query_const

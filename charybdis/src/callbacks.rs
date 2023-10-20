@@ -42,7 +42,7 @@ pub trait Callbacks<Err: From<CharybdisError>> {
 ///     table_name = users,
 ///     partition_keys = [id],
 ///     clustering_keys = [],
-///     secondary_indexes = [username, email]
+///     global_secondary_indexes = [username, email]
 /// )]
 /// pub struct User {
 ///    ...

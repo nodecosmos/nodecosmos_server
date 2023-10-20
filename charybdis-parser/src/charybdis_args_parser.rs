@@ -1,4 +1,4 @@
-use crate::parse_arr_expr_from_literals;
+use crate::{parse_arr_expr_from_literals, parse_loc_sec_idx_array_expr, LocalIndexTarget};
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::collections::HashMap;
@@ -12,7 +12,8 @@ pub struct CharybdisArgs {
     pub base_table: Option<String>,
     pub partition_keys: Option<Vec<String>>,
     pub clustering_keys: Option<Vec<String>>,
-    pub secondary_indexes: Option<Vec<String>>,
+    pub global_secondary_indexes: Option<Vec<String>>,
+    pub local_secondary_indexes: Option<Vec<LocalIndexTarget>>,
     pub exclude_partial_model: Option<bool>,
     pub fields_names: Option<Vec<String>>,
     pub field_types_hash: Option<HashMap<String, TokenStream>>,
@@ -81,7 +82,8 @@ impl Parse for CharybdisArgs {
         let mut base_table = None;
         let mut partition_keys = None;
         let mut clustering_keys = None;
-        let mut secondary_indexes = None;
+        let mut global_secondary_indexes = None;
+        let mut local_secondary_indexes = None;
         let mut fields_names = None;
         let mut field_types_hash = None;
         let mut field_attributes_hash = None;
@@ -117,11 +119,17 @@ impl Parse for CharybdisArgs {
 
                     clustering_keys = Some(parsed)
                 }
-                "secondary_indexes" => {
+                "global_secondary_indexes" => {
                     let array: syn::ExprArray = input.parse()?;
                     let parsed = parse_arr_expr_from_literals(array);
 
-                    secondary_indexes = Some(parsed)
+                    global_secondary_indexes = Some(parsed)
+                }
+                "local_secondary_indexes" => {
+                    let array: syn::ExprArray = input.parse()?;
+                    let parsed = parse_loc_sec_idx_array_expr(array);
+
+                    local_secondary_indexes = Some(parsed)
                 }
                 "exclude_partial_model" => {
                     let value: syn::LitBool = input.parse()?;
@@ -165,7 +173,8 @@ impl Parse for CharybdisArgs {
             base_table,
             partition_keys,
             clustering_keys,
-            secondary_indexes,
+            global_secondary_indexes,
+            local_secondary_indexes,
             fields_names,
             field_types_hash,
             field_attributes_hash,

@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
     table_name = nodes,
     partition_keys = [id],
     clustering_keys = [],
-    secondary_indexes = [],
+    global_secondary_indexes = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Node {
@@ -135,6 +135,7 @@ impl Node {
             self.parent_id = Some(parent.id);
             self.editor_ids = parent.editor_ids.clone();
             self.is_public = parent.is_public;
+            self.is_root = false;
 
             let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
             ancestor_ids.push(parent.id);

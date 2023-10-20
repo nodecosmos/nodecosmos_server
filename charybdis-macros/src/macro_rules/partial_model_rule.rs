@@ -21,7 +21,7 @@ use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 ///     table_name = "users",
 ///     partition_keys = ["id"],
 ///     clustering_keys = []
-///     secondary_indexes = [])]
+///     global_secondary_indexes = [])]
 /// pub struct User {
 ///     pub id: Uuid,
 ///     pub username: Text,
@@ -45,7 +45,7 @@ use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 ///     table_name = "users",
 ///     partition_keys = ["id"],
 ///     clustering_keys = []
-///     secondary_indexes = [])]
+///     global_secondary_indexes = [])]
 /// pub struct PartialUser {
 ///    pub id: Uuid,
 ///    pub username: Text,
@@ -85,7 +85,7 @@ use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 ///     table_name = users,
 ///     partition_keys = [id],
 ///     clustering_keys = [created_at, updated_at],
-///     secondary_indexes = []
+///     global_secondary_indexes = []
 /// )]
 /// pub struct User {
 ///     pub id: Uuid,
@@ -109,7 +109,7 @@ use syn::{parse_str, Attribute, DeriveInput, FieldsNamed};
 ///     table_name = users,
 ///     partition_keys = [id],
 ///     clustering_keys = [created_at],
-///     secondary_indexes = [])]
+///     global_secondary_indexes = [])]
 /// pub struct UserOps {...}
 /// ```
 /// Note that `updated_at` is not present in generated declaration.
@@ -144,7 +144,7 @@ pub(crate) fn partial_model_macro_generator(args: CharybdisArgs, input: &DeriveI
 
     let cks = args.clustering_keys.unwrap_or(vec![]);
     let pks = args.partition_keys.unwrap_or(vec![]);
-    let sec_idxes = args.secondary_indexes.unwrap_or(vec![]);
+    let sec_idxes = args.global_secondary_indexes.unwrap_or(vec![]);
 
     let cks: Vec<syn::Ident> = cks
         .into_iter()
@@ -181,7 +181,7 @@ pub(crate) fn partial_model_macro_generator(args: CharybdisArgs, input: &DeriveI
                     table_name=#table_name,
                     partition_keys=[ #(#pks),* ],
                     clustering_keys=[ #(#cks),* ],
-                    secondary_indexes=[ #(#sec_idxes),* ],
+                    global_secondary_indexes=[ #(#sec_idxes),* ],
                     exclude_partial_model=true
                 )]
                 #(#other_attrs)*

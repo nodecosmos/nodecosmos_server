@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
     table_name = node_descendants,
     partition_keys = [root_id],
     clustering_keys = [node_id, order_index, id],
-    secondary_indexes = [],
+    global_secondary_indexes = [],
     table_options = r#"
         gc_grace_seconds = 432000
     "#,

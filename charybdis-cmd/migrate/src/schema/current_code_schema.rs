@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
 
-use super::parser::*;
+use super::code_schema_parser::*;
 
 const MODEL_MACRO_NAME: &str = "charybdis_model";
 const MATERIALIZED_VIEW_MACRO_NAME: &str = "charybdis_view_model";
@@ -91,14 +91,6 @@ impl CurrentCodeSchema {
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {
-            // println!(
-            //     "{} {} {} {}",
-            //     "Could not find".yellow(),
-            //     MODEL_MACRO_NAME,
-            //     "macro for file:".yellow(),
-            //     entry.path().to_str().unwrap()
-            // );
-
             return;
         }
 
