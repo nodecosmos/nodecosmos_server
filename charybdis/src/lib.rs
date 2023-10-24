@@ -1,6 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(async_fn_in_trait)]
-
 pub mod batch;
 pub mod callbacks;
 pub mod errors;

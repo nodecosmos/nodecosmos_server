@@ -15,7 +15,7 @@ pub struct Owner {
 
     pub username: Option<Text>,
 
-    #[serde(rename = "profileImageUrl")]
+    #[serde(rename = "profileImageURL")]
     pub profile_image_url: Option<Text>,
 }
 

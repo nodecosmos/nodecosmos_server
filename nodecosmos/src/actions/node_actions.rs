@@ -16,7 +16,7 @@ use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New, UpdateWithExtCallbacks};
-use charybdis::types::{Boolean, Text, Uuid};
+use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -87,45 +87,21 @@ pub async fn get_node_description_base64(
     })))
 }
 
-// This is unique case where we need permitted params.
-// We prevent node overwrite if id is sent as part of request.
-#[derive(Deserialize)]
-pub struct CreateNodePermittedParams {
-    #[serde(rename = "parentId")]
-    pub parent_id: Option<Uuid>,
-
-    pub title: Text,
-
-    #[serde(rename = "isRoot")]
-    pub is_root: Boolean,
-
-    #[serde(rename = "isPublic")]
-    pub is_public: Boolean,
-}
-
 #[post("")]
 pub async fn create_node(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
-    params: web::Json<CreateNodePermittedParams>,
+    mut node: web::Json<Node>,
     current_user: CurrentUser,
     resource_locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut node = Node {
-        id: Uuid::new_v4(),
-        parent_id: params.parent_id,
-        title: params.title.clone(),
-        is_root: params.is_root,
-        is_public: params.is_public,
-        ..Default::default()
-    };
-
     let parent = node.parent(&db_session).await?;
+
+    auth_node_creation(&node, &parent, &current_user).await?;
 
     node.set_owner(&current_user);
     node.set_defaults(&parent).await?;
 
-    auth_node_creation(&parent, &current_user).await?;
     resource_locker.check_node_lock(&node).await?;
 
     node.insert_cb(&db_session, &cb_extension).await?;
@@ -232,7 +208,6 @@ async fn upload_cover_image(
     let image_url = handle_cover_image_upload(payload, &s3_client, &nc_app, node, &db_session, &cb_extension).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "coverImageUrl": image_url
     })))
 }

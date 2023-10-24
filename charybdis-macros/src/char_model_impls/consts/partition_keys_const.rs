@@ -7,18 +7,18 @@ pub(crate) fn partition_keys_const(ch_args: &CharybdisArgs) -> ImplItem {
     let partition_keys = ch_args.partition_keys.as_ref().unwrap_or_else(|| {
         panic!(
             r#"
-            The `partition_keys` attribute is required for the `charybdis_model` macro.
-            Please provide a list of partition keys for the model.
-            e.g. #[charybdis_model(partition_keys = ["id"])]
-        "#
+                The `partition_keys` attribute is required for the `charybdis_model` macro.
+                Please provide a list of partition keys for the model.
+                e.g. #[charybdis_model(partition_keys = ["id"])]
+            "#
         )
     });
 
     if partition_keys.is_empty() {
         panic!(
             r#"
-            The `partition_keys` attribute must define at least one partition key.
-        "#
+                The `partition_keys` attribute must define at least one partition key.
+            "#
         )
     }
 

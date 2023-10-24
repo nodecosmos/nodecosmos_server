@@ -1,12 +1,12 @@
 use crate::errors::NodecosmosError;
-use crate::models::flow::FlowDelete;
+use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteInputOutput;
 use crate::models::like::Like;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::workflow::WorkflowDelete;
+use crate::models::workflow::WorkDeleteFlow;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use crate::services::logger::log_error;
 use crate::CbExtension;
@@ -69,12 +69,12 @@ impl<'a> NodeDeleter<'a> {
     pub async fn delete_node_data(&mut self) -> Result<(), NodecosmosError> {
         let mut batch = CharybdisModelBatch::unlogged();
 
-        batch.append_delete_by_partition_key(&WorkflowDelete {
+        batch.append_delete_by_partition_key(&WorkDeleteFlow {
             node_id: self.node.id,
             ..Default::default()
         })?;
 
-        batch.append_delete_by_partition_key(&FlowDelete {
+        batch.append_delete_by_partition_key(&DeleteFlow {
             node_id: self.node.id,
             ..Default::default()
         })?;
@@ -101,7 +101,7 @@ impl<'a> NodeDeleter<'a> {
         Ok(())
     }
 
-    /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node and all of its descendants.
+    /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node descendants.
     /// Here we also consume stream of descendants, so we populate children_by_parent_id that
     /// is used in self.delete_descendants.
     pub async fn delete_and_populate_desc_data(&mut self) -> Result<(), NodecosmosError> {
@@ -116,12 +116,12 @@ impl<'a> NodeDeleter<'a> {
 
                 self.node_ids_to_delete.push(descendant.id);
 
-                batch.append_delete_by_partition_key(&WorkflowDelete {
+                batch.append_delete_by_partition_key(&WorkDeleteFlow {
                     node_id: descendant.id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&FlowDelete {
+                batch.append_delete_by_partition_key(&DeleteFlow {
                     node_id: descendant.id,
                     ..Default::default()
                 })?;
@@ -177,7 +177,7 @@ impl<'a> NodeDeleter<'a> {
 
     /// Here we delete all of node descendants for all of its ancestors.
     /// We use child_ids_by_parent_id so we don't have to query ancestor_ids for each descendant node.
-    /// It's important to remember that each node in tree has its own descendant records in node_descendants table,
+    /// Each node in the tree has its own descendant records in node_descendants table,
     /// so we have to get all of them.
     pub async fn delete_descendants(&mut self) -> Result<(), NodecosmosError> {
         if self.node.is_root {

@@ -1,6 +1,6 @@
 # High-Performance ORM for ScyllaDB in Rust
 ### Use monstrous tandem of scylla and charybdis for your next project
-⚠️ *WIP: This project is currently in an experimental stage; It uses built-in async trait support from rust nightly release*
+⚠️ *WIP: This project is currently in an experimental stage; It uses async trait support from rust nightly release*
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
@@ -54,10 +54,13 @@ Declare model as a struct within `src/models` dir:
     table_name = users,
     partition_keys = [id],
     clustering_keys = [],
-    global_secondary_indexes = []
+    global_secondary_indexes = [],
+    local_secondary_indexes = [],
 )]
 pub struct User {
+    pub organizatin_id: Uuid,
     pub id: Uuid,
+    pub department_id: Uuid,
     pub username: Text,
     pub email: Text,
     pub created_at: Timestamp,
@@ -125,7 +128,7 @@ It supports following operations:
 - Delete secondary indexes
 - Create UDTs (`src/models/udts`)
 - Create materialized views (`src/models/materialized_views`)
-- Table options (*expermiental*)
+- Table options
   ```rust
     #[charybdis_model(
         table_name = commits,
@@ -160,13 +163,13 @@ in case there is no model definition for table, it will **not** drop it. In futu
 we will add `modelize` command that will generate `src/models` files from existing data source.
 
 #### Global secondary indexes
-They are simply defined as are array of strings:
+They are simply defined as array of strings:
 ```rust
 #[charybdis_model(
     table_name = users,
     partition_keys = [id],
     clustering_keys = [],
-    global_secondary_indexes = ["email"]
+    global_secondary_indexes = ["username"]
 )]
 ```
 #### Local secondary Indexes
@@ -180,7 +183,9 @@ They are defined as array of tuples
     partition_keys = [location],
     clustering_keys = [name, price, dish_type],
     global_secondary_indexes = [],
-    local_secondary_indexes = [([location], [dish_type])]
+    local_secondary_indexes = [
+        ([location], [dish_type])
+    ]
 )]
 ```
 resulting query will be: `CREATE INDEX ON menus((location), dish_type);`
@@ -241,31 +246,34 @@ Let's say we have a model:
 ```rust 
 #[charybdis_model(
     table_name = posts, 
-    partition_keys = [date], 
-    clustering_keys = [category_id, title],
+    partition_keys = [category_id], 
+    clustering_keys = [date, title],
     global_secondary_indexes = []
 )]
 pub struct Post {...}
 ```
 We get automatically generated `find_post!` macro that follows convention `find_<struct_name>!`.
-It can be used to create custom queries:
+It can be used to create custom queries.
+
+
+Following will return stream of `Post` models, and query will be constructed at compile time as `&'static str`.
 
 ```rust
 // automatically generated macro rule
 let res = find_post!(
     session,
-    "date = ? AND category_id in ?",
-    (date, categor_vec])
+    "category_id in ? AND date > ?",
+    (categor_vec, date])
 ).await?;
 ```
-This will return stream of `Post` models, and query will be constructed at compile time as `&'static str`.
 
+We can also use `find_one_post!` macro to get single result:
 ```rust
 let res = find_one_post!(
     session,
-    "date = ? AND category_id in ?",
+    "category_id in ? AND date > ?",
     (date, categor_vec]
-)  -> CharybdisModelStream<Post>
+).await?;
 ```
 
 If we just need the `Query` and not the result, we can use `find_post_query!` macro:
@@ -275,7 +283,6 @@ let query = find_post_query!(
     (date, categor_vec])
 ```
 
-All macro
 
 ### Additional helpers 
 Lets say we have model:
@@ -350,8 +357,8 @@ let partial_user = partial_user.find_by_primary_key(&:session).await?;
 let user = partial_user.as_native().find_by_primary_key(&session).await?;
 ```
 
-Note that if you have custom attributes on model fields,
-they will be automatically added to partial fields.
+Derives that are defined bellow `charybdis_model` and custom attributes on model fields 
+will be automatically added to partial fields.
 
 ```rust
 #[charybdis_model(
@@ -373,23 +380,19 @@ pub struct Node {
 
 partial_node!(PartialNode, id, root_id);
 ```
-`PartialNode` will include everything that is internal to native struct.
-So here serde attributes `#[serde(rename = "rootId")]` from `Node` model.
 
 ### Partial Model Considerations:
 1) `partial_<model>` require complete primary key in definition
 
-2) All derives that are defined on native model bellow `#charybdis_model` macro will be automatically added to partial model.
+2) All derives that are defined bellow `#charybdis_model` macro will be automatically added to partial model.
 
 3) `partial_<model>` struct implement everything that is **internal** to native struct and library
    traits that are required for basic operations. Unsurprisingly, it doesn't implement `Callbacks`
-   unless they are derives defined bellow `#charybdis_model`.
-   We can either manually implement `Callbacks`, use macro helpers, or have custom written 
-   derive.
+   unless they are derives.
+   We can either manually implement `Callbacks`, use macro helpers.
 
-Recommended convention for naming is `Purpose` + `Original Struct Name`. E.g: 
+Recommended naming convention is `Purpose` + `Original Struct Name`. E.g: 
 `UpdateAdresssUser`, `UpdateDescriptionPost`. 
-So Idea is that those structs are used for partial updates.
 
 ## Callbacks
 We can define callbacks that will be executed before and after certain operations.
@@ -436,7 +439,7 @@ Possible callbacks:
 - `after_delete`
 
 ⚠️ In order to trigger callback, instead of calling `insert` method on model, we can call 
-`insert_cb. This enables us to have clear distinction between insert and insert with callbacks.
+`insert_cb`. This enables us to have clear distinction between insert and insert with callbacks.
 ```rust
 let post = Post::from_json(json);
 let res = post.insert_cb(&session).await;

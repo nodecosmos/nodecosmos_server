@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Node {
-    #[serde(default = "Uuid::new_v4")]
+    #[serde(default)]
     pub id: Uuid,
 
     #[serde(default, rename = "rootId")]
@@ -75,21 +75,21 @@ pub struct Node {
     pub owner: Option<Owner>, // for front-end compatibility
     pub creator: Option<Creator>,
 
+    #[serde(rename = "likesCount", default = "default_to_0")]
+    pub likes_count: Option<BigInt>,
+
+    #[serde(rename = "coverImageURL")]
+    pub cover_image_url: Option<Text>,
+
+    #[serde(rename = "coverImageKey")]
+    pub cover_image_filename: Option<Text>,
+
     // timestamps
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
-
-    #[serde(rename = "likesCount", default = "default_to_0")]
-    pub likes_count: Option<BigInt>,
-
-    #[serde(rename = "coverImageUrl")]
-    pub cover_image_url: Option<Text>,
-
-    #[serde(rename = "coverImageKey")]
-    pub cover_image_filename: Option<Text>,
 }
 
 impl Node {
@@ -130,6 +130,8 @@ impl Node {
     }
 
     pub async fn set_defaults(&mut self, parent: &Option<Self>) -> Result<(), NodecosmosError> {
+        self.id = Uuid::new_v4();
+
         if let Some(parent) = parent {
             self.root_id = parent.root_id;
             self.parent_id = Some(parent.id);
@@ -183,7 +185,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for Node {
         Ok(())
     }
 
-    async fn after_insert(&mut self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
+    async fn after_insert(&self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.append_to_ancestors(db_session).await?;
         self.add_to_elastic(ext).await?;
 

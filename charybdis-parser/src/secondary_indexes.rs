@@ -30,8 +30,6 @@ impl FromCqlVal<CqlValue> for IndexTarget {
                 let target_val_string = target_value.into_string().unwrap();
 
                 if target_val_string.starts_with('{') {
-                    println!("target_val_string: {}", target_val_string);
-
                     let parsed: LocalIndexTarget = serde_json::from_str(&target_val_string).unwrap();
 
                     return Ok(IndexTarget {

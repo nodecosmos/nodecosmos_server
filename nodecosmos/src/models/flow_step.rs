@@ -1,29 +1,24 @@
+pub mod flow_steps_by_index;
+
 use crate::errors::NodecosmosError;
-use crate::models::flow::Flow;
 use crate::models::helpers::{
     created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn, ClonedRef,
 };
 use crate::models::input_output::InputOutput;
-use crate::models::workflow::Workflow;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
 use charybdis::operations::{Find, New, UpdateWithCallbacks};
-use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{Frozen, Int, List, Map, Text, Timestamp, Uuid};
-use futures::TryStreamExt;
+use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = flow_steps,
     partition_keys = [node_id],
-    clustering_keys = [workflow_id, workflow_index, id],
+    clustering_keys = [workflow_id, flow_id, flow_index, id],
     global_secondary_indexes = [],
-    local_secondary_indexes = [
-        ([node_id], [id])
-    ]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct FlowStep {
@@ -33,14 +28,14 @@ pub struct FlowStep {
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
 
-    #[serde(rename = "workflowIndex")]
-    pub workflow_index: Int,
+    #[serde(rename = "flowId")]
+    pub flow_id: Uuid,
+
+    #[serde(rename = "flowIndex")]
+    pub flow_index: Double,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
-
-    #[serde(rename = "flowId")]
-    pub flow_id: Uuid,
 
     #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
@@ -64,18 +59,6 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    pub async fn flow_steps_by_workflow_index(
-        session: &CachingSession,
-        workflow: &Workflow,
-        index: Int,
-    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        let res =
-            FlowStep::find_by_node_id_and_workflow_id_and_workflow_index(session, workflow.node_id, workflow.id, index)
-                .await?;
-
-        Ok(res)
-    }
-
     pub async fn pull_output_id(&mut self, session: &CachingSession, output_id: Uuid) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
             for (_, input_ids) in output_ids_by_node_id.iter_mut() {
@@ -96,6 +79,13 @@ impl FlowStep {
 
             self.update_cb(session).await?;
         }
+
+        Ok(())
+    }
+
+    pub async fn remove_inputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.input_ids_by_node_id = None;
+        self.update_cb(session).await?;
 
         Ok(())
     }
@@ -164,79 +154,43 @@ impl FlowStep {
 
         Ok(())
     }
-
-    async fn disassociate_outputs_from_subsequent_step(
-        &self,
-        session: &CachingSession,
-        output_ids: &Vec<Uuid>,
-    ) -> Result<(), NodecosmosError> {
-        let mut next_flow_steps = FlowStep::find_by_node_id_and_workflow_id_and_workflow_index(
-            session,
-            self.node_id,
-            self.workflow_id,
-            self.workflow_index + 1,
-        )
-        .await?;
-
-        while let Some(mut fs) = next_flow_steps.try_next().await? {
-            for output_id in output_ids.iter() {
-                fs.pull_input_id(session, *output_id).await?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl Callbacks<NodecosmosError> for FlowStep {
     created_at_cb_fn!();
 
-    async fn after_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut flow = Flow::new();
-
-        flow.node_id = self.node_id;
-        flow.workflow_id = self.workflow_id;
-        flow.id = self.flow_id;
-
-        flow.append_step(session, self.id).await?;
-
-        Ok(())
-    }
-
     updated_at_cb_fn!();
 
     async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut flow = Flow::new();
-
-        flow.node_id = self.node_id;
-        flow.workflow_id = self.workflow_id;
-        flow.id = self.flow_id;
-
-        flow.remove_step(session, self.id).await?;
         self.delete_fs_outputs(session).await?;
 
         Ok(())
     }
 }
 
+partial_flow_step!(BaseFlowStep, node_id, workflow_id, flow_id, flow_index, id);
+
 partial_flow_step!(
     UpdateInputIdsFlowStep,
     node_id,
     workflow_id,
-    workflow_index,
     flow_id,
+    flow_index,
     id,
     input_ids_by_node_id,
     updated_at
 );
-impl_updated_at_cb!(UpdateInputIdsFlowStep);
+
+impl Callbacks<NodecosmosError> for UpdateInputIdsFlowStep {
+    updated_at_cb_fn!();
+}
 
 partial_flow_step!(
     UpdateOutputIdsFlowStep,
     node_id,
     workflow_id,
-    workflow_index,
     flow_id,
+    flow_index,
     id,
     output_ids_by_node_id,
     updated_at
@@ -247,8 +201,8 @@ partial_flow_step!(
     UpdateFlowStepNodeIds,
     node_id,
     workflow_id,
-    workflow_index,
     flow_id,
+    flow_index,
     id,
     node_ids,
     updated_at
@@ -257,7 +211,7 @@ partial_flow_step!(
 impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
     updated_at_cb_fn!();
 
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.as_native().find_by_primary_key(session).await?;
 
         flow_step.delete_outputs_from_removed_nodes(session).await?;
@@ -272,7 +226,8 @@ partial_flow_step!(
     UpdateDescriptionFlowStep,
     node_id,
     workflow_id,
-    workflow_index,
+    flow_id,
+    flow_index,
     id,
     description,
     description_markdown,
@@ -280,6 +235,4 @@ partial_flow_step!(
 );
 sanitize_description_cb!(UpdateDescriptionFlowStep);
 
-partial_flow_step!(UpdateWorkflowIndexFlowStep, node_id, workflow_id, workflow_index, id);
-
-partial_flow_step!(DeleteFlowStep, node_id, workflow_id, workflow_index, id);
+partial_flow_step!(DeleteFlowStep, node_id, workflow_id, flow_id, flow_index, id);

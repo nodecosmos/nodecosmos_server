@@ -3,56 +3,69 @@ use crate::errors::CharybdisError;
 use crate::model::Model;
 use scylla::frame::value::ValueList;
 use scylla::{CachingSession, QueryResult};
+use std::future::Future;
 
 pub trait Update {
-    async fn update(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError>;
+    fn update(&self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, CharybdisError>>;
 }
 
 impl<T: Model + ValueList> Update for T {
-    async fn update(&self, session: &CachingSession) -> Result<QueryResult, CharybdisError> {
-        let update_values = self
-            .get_update_values()
-            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
+    fn update(&self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, CharybdisError>> {
+        async move {
+            let update_values = self.get_update_values()?;
 
-        session
-            .execute(Self::UPDATE_QUERY, update_values)
-            .await
-            .map_err(CharybdisError::QueryError)
+            session
+                .execute(Self::UPDATE_QUERY, update_values)
+                .await
+                .map_err(CharybdisError::from)
+        }
     }
 }
 
-pub trait UpdateWithCallbacks<Err> {
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err>;
+pub trait UpdateWithCallbacks<'a, Err> {
+    fn update_cb(&mut self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, Err>>;
 }
 
-impl<T, Err> UpdateWithCallbacks<Err> for T
+impl<'a, T, Err> UpdateWithCallbacks<'a, Err> for T
 where
     Err: From<CharybdisError>,
     T: Model + ValueList + Update + Callbacks<Err>,
 {
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err> {
-        self.before_update(session).await?;
-        let res = self.update(session).await;
-        self.after_update(session).await?;
+    fn update_cb(&mut self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, Err>> {
+        async move {
+            self.before_update(session).await?;
+            let res = self.update(session).await;
+            self.after_update(session).await?;
 
-        Ok(res?)
+            res.map_err(Err::from)
+        }
     }
 }
 
-pub trait UpdateWithExtCallbacks<Ext, Err> {
-    async fn update_cb(&mut self, session: &CachingSession, extension: &Ext) -> Result<QueryResult, Err>;
+pub trait UpdateWithExtCallbacks<'a, Ext, Err> {
+    fn update_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &Ext,
+    ) -> impl Future<Output = Result<QueryResult, Err>>;
 }
 
-impl<T, Ext, Err> UpdateWithExtCallbacks<Ext, Err> for T
+impl<'a, T, Ext, Err> UpdateWithExtCallbacks<'a, Ext, Err> for T
 where
     Err: From<CharybdisError>,
     T: Model + ValueList + Update + ExtCallbacks<Ext, Err>,
 {
-    async fn update_cb(&mut self, session: &CachingSession, extension: &Ext) -> Result<QueryResult, Err> {
-        self.before_update(session, extension).await?;
-        let res = self.update(session).await;
-        self.after_update(session, extension).await?;
+    fn update_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &Ext,
+    ) -> impl Future<Output = Result<QueryResult, Err>> {
+        async move {
+            self.before_update(session, extension).await?;
+            let res = self.update(session).await;
+            // self.after_update(session, extension).await?;
 
-        Ok(res?)
+            res.map_err(Err::from)
+        }
     }
 }

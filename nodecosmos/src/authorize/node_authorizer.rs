@@ -28,7 +28,18 @@ pub async fn auth_node_access(node: &BaseNode, opt_current_user: OptCurrentUser)
     }
 }
 
-pub async fn auth_node_creation(parent: &Option<Node>, current_user: &CurrentUser) -> Result<(), NodecosmosError> {
+pub async fn auth_node_creation(
+    node: &Node,
+    parent: &Option<Node>,
+    current_user: &CurrentUser,
+) -> Result<(), NodecosmosError> {
+    if node.id != Uuid::default() {
+        return Err(NodecosmosError::Unauthorized(json!({
+            "error": "Bad Request!",
+            "message": "Cannot create node with id!"
+        })));
+    }
+
     if let Some(parent) = parent {
         if can_edit_node(current_user, parent) {
             Ok(())

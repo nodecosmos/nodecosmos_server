@@ -1,5 +1,6 @@
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
+use crate::models::flow_step::{find_one_flow_step, FlowStep};
 use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
@@ -7,20 +8,26 @@ use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
-use charybdis::types::{Frozen, Int, List, Text, Timestamp, Uuid};
-use futures::TryStreamExt;
+use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
+/// we group input outputs by root node id
+/// so they are accessible to all workflows within a same root node
 #[derive(Clone)]
 #[charybdis_model(
     table_name = input_outputs,
-    partition_keys = [node_id],
-    clustering_keys = [workflow_id, id],
-    global_secondary_indexes = [original_id, id]
+    partition_keys = [root_node_id],
+    clustering_keys = [node_id, workflow_id, id],
+    local_secondary_indexes = [
+        ([root_node_id] [id])
+    ]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct InputOutput {
+    #[serde(rename = "rootNodeId")]
+    pub root_node_id: Uuid,
+
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
@@ -29,9 +36,6 @@ pub struct InputOutput {
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
-
-    #[serde(rename = "rootNodeId")]
-    pub root_node_id: Option<Uuid>,
 
     #[serde(rename = "originalId")]
     pub original_id: Option<Uuid>,
@@ -64,12 +68,17 @@ pub struct InputOutput {
 impl InputOutput {
     pub async fn ios_by_original_id(
         session: &CachingSession,
+        root_node_id: Uuid,
         original_id: Uuid,
     ) -> Result<Vec<InputOutput>, NodecosmosError> {
-        let ios = find_input_output!(session, "original_id = ?", (original_id,))
-            .await?
-            .try_collect()
-            .await?;
+        let ios = find_input_output!(
+            session,
+            "root_node_id = ? AND original_id = ?",
+            (root_node_id, original_id)
+        )
+        .await?
+        .try_collect()
+        .await?;
 
         Ok(ios)
     }
@@ -91,14 +100,9 @@ impl InputOutput {
             return Ok(None);
         }
 
-        let mut flow_step = FlowStep::new();
-        flow_step.node_id = self.node_id;
-        flow_step.workflow_id = self.workflow_id;
-        flow_step.id = self.flow_step_id.unwrap_or_default();
+        let flow_step = find_one_flow_step!(session, "node_id = ? AND id = ?", (self.node_id, flow_step_id)).await?;
 
-        let fs = flow_step.find_by_primary_key(session).await?;
-
-        Ok(Some(fs))
+        Ok(Some(flow_step))
     }
 }
 
@@ -111,14 +115,16 @@ impl Callbacks<NodecosmosError> for InputOutput {
         self.updated_at = Some(now);
 
         if let Some(original_id) = self.original_id {
-            let original_io = find_one_input_output!(session, "id = ?", (original_id,)).await?;
+            let original_input =
+                find_one_input_output!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id))
+                    .await?;
 
-            self.title = original_io.title;
-            self.unit = original_io.unit;
-            self.data_type = original_io.data_type;
-            self.description = original_io.description;
-            self.description_markdown = original_io.description_markdown;
-            self.original_id = original_io.original_id;
+            self.title = original_input.title;
+            self.unit = original_input.unit;
+            self.data_type = original_input.data_type;
+            self.description = original_input.description;
+            self.description_markdown = original_input.description_markdown;
+            self.original_id = original_input.original_id;
         } else {
             self.original_id = Some(self.id);
         }
@@ -128,7 +134,7 @@ impl Callbacks<NodecosmosError> for InputOutput {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut workflow = self.workflow(session).await?;
         let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
 
@@ -138,20 +144,24 @@ impl Callbacks<NodecosmosError> for InputOutput {
 
         let flow_step = self.flow_step(session).await?;
 
-        if let Some(mut fs) = flow_step {
-            fs.pull_output_id(session, self.id).await?;
-        }
+        if let Some(mut flow_step) = flow_step {
+            flow_step.pull_output_id(session, self.id).await?;
 
-        // Remove IO from all flow steps on next workflow index
-        // we get flows from the workflow
-        // workflow index is calculated by following:
-        // flow.start_index + flow.stepIds.iter().position(|&id| id == self.flow_step_id).unwrap(); + 1
+            // remove input from next flow steps
+            let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
+            let current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
 
-        let mut flows = workflow.flows(session).await?;
+            if let Some(current_step_wf_index) = current_step_wf_index {
+                let next_wf_index = current_step_wf_index + 1;
+                let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
 
-        while let Some(flow) = flows.try_next().await? {
-            let mut flow_step_ids = flow.step_ids.unwrap_or_default();
-            let mut flow_start_index = flow.start_index;
+                if let Some(mut next_flow_steps) = next_flow_steps {
+                    for flow_step in next_flow_steps.iter_mut() {
+                        let mut flow_step = flow_step.borrow_mut();
+                        flow_step.pull_input_id(session, self.id).await?;
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -160,6 +170,7 @@ impl Callbacks<NodecosmosError> for InputOutput {
 
 partial_input_output!(
     UpdateDescriptionInputOutput,
+    root_node_id,
     node_id,
     workflow_id,
     id,
@@ -168,14 +179,15 @@ partial_input_output!(
     description_markdown,
     updated_at
 );
+
 impl Callbacks<NodecosmosError> for UpdateDescriptionInputOutput {
     sanitize_description_cb_fn!();
 
     /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
     /// while allowing IO to have it's own properties and value.
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
+            let ios = InputOutput::ios_by_original_id(session, self.root_node_id, original_id).await?;
 
             for chunk in ios.chunks(25) {
                 let mut batch = CharybdisModelBatch::new();
@@ -184,12 +196,12 @@ impl Callbacks<NodecosmosError> for UpdateDescriptionInputOutput {
                     if io.id == self.id {
                         continue;
                     }
-                    let mut updated_io = io.clone();
-                    updated_io.description = self.description.clone();
-                    updated_io.description_markdown = self.description_markdown.clone();
-                    updated_io.updated_at = self.updated_at;
+                    let mut updated_input = io.clone();
+                    updated_input.description = self.description.clone();
+                    updated_input.description_markdown = self.description_markdown.clone();
+                    updated_input.updated_at = self.updated_at;
 
-                    batch.append_update(&updated_io)?;
+                    batch.append_update(&updated_input)?;
                 }
 
                 // Execute the batch update
@@ -203,6 +215,7 @@ impl Callbacks<NodecosmosError> for UpdateDescriptionInputOutput {
 
 partial_input_output!(
     UpdateTitleInputOutput,
+    root_node_id,
     node_id,
     workflow_id,
     id,
@@ -215,9 +228,9 @@ impl Callbacks<NodecosmosError> for UpdateTitleInputOutput {
     updated_at_cb_fn!();
 
     /// See UpdateDescriptionInputOutput::after_update for explanation
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let ios = InputOutput::ios_by_original_id(session, original_id).await?;
+            let ios = InputOutput::ios_by_original_id(session, self.root_node_id, original_id).await?;
 
             for chunk in ios.chunks(25) {
                 let mut batch = CharybdisModelBatch::new();
@@ -226,11 +239,11 @@ impl Callbacks<NodecosmosError> for UpdateTitleInputOutput {
                     if io.id == self.id {
                         continue;
                     }
-                    let mut updated_io = io.clone();
-                    updated_io.title = self.title.clone();
-                    updated_io.updated_at = self.updated_at;
+                    let mut updated_input = io.clone();
+                    updated_input.title = self.title.clone();
+                    updated_input.updated_at = self.updated_at;
 
-                    batch.append_update(&updated_io)?;
+                    batch.append_update(&updated_input)?;
                 }
 
                 batch.execute(session).await?;
@@ -241,6 +254,6 @@ impl Callbacks<NodecosmosError> for UpdateTitleInputOutput {
     }
 }
 
-partial_input_output!(UpdateWorkflowIndexInputOutput, node_id, workflow_id, id, workflow_index);
+partial_input_output!(UpdateWorkflowIndexInputOutput, root_node_id, node_id, workflow_id, id);
 
-partial_input_output!(DeleteInputOutput, node_id, workflow_id, id);
+partial_input_output!(DeleteInputOutput, root_node_id, node_id, workflow_id, id);

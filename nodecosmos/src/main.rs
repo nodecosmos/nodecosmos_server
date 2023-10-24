@@ -1,5 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(async_fn_in_trait)]
 #![feature(const_option)]
 
 mod actions;
@@ -52,7 +50,7 @@ async fn main() {
     let resource_locker_web_data = web::Data::new(resource_locker.clone());
 
     let cb_extension = CbExtension::new(elastic_client.clone(), resource_locker.clone());
-    let cb_extension_web_data = web::Data::new(cb_extension.clone());
+    let cb_extension_web_data = web::Data::new(cb_extension);
 
     nodecosmos
         .init(&db_session_web_data, &resource_locker_web_data, &elastic_client)

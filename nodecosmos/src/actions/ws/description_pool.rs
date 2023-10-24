@@ -90,7 +90,7 @@ impl Handler<DescriptionUpdateMessage> for DescriptionWsConnection {
 
 #[derive(Deserialize)]
 pub struct PathParams {
-    // check if we can route LB connections based on room_id params
+    // check if we can route Load Balancer connections based on room_id params
     room_id: Uuid,
     node_id: Uuid,
 }

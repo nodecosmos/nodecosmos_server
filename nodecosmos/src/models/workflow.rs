@@ -1,11 +1,9 @@
 use crate::errors::NodecosmosError;
-use crate::models::flow::{Flow, FlowDelete};
+use crate::models::flow::{DeleteFlow, Flow};
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::input_output::DeleteInputOutput;
-use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::Callbacks;
-use charybdis::errors::CharybdisError;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -39,11 +37,12 @@ pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
 
-    #[serde(default = "Uuid::new_v4")]
-    pub id: Uuid,
     pub title: Option<Text>,
     pub description: Option<Text>,
     pub description_markdown: Option<Text>,
@@ -56,34 +55,19 @@ pub struct Workflow {
 
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
-
-    #[serde(rename = "flowIds")]
-    pub flow_ids: Option<List<Uuid>>,
 }
 
 impl Workflow {
-    pub async fn append_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
-        self.push_to_flow_ids(session, &vec![flow_id]).await?;
-
-        Ok(())
-    }
-
-    pub async fn pull_flow_id(&mut self, session: &CachingSession, flow_id: Uuid) -> Result<(), CharybdisError> {
-        self.pull_from_flow_ids(session, &vec![flow_id]).await?;
-
-        Ok(())
-    }
-
-    pub async fn pull_initial_input_id(&mut self, session: &CachingSession, id: Uuid) -> Result<(), CharybdisError> {
-        self.pull_from_initial_input_ids(session, &vec![id]).await?;
-
-        Ok(())
-    }
-
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
         let flows = Flow::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
 
         Ok(flows)
+    }
+
+    pub async fn pull_initial_input_id(&mut self, session: &CachingSession, id: Uuid) -> Result<(), NodecosmosError> {
+        self.pull_from_initial_input_ids(session, &vec![id]).await?;
+
+        Ok(())
     }
 }
 
@@ -92,34 +76,15 @@ impl Callbacks<NodecosmosError> for Workflow {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        if self.flow_ids.is_some() {
-            let flow_steps = DeleteFlowStep::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                .await?
-                .try_collect()
-                .await?;
+    async fn after_delete(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        DeleteFlowStep::delete_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+        DeleteFlow::delete_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
 
-            let flows = FlowDelete::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                .await?
-                .try_collect()
-                .await?;
-
-            let input_outputs = DeleteInputOutput::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                .await?
-                .try_collect()
-                .await?;
-
-            CharybdisModelBatch::chunked_delete(session, &flow_steps, 100).await?;
-            CharybdisModelBatch::chunked_delete(session, &flows, 100).await?;
-            CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
-        } else if self.initial_input_ids.is_some() {
-            let input_outputs = DeleteInputOutput::find_by_node_id_and_workflow_id(session, self.node_id, self.id)
-                .await?
-                .try_collect()
-                .await?;
-
-            CharybdisModelBatch::chunked_delete(session, &input_outputs, 100).await?;
-        }
+        DeleteInputOutput::delete_by_root_node_id_and_node_id(session, self.root_node_id, self.node_id).await?;
+        DeleteInputOutput::delete_by_root_node_id_and_node_id(session, self.root_node_id, self.node_id)
+            .await?
+            .try_collect()
+            .await?;
 
         Ok(())
     }
@@ -129,7 +94,7 @@ partial_workflow!(UpdateInitialInputsWorkflow, node_id, id, initial_input_ids, u
 impl_updated_at_cb!(UpdateInitialInputsWorkflow);
 
 // used by node deletion
-partial_workflow!(WorkflowDelete, node_id, id);
+partial_workflow!(WorkDeleteFlow, node_id, id);
 
 partial_workflow!(UpdateWorkflowTitle, node_id, id, title, updated_at);
 impl_updated_at_cb!(UpdateWorkflowTitle);

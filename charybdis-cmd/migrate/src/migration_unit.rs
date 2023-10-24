@@ -113,7 +113,7 @@ impl<'a> MigrationUnit<'a> {
                 "Illegal change in".bright_red(),
                 self.data.migration_object_name.bright_yellow(),
                 self.data.migration_object_type.to_string().bright_magenta(),
-                "Field type change is not supported!".bright_red(),
+                "Field type change is not supported yet!".bright_red(),
             );
 
             // TODO: implement migration flag so on field type change

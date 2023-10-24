@@ -55,5 +55,5 @@ pub async fn sync(client_session: Session) -> impl Responder {
 #[delete("/logout")]
 pub async fn logout(client_session: Session) -> impl Responder {
     client_session.clear();
-    HttpResponse::Ok().json(json!({"success": true}))
+    HttpResponse::Ok().finish()
 }

@@ -31,14 +31,11 @@ pub(crate) fn find_by_primary_keys_functions(
         i += 1;
 
         let current_keys = primary_key.clone();
-
         let primary_key_where_clause: String = current_keys.join(" = ? AND ");
-
         let query_str = format!(
             "SELECT {} FROM {} WHERE {} = ?",
             comma_sep_cols, table_name, primary_key_where_clause
         );
-
         let find_by_fun_name_str = format!(
             "find_by_{}",
             current_keys
@@ -47,7 +44,6 @@ pub(crate) fn find_by_primary_keys_functions(
                 .collect::<Vec<String>>()
                 .join("_and_")
         );
-
         let find_by_fun_name = syn::Ident::new(&find_by_fun_name_str, proc_macro2::Span::call_site());
 
         let arguments = current_keys

@@ -1,24 +1,25 @@
 use crate::errors::CharybdisError;
 use scylla::CachingSession;
+use std::future::Future;
 
 pub trait Callbacks<Err: From<CharybdisError>> {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn before_insert(&mut self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_insert(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn after_insert(&self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn before_update(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn before_update(&mut self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_update(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn after_update(&self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn before_delete(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn before_delete(&mut self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_delete(&mut self, _session: &CachingSession) -> Result<(), Err> {
-        Ok(())
+    fn after_delete(&self, _session: &CachingSession) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
 }
 
@@ -56,28 +57,28 @@ pub trait Callbacks<Err: From<CharybdisError>> {
 ///    ) -> Result<(), CustomError> {
 ///        // do something with extension.elastic_client
 ///        extension.elastic_client.update(...).await?;
-///        Ok(())
+///        async move { Ok(()) }
 ///    }
 /// }
 /// ```
 ///
 pub trait ExtCallbacks<Ext, Err: From<CharybdisError>> {
-    async fn before_insert(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn before_insert(&mut self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_insert(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn after_insert(&self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn before_update(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn before_update(&mut self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_update(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn after_update(&self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn before_delete(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn before_delete(&mut self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
-    async fn after_delete(&mut self, _session: &CachingSession, _extension: &Ext) -> Result<(), Err> {
-        Ok(())
+    fn after_delete(&self, _session: &CachingSession, _extension: &Ext) -> impl Future<Output = Result<(), Err>> {
+        async move { Ok(()) }
     }
 }

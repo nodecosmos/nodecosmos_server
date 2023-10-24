@@ -2,6 +2,7 @@ use scylla::frame::value::ValueList;
 use scylla::query::Query;
 use scylla::{Bytes, IntoTypedRows};
 use scylla::{CachingSession, QueryResult};
+use std::future::Future;
 
 use crate::errors::CharybdisError;
 use crate::iterator::CharybdisModelIterator;
@@ -9,169 +10,187 @@ use crate::model::BaseModel;
 use crate::stream::CharybdisModelStream;
 
 pub trait Find: BaseModel {
-    async fn find(
+    fn find(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>>;
 
-    async fn find_one(
+    fn find_one(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<Self, CharybdisError>;
+    ) -> impl Future<Output = Result<Self, CharybdisError>>;
 
-    async fn find_paged(
+    fn find_paged(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
         page_size: Option<Bytes>,
-    ) -> Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError>;
+    ) -> impl Future<Output = Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError>>;
 
-    async fn find_all(
+    fn find_all(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
+    ) -> impl Future<Output = Result<CharybdisModelIterator<Self>, CharybdisError>>;
 
-    async fn find_by_primary_key_value(
+    fn find_by_primary_key_value(
         session: &CachingSession,
         value: impl ValueList + std::fmt::Debug,
-    ) -> Result<Self, CharybdisError>;
+    ) -> impl Future<Output = Result<Self, CharybdisError>>;
 
-    async fn find_by_partition_key_value(
+    fn find_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>>;
 
-    async fn find_one_by_partition_key_value(
+    fn find_one_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
-    ) -> Result<Self, CharybdisError>;
+    ) -> impl Future<Output = Result<Self, CharybdisError>>;
 
-    async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError>;
+    fn find_by_primary_key(&self, session: &CachingSession) -> impl Future<Output = Result<Self, CharybdisError>>;
 
-    async fn find_by_partition_key(
+    fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError>;
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>>;
 }
 
 impl<T: BaseModel> Find for T {
     // find iter
-    async fn find(
+    fn find(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
-        let query = Query::new(query);
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>> {
+        async move {
+            let query = Query::new(query);
 
-        let rows = session.execute_iter(query, values).await?.into_typed();
+            let rows = session.execute_iter(query, values).await?.into_typed();
 
-        Ok(CharybdisModelStream::from(rows))
+            Ok(CharybdisModelStream::from(rows))
+        }
     }
 
-    async fn find_one(
+    fn find_one(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<Self, CharybdisError> {
-        let result: QueryResult = session.execute(query, values).await?;
-        let typed_row: Self = result.first_row_typed()?;
+    ) -> impl Future<Output = Result<Self, CharybdisError>> {
+        async move {
+            let result: QueryResult = session.execute(query, values).await?;
+            let typed_row: Self = result.first_row_typed()?;
 
-        Ok(typed_row)
+            Ok(typed_row)
+        }
     }
 
-    async fn find_paged(
+    fn find_paged(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
         paging_state: Option<Bytes>,
-    ) -> Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError> {
-        let res = session.execute_paged(query, values, paging_state).await?;
-        let paging_state = res.paging_state.clone();
-        let rows = res.rows()?;
-        let typed_rows = CharybdisModelIterator::from(rows.into_typed());
+    ) -> impl Future<Output = Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError>> {
+        async move {
+            let res = session.execute_paged(query, values, paging_state).await?;
+            let paging_state = res.paging_state.clone();
+            let rows = res.rows()?;
+            let typed_rows = CharybdisModelIterator::from(rows.into_typed());
 
-        Ok((typed_rows, paging_state))
+            Ok((typed_rows, paging_state))
+        }
     }
 
-    async fn find_all(
+    fn find_all(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
-        let result: QueryResult = session.execute(query, values).await?;
+    ) -> impl Future<Output = Result<CharybdisModelIterator<Self>, CharybdisError>> {
+        async move {
+            let result: QueryResult = session.execute(query, values).await?;
 
-        let rows = result.rows()?;
-        let typed_rows = CharybdisModelIterator::from(rows.into_typed());
+            let rows = result.rows()?;
+            let typed_rows = CharybdisModelIterator::from(rows.into_typed());
 
-        Ok(typed_rows)
+            Ok(typed_rows)
+        }
     }
 
-    async fn find_by_primary_key_value(
+    fn find_by_primary_key_value(
         session: &CachingSession,
         value: impl ValueList + std::fmt::Debug,
-    ) -> Result<Self, CharybdisError> {
-        let result: QueryResult = session.execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value).await?;
+    ) -> impl Future<Output = Result<Self, CharybdisError>> {
+        async move {
+            let result: QueryResult = session.execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value).await?;
 
-        let res = result.first_row_typed()?;
+            let res = result.first_row_typed()?;
 
-        Ok(res)
+            Ok(res)
+        }
     }
 
-    async fn find_by_partition_key_value(
+    fn find_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
-        let rows = session
-            .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, value)
-            .await?
-            .into_typed::<Self>();
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>> {
+        async move {
+            let rows = session
+                .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, value)
+                .await?
+                .into_typed::<Self>();
 
-        Ok(CharybdisModelStream::from(rows))
+            Ok(CharybdisModelStream::from(rows))
+        }
     }
 
-    async fn find_one_by_partition_key_value(
+    fn find_one_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
-    ) -> Result<Self, CharybdisError> {
-        let result: QueryResult = session.execute(Self::FIND_BY_PARTITION_KEY_QUERY, value).await?;
+    ) -> impl Future<Output = Result<Self, CharybdisError>> {
+        async move {
+            let result: QueryResult = session.execute(Self::FIND_BY_PARTITION_KEY_QUERY, value).await?;
 
-        let res = result.first_row_typed()?;
+            let res = result.first_row_typed()?;
 
-        Ok(res)
+            Ok(res)
+        }
     }
 
     /// Preferred way to find by partition key, as keys will be in correct order
-    async fn find_by_primary_key(&self, session: &CachingSession) -> Result<Self, CharybdisError> {
-        let primary_key_values = self
-            .get_primary_key_values()
-            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
+    fn find_by_primary_key(&self, session: &CachingSession) -> impl Future<Output = Result<Self, CharybdisError>> {
+        async move {
+            let primary_key_values = self
+                .get_primary_key_values()
+                .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
-        let result: QueryResult = session
-            .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, &primary_key_values)
-            .await?;
+            let result: QueryResult = session
+                .execute(Self::FIND_BY_PRIMARY_KEY_QUERY, &primary_key_values)
+                .await?;
 
-        let res = result.first_row_typed()?;
+            let res = result.first_row_typed()?;
 
-        Ok(res)
+            Ok(res)
+        }
     }
 
     /// Preferred way to find by partition key, as keys will be in correct order
-    async fn find_by_partition_key(
+    fn find_by_partition_key(
         &self,
         session: &CachingSession,
-    ) -> Result<CharybdisModelStream<Self>, CharybdisError> {
-        let get_partition_key_values = self
-            .get_partition_key_values()
-            .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
+    ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>> {
+        async move {
+            let get_partition_key_values = self
+                .get_partition_key_values()
+                .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
-        let rows = session
-            .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
-            .await?
-            .into_typed::<Self>();
+            let rows = session
+                .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
+                .await?
+                .into_typed::<Self>();
 
-        Ok(CharybdisModelStream::from(rows))
+            Ok(CharybdisModelStream::from(rows))
+        }
     }
 }

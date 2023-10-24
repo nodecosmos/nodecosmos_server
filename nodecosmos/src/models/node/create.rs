@@ -8,7 +8,7 @@ use charybdis::errors::CharybdisError;
 use scylla::CachingSession;
 
 impl Node {
-    pub async fn append_to_ancestors(&mut self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+    pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut batch = CharybdisModelBatch::new();
 

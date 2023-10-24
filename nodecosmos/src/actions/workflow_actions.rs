@@ -2,7 +2,7 @@ use crate::authorize::{auth_workflow_creation, auth_workflow_update};
 use crate::errors::NodecosmosError;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
-use crate::models::materialized_views::input_outputs_by_root_node_id::InputOutputsByRootNodeId;
+use crate::models::input_output::InputOutput;
 use crate::models::user::CurrentUser;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
@@ -24,13 +24,11 @@ pub async fn get_workflow(
     // flows
     let mut flow = BaseFlow::new();
     flow.node_id = node_id;
-    flow.workflow_id = workflow.id;
     let flows = flow.find_by_partition_key(&db_session).await?.try_collect().await?;
 
     // flow steps
     let mut flow_step = FlowStep::new();
     flow_step.node_id = node_id;
-    flow_step.workflow_id = workflow.id;
     let flow_steps = flow_step
         .find_by_partition_key(&db_session)
         .await?
@@ -38,9 +36,10 @@ pub async fn get_workflow(
         .await?;
 
     // input outputs
-    let mut base_ios = InputOutputsByRootNodeId::new();
-    base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs = base_ios.find_by_partition_key(&db_session).await?.try_collect().await?;
+    let input_outputs = InputOutput::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+        .await?
+        .try_collect()
+        .await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
@@ -56,16 +55,16 @@ pub async fn create_workflow(
     current_user: CurrentUser,
     mut workflow: web::Json<Workflow>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    auth_workflow_creation(&db_session, workflow.node_id, current_user).await?;
+    auth_workflow_creation(&db_session, &workflow, &current_user).await?;
 
     workflow.insert_cb(&db_session).await?;
 
-    let mut base_ios = InputOutputsByRootNodeId::new();
-    base_ios.root_node_id = workflow.root_node_id;
-    let input_outputs = base_ios.find_by_partition_key(&db_session).await?.try_collect().await?;
+    let input_outputs = InputOutput::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+        .await?
+        .try_collect()
+        .await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "workflow": workflow,
         "inputOutputs": input_outputs,
     })))
@@ -82,7 +81,6 @@ pub async fn update_initial_inputs(
     workflow.update_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "workflow": workflow,
     })))
 }
@@ -98,7 +96,6 @@ pub async fn update_workflow_title(
     workflow.update_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "workflow": workflow,
     })))
 }
@@ -122,7 +119,6 @@ pub async fn delete_workflow(
     workflow.delete_cb(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "workflow": workflow,
     })))
 }

@@ -59,7 +59,6 @@ impl<'a> MigrationUnitData<'a> {
         self.current_db_schema.fields.is_empty()
     }
 
-    // we will not sync glob secondary indexes if fields are not defined in code schema
     pub(crate) fn has_new_global_secondary_indexes(&self) -> bool {
         !self.new_global_secondary_indexes.is_empty()
     }
@@ -68,7 +67,6 @@ impl<'a> MigrationUnitData<'a> {
         !self.removed_global_secondary_indexes.is_empty()
     }
 
-    // we will not sync local secondary indexes if fields are not defined in code schema
     pub(crate) fn has_new_local_secondary_indexes(&self) -> bool {
         !self.new_local_secondary_indexes.is_empty()
     }

@@ -69,7 +69,7 @@ impl Callbacks<NodecosmosError> for ContributionRequest {
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_delete(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         Commit::delete_contribution_request_commits(session, self.id).await?;
         Ok(())
     }

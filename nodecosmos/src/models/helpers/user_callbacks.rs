@@ -12,7 +12,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
             }
 
             async fn after_update(
-                &mut self,
+                &self,
                 _session: &charybdis::CachingSession,
                 ext: &crate::CbExtension,
             ) -> Result<(), crate::errors::NodecosmosError> {

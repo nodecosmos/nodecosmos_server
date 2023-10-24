@@ -133,7 +133,6 @@ pub async fn liked_object_ids(
     let liked_object_ids = user.liked_object_ids.unwrap_or(vec![]);
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "likedObjectIds": liked_object_ids,
     })))
 }

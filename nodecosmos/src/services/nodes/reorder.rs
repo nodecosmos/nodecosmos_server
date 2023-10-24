@@ -108,6 +108,8 @@ impl<'a> Reorderer<'a> {
 
         update_order_node.update(&self.db_session).await?;
 
+        println!("Updated node order: {:?}", update_order_node.id);
+
         Ok(())
     }
 
