@@ -1,29 +1,27 @@
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    BaseFlowStep, FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep,
-    UpdateOutputIdsFlowStep,
+    FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::user::CurrentUser;
 use crate::services::flow_step_idx_calculator::FlowStepIdxCalculator;
 use crate::services::resource_locker::ResourceLocker;
 use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
-const WORKFLOW_RESOURCE_LOCKER_TTL: usize = 1000 * 10; // 10 seconds
+const LOCKER_TTL: usize = 1000 * 10; // 10 seconds
 
 #[derive(Deserialize)]
 pub struct FlowStepCreationParams {
-    #[serde(rename = "previousFlowStepId")]
-    pub pref_flow_step: Option<BaseFlowStep>,
+    #[serde(rename = "prevFlowStepId")]
+    pub pref_flow_step_id: Option<Uuid>,
 
     #[serde(rename = "nextFlowStepId")]
-    pub next_flow_step: Option<BaseFlowStep>,
+    pub next_flow_step_id: Option<Uuid>,
 
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -41,6 +39,7 @@ pub struct FlowStepCreationParams {
 #[post("")]
 pub async fn create_flow_step(
     db_session: web::Data<CachingSession>,
+    locker: web::Data<ResourceLocker>,
     params: web::Json<FlowStepCreationParams>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
@@ -49,21 +48,23 @@ pub async fn create_flow_step(
         workflow_id: params.workflow_id,
         flow_id: params.flow_id,
         node_ids: params.node_ids.clone(),
+        id: Uuid::new_v4(),
         ..Default::default()
     };
 
     auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
-    let flow_step_index = FlowStepIdxCalculator::new(&db_session, &params)
-        .await?
-        .calculate_index();
+    locker.check_resource_lock(&flow_step.flow_id.to_string()).await?;
+    locker.lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL).await?;
 
-    flow_step.flow_index = flow_step_index;
+    let index_calculator = FlowStepIdxCalculator::new(&db_session, &params).await?;
+    index_calculator.validate()?;
+
+    flow_step.flow_index = index_calculator.calculate_index();
+
     flow_step.insert_cb(&db_session).await?;
 
-    if let Some(next_flow_step) = &params.next_flow_step {
-        next_flow_step.as_native().remove_inputs(&db_session).await?;
-    }
+    locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "flowStep": flow_step,
@@ -130,29 +131,22 @@ pub async fn update_flow_step_description(
     })))
 }
 
-#[delete("{nodeId}/{workflowId}/{flowId}/{flowIndex}/id")]
+#[delete("{nodeId}/{workflowId}/{flowId}/{flowIndex}/{id}")]
 pub async fn delete_flow_step(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
     flow_step: web::Path<FlowStep>,
-    resource_locker: web::Data<ResourceLocker>,
+    locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut flow_step = flow_step.find_by_primary_key(&db_session).await?;
     auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
-    resource_locker
-        .check_resource_lock(&flow_step.workflow_id.to_string())
-        .await?;
-
-    resource_locker
-        .lock_resource(&flow_step.workflow_id.to_string(), WORKFLOW_RESOURCE_LOCKER_TTL)
-        .await?;
+    locker.check_resource_lock(&flow_step.flow_id.to_string()).await?;
+    locker.lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL).await?;
 
     flow_step.delete_cb(&db_session).await?;
 
-    resource_locker
-        .unlock_resource(&flow_step.workflow_id.to_string())
-        .await?;
+    locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "flowStep": flow_step,

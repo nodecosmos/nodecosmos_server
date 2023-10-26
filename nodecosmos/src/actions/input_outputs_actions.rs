@@ -23,7 +23,7 @@ pub async fn create_io(
     })))
 }
 
-#[get("/{rootNodeId}/{nodeId}/{id}/description")]
+#[get("/{rootNodeId}/{nodeId}/{workflowId}/{id}/description")]
 pub async fn get_io_description(
     db_session: web::Data<CachingSession>,
     input_output: web::Path<UpdateDescriptionInputOutput>,
@@ -39,10 +39,8 @@ pub async fn get_io_description(
 pub async fn update_io_title(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    input_output: web::Json<UpdateTitleInputOutput>,
+    mut input_output: web::Json<UpdateTitleInputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = input_output.find_by_primary_key(&db_session).await?;
-
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;
 
     input_output.update_cb(&db_session).await?;
@@ -56,10 +54,8 @@ pub async fn update_io_title(
 pub async fn update_io_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    input_output: web::Json<UpdateDescriptionInputOutput>,
+    mut input_output: web::Json<UpdateDescriptionInputOutput>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let mut input_output = input_output.find_by_primary_key(&db_session).await?;
-
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;
 
     input_output.update_cb(&db_session).await?;

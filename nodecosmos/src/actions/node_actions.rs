@@ -93,7 +93,7 @@ pub async fn create_node(
     cb_extension: web::Data<CbExtension>,
     mut node: web::Json<Node>,
     current_user: CurrentUser,
-    resource_locker: web::Data<ResourceLocker>,
+    locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let parent = node.parent(&db_session).await?;
 
@@ -102,7 +102,7 @@ pub async fn create_node(
     node.set_owner(&current_user);
     node.set_defaults(&parent).await?;
 
-    resource_locker.check_node_lock(&node).await?;
+    locker.check_node_lock(&node).await?;
 
     node.insert_cb(&db_session, &cb_extension).await?;
 
@@ -115,13 +115,13 @@ pub async fn update_node_title(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
-    resource_locker: web::Data<ResourceLocker>,
+    locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let native_node = update_title_node.as_native().find_by_primary_key(&db_session).await?;
 
     auth_node_update(&native_node, &current_user).await?;
 
-    resource_locker.check_node_lock(&native_node).await?;
+    locker.check_node_lock(&native_node).await?;
 
     update_title_node.update_cb(&db_session, &cb_extension).await?;
 
@@ -149,12 +149,12 @@ pub async fn delete_node(
     db_session: web::Data<CachingSession>,
     cb_extension: web::Data<CbExtension>,
     current_user: CurrentUser,
-    resource_locker: web::Data<ResourceLocker>,
+    locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = Node::new();
     node.id = *id;
 
-    resource_locker.check_node_lock(&node).await?;
+    locker.check_node_lock(&node).await?;
 
     let mut node = node.find_by_primary_key(&db_session).await?;
 
@@ -169,7 +169,7 @@ pub async fn reorder_nodes(
     db_session: web::Data<CachingSession>,
     params: web::Json<ReorderParams>,
     current_user: CurrentUser,
-    resource_locker: web::Data<ResourceLocker>,
+    locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut node = Node::new();
     node.id = params.node_id;
@@ -177,14 +177,14 @@ pub async fn reorder_nodes(
     let node = node.find_by_primary_key(&db_session).await?;
     auth_node_update(&node, &current_user).await?;
 
-    resource_locker.check_node_lock(&node).await?;
-    resource_locker
+    locker.check_node_lock(&node).await?;
+    locker
         .check_node_action_lock(ActionTypes::Reorder(ActionObject::Node), &node)
         .await?;
 
     let mut reorderer = Reorderer::new(&db_session, params.into_inner()).await?;
 
-    reorderer.reorder(&resource_locker).await?;
+    reorderer.reorder(&locker).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

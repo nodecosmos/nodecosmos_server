@@ -1194,6 +1194,7 @@ dependencies = [
 name = "charybdis_parser"
 version = "0.1.0"
 dependencies = [
+ "colored",
  "proc-macro2",
  "quote",
  "scylla",

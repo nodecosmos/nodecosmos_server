@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::types::Text;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[charybdis_udt_model(type_name = property)]
 pub struct Property {
     pub title: Text,

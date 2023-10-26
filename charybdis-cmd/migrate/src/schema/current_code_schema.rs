@@ -1,4 +1,3 @@
-// use colored::Colorize;
 use crate::schema::{SchemaObject, SchemaObjects};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

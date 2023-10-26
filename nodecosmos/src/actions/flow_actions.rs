@@ -22,12 +22,14 @@ pub async fn create_flow(
     })))
 }
 
-#[get("/{nodeId}/{workflowId}/{startIndex}{verticalIndex}/description")]
+#[get("/{nodeId}/{workflowId}/{startIndex}/{verticalIndex}/{id}/description")]
 pub async fn get_flow_description(
     db_session: web::Data<CachingSession>,
     _current_user: CurrentUser,
     flow: web::Path<FlowDescription>,
 ) -> Result<HttpResponse, NodecosmosError> {
+    println!("Flow description: {:?}", flow);
+
     let flow = flow.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
@@ -65,7 +67,7 @@ pub async fn update_flow_description(
     })))
 }
 
-#[delete("/{nodeId}/{workflowId}/{startIndex}{verticalIndex}")]
+#[delete("/{nodeId}/{workflowId}/{startIndex}/{verticalIndex}/{id}")]
 pub async fn delete_flow(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,

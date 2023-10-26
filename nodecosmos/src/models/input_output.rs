@@ -20,10 +20,11 @@ use serde::{Deserialize, Serialize};
     partition_keys = [root_node_id],
     clustering_keys = [node_id, workflow_id, id],
     local_secondary_indexes = [
-        ([root_node_id] [id])
+        ([root_node_id], [id]),
+        ([root_node_id], [original_id]),
     ]
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct InputOutput {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
@@ -83,7 +84,7 @@ impl InputOutput {
         Ok(ios)
     }
 
-    async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
+    pub async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
         let mut workflow = Workflow::new();
         workflow.node_id = self.node_id;
         workflow.id = self.workflow_id;
@@ -93,7 +94,7 @@ impl InputOutput {
         Ok(res)
     }
 
-    async fn flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
+    pub async fn flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
         let flow_step_id = self.flow_step_id.unwrap_or_default();
 
         if flow_step_id.is_nil() {
@@ -103,6 +104,29 @@ impl InputOutput {
         let flow_step = find_one_flow_step!(session, "node_id = ? AND id = ?", (self.node_id, flow_step_id)).await?;
 
         Ok(Some(flow_step))
+    }
+
+    pub async fn remove_from_next_workflow_step(
+        &self,
+        session: &CachingSession,
+        flow_step: &FlowStep,
+        flow_steps_by_index: &mut FlowStepsByIndex,
+    ) -> Result<(), NodecosmosError> {
+        // remove input from next flow steps
+        let current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
+        if let Some(current_step_wf_index) = current_step_wf_index {
+            let next_wf_index = current_step_wf_index + 1;
+            let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
+
+            if let Some(mut next_flow_steps) = next_flow_steps {
+                for flow_step in next_flow_steps.iter_mut() {
+                    let mut flow_step = flow_step.borrow_mut();
+                    flow_step.pull_input_id(session, self.id).await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -142,26 +166,13 @@ impl Callbacks<NodecosmosError> for InputOutput {
             workflow.pull_initial_input_id(session, self.id).await?;
         }
 
+        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
         let flow_step = self.flow_step(session).await?;
 
         if let Some(mut flow_step) = flow_step {
             flow_step.pull_output_id(session, self.id).await?;
-
-            // remove input from next flow steps
-            let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
-            let current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
-
-            if let Some(current_step_wf_index) = current_step_wf_index {
-                let next_wf_index = current_step_wf_index + 1;
-                let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
-
-                if let Some(mut next_flow_steps) = next_flow_steps {
-                    for flow_step in next_flow_steps.iter_mut() {
-                        let mut flow_step = flow_step.borrow_mut();
-                        flow_step.pull_input_id(session, self.id).await?;
-                    }
-                }
-            }
+            self.remove_from_next_workflow_step(session, &flow_step, &mut flow_steps_by_index)
+                .await?;
         }
 
         Ok(())

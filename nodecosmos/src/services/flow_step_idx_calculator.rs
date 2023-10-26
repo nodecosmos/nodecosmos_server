@@ -1,12 +1,11 @@
 use crate::actions::FlowStepCreationParams;
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::BaseFlowStep;
-use charybdis::operations::Find;
+use crate::models::flow_step::FlowStep;
 use scylla::CachingSession;
 
 pub struct FlowStepIdxCalculator {
-    prev_flow_step: Option<BaseFlowStep>,
-    next_flow_step: Option<BaseFlowStep>,
+    prev_flow_step: Option<FlowStep>,
+    next_flow_step: Option<FlowStep>,
 }
 
 impl FlowStepIdxCalculator {
@@ -14,13 +13,13 @@ impl FlowStepIdxCalculator {
         let mut prev_flow_step = None;
         let mut next_flow_step = None;
 
-        if let Some(flow_step) = &params.pref_flow_step {
-            let fs = flow_step.find_by_primary_key(db_session).await?;
+        if let Some(pref_flow_step_id) = &params.pref_flow_step_id {
+            let fs = FlowStep::find_by_node_id_and_id(db_session, params.node_id, *pref_flow_step_id).await?;
             prev_flow_step = Some(fs);
         }
 
-        if let Some(flow_step) = &params.next_flow_step {
-            let fs = flow_step.find_by_primary_key(db_session).await?;
+        if let Some(next_flow_step_id) = &params.next_flow_step_id {
+            let fs = FlowStep::find_by_node_id_and_id(db_session, params.node_id, *next_flow_step_id).await?;
             next_flow_step = Some(fs);
         }
 
@@ -28,6 +27,46 @@ impl FlowStepIdxCalculator {
             prev_flow_step,
             next_flow_step,
         })
+    }
+
+    pub fn validate(&self) -> Result<(), NodecosmosError> {
+        match (&self.prev_flow_step, &self.next_flow_step) {
+            (Some(prev_flow_step), Some(next_flow_step)) => match prev_flow_step.next_flow_step_id {
+                Some(prev_flow_step_next_flow_step_id) => {
+                    if prev_flow_step_next_flow_step_id != next_flow_step.id {
+                        return Err(NodecosmosError::Conflict(format!(
+                            r#"
+                                The previous flow step's next flow step id ({}) 
+                                does not match the next flow step's id ({})
+                            "#,
+                            prev_flow_step_next_flow_step_id, next_flow_step.id
+                        )));
+                    }
+                }
+                None => {
+                    return Err(NodecosmosError::Conflict(format!(
+                        "The previous flow step's next flow step id is null"
+                    )));
+                }
+            },
+            (Some(prev_flow_step), None) => {
+                if prev_flow_step.next_flow_step_id.is_some() {
+                    return Err(NodecosmosError::Conflict(format!(
+                        "The previous flow step's next flow step id is not null"
+                    )));
+                }
+            }
+            (None, Some(next_flow_step)) => {
+                if next_flow_step.prev_flow_step_id.is_some() {
+                    return Err(NodecosmosError::Conflict(format!(
+                        "The next flow step's previous flow step id is not null"
+                    )));
+                }
+            }
+            (None, None) => {}
+        }
+
+        Ok(())
     }
 
     pub fn calculate_index(&self) -> f64 {
