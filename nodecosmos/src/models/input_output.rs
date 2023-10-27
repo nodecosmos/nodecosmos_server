@@ -50,6 +50,7 @@ pub struct InputOutput {
 
     #[serde(rename = "dataType")]
     pub data_type: Option<Text>,
+
     pub value: Option<Text>,
 
     pub description: Option<Text>,

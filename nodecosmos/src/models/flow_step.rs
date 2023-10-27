@@ -6,6 +6,7 @@ use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::helpers::ClonedRef;
 use crate::models::input_output::InputOutput;
 use crate::models::workflow::Workflow;
+
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New, UpdateWithCallbacks};
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
@@ -32,7 +33,7 @@ pub struct FlowStep {
     #[serde(rename = "flowId")]
     pub flow_id: Uuid,
 
-    #[serde(rename = "flowIndex")]
+    #[serde(default, rename = "flowIndex")]
     pub flow_index: Double,
 
     #[serde(default = "Uuid::new_v4")]
