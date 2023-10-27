@@ -1,9 +1,10 @@
+mod callbacks;
+
 use crate::errors::NodecosmosError;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
 use crate::models::user::User;
 use crate::CbExtension;
-use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{execute, Find, New, UpdateWithExtCallbacks};
 use charybdis::types::{Text, Timestamp, Uuid};
@@ -118,37 +119,6 @@ impl Like {
         let q = User::PULL_FROM_LIKED_OBJECT_IDS_QUERY;
 
         execute(session, q, (vec![self.object_id], self.user_id)).await?;
-
-        Ok(())
-    }
-}
-
-impl ExtCallbacks<CbExtension, NodecosmosError> for Like {
-    async fn before_insert(&mut self, session: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.validate_not_liked(session).await?;
-        self.set_defaults();
-
-        LikesCount::increment(session, self.object_id).await?;
-
-        Ok(())
-    }
-
-    async fn after_insert(&self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.update_model_likes_count(session, ext).await?;
-        self.push_to_user_liked_obj_ids(session).await?;
-
-        Ok(())
-    }
-
-    async fn before_delete(&mut self, session: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
-        LikesCount::decrement(session, self.object_id).await?;
-
-        Ok(())
-    }
-
-    async fn after_delete(&self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.update_model_likes_count(session, ext).await?;
-        self.pull_from_user_liked_obj_ids(session).await?;
 
         Ok(())
     }

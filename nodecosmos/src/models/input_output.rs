@@ -1,11 +1,11 @@
+mod callbacks;
+
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::flow_step::{find_one_flow_step, FlowStep};
-use crate::models::helpers::{sanitize_description_cb_fn, updated_at_cb_fn};
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
 use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
@@ -84,6 +84,37 @@ impl InputOutput {
         Ok(ios)
     }
 
+    pub async fn delete_by_ids(
+        session: &CachingSession,
+        ids: Vec<Uuid>,
+        workflow: &Workflow,
+        node_id: Uuid,
+        flow_step: Option<&FlowStep>,
+    ) -> Result<(), NodecosmosError> {
+        let mut batch = CharybdisModelBatch::new();
+        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
+
+        for output_id in ids.iter() {
+            let mut output = InputOutput::new();
+
+            output.root_node_id = workflow.root_node_id;
+            output.node_id = node_id;
+            output.workflow_id = workflow.id;
+            output.flow_step_id = flow_step.map(|fs| fs.id);
+            output.id = *output_id;
+
+            batch.append_delete(&output)?;
+
+            output
+                .remove_from_next_workflow_step(session, flow_step, &mut flow_steps_by_index)
+                .await?;
+        }
+
+        batch.execute(session).await?;
+
+        Ok(())
+    }
+
     pub async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
         let mut workflow = Workflow::new();
         workflow.node_id = self.node_id;
@@ -106,14 +137,51 @@ impl InputOutput {
         Ok(Some(flow_step))
     }
 
+    pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        if let Some(original_id) = self.original_id {
+            let original_io =
+                find_one_input_output!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id))
+                    .await?;
+            Ok(Some(original_io))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// We use copy instead of reference, as in future we may add more features
+    /// that will require each node within a flow step to have it's own IO.
+    pub async fn copy_vals_from_original(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let original_io = self.original_io(session).await?;
+
+        if let Some(original_io) = original_io {
+            self.title = original_io.title;
+            self.unit = original_io.unit;
+            self.data_type = original_io.data_type;
+            self.description = original_io.description;
+            self.description_markdown = original_io.description_markdown;
+            self.original_id = original_io.original_id;
+        } else {
+            self.original_id = Some(self.id);
+        }
+
+        Ok(())
+    }
+
+    // remove output as input from next workflow step
     pub async fn remove_from_next_workflow_step(
         &self,
         session: &CachingSession,
-        flow_step: &FlowStep,
+        flow_step: Option<&FlowStep>,
         flow_steps_by_index: &mut FlowStepsByIndex,
     ) -> Result<(), NodecosmosError> {
-        // remove input from next flow steps
-        let current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
+        let current_step_wf_index;
+
+        if let Some(flow_step) = flow_step {
+            current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
+        } else {
+            current_step_wf_index = Some(0);
+        }
+
         if let Some(current_step_wf_index) = current_step_wf_index {
             let next_wf_index = current_step_wf_index + 1;
             let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
@@ -124,55 +192,6 @@ impl InputOutput {
                     flow_step.pull_input_id(session, self.id).await?;
                 }
             }
-        }
-
-        Ok(())
-    }
-}
-
-impl Callbacks<NodecosmosError> for InputOutput {
-    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
-        if let Some(original_id) = self.original_id {
-            let original_input =
-                find_one_input_output!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id))
-                    .await?;
-
-            self.title = original_input.title;
-            self.unit = original_input.unit;
-            self.data_type = original_input.data_type;
-            self.description = original_input.description;
-            self.description_markdown = original_input.description_markdown;
-            self.original_id = original_input.original_id;
-        } else {
-            self.original_id = Some(self.id);
-        }
-
-        Ok(())
-    }
-
-    updated_at_cb_fn!();
-
-    async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut workflow = self.workflow(session).await?;
-        let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
-
-        if initial_input_ids.contains(&self.id) {
-            workflow.pull_initial_input_id(session, self.id).await?;
-        }
-
-        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
-        let flow_step = self.flow_step(session).await?;
-
-        if let Some(mut flow_step) = flow_step {
-            flow_step.pull_output_id(session, self.id).await?;
-            self.remove_from_next_workflow_step(session, &flow_step, &mut flow_steps_by_index)
-                .await?;
         }
 
         Ok(())
@@ -191,39 +210,6 @@ partial_input_output!(
     updated_at
 );
 
-impl Callbacks<NodecosmosError> for UpdateDescriptionInputOutput {
-    sanitize_description_cb_fn!();
-
-    /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
-    /// while allowing IO to have it's own properties and value.
-    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(original_id) = self.original_id {
-            let ios = InputOutput::ios_by_original_id(session, self.root_node_id, original_id).await?;
-
-            for chunk in ios.chunks(25) {
-                let mut batch = CharybdisModelBatch::new();
-
-                for io in chunk {
-                    if io.id == self.id {
-                        continue;
-                    }
-                    let mut updated_input = io.clone();
-                    updated_input.description = self.description.clone();
-                    updated_input.description_markdown = self.description_markdown.clone();
-                    updated_input.updated_at = self.updated_at;
-
-                    batch.append_update(&updated_input)?;
-                }
-
-                // Execute the batch update
-                batch.execute(session).await?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
 partial_input_output!(
     UpdateTitleInputOutput,
     root_node_id,
@@ -234,36 +220,6 @@ partial_input_output!(
     title,
     updated_at
 );
-
-impl Callbacks<NodecosmosError> for UpdateTitleInputOutput {
-    updated_at_cb_fn!();
-
-    /// See UpdateDescriptionInputOutput::after_update for explanation
-    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(original_id) = self.original_id {
-            let ios = InputOutput::ios_by_original_id(session, self.root_node_id, original_id).await?;
-
-            for chunk in ios.chunks(25) {
-                let mut batch = CharybdisModelBatch::new();
-
-                for io in chunk {
-                    if io.id == self.id {
-                        continue;
-                    }
-                    let mut updated_input = io.clone();
-                    updated_input.title = self.title.clone();
-                    updated_input.updated_at = self.updated_at;
-
-                    batch.append_update(&updated_input)?;
-                }
-
-                batch.execute(session).await?;
-            }
-        }
-
-        Ok(())
-    }
-}
 
 partial_input_output!(UpdateWorkflowIndexInputOutput, root_node_id, node_id, workflow_id, id);
 

@@ -24,14 +24,14 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let struct_name = &input.ident;
     let fields_named = parse_named_fields(&input);
 
-    // basic consts
+    // Model trait consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
     let primary_key_const = primary_key_const(&args);
     let select_fields_clause = select_fields_clause(&args, fields_named);
 
-    // operation consts
+    // Model trait operation consts
     let find_by_primary_key_query_const = find_by_primary_key_query_const(&args, fields_named);
     let find_by_partition_key_query_const = find_by_partition_key_query_const(&args, fields_named);
     let insert_query_const = insert_query_const(&args, fields_named);
@@ -39,20 +39,21 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let delete_query_const = delete_query_const(&args);
     let delete_by_partition_key_query_const = delete_by_partition_key_query_const(&args);
 
-    // model specific operation consts
+    // Collection consts
     let push_to_collection_fields_query_consts = push_to_collection_fields_query_consts(&args, fields_named);
     let pull_from_collection_fields_query_consts = pull_from_collection_fields_query_consts(&args, fields_named);
 
+    // Collection methods
     let push_to_collection_funs = push_to_collection_funs(&args, fields_named);
     let pull_from_collection_funs = pull_from_collection_funs(&args, fields_named);
 
-    // methods
+    // Model trait methods
     let get_primary_key_values = get_primary_key_values(&args);
     let get_partition_key_values = get_partition_key_values(&args);
     let get_clustering_key_values = get_clustering_key_values(&args);
     let get_update_values = get_update_values(&args, fields_named);
 
-    // rules
+    // current model specific rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
     let find_model_rule = find_model_rule(&args, fields_named, struct_name);
     let find_one_model_rule = find_one_model_rule(&args, fields_named, struct_name);
@@ -123,7 +124,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let struct_name = &input.ident;
     let fields_named = parse_named_fields(&input);
 
-    // Model consts
+    // Model trait consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
@@ -132,15 +133,15 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let find_by_partition_key_query_const = find_by_partition_key_query_const(&args, fields_named);
     let select_fields_clause = select_fields_clause(&args, fields_named);
 
-    // Model methods
+    // Model trait methods
     let get_primary_key_values = get_primary_key_values(&args);
     let get_partition_key_values = get_partition_key_values(&args);
     let get_clustering_key_values = get_clustering_key_values(&args);
 
-    // rules
+    // model specific rules
     let find_model_query_rule = find_model_query_rule(&args, fields_named, struct_name);
 
-    // Associated functions for finding by clustering keys
+    // Associated functions for finding by partial primary key
     let find_by_key_funs = find_by_primary_keys_functions(&args, fields_named, struct_name);
 
     let expanded = quote! {

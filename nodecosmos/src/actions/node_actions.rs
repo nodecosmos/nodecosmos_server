@@ -4,7 +4,6 @@ use crate::client_session::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::node::*;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::node_partials::*;
 use crate::models::user::CurrentUser;
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;

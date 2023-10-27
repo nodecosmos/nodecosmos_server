@@ -1,4 +1,3 @@
-use crate::actions::FlowStepCreationParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use scylla::CachingSession;
@@ -9,17 +8,17 @@ pub struct FlowStepIdxCalculator {
 }
 
 impl FlowStepIdxCalculator {
-    pub async fn new(db_session: &CachingSession, params: &FlowStepCreationParams) -> Result<Self, NodecosmosError> {
+    pub async fn new(db_session: &CachingSession, flow_step: &FlowStep) -> Result<Self, NodecosmosError> {
         let mut prev_flow_step = None;
         let mut next_flow_step = None;
 
-        if let Some(pref_flow_step_id) = &params.pref_flow_step_id {
-            let fs = FlowStep::find_by_node_id_and_id(db_session, params.node_id, *pref_flow_step_id).await?;
+        if let Some(prev_flow_step_id) = flow_step.prev_flow_step_id {
+            let fs = FlowStep::find_by_node_id_and_id(db_session, flow_step.node_id, prev_flow_step_id).await?;
             prev_flow_step = Some(fs);
         }
 
-        if let Some(next_flow_step_id) = &params.next_flow_step_id {
-            let fs = FlowStep::find_by_node_id_and_id(db_session, params.node_id, *next_flow_step_id).await?;
+        if let Some(next_flow_step_id) = flow_step.next_flow_step_id {
+            let fs = FlowStep::find_by_node_id_and_id(db_session, flow_step.node_id, next_flow_step_id).await?;
             next_flow_step = Some(fs);
         }
 

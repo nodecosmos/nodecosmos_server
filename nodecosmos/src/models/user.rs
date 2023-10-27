@@ -1,10 +1,13 @@
+mod callbacks;
+mod current_user;
+
 pub use super::udts::Address;
+pub use current_user::CurrentUser;
+
 use crate::errors::NodecosmosError;
-use crate::models::helpers::{default_to_false_bool, impl_user_updated_at_with_elastic_ext_cb};
-use crate::services::elastic::{add_elastic_document, delete_elastic_document};
-use crate::CbExtension;
+use crate::models::helpers::default_to_false_bool;
+
 use bcrypt::{hash, verify};
-use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
@@ -111,65 +114,8 @@ impl User {
     }
 }
 
-impl ExtCallbacks<CbExtension, NodecosmosError> for User {
-    async fn before_insert(&mut self, session: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.check_existing_user(session).await?;
-
-        self.set_defaults();
-        self.set_password()?;
-
-        Ok(())
-    }
-
-    async fn after_insert(&self, _session: &CachingSession, cb_extension: &CbExtension) -> Result<(), NodecosmosError> {
-        add_elastic_document(
-            &cb_extension.elastic_client,
-            User::ELASTIC_IDX_NAME,
-            self,
-            self.id.to_string(),
-        )
-        .await;
-
-        Ok(())
-    }
-
-    async fn before_update(&mut self, _: &CachingSession, _ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(Utc::now());
-        Ok(())
-    }
-
-    async fn after_delete(&self, _: &CachingSession, cb_extension: &CbExtension) -> Result<(), NodecosmosError> {
-        delete_elastic_document(
-            &cb_extension.elastic_client,
-            User::ELASTIC_IDX_NAME,
-            self.id.to_string(),
-        )
-        .await;
-
-        Ok(())
-    }
-}
-
 partial_user!(GetUser, id, username, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 
 partial_user!(LikedObjectIdsUser, id, liked_object_ids);
-
-partial_user!(
-    CurrentUser,
-    id,
-    first_name,
-    last_name,
-    username,
-    email,
-    is_confirmed,
-    is_blocked
-);
-
-impl CurrentUser {
-    pub fn full_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
-    }
-}

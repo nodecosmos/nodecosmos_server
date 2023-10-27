@@ -1,15 +1,16 @@
+mod callbacks;
 mod create;
 mod delete;
+mod update_title_node;
+
+pub use update_title_node::UpdateTitleNode;
 
 use crate::errors::NodecosmosError;
-use crate::models::helpers::{default_to_0, impl_node_updated_at_with_elastic_ext_cb};
-use crate::models::node::delete::NodeDeleter;
+use crate::models::helpers::default_to_0;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::models::user::CurrentUser;
-use crate::CbExtension;
 
-use charybdis::callbacks::ExtCallbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
@@ -178,28 +179,6 @@ impl Node {
     }
 }
 
-impl ExtCallbacks<CbExtension, NodecosmosError> for Node {
-    async fn before_insert(&mut self, _: &CachingSession, _: &CbExtension) -> Result<(), NodecosmosError> {
-        self.validate_root().await?;
-
-        Ok(())
-    }
-
-    async fn after_insert(&self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.append_to_ancestors(db_session).await?;
-        self.add_to_elastic(ext).await?;
-
-        Ok(())
-    }
-
-    async fn before_delete(&mut self, db_session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
-        NodeDeleter::new(self, db_session, ext).run().await?;
-
-        Ok(())
-    }
-}
-
-//----------------------------------------------------------------------------------------------------------------------
 partial_node!(
     BaseNode,
     root_id,
@@ -233,14 +212,20 @@ partial_node!(GetDescriptionBase64Node, id, description_base64);
 
 partial_node!(GetStructureNode, root_id, id, parent_id, ancestor_ids, order_index);
 
-//----------------------------------------------------------------------------------------------------------------------
 partial_node!(UpdateOrderNode, id, parent_id, order_index);
 
-//----------------------------------------------------------------------------------------------------------------------
 partial_node!(UpdateLikesCountNode, id, likes_count, updated_at);
-impl_node_updated_at_with_elastic_ext_cb!(UpdateLikesCountNode);
 
-//----------------------------------------------------------------------------------------------------------------------
+partial_node!(
+    UpdateDescriptionNode,
+    id,
+    description,
+    short_description,
+    description_markdown,
+    description_base64,
+    updated_at
+);
+
 partial_node!(
     UpdateCoverImageNode,
     id,
@@ -248,7 +233,5 @@ partial_node!(
     cover_image_filename,
     updated_at
 );
-impl_node_updated_at_with_elastic_ext_cb!(UpdateCoverImageNode);
 
-//----------------------------------------------------------------------------------------------------------------------
 partial_node!(DeleteNode, id);

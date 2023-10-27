@@ -20,7 +20,7 @@ macro_rules! created_at_cb_fn {
         ) -> Result<(), crate::errors::NodecosmosError> {
             let now = chrono::Utc::now();
 
-            self.id = Uuid::new_v4();
+            self.id = charybdis::types::Uuid::new_v4();
             self.created_at = Some(now);
             self.updated_at = Some(now);
 

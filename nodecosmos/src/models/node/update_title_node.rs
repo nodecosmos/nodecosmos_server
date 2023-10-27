@@ -6,7 +6,6 @@ use crate::services::elastic::update_elastic_document;
 use crate::services::logger::log_error;
 use crate::CbExtension;
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::callbacks::ExtCallbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Text, Timestamp, Uuid};
@@ -79,15 +78,5 @@ impl UpdateTitleNode {
 
     pub async fn update_elastic_index(&self, ext: &CbExtension) {
         update_elastic_document(&ext.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
-    }
-}
-
-impl ExtCallbacks<CbExtension, NodecosmosError> for UpdateTitleNode {
-    async fn before_update(&mut self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
-        self.update_title_for_ancestors(session, ext).await?;
-        self.update_elastic_index(ext).await;
-        self.updated_at = Some(chrono::Utc::now());
-
-        Ok(())
     }
 }

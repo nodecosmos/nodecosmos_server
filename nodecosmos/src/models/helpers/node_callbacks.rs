@@ -6,7 +6,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 _ext: &crate::CbExtension,
             ) -> Result<(), crate::errors::NodecosmosError> {
-                self.updated_at = Some(Utc::now());
+                self.updated_at = Some(chrono::Utc::now());
 
                 Ok(())
             }

@@ -22,7 +22,7 @@ pub async fn create_flow(
     })))
 }
 
-#[get("/{nodeId}/{workflowId}/{startIndex}/{verticalIndex}/{id}/description")]
+#[get("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}/description")]
 pub async fn get_flow_description(
     db_session: web::Data<CachingSession>,
     _current_user: CurrentUser,
@@ -67,7 +67,7 @@ pub async fn update_flow_description(
     })))
 }
 
-#[delete("/{nodeId}/{workflowId}/{startIndex}/{verticalIndex}/{id}")]
+#[delete("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}")]
 pub async fn delete_flow(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,

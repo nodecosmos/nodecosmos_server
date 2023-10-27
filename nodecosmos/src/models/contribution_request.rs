@@ -1,13 +1,9 @@
+mod callbacks;
 pub mod status;
 
-use crate::errors::NodecosmosError;
-use crate::models::commit::Commit;
-use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
 use crate::models::udts::Owner;
-use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
-use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
@@ -58,27 +54,9 @@ impl ContributionRequest {
     }
 }
 
-impl Callbacks<NodecosmosError> for ContributionRequest {
-    async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
-        Ok(())
-    }
-
-    async fn after_delete(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        Commit::delete_contribution_request_commits(session, self.id).await?;
-        Ok(())
-    }
-}
-
 partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title, created_at, status);
 
 partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, owner_id, title, updated_at);
-impl_updated_at_cb!(UpdateContributionRequestTitle);
 
 partial_contribution_request!(
     UpdateContributionRequestDescription,
@@ -89,4 +67,3 @@ partial_contribution_request!(
     description_markdown,
     updated_at
 );
-sanitize_description_cb!(UpdateContributionRequestDescription);

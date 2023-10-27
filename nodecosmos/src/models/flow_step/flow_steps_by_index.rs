@@ -13,6 +13,8 @@ pub struct FlowStepsByIndex {
     pub flow_step_index_by_id: HashMap<Uuid, u32>,
 }
 
+/// This is a helper struct to get the flow steps by workflow step index.
+/// FlowStep's workflow's index is calculated by `flow.start_index + flow_step.flow_index`
 impl FlowStepsByIndex {
     pub async fn build(session: &CachingSession, workflow: &Workflow) -> Result<FlowStepsByIndex, NodecosmosError> {
         let mut flows = workflow.flows(session).await?;
