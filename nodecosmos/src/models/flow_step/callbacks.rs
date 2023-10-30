@@ -2,7 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
     FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep, UpdateOutputIdsFlowStep,
 };
-use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
+use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::{Find, UpdateWithCallbacks};

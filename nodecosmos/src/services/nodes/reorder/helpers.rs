@@ -1,5 +1,6 @@
 use crate::errors::NodecosmosError;
-use crate::models::helpers::ClonedRef;
+use crate::utils::cloned_ref::ClonedRef;
+
 use crate::models::node::GetStructureNode;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;

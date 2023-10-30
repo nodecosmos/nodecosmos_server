@@ -8,6 +8,7 @@ mod client_session;
 mod errors;
 mod models;
 mod services;
+mod utils;
 
 use crate::app::*;
 use crate::services::elastic;

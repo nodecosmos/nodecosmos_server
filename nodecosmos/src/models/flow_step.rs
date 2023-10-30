@@ -3,9 +3,9 @@ pub mod flow_steps_by_index;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
-use crate::models::helpers::ClonedRef;
-use crate::models::input_output::InputOutput;
+use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
+use crate::utils::cloned_ref::ClonedRef;
 
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New, UpdateWithCallbacks};
@@ -135,7 +135,7 @@ impl FlowStep {
     ) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id.clone() {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-            InputOutput::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(&self)).await?;
+            Io::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(&self)).await?;
         }
 
         Ok(())
@@ -153,7 +153,7 @@ impl FlowStep {
         if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_ref() {
             for (node_id, output_ids) in output_ids_by_node_id.iter() {
                 if !node_ids.contains(node_id) {
-                    InputOutput::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(self)).await?;
+                    Io::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(self)).await?;
 
                     node_ids_to_remove.push(*node_id);
                 }
@@ -204,7 +204,7 @@ impl FlowStep {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
             for id in output_ids {
-                let mut output = InputOutput::new();
+                let mut output = Io::new();
                 output.root_node_id = workflow.root_node_id;
                 output.node_id = self.node_id;
                 output.workflow_id = self.workflow_id;

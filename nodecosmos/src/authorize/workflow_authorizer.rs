@@ -2,7 +2,7 @@ use crate::authorize::{auth_node_update, auth_node_update_by_id};
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
 
-use crate::models::input_output::InputOutput;
+use crate::models::input_output::Io;
 use crate::models::node::Node;
 use crate::models::workflow::Workflow;
 use charybdis::operations::Find;
@@ -45,7 +45,7 @@ pub async fn auth_workflow_update(
 
 pub async fn auth_input_output_creation(
     db_session: &CachingSession,
-    io: &InputOutput,
+    io: &Io,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
     let node = Node {
@@ -61,7 +61,7 @@ pub async fn auth_input_output_creation(
     if io.root_node_id != node.root_id {
         return Err(NodecosmosError::Unauthorized(json!({
             "error": "Unauthorized",
-            "message": "Not authorized to add workflow for this node!"
+            "message": "Not authorized to add IO for this node!"
         })));
     }
 

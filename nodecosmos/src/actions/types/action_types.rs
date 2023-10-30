@@ -27,7 +27,7 @@ pub enum ActionObject {
     Workflow,
     Flow,
     FlowStep,
-    InputOutput,
+    Io,
 }
 
 impl Display for ActionObject {
@@ -37,7 +37,7 @@ impl Display for ActionObject {
             ActionObject::Workflow => write!(f, "WORKFLOW"),
             ActionObject::Flow => write!(f, "FLOW"),
             ActionObject::FlowStep => write!(f, "FLOW_STEP"),
-            ActionObject::InputOutput => write!(f, "INPUT_OUTPUT"),
+            ActionObject::Io => write!(f, "INPUT_OUTPUT"),
         }
     }
 }

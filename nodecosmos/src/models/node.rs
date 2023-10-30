@@ -6,10 +6,10 @@ mod update_title_node;
 pub use update_title_node::UpdateTitleNode;
 
 use crate::errors::NodecosmosError;
-use crate::models::helpers::default_to_0;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Creator, Owner, OwnerTypes};
 use crate::models::user::CurrentUser;
+use crate::utils::defaults::default_to_0;
 
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;

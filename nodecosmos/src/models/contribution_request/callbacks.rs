@@ -3,7 +3,7 @@ use crate::models::commit::Commit;
 use crate::models::contribution_request::{
     ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
-use crate::models::helpers::{impl_updated_at_cb, sanitize_description_cb};
+use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb};
 use charybdis::callbacks::Callbacks;
 use charybdis::types::Uuid;
 use scylla::CachingSession;

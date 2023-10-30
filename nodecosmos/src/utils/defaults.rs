@@ -5,7 +5,7 @@ pub fn default_to_true() -> Option<Boolean> {
     Some(true)
 }
 
-pub fn default_to_false_bool() -> Boolean {
+pub fn default_to_false() -> Boolean {
     false
 }
 

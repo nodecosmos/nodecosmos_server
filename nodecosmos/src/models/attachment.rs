@@ -1,4 +1,4 @@
-use crate::models::helpers::impl_default_callbacks;
+use crate::models::utils::impl_default_callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
 use serde::{Deserialize, Serialize};

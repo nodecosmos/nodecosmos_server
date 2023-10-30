@@ -5,7 +5,8 @@ pub mod workflow_commit;
 use crate::actions::commit_actions::CommitParams;
 use crate::errors::NodecosmosError;
 use crate::models::commit::types::CommitTypes;
-use crate::models::helpers::impl_default_callbacks;
+use crate::models::utils::impl_default_callbacks;
+
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Delete, InsertWithCallbacks, New};
 use charybdis::types::{Map, Text, Timestamp, Uuid};

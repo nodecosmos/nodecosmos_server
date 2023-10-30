@@ -20,7 +20,7 @@ pub enum CommitObjectTypes {
     Node(Committable),
     // Flow,
     // FlowStep,
-    // InputOutput,
+    // Io,
     Workflow(Committable),
 }
 
@@ -46,7 +46,7 @@ impl Display for CommitObjectTypes {
             CommitObjectTypes::Node(committable) => write!(f, "NODE_{}", committable),
             // CommitObjectTypes::Flow => write!(f, "Flow"),
             // CommitObjectTypes::FlowStep => write!(f, "FlowStep"),
-            // CommitObjectTypes::InputOutput => write!(f, "InputOutput"),
+            // CommitObjectTypes::Io => write!(f, "Io"),
             CommitObjectTypes::Workflow(committable) => write!(f, "WORKFLOW_{}", committable),
         }
     }

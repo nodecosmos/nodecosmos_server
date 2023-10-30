@@ -2,9 +2,11 @@ mod callbacks;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
-use crate::models::flow_step::{find_one_flow_step, FlowStep};
+use crate::models::flow_step::FlowStep;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
+use crate::utils::deserializer::required;
+
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
@@ -25,7 +27,7 @@ use serde::{Deserialize, Serialize};
     ]
 )]
 #[derive(Serialize, Deserialize, Default, Debug)]
-pub struct InputOutput {
+pub struct Io {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
 
@@ -38,7 +40,7 @@ pub struct InputOutput {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "originalId")]
+    #[serde(rename = "originalId", deserialize_with = "required")]
     pub original_id: Option<Uuid>,
 
     /// outputted by flow step
@@ -46,6 +48,7 @@ pub struct InputOutput {
     pub flow_step_id: Option<Uuid>,
 
     pub title: Option<Text>,
+
     pub unit: Option<Text>,
 
     #[serde(rename = "dataType")]
@@ -67,13 +70,13 @@ pub struct InputOutput {
     pub updated_at: Option<Timestamp>,
 }
 
-impl InputOutput {
+impl Io {
     pub async fn ios_by_original_id(
         session: &CachingSession,
         root_node_id: Uuid,
         original_id: Uuid,
-    ) -> Result<Vec<InputOutput>, NodecosmosError> {
-        let ios = find_input_output!(
+    ) -> Result<Vec<Io>, NodecosmosError> {
+        let ios = find_io!(
             session,
             "root_node_id = ? AND original_id = ?",
             (root_node_id, original_id)
@@ -96,7 +99,7 @@ impl InputOutput {
         let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
 
         for output_id in ids.iter() {
-            let mut output = InputOutput::new();
+            let mut output = Io::new();
 
             output.root_node_id = workflow.root_node_id;
             output.node_id = node_id;
@@ -133,7 +136,7 @@ impl InputOutput {
             return Ok(None);
         }
 
-        let flow_step = find_one_flow_step!(session, "node_id = ? AND id = ?", (self.node_id, flow_step_id)).await?;
+        let flow_step = FlowStep::find_by_node_id_and_id(session, self.node_id, flow_step_id).await?;
 
         Ok(Some(flow_step))
     }
@@ -141,8 +144,7 @@ impl InputOutput {
     pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let original_io =
-                find_one_input_output!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id))
-                    .await?;
+                find_one_io!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id)).await?;
             Ok(Some(original_io))
         } else {
             Ok(None)
@@ -178,20 +180,23 @@ impl InputOutput {
         let current_step_wf_index;
 
         if let Some(flow_step) = flow_step {
-            current_step_wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
+            let wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
+            if let Some(wf_index) = wf_index {
+                current_step_wf_index = wf_index;
+            } else {
+                return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
+            }
         } else {
-            current_step_wf_index = Some(0);
+            current_step_wf_index = 0;
         }
 
-        if let Some(current_step_wf_index) = current_step_wf_index {
-            let next_wf_index = current_step_wf_index + 1;
-            let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
+        let next_wf_index = current_step_wf_index + 1;
+        let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
 
-            if let Some(mut next_flow_steps) = next_flow_steps {
-                for flow_step in next_flow_steps.iter_mut() {
-                    let mut flow_step = flow_step.borrow_mut();
-                    flow_step.pull_input_id(session, self.id).await?;
-                }
+        if let Some(mut next_flow_steps) = next_flow_steps {
+            for flow_step in next_flow_steps.iter_mut() {
+                let mut flow_step = flow_step.borrow_mut();
+                flow_step.pull_input_id(session, self.id).await?;
             }
         }
 
@@ -199,8 +204,8 @@ impl InputOutput {
     }
 }
 
-partial_input_output!(
-    UpdateDescriptionInputOutput,
+partial_io!(
+    UpdateDescriptionIo,
     root_node_id,
     node_id,
     workflow_id,
@@ -211,8 +216,8 @@ partial_input_output!(
     updated_at
 );
 
-partial_input_output!(
-    UpdateTitleInputOutput,
+partial_io!(
+    UpdateTitleIo,
     root_node_id,
     node_id,
     workflow_id,
@@ -222,6 +227,6 @@ partial_input_output!(
     updated_at
 );
 
-partial_input_output!(UpdateWorkflowIndexInputOutput, root_node_id, node_id, workflow_id, id);
+partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, workflow_id, id);
 
-partial_input_output!(DeleteInputOutput, root_node_id, node_id, workflow_id, id);
+partial_io!(DeleteIo, root_node_id, node_id, workflow_id, id, flow_step_id);

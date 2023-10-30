@@ -2,9 +2,9 @@
 macro_rules! impl_default_callbacks {
     ($struct_name:ident) => {
         impl charybdis::callbacks::Callbacks<crate::errors::NodecosmosError> for $struct_name {
-            crate::models::helpers::created_at_cb_fn!();
+            crate::models::utils::created_at_cb_fn!();
 
-            crate::models::helpers::updated_at_cb_fn!();
+            crate::models::utils::updated_at_cb_fn!();
         }
     };
 }
@@ -33,7 +33,7 @@ pub(crate) use created_at_cb_fn;
 macro_rules! impl_updated_at_cb {
     ($struct_name:ident) => {
         impl charybdis::callbacks::Callbacks<crate::errors::NodecosmosError> for $struct_name {
-            crate::models::helpers::updated_at_cb_fn!();
+            crate::models::utils::updated_at_cb_fn!();
         }
     };
 }
@@ -56,7 +56,7 @@ pub(crate) use updated_at_cb_fn;
 macro_rules! sanitize_description_cb {
     ($struct_name:ident) => {
         impl charybdis::callbacks::Callbacks<crate::errors::NodecosmosError> for $struct_name {
-            crate::models::helpers::sanitize_description_cb_fn!();
+            crate::models::utils::sanitize_description_cb_fn!();
         }
     };
 }

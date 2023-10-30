@@ -1,7 +1,7 @@
 use crate::callback_extension::CbExtension;
 use crate::errors::NodecosmosError;
-use crate::models::helpers::impl_user_updated_at_with_elastic_ext_cb;
 use crate::models::user::{UpdateUser, User};
+use crate::models::utils::impl_user_updated_at_with_elastic_ext_cb;
 use crate::services::elastic::{add_elastic_document, delete_elastic_document};
 use charybdis::callbacks::ExtCallbacks;
 use chrono::Utc;

@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
-use crate::models::input_output::DeleteInputOutput;
+use crate::models::input_output::DeleteIo;
 use crate::models::like::Like;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
@@ -84,7 +84,7 @@ impl<'a> NodeDeleter<'a> {
             ..Default::default()
         })?;
 
-        batch.append_delete_by_partition_key(&DeleteInputOutput {
+        batch.append_delete_by_partition_key(&DeleteIo {
             node_id: self.node.id,
             ..Default::default()
         })?;
@@ -131,7 +131,7 @@ impl<'a> NodeDeleter<'a> {
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&DeleteInputOutput {
+                batch.append_delete_by_partition_key(&DeleteIo {
                     node_id: descendant.id,
                     ..Default::default()
                 })?;

@@ -1,8 +1,8 @@
 use crate::callback_extension::CbExtension;
 use crate::errors::NodecosmosError;
-use crate::models::helpers::impl_node_updated_at_with_elastic_ext_cb;
 use crate::models::node::delete::NodeDeleter;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
+use crate::models::utils::impl_node_updated_at_with_elastic_ext_cb;
 use crate::services::elastic::update_elastic_document;
 use ammonia::clean;
 use charybdis::callbacks::ExtCallbacks;

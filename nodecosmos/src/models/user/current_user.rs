@@ -1,5 +1,5 @@
-use crate::models::helpers::default_to_false_bool;
 use crate::models::user::{partial_user, User};
+use crate::utils::defaults::default_to_false;
 use charybdis::types::{Boolean, Text, Uuid};
 use serde::{Deserialize, Serialize};
 

@@ -1,9 +1,11 @@
 use crate::errors::NodecosmosError;
-use crate::models::helpers::{ClonedRef, Pluckable};
 use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::utils::Pluckable;
 use crate::services::nodes::reorder::helpers::{build_new_ancestor_ids, build_new_index, init_sibling};
 use crate::services::nodes::reorder::ReorderParams;
+use crate::utils::cloned_ref::ClonedRef;
+
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use scylla::CachingSession;

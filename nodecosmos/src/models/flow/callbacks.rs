@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow::{Flow, FlowDescription, UpdateFlowTitle};
 use crate::models::flow_step::FlowStep;
-use crate::models::helpers::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
+use crate::models::utils::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 

@@ -5,7 +5,7 @@ pub use super::udts::Address;
 pub use current_user::CurrentUser;
 
 use crate::errors::NodecosmosError;
-use crate::models::helpers::default_to_false_bool;
+use crate::utils::defaults::default_to_false;
 
 use bcrypt::{hash, verify};
 use charybdis::macros::charybdis_model;
@@ -47,10 +47,10 @@ pub struct User {
 
     pub address: Option<Address>,
 
-    #[serde(rename = "isConfirmed", default = "default_to_false_bool")]
+    #[serde(rename = "isConfirmed", default = "default_to_false")]
     pub is_confirmed: Boolean,
 
-    #[serde(rename = "isBlocked", default = "default_to_false_bool")]
+    #[serde(rename = "isBlocked", default = "default_to_false")]
     pub is_blocked: Boolean,
 
     #[serde(rename = "likedObjectIds")]

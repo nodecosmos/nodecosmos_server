@@ -1,6 +1,6 @@
 use crate::authorize::{auth_input_output_creation, auth_workflow_update};
 use crate::errors::NodecosmosError;
-use crate::models::input_output::{InputOutput, UpdateDescriptionInputOutput, UpdateTitleInputOutput};
+use crate::models::input_output::{DeleteIo, Io, UpdateDescriptionIo, UpdateTitleIo};
 use crate::models::user::CurrentUser;
 
 use actix_web::{delete, get, post, put, web, HttpResponse};
@@ -12,7 +12,7 @@ use serde_json::json;
 pub async fn create_io(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    mut input_output: web::Json<InputOutput>,
+    mut input_output: web::Json<Io>,
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_input_output_creation(&db_session, &input_output, &current_user).await?;
 
@@ -26,7 +26,7 @@ pub async fn create_io(
 #[get("/{rootNodeId}/{nodeId}/{workflowId}/{id}/description")]
 pub async fn get_io_description(
     db_session: web::Data<CachingSession>,
-    input_output: web::Path<UpdateDescriptionInputOutput>,
+    input_output: web::Path<UpdateDescriptionIo>,
 ) -> Result<HttpResponse, NodecosmosError> {
     let input_output = input_output.find_by_primary_key(&db_session).await?;
 
@@ -39,7 +39,7 @@ pub async fn get_io_description(
 pub async fn update_io_title(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    mut input_output: web::Json<UpdateTitleInputOutput>,
+    mut input_output: web::Json<UpdateTitleIo>,
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;
 
@@ -54,7 +54,7 @@ pub async fn update_io_title(
 pub async fn update_io_description(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    mut input_output: web::Json<UpdateDescriptionInputOutput>,
+    mut input_output: web::Json<UpdateDescriptionIo>,
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_workflow_update(&db_session, input_output.node_id, current_user).await?;
 
@@ -68,7 +68,7 @@ pub async fn update_io_description(
 #[delete("/{rootNodeId}/{nodeId}/{workflowId}/{id}")]
 pub async fn delete_io(
     db_session: web::Data<CachingSession>,
-    input_output: web::Path<InputOutput>,
+    input_output: web::Path<DeleteIo>,
     current_user: CurrentUser,
 ) -> Result<HttpResponse, NodecosmosError> {
     let mut input_output = input_output.find_by_primary_key(&db_session).await?;

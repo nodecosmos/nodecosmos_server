@@ -2,7 +2,7 @@ use crate::authorize::{auth_workflow_creation, auth_workflow_update};
 use crate::errors::NodecosmosError;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
-use crate::models::input_output::InputOutput;
+use crate::models::input_output::Io;
 use crate::models::user::CurrentUser;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
@@ -36,7 +36,7 @@ pub async fn get_workflow(
         .await?;
 
     // input outputs
-    let input_outputs = InputOutput::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+    let input_outputs = Io::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
         .await?
         .try_collect()
         .await?;
@@ -59,7 +59,7 @@ pub async fn create_workflow(
 
     workflow.insert_cb(&db_session).await?;
 
-    let input_outputs = InputOutput::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+    let input_outputs = Io::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
         .await?
         .try_collect()
         .await?;
