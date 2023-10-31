@@ -54,12 +54,3 @@ impl Value for Counter {
         Ok(())
     }
 }
-
-#[derive(Serialize, Deserialize, Default, Debug)]
-pub struct Ignore<T>(pub Option<T>);
-
-impl<T> FromCqlVal<CqlValue> for Ignore<T> {
-    fn from_cql(_cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        Ok(Ignore(None))
-    }
-}

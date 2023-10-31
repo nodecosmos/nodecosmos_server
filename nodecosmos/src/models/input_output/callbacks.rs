@@ -1,5 +1,4 @@
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::input_output::{DeleteIo, Io, UpdateDescriptionIo, UpdateTitleIo};
 use crate::models::utils::{sanitize_description_cb_fn, updated_at_cb_fn};
 use charybdis::batch::CharybdisModelBatch;
@@ -85,25 +84,11 @@ impl Callbacks<NodecosmosError> for UpdateTitleIo {
 
 impl Callbacks<NodecosmosError> for DeleteIo {
     async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let native = self.as_native();
+        let mut native_io = self.as_native();
 
-        let mut workflow = native.workflow(session).await?;
-        let initial_input_ids = workflow.initial_input_ids.clone().unwrap_or_default();
-
-        if initial_input_ids.contains(&self.id) {
-            workflow.pull_initial_input_id(session, self.id).await?;
-        }
-
-        let flow_step = native.flow_step(session).await?;
-
-        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
-        native
-            .pull_from_next_workflow_step(session, flow_step.as_ref(), &mut flow_steps_by_index)
-            .await?;
-
-        if let Some(mut flow_step) = flow_step {
-            flow_step.pull_output_id(session, self.id).await?;
-        }
+        native_io.pull_from_initial_input_ids(session).await?;
+        native_io.pull_form_flow_step(session).await?;
+        native_io.pull_from_next_workflow_step(session).await?;
 
         Ok(())
     }

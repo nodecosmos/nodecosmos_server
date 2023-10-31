@@ -1,14 +1,13 @@
 mod callbacks;
-pub mod flow_steps_by_index;
 
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
 use crate::utils::cloned_ref::ClonedRef;
+use std::cell::{RefCell, RefMut};
 
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, New, UpdateWithCallbacks};
+use charybdis::operations::{New, UpdateWithCallbacks};
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ use serde::{Deserialize, Serialize};
         ([node_id], [id])
     ]
 )]
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -64,6 +63,10 @@ pub struct FlowStep {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub workflow: RefCell<Option<Workflow>>,
 }
 
 impl FlowStep {
@@ -75,6 +78,15 @@ impl FlowStep {
         let fs = find_one_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
 
         Ok(fs)
+    }
+
+    pub(crate) async fn workflow(&self, session: &CachingSession) -> Result<RefMut<Option<Workflow>>, NodecosmosError> {
+        if self.workflow.borrow().is_none() {
+            let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
+            *self.workflow.borrow_mut() = Some(workflow);
+        }
+
+        Ok(self.workflow.borrow_mut())
     }
 
     pub async fn prev_flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
@@ -128,50 +140,51 @@ impl FlowStep {
         Ok(())
     }
 
-    pub(crate) async fn delete_fs_outputs(
-        &mut self,
-        session: &CachingSession,
-        workflow: &Workflow,
-    ) -> Result<(), NodecosmosError> {
-        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id.clone() {
-            let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-            Io::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(&self)).await?;
+    pub(crate) async fn delete_fs_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
+        let workflow = self.workflow(session).await?;
+
+        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
+            if let Some(workflow) = workflow.as_ref() {
+                let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
+                Io::delete_by_ids(session, output_ids.clone(), workflow, Some(self.id)).await?;
+            }
         }
 
         Ok(())
     }
 
-    async fn delete_outputs_from_removed_nodes(
-        &mut self,
-        session: &CachingSession,
-        workflow: &Workflow,
-    ) -> Result<(), NodecosmosError> {
-        let node_ids = self.node_ids.cloned_ref();
-        let mut node_ids_to_remove = vec![];
+    // delete outputs models
+    async fn delete_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let workflow = self.workflow(session).await?;
+        let cloned_node_ids = self.node_ids.cloned_ref();
 
-        // delete outputs from db
-        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_ref() {
-            for (node_id, output_ids) in output_ids_by_node_id.iter() {
-                if !node_ids.contains(node_id) {
-                    Io::delete_by_ids(session, output_ids.clone(), workflow, self.node_id, Some(self)).await?;
-
-                    node_ids_to_remove.push(*node_id);
+        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.clone() {
+            if let Some(workflow) = workflow.as_ref() {
+                for (node_id, output_ids) in output_ids_by_node_id.iter() {
+                    if !cloned_node_ids.contains(node_id) {
+                        Io::delete_by_ids(session, output_ids.clone(), workflow, Some(self.id)).await?;
+                    }
                 }
             }
         }
 
-        // delete outputs from output_ids_by_node_id
-        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
-            for node_id in node_ids_to_remove {
-                output_ids_by_node_id.remove(&node_id);
-            }
+        Ok(())
+    }
 
+    // remove outputs references
+    async fn remove_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node_ids = self.node_ids.cloned_ref();
+
+        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
+            output_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
             self.update_cb(session).await?;
         }
 
         Ok(())
     }
 
+    // remove inputs references
     async fn remove_inputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let node_ids = self.node_ids.cloned_ref();
 
@@ -183,37 +196,27 @@ impl FlowStep {
         Ok(())
     }
 
-    pub(crate) async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
-        let mut workflow = Workflow::new();
-
-        workflow.node_id = self.node_id;
-        workflow.id = self.workflow_id;
-
-        workflow.find_by_primary_key(session).await?;
-
-        Ok(workflow)
-    }
-
     // removes outputs as inputs from next workflow step
     pub(crate) async fn pull_outputs_from_next_workflow_step(
-        &self,
+        &mut self,
         session: &CachingSession,
-        workflow: &Workflow,
-        flow_steps_by_index: &mut FlowStepsByIndex,
     ) -> Result<(), NodecosmosError> {
-        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
+        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
+        let workflow = self.workflow(session).await?;
+
+        if let (Some(output_ids_by_node_id), Some(workflow)) = (output_ids_by_node_id, workflow.as_ref()) {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
             for id in output_ids {
                 let mut output = Io::new();
                 output.root_node_id = workflow.root_node_id;
-                output.node_id = self.node_id;
-                output.workflow_id = self.workflow_id;
+                output.node_id = workflow.node_id;
+                output.workflow_id = workflow.id;
                 output.id = id;
+                output.workflow = RefCell::new(Some(workflow.clone()));
+                output.flow_step = RefCell::new(Some(self.clone()));
 
-                output
-                    .pull_from_next_workflow_step(session, Some(self), flow_steps_by_index)
-                    .await?;
+                output.pull_from_next_workflow_step(session).await?;
             }
         }
 

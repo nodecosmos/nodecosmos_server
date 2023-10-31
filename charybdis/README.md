@@ -40,6 +40,7 @@
 - [Batch Operations](#batch-operations)
 - [As Native](#as-native)
 - [Collection queries](#collection-queries)
+- [Ignored fields](#ignored-fields)
 - [Roadmap](#Roadmap)
 
 ## Charybdis Models
@@ -560,7 +561,19 @@ let user = User::from_json(json);
 user.push_to_tags(&session, vec![tag]).await;
 user.pull_from_post_ids(&session, post_ids_vec).await;
 ```
-
+## Ignored fields
+We can ignore fields by using `#[charybdis(ignore)]` attribute:
+```rust
+#[charybdis_model(...)]
+pub struct User {
+    id: Uuid,
+    #[charybdis(ignore)]
+    organization: Option<Organization>,
+}
+```
+So field `organization` will be ignored in all operations and
+default value will be used when deserializing from other data sources.
+It can be used to hold data that is not persisted in database.
 
 ## Roadmap:
 - [ ] Add tests

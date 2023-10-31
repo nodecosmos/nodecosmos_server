@@ -1,7 +1,9 @@
 mod callbacks;
+pub mod diagram;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
+use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -30,7 +32,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -53,9 +55,32 @@ pub struct Workflow {
 
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub diagram: Option<WorkflowDiagram>,
 }
 
 impl Workflow {
+    pub async fn by_node_id_and_id(
+        session: &CachingSession,
+        node_id: Uuid,
+        id: Uuid,
+    ) -> Result<Workflow, NodecosmosError> {
+        let workflow = find_one_workflow!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+
+        Ok(workflow)
+    }
+
+    pub async fn diagram(&mut self, session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
+        if self.diagram.is_none() {
+            let diagram = WorkflowDiagram::build(session, self).await?;
+            self.diagram = Some(diagram);
+        }
+
+        Ok(self.diagram.as_mut().unwrap())
+    }
+
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
         let flows = Flow::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
 

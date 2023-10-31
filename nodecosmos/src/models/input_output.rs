@@ -1,18 +1,17 @@
 mod callbacks;
 
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::flow_step::FlowStep;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use crate::utils::deserializer::required;
-
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, New};
-use charybdis::types::{Frozen, Ignore, List, Text, Timestamp, Uuid};
+use charybdis::operations::New;
+use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::cell::{RefCell, RefMut};
 
 /// we group input outputs by root node id
 /// so they are accessible to all workflows within a same root node
@@ -25,7 +24,7 @@ use serde::{Deserialize, Serialize};
         ([root_node_id], [original_id]),
     ]
 )]
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Io {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
@@ -69,7 +68,12 @@ pub struct Io {
     pub updated_at: Option<Timestamp>,
 
     #[charybdis(ignore)]
-    pub flow_step: Ignore<FlowStep>,
+    #[serde(skip)]
+    pub flow_step: RefCell<Option<FlowStep>>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub workflow: RefCell<Option<Workflow>>,
 }
 
 impl Io {
@@ -90,30 +94,27 @@ impl Io {
         Ok(ios)
     }
 
-    pub async fn delete_by_ids(
+    pub async fn delete_by_ids<'a>(
         session: &CachingSession,
         ids: Vec<Uuid>,
         workflow: &Workflow,
-        node_id: Uuid,
-        flow_step: Option<&FlowStep>,
+        flow_step_id: Option<Uuid>,
     ) -> Result<(), NodecosmosError> {
         let mut batch = CharybdisModelBatch::new();
-        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
 
         for output_id in ids.iter() {
             let mut output = Io::new();
 
             output.root_node_id = workflow.root_node_id;
-            output.node_id = node_id;
+            output.node_id = workflow.node_id;
             output.workflow_id = workflow.id;
-            output.flow_step_id = flow_step.map(|fs| fs.id);
+            output.flow_step_id = flow_step_id;
             output.id = *output_id;
+            output.workflow = RefCell::new(Some(workflow.clone()));
 
             batch.append_delete(&output)?;
 
-            output
-                .pull_from_next_workflow_step(session, flow_step, &mut flow_steps_by_index)
-                .await?;
+            output.pull_from_next_workflow_step(session).await?;
         }
 
         batch.execute(session).await?;
@@ -121,26 +122,24 @@ impl Io {
         Ok(())
     }
 
-    pub async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
-        let mut workflow = Workflow::new();
-        workflow.node_id = self.node_id;
-        workflow.id = self.workflow_id;
-
-        let res = workflow.find_by_primary_key(session).await?;
-
-        Ok(res)
-    }
-
-    pub async fn flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
-        let flow_step_id = self.flow_step_id.unwrap_or_default();
-
-        if flow_step_id.is_nil() {
-            return Ok(None);
+    pub async fn workflow(&self, session: &CachingSession) -> Result<RefMut<Option<Workflow>>, NodecosmosError> {
+        if self.workflow.borrow().is_none() {
+            let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
+            *self.workflow.borrow_mut() = Some(workflow);
         }
 
-        let flow_step = FlowStep::find_by_node_id_and_id(session, self.node_id, flow_step_id).await?;
+        Ok(self.workflow.borrow_mut())
+    }
 
-        Ok(Some(flow_step))
+    pub async fn flow_step(&self, session: &CachingSession) -> Result<RefMut<Option<FlowStep>>, NodecosmosError> {
+        if let Some(flow_step_id) = self.flow_step_id {
+            if self.flow_step.borrow().is_none() {
+                let flow_step = FlowStep::find_by_node_id_and_id(session, self.node_id, flow_step_id).await?;
+                *self.flow_step.borrow_mut() = Some(flow_step);
+            }
+        }
+
+        Ok(self.flow_step.borrow_mut())
     }
 
     pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
@@ -172,33 +171,58 @@ impl Io {
         Ok(())
     }
 
-    // remove output as input from next workflow step
-    pub async fn pull_from_next_workflow_step(
-        &self,
-        session: &CachingSession,
-        flow_step: Option<&FlowStep>,
-        flow_steps_by_index: &mut FlowStepsByIndex,
-    ) -> Result<(), NodecosmosError> {
-        let current_step_wf_index;
+    pub async fn pull_from_initial_input_ids(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let mut workflow = self.workflow(session).await?;
 
-        if let Some(flow_step) = flow_step {
-            let wf_index = flow_steps_by_index.flow_step_index(flow_step.id);
-            if let Some(wf_index) = wf_index {
-                current_step_wf_index = wf_index;
-            } else {
-                return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
+        if let Some(workflow) = &mut workflow.as_mut() {
+            let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
+
+            if initial_input_ids.contains(&self.id) {
+                workflow.pull_initial_input_id(session, self.id).await?;
             }
-        } else {
-            current_step_wf_index = 0;
         }
 
-        let next_wf_index = current_step_wf_index + 1;
-        let next_flow_steps = flow_steps_by_index.flow_steps_by_wf_index(next_wf_index)?;
+        Ok(())
+    }
 
-        if let Some(mut next_flow_steps) = next_flow_steps {
-            for flow_step in next_flow_steps.iter_mut() {
-                let mut flow_step = flow_step.borrow_mut();
-                flow_step.pull_input_id(session, self.id).await?;
+    pub async fn pull_form_flow_step(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let mut flow_step = self.flow_step(session).await?;
+
+        if let Some(flow_step) = &mut flow_step.as_mut() {
+            flow_step.pull_output_id(session, self.id).await?;
+        }
+
+        Ok(())
+    }
+
+    // remove output as input from next workflow step
+    pub async fn pull_from_next_workflow_step(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let current_step_wf_index;
+        let mut workflow = self.workflow(session).await?;
+        let flow_step = &self.flow_step(session).await?;
+
+        if let Some(workflow) = workflow.as_mut() {
+            let diagram = workflow.diagram(session).await?;
+
+            if let Some(flow_step) = flow_step.as_ref() {
+                let wf_index = diagram.flow_step_index(flow_step.id);
+                if let Some(wf_index) = wf_index {
+                    current_step_wf_index = wf_index;
+                } else {
+                    return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
+                }
+            } else {
+                current_step_wf_index = 0;
+            }
+
+            let next_wf_index = current_step_wf_index + 1;
+            let next_flow_steps = diagram.flow_steps_by_wf_index(next_wf_index)?;
+
+            if let Some(mut next_flow_steps) = next_flow_steps {
+                for flow_step in next_flow_steps.iter_mut() {
+                    let mut flow_step = flow_step.borrow_mut();
+                    flow_step.pull_input_id(session, self.id).await?;
+                }
             }
         }
 
