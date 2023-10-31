@@ -1,21 +1,21 @@
 use crate::migration_unit::data::MigrationUnitData;
 use crate::migration_unit::{MigrationObjectType, MigrationUnit};
-use crate::schema::current_code_schema::CurrentCodeSchema;
-use crate::schema::current_db_schema::CurrentDbSchema;
-use crate::schema::SchemaObject;
+use charybdis_parser::schema::code_schema::CodeSchema;
+use charybdis_parser::schema::db_schema::DbSchema;
+use charybdis_parser::schema::SchemaObject;
 use colored::Colorize;
 use scylla::Session;
 
 pub(crate) struct Migration<'a> {
-    current_db_schema: &'a CurrentDbSchema,
-    current_code_schema: &'a CurrentCodeSchema,
+    current_db_schema: &'a DbSchema,
+    current_code_schema: &'a CodeSchema,
     session: &'a Session,
 }
 
 impl<'a> Migration<'a> {
     pub(crate) fn new(
-        current_db_schema: &'a CurrentDbSchema,
-        current_code_schema: &'a CurrentCodeSchema,
+        current_db_schema: &'a DbSchema,
+        current_code_schema: &'a CodeSchema,
         session: &'a Session,
     ) -> Self {
         Migration {

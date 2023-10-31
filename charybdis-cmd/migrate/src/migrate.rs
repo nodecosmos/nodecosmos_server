@@ -1,11 +1,12 @@
 mod migration;
 mod migration_unit;
-mod schema;
 mod session;
 
 use crate::migration::Migration;
-use crate::schema::current_code_schema::CurrentCodeSchema;
-use crate::schema::current_db_schema::CurrentDbSchema;
+
+use charybdis_parser::schema::code_schema::CodeSchema;
+use charybdis_parser::schema::db_schema::DbSchema;
+
 use clap::Parser;
 use scylla::Session;
 use session::initialize_session;
@@ -43,8 +44,8 @@ async fn main() {
 
     let session: Session = initialize_session(&args).await;
 
-    let current_db_schema = CurrentDbSchema::new(&session, args.keyspace).await.unwrap();
-    let current_code_schema = CurrentCodeSchema::new(&project_root);
+    let current_db_schema = DbSchema::new(&session, args.keyspace).await;
+    let current_code_schema = CodeSchema::new(&project_root);
 
     let migration = Migration::new(&current_db_schema, &current_code_schema, &session);
 

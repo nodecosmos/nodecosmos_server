@@ -2,7 +2,9 @@ mod callbacks;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
+use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -46,6 +48,12 @@ pub struct Flow {
 }
 
 impl Flow {
+    pub async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
+        let wf = Workflow::find_by_primary_key_value(session, (self.node_id, self.workflow_id)).await?;
+
+        Ok(wf)
+    }
+
     pub async fn flow_steps(
         &self,
         session: &CachingSession,

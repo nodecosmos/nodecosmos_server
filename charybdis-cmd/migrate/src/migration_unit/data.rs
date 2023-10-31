@@ -1,7 +1,7 @@
 use crate::migration_unit::runner::INDEX_SUFFIX;
 use crate::migration_unit::MigrationObjectType;
-use crate::schema::{IndexName, SchemaObject};
-use charybdis_parser::LocalIndexTarget;
+use charybdis_parser::schema::secondary_indexes::LocalIndexTarget;
+use charybdis_parser::schema::{IndexName, SchemaObject};
 use colored::Colorize;
 
 pub type FieldName = String;

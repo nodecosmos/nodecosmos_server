@@ -10,13 +10,12 @@ use crate::utils::deserializer::required;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, New};
-use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
+use charybdis::types::{Frozen, Ignore, List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 /// we group input outputs by root node id
 /// so they are accessible to all workflows within a same root node
-#[derive(Clone)]
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_node_id],
@@ -68,6 +67,9 @@ pub struct Io {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[charybdis(ignore)]
+    pub flow_step: Ignore<FlowStep>,
 }
 
 impl Io {
@@ -110,7 +112,7 @@ impl Io {
             batch.append_delete(&output)?;
 
             output
-                .remove_from_next_workflow_step(session, flow_step, &mut flow_steps_by_index)
+                .pull_from_next_workflow_step(session, flow_step, &mut flow_steps_by_index)
                 .await?;
         }
 
@@ -171,7 +173,7 @@ impl Io {
     }
 
     // remove output as input from next workflow step
-    pub async fn remove_from_next_workflow_step(
+    pub async fn pull_from_next_workflow_step(
         &self,
         session: &CachingSession,
         flow_step: Option<&FlowStep>,

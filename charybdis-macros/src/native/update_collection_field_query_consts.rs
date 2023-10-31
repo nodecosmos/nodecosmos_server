@@ -1,12 +1,9 @@
-use charybdis_parser::CharybdisArgs;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse_str, FieldsNamed};
+use syn::{parse_str, Field};
 
-pub(crate) fn push_to_collection_fields_query_consts(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
-) -> TokenStream {
+pub(crate) fn push_to_collection_fields_query_consts(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
     let mut primary_key = ch_args.partition_keys.clone().unwrap();
@@ -16,8 +13,7 @@ pub(crate) fn push_to_collection_fields_query_consts(
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 
-    let queries: Vec<TokenStream> = fields_named
-        .named
+    let queries: Vec<TokenStream> = fields
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();
@@ -58,8 +54,8 @@ pub(crate) fn push_to_collection_fields_query_consts(
 }
 
 pub(crate) fn pull_from_collection_fields_query_consts(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
+    ch_args: &CharybdisMacroArgs,
+    fields: &Vec<Field>,
 ) -> TokenStream {
     let table_name = ch_args.table_name.as_ref().unwrap();
 
@@ -70,8 +66,7 @@ pub(crate) fn pull_from_collection_fields_query_consts(
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 
-    let queries: Vec<TokenStream> = fields_named
-        .named
+    let queries: Vec<TokenStream> = fields
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();

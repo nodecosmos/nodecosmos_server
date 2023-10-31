@@ -1,24 +1,24 @@
+mod parser;
+
 use crate::schema::{SchemaObject, SchemaObjects};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
-
-use super::code_schema_parser::*;
 
 const MODEL_MACRO_NAME: &str = "charybdis_model";
 const MATERIALIZED_VIEW_MACRO_NAME: &str = "charybdis_view_model";
 const UDT_MACRO_NAME: &str = "charybdis_udt_model";
 
 #[derive(Serialize, Deserialize, Default, Debug)]
-pub struct CurrentCodeSchema {
+pub struct CodeSchema {
     pub tables: SchemaObjects,
     pub udts: SchemaObjects,
     pub materialized_views: SchemaObjects,
 }
 
-impl CurrentCodeSchema {
-    pub fn new(project_root: &PathBuf) -> CurrentCodeSchema {
-        let mut current_code_schema = CurrentCodeSchema {
+impl CodeSchema {
+    pub fn new(project_root: &PathBuf) -> CodeSchema {
+        let mut current_code_schema = CodeSchema {
             tables: SchemaObjects::new(),
             udts: SchemaObjects::new(),
             materialized_views: SchemaObjects::new(),
@@ -30,7 +30,7 @@ impl CurrentCodeSchema {
     }
 
     pub fn get_models_from_code(&mut self, project_root: &PathBuf) {
-        if let Some(models_base_dir) = find_src_models_dir(project_root) {
+        if let Some(models_base_dir) = parser::find_src_models_dir(project_root) {
             for entry in WalkDir::new(&models_base_dir) {
                 let entry: DirEntry = entry.unwrap();
                 if entry.path().is_file() {
@@ -53,8 +53,9 @@ impl CurrentCodeSchema {
     }
 
     pub fn populate_materialized_views(&mut self, entry: DirEntry) {
-        let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
+        let file_content: String = parser::parse_file_as_string(entry.path());
+        let schema_object: SchemaObject =
+            parser::parse_charybdis_model_def(&file_content, MATERIALIZED_VIEW_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {
@@ -69,8 +70,8 @@ impl CurrentCodeSchema {
     }
 
     pub fn populate_udts(&mut self, entry: DirEntry) {
-        let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, UDT_MACRO_NAME);
+        let file_content: String = parser::parse_file_as_string(entry.path());
+        let schema_object: SchemaObject = parser::parse_charybdis_model_def(&file_content, UDT_MACRO_NAME);
         let type_name = schema_object.type_name.clone();
 
         if type_name.is_empty() {
@@ -85,8 +86,8 @@ impl CurrentCodeSchema {
     }
 
     pub fn populate_tables(&mut self, entry: DirEntry) {
-        let file_content: String = parse_file_as_string(entry.path());
-        let schema_object: SchemaObject = parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
+        let file_content: String = parser::parse_file_as_string(entry.path());
+        let schema_object: SchemaObject = parser::parse_charybdis_model_def(&file_content, MODEL_MACRO_NAME);
         let table_name = schema_object.table_name.clone();
 
         if table_name.is_empty() {

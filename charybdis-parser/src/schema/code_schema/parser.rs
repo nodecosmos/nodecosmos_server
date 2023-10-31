@@ -1,5 +1,5 @@
+use crate::macro_args::CharybdisMacroArgs;
 use crate::schema::SchemaObject;
-use charybdis_parser::CharybdisArgs;
 use colored::Colorize;
 use std::fs::File;
 use std::io::Read;
@@ -43,6 +43,13 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
 
     for item in ast.items {
         if let Item::Struct(item_struct) = item {
+            let is_charybdis_model = item_struct.attrs.iter().any(|attr| attr.path().is_ident(macro_name));
+
+            // If the struct doesn't have the required macro, continue to the next item
+            if !is_charybdis_model {
+                continue;
+            }
+
             if let Fields::Named(fields_named) = item_struct.fields {
                 for field in fields_named.named {
                     if let Field {
@@ -62,7 +69,7 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
             // parse charybdis macro content
             for attr in &item_struct.attrs {
                 if attr.path().is_ident(macro_name) {
-                    let args: CharybdisArgs = attr.parse_args().unwrap();
+                    let args: CharybdisMacroArgs = attr.parse_args().unwrap();
 
                     schema_object.table_name = args.table_name.unwrap_or("".to_string());
                     schema_object.type_name = args.type_name.unwrap_or("".to_string());

@@ -1,5 +1,4 @@
 use crate::migration_unit::{MigrationObjectType, MigrationUnitData};
-use crate::schema::SchemaObjectTrait;
 use colored::*;
 use regex::Regex;
 use scylla::Session;

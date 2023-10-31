@@ -20,7 +20,7 @@ pub mod macros {
 pub use scylla::{
     cql_to_rust::{FromCqlVal, FromRow, FromRowError},
     frame::{
-        response::result::Row,
+        response::result::{CqlValue, Row},
         value::{SerializedResult, SerializedValues, Value, ValueList},
     },
     query::Query,

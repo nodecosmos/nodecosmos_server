@@ -1,8 +1,8 @@
-pub(crate) mod code_schema_parser;
-pub(crate) mod current_code_schema;
-pub(crate) mod current_db_schema;
+pub mod code_schema;
+pub mod db_schema;
+pub mod secondary_indexes;
 
-use charybdis_parser::LocalIndexTarget;
+use crate::schema::secondary_indexes::LocalIndexTarget;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,16 +37,8 @@ impl SchemaObject {
             table_options: None,
         }
     }
-}
 
-pub type SchemaObjects = HashMap<String, SchemaObject>;
-
-pub trait SchemaObjectTrait {
-    fn get_cql_fields(&self) -> String;
-}
-
-impl SchemaObjectTrait for SchemaObject {
-    fn get_cql_fields(&self) -> String {
+    pub fn get_cql_fields(&self) -> String {
         let mut cql_fields = String::new();
         let mut sorted_fields: Vec<(&String, &String)> = self.fields.iter().collect();
         sorted_fields.sort();
@@ -64,3 +56,6 @@ impl SchemaObjectTrait for SchemaObject {
         cql_fields
     }
 }
+
+pub type ModelName = String;
+pub type SchemaObjects = HashMap<ModelName, SchemaObject>;

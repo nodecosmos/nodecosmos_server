@@ -1,11 +1,11 @@
-use crate::helpers::{camel_to_snake_case, comma_sep_cols};
-use charybdis_parser::CharybdisArgs;
+use crate::utils::{camel_to_snake_case, comma_sep_cols};
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{parse_str, FieldsNamed};
+use syn::{parse_str, Field};
 
-pub fn find_model_query_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
-    let comma_sep_cols = comma_sep_cols(fields_named);
+pub fn find_model_query_rule(args: &CharybdisMacroArgs, fields: &Vec<Field>, struct_name: &Ident) -> TokenStream {
+    let comma_sep_cols = comma_sep_cols(fields);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
 
@@ -28,8 +28,8 @@ pub fn find_model_query_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, s
     expanded
 }
 
-pub fn find_model_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
-    let comma_sep_cols = comma_sep_cols(fields_named);
+pub fn find_model_rule(args: &CharybdisMacroArgs, fields: &Vec<Field>, struct_name: &Ident) -> TokenStream {
+    let comma_sep_cols = comma_sep_cols(fields);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
 
@@ -52,8 +52,8 @@ pub fn find_model_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_
     expanded
 }
 
-pub fn find_one_model_rule(args: &CharybdisArgs, fields_named: &FieldsNamed, struct_name: &Ident) -> TokenStream {
-    let comma_sep_cols = comma_sep_cols(fields_named);
+pub fn find_one_model_rule(args: &CharybdisMacroArgs, fields: &Vec<Field>, struct_name: &Ident) -> TokenStream {
+    let comma_sep_cols = comma_sep_cols(fields);
     let table_name = args.table_name.clone().unwrap();
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
 

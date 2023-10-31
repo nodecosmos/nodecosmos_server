@@ -1,4 +1,5 @@
 use crate::errors::NodecosmosError;
+use crate::models::flow_step::flow_steps_by_index::FlowStepsByIndex;
 use crate::models::flow_step::{
     FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep, UpdateOutputIdsFlowStep,
 };
@@ -23,8 +24,11 @@ impl Callbacks<NodecosmosError> for FlowStep {
         match (prev_fs, next_fs) {
             (Some(mut prev_fs), Some(mut next_fs)) => {
                 let workflow = self.workflow(session).await?;
+                let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
 
-                prev_fs.remove_outputs_from_next_wf_step(session, &workflow).await?;
+                prev_fs
+                    .pull_outputs_from_next_workflow_step(session, &workflow, &mut flow_steps_by_index)
+                    .await?;
                 prev_fs.next_flow_step_id = Some(self.id);
                 prev_fs.update_cb(session).await?;
 
@@ -51,8 +55,10 @@ impl Callbacks<NodecosmosError> for FlowStep {
 
     async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let workflow = self.workflow(session).await?;
+        let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
 
-        self.remove_outputs_from_next_wf_step(session, &workflow).await?;
+        self.pull_outputs_from_next_workflow_step(session, &workflow, &mut flow_steps_by_index)
+            .await?;
         self.delete_fs_outputs(session, &workflow).await?;
 
         if let Some(mut prev_flow_step) = self.prev_flow_step(session).await? {

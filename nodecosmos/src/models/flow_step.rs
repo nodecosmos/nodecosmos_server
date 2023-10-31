@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
         ([node_id], [id])
     ]
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -128,7 +128,7 @@ impl FlowStep {
         Ok(())
     }
 
-    async fn delete_fs_outputs(
+    pub(crate) async fn delete_fs_outputs(
         &mut self,
         session: &CachingSession,
         workflow: &Workflow,
@@ -165,6 +165,7 @@ impl FlowStep {
             for node_id in node_ids_to_remove {
                 output_ids_by_node_id.remove(&node_id);
             }
+
             self.update_cb(session).await?;
         }
 
@@ -182,7 +183,7 @@ impl FlowStep {
         Ok(())
     }
 
-    async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
+    pub(crate) async fn workflow(&self, session: &CachingSession) -> Result<Workflow, NodecosmosError> {
         let mut workflow = Workflow::new();
 
         workflow.node_id = self.node_id;
@@ -194,13 +195,13 @@ impl FlowStep {
     }
 
     // removes outputs as inputs from next workflow step
-    async fn remove_outputs_from_next_wf_step(
+    pub(crate) async fn pull_outputs_from_next_workflow_step(
         &self,
         session: &CachingSession,
         workflow: &Workflow,
+        flow_steps_by_index: &mut FlowStepsByIndex,
     ) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
-            let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
             for id in output_ids {
@@ -211,7 +212,7 @@ impl FlowStep {
                 output.id = id;
 
                 output
-                    .remove_from_next_workflow_step(session, Some(self), &mut flow_steps_by_index)
+                    .pull_from_next_workflow_step(session, Some(self), flow_steps_by_index)
                     .await?;
             }
         }

@@ -1,12 +1,16 @@
-use crate::{parse_arr_expr_from_literals, parse_loc_sec_idx_array_expr, LocalIndexTarget};
+mod hash_expr_lit_to_hash;
+mod parse_fields_from_array;
+
+use crate::macro_args::hash_expr_lit_to_hash::hash_expr_lit_to_hash;
+use crate::macro_args::parse_fields_from_array::{parse_arr_expr_from_literals, parse_loc_sec_idx_array_expr};
+use crate::schema::secondary_indexes::LocalIndexTarget;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, DeriveInput};
 
 #[derive(Debug, Default)]
-pub struct CharybdisArgs {
+pub struct CharybdisMacroArgs {
     pub table_name: Option<String>,
     pub type_name: Option<String>,
     pub base_table: Option<String>,
@@ -21,17 +25,7 @@ pub struct CharybdisArgs {
     pub table_options: Option<String>,
 }
 
-impl CharybdisArgs {
-    pub fn from_derive(input: &DeriveInput) -> Self {
-        let charybdis_model_attr: &Attribute = input
-            .attrs
-            .iter()
-            .find(|attr| attr.path().is_ident("charybdis_model"))
-            .unwrap_or_else(|| panic!("Missing charybdis_model attribute"));
-        let args: CharybdisArgs = charybdis_model_attr.parse_args::<CharybdisArgs>().unwrap();
-        args
-    }
-
+impl CharybdisMacroArgs {
     pub fn get_primary_key(&self) -> Vec<String> {
         let mut primary_key: Vec<String> = self.partition_keys.clone().unwrap();
         let mut clustering_keys: Vec<String> = self.clustering_keys.clone().unwrap();
@@ -39,43 +33,9 @@ impl CharybdisArgs {
         primary_key.append(clustering_keys.as_mut());
         primary_key
     }
-
-    pub fn hash_expr_lit_to_hash(expr: syn::Expr, cha_attr_name: String) -> HashMap<String, TokenStream> {
-        // parse ruby style hash
-        let hash = match expr {
-            syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::Str(lit_str),
-                ..
-            }) => lit_str.value(),
-            _ => panic!("{} must be a string", cha_attr_name),
-        };
-
-        // hashmap
-        let mut parsed_field_types_hash = HashMap::new();
-        for pair in hash.split(';') {
-            let pair = pair.trim();
-            let pair: Vec<&str> = pair.split("=>").collect();
-
-            if pair.len() != 2 {
-                continue;
-            }
-
-            let key = pair[0].trim_matches('\'').trim();
-            let value = pair[1].trim_matches('\'');
-
-            // println!("key: {}", key);
-            // println!("value: {}", value);
-
-            let token = syn::parse_str::<TokenStream>(value).unwrap();
-
-            parsed_field_types_hash.insert(key.to_string(), token);
-        }
-
-        parsed_field_types_hash
-    }
 }
 
-impl Parse for CharybdisArgs {
+impl Parse for CharybdisMacroArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut type_name = None;
         let mut table_name = None;
@@ -143,15 +103,14 @@ impl Parse for CharybdisArgs {
                 }
                 "field_types_hash" => {
                     let hash: syn::Expr = input.parse()?;
-                    let parsed_field_types_hash = Self::hash_expr_lit_to_hash(hash, "field_types_hash".to_string());
+                    let parsed_field_types_hash = hash_expr_lit_to_hash(hash, "field_types_hash".to_string());
 
                     field_types_hash = Some(parsed_field_types_hash);
                 }
                 "field_attributes_hash" => {
                     // parse ruby style hash
                     let hash: syn::Expr = input.parse()?;
-                    let parsed_field_attributes_hash =
-                        Self::hash_expr_lit_to_hash(hash, "field_attributes_hash".to_string());
+                    let parsed_field_attributes_hash = hash_expr_lit_to_hash(hash, "field_attributes_hash".to_string());
                     field_attributes_hash = Some(parsed_field_attributes_hash);
                 }
                 "table_options" => {
@@ -167,7 +126,7 @@ impl Parse for CharybdisArgs {
             }
         }
 
-        Ok(CharybdisArgs {
+        Ok(CharybdisMacroArgs {
             type_name,
             table_name,
             base_table,
@@ -184,13 +143,13 @@ impl Parse for CharybdisArgs {
     }
 }
 
-impl From<TokenStream> for CharybdisArgs {
+impl From<TokenStream> for CharybdisMacroArgs {
     fn from(tokens: TokenStream) -> Self {
         // Convert the input tokens to a ParseStream
         let parse_stream: TokenStream = syn::parse2(tokens).unwrap();
 
         // Parse the ParseStream into a MyStruct instance
-        let my_struct: CharybdisArgs = syn::parse2(parse_stream).unwrap();
+        let my_struct: CharybdisMacroArgs = syn::parse2(parse_stream).unwrap();
 
         // Return the parsed MyStruct instance
         my_struct

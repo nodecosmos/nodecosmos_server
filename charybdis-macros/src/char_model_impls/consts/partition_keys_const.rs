@@ -1,9 +1,9 @@
-use charybdis_parser::CharybdisArgs;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ImplItem;
 
-pub(crate) fn partition_keys_const(ch_args: &CharybdisArgs) -> ImplItem {
+pub(crate) fn partition_keys_const(ch_args: &CharybdisMacroArgs) -> ImplItem {
     let partition_keys = ch_args.partition_keys.as_ref().unwrap_or_else(|| {
         panic!(
             r#"

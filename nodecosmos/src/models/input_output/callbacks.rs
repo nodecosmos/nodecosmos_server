@@ -29,21 +29,20 @@ impl Callbacks<NodecosmosError> for UpdateDescriptionIo {
     /// while allowing IO to have it's own properties and value.
     async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let ios = Io::ios_by_original_id(session, self.root_node_id, original_id).await?;
+            let mut ios = Io::ios_by_original_id(session, self.root_node_id, original_id).await?;
 
-            for chunk in ios.chunks(25) {
+            for chunk in ios.chunks_mut(25) {
                 let mut batch = CharybdisModelBatch::new();
 
                 for io in chunk {
                     if io.id == self.id {
                         continue;
                     }
-                    let mut updated_input = io.clone();
-                    updated_input.description = self.description.clone();
-                    updated_input.description_markdown = self.description_markdown.clone();
-                    updated_input.updated_at = self.updated_at;
+                    io.description = self.description.clone();
+                    io.description_markdown = self.description_markdown.clone();
+                    io.updated_at = self.updated_at;
 
-                    batch.append_update(&updated_input)?;
+                    batch.append_update(io)?;
                 }
 
                 // Execute the batch update
@@ -60,22 +59,22 @@ impl Callbacks<NodecosmosError> for UpdateTitleIo {
 
     async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let ios = Io::ios_by_original_id(session, self.root_node_id, original_id).await?;
+            let mut ios = Io::ios_by_original_id(session, self.root_node_id, original_id).await?;
 
-            for chunk in ios.chunks(25) {
+            for chunk in ios.chunks_mut(25) {
                 let mut batch = CharybdisModelBatch::new();
 
                 for io in chunk {
                     if io.id == self.id {
                         continue;
                     }
-                    let mut updated_input = io.clone();
-                    updated_input.title = self.title.clone();
-                    updated_input.updated_at = self.updated_at;
+                    io.description = self.title.clone();
+                    io.updated_at = self.updated_at;
 
-                    batch.append_update(&updated_input)?;
+                    batch.append_update(io)?;
                 }
 
+                // Execute the batch update
                 batch.execute(session).await?;
             }
         }
@@ -99,7 +98,7 @@ impl Callbacks<NodecosmosError> for DeleteIo {
 
         let mut flow_steps_by_index = FlowStepsByIndex::build(session, &workflow).await?;
         native
-            .remove_from_next_workflow_step(session, flow_step.as_ref(), &mut flow_steps_by_index)
+            .pull_from_next_workflow_step(session, flow_step.as_ref(), &mut flow_steps_by_index)
             .await?;
 
         if let Some(mut flow_step) = flow_step {

@@ -1,8 +1,8 @@
-use crate::helpers::comma_sep_cols;
-use charybdis_parser::CharybdisArgs;
+use crate::utils::comma_sep_cols;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, FieldsNamed, GenericArgument, PathArguments, Type};
+use syn::{parse_str, Field, GenericArgument, PathArguments, Type};
 
 const MAX_FIND_BY_FUNCTIONS: usize = 3;
 
@@ -10,13 +10,13 @@ const MAX_FIND_BY_FUNCTIONS: usize = 3;
 /// finds a model by that keys in order defined.
 /// Scylla enables us to query by complete partition key and partial clustering key.
 pub(crate) fn find_by_primary_keys_functions(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
+    ch_args: &CharybdisMacroArgs,
+    fields: &Vec<Field>,
     struct_name: &syn::Ident,
 ) -> TokenStream {
     let partition_keys = ch_args.partition_keys.clone().unwrap();
     let table_name = ch_args.table_name.clone().unwrap();
-    let comma_sep_cols = comma_sep_cols(fields_named);
+    let comma_sep_cols = comma_sep_cols(fields);
 
     let mut primary_key = ch_args.get_primary_key();
     let mut generated = quote! {};
@@ -49,8 +49,7 @@ pub(crate) fn find_by_primary_keys_functions(
         let arguments = current_keys
             .iter()
             .map(|key| {
-                let key_type = fields_named
-                    .named
+                let key_type = fields
                     .iter()
                     .find(|field| field.ident.as_ref().unwrap() == key)
                     .unwrap_or_else(|| {

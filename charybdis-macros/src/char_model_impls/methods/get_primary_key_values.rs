@@ -1,10 +1,10 @@
-use crate::helpers::serialized_field_value_adder;
-use charybdis_parser::CharybdisArgs;
+use crate::utils::serialized_field_value_adder;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ImplItem;
 
-pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
+pub(crate) fn get_primary_key_values(ch_args: &CharybdisMacroArgs) -> ImplItem {
     let primary_key: Vec<String> = ch_args.get_primary_key();
     let capacity: usize = primary_key.len();
 
@@ -23,7 +23,7 @@ pub(crate) fn get_primary_key_values(ch_args: &CharybdisArgs) -> ImplItem {
     syn::parse_quote!(#generated)
 }
 
-pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
+pub(crate) fn get_partition_key_values(ch_args: &CharybdisMacroArgs) -> ImplItem {
     let partition_keys: Vec<String> = ch_args.partition_keys.clone().unwrap();
     let capacity: usize = partition_keys.len();
 
@@ -42,7 +42,7 @@ pub(crate) fn get_partition_key_values(ch_args: &CharybdisArgs) -> ImplItem {
     syn::parse_quote!(#generated)
 }
 
-pub(crate) fn get_clustering_key_values(ch_args: &CharybdisArgs) -> ImplItem {
+pub(crate) fn get_clustering_key_values(ch_args: &CharybdisMacroArgs) -> ImplItem {
     let clustering_keys = ch_args.clustering_keys.clone().unwrap();
     let capacity: usize = clustering_keys.len();
 

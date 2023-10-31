@@ -1,12 +1,12 @@
-use crate::helpers::comma_sep_cols;
-use charybdis_parser::CharybdisArgs;
+use crate::utils::comma_sep_cols;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use quote::quote;
-use syn::{FieldsNamed, ImplItem};
+use syn::{Field, ImplItem};
 
-pub fn select_fields_clause(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
+pub fn select_fields_clause(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> ImplItem {
     let table_name = ch_args.table_name.clone().unwrap();
 
-    let comma_sep_cols = comma_sep_cols(fields_named);
+    let comma_sep_cols = comma_sep_cols(fields);
 
     let query_str = format!("SELECT {} FROM {}", comma_sep_cols, table_name);
 

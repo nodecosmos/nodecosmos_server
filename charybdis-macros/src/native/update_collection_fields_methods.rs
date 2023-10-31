@@ -1,18 +1,17 @@
-use crate::helpers::serialized_field_value_adder;
-use charybdis_parser::CharybdisArgs;
+use crate::utils::serialized_field_value_adder;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse_str, FieldsNamed};
+use syn::{parse_str, Field};
 
 // Here we utilize PUSH_TO_{}_QUERY and PULL_FROM_{}_QUERY consts to generate Model functions
 // for updating collection fields.
-pub fn push_to_collection_funs(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> TokenStream {
+pub fn push_to_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
     let primary_key = ch_args.get_primary_key();
     let values_capacity: usize = primary_key.len() + 1; // +1 for the value to be pushed
     let serialized_field_value_adder: TokenStream = serialized_field_value_adder(primary_key);
 
-    let push_to_collection_rules: Vec<TokenStream> = fields_named
-        .named
+    let push_to_collection_rules: Vec<TokenStream> = fields
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();
@@ -63,13 +62,12 @@ pub fn push_to_collection_funs(ch_args: &CharybdisArgs, fields_named: &FieldsNam
     expanded
 }
 
-pub fn pull_from_collection_funs(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> TokenStream {
+pub fn pull_from_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
     let primary_key = ch_args.get_primary_key();
     let values_capacity: usize = primary_key.len() + 1; // +1 for the value to be pushed
     let serialized_field_value_adder: TokenStream = serialized_field_value_adder(primary_key);
 
-    let pull_from_collection_rules: Vec<TokenStream> = fields_named
-        .named
+    let pull_from_collection_rules: Vec<TokenStream> = fields
         .iter()
         .filter_map(|field| {
             let field_name = field.ident.as_ref().unwrap().to_string();

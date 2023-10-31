@@ -1,14 +1,13 @@
-use charybdis_parser::CharybdisArgs;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use quote::quote;
-use syn::{FieldsNamed, ImplItem};
+use syn::{Field, ImplItem};
 
-use crate::helpers::comma_sep_cols;
+use crate::utils::comma_sep_cols;
 
-pub(crate) fn insert_query_const(ch_args: &CharybdisArgs, fields_named: &FieldsNamed) -> ImplItem {
+pub(crate) fn insert_query_const(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
-    let comma_sep_cols = comma_sep_cols(fields_named);
-    let coma_sep_values_placeholders: String = fields_named
-        .named
+    let comma_sep_cols = comma_sep_cols(fields);
+    let coma_sep_values_placeholders: String = fields
         .iter()
         .map(|_| "?".to_string())
         .collect::<Vec<String>>()

@@ -1,7 +1,7 @@
-use charybdis_parser::CharybdisArgs;
+use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse_str, FieldsNamed};
+use syn::{parse_str, Field};
 
 /// for each clustering key generate additional function that finds by partition key & partial clustering key
 /// Example:
@@ -18,8 +18,8 @@ use syn::{parse_str, FieldsNamed};
 ///  User::delete_by_id_and_org_id(session: &Session, org_id: Uuid) -> Result<Vec<User>, errors::CharybdisError>
 ///  User::delete_by_id_and_org_id_and_created_at(session: &Session, org_id: Uuid, created_at: Timestamp) -> Result<Vec<User>, errors::CharybdisError>
 pub(crate) fn delete_by_clustering_key_functions(
-    ch_args: &CharybdisArgs,
-    fields_named: &FieldsNamed,
+    ch_args: &CharybdisMacroArgs,
+    fields: &Vec<Field>,
     struct_name: &syn::Ident,
 ) -> TokenStream {
     let partition_keys = ch_args.partition_keys.clone().unwrap();
@@ -52,8 +52,7 @@ pub(crate) fn delete_by_clustering_key_functions(
         let arguments = query_keys
             .iter()
             .map(|key| {
-                let key_type = fields_named
-                    .named
+                let key_type = fields
                     .iter()
                     .find(|field| field.ident.as_ref().unwrap() == key)
                     .unwrap()

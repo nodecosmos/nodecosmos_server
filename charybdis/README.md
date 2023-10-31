@@ -58,9 +58,7 @@ Declare model as a struct within `src/models` dir:
     local_secondary_indexes = [],
 )]
 pub struct User {
-    pub organizatin_id: Uuid,
     pub id: Uuid,
-    pub department_id: Uuid,
     pub username: Text,
     pub email: Text,
     pub created_at: Timestamp,

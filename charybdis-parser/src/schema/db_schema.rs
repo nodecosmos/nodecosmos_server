@@ -1,6 +1,8 @@
+mod errors;
+
+use crate::schema::secondary_indexes::{IndexTarget, Target};
 use crate::schema::{SchemaObject, SchemaObjects};
-use charybdis::errors::CharybdisError;
-use charybdis_parser::{IndexTarget, Target};
+use colored::Colorize;
 use scylla::Session;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
@@ -8,7 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CurrentDbSchema {
+pub struct DbSchema {
     pub tables: SchemaObjects,
     pub udts: SchemaObjects,
     pub materialized_views: SchemaObjects,
@@ -16,27 +18,65 @@ pub struct CurrentDbSchema {
 }
 
 /**
- * CurrentDbSchema is a singleton that contains the current state of the database schema.
+ * DbSchema is a singleton that contains the current state of the database schema.
  * It is populated by the get_current_schema() function.
  * It is used to compare the current state to the desired state of the database schema.
  */
-impl CurrentDbSchema {
-    pub(crate) async fn new(session: &Session, keyspace_name: String) -> Result<CurrentDbSchema, CharybdisError> {
-        let mut current_schema = CurrentDbSchema {
+impl DbSchema {
+    pub async fn new(session: &Session, keyspace_name: String) -> DbSchema {
+        let mut current_schema = DbSchema {
             tables: HashMap::new(),
             udts: HashMap::new(),
             materialized_views: HashMap::new(),
             keyspace_name,
         };
 
-        current_schema.get_tables_from_system_schema(session).await?;
-        current_schema.get_udts_from_system_schema(session).await?;
-        current_schema.get_mvs_from_system_schema(session).await?;
+        current_schema
+            .get_tables_from_system_schema(session)
+            .await
+            .map_err(|e| {
+                println!(
+                    "{}\n",
+                    format!("Error getting tables from system_schema: {}", e)
+                        .bright_red()
+                        .bold()
+                );
+                e
+            })
+            .unwrap();
 
-        Ok(current_schema)
+        current_schema
+            .get_udts_from_system_schema(session)
+            .await
+            .map_err(|e| {
+                println!(
+                    "{}\n",
+                    format!("Error getting udts from system_schema: {}", e)
+                        .bright_red()
+                        .bold()
+                );
+                e
+            })
+            .unwrap();
+
+        current_schema
+            .get_mvs_from_system_schema(session)
+            .await
+            .map_err(|e| {
+                println!(
+                    "{}\n",
+                    format!("Error getting materialized views from system_schema: {}", e)
+                        .bright_red()
+                        .bold()
+                );
+                e
+            })
+            .unwrap();
+
+        current_schema
     }
 
-    async fn get_tables_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
+    async fn get_tables_from_system_schema(&mut self, session: &Session) -> Result<(), errors::DbSchemaParserError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -59,7 +99,11 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn populate_table_columns(&mut self, table_name: &String, session: &Session) -> Result<(), CharybdisError> {
+    async fn populate_table_columns(
+        &mut self,
+        table_name: &String,
+        session: &Session,
+    ) -> Result<(), errors::DbSchemaParserError> {
         // get columns and types for provided table
         let cql = r#"
             SELECT
@@ -91,7 +135,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), errors::DbSchemaParserError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -123,7 +167,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), errors::DbSchemaParserError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT column_name
@@ -155,7 +199,7 @@ impl CurrentDbSchema {
         &mut self,
         table_name: &String,
         session: &Session,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), errors::DbSchemaParserError> {
         // get partition keys for provided table
         let cql = r#"
             SELECT index_name, options
@@ -190,7 +234,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn get_udts_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
+    async fn get_udts_from_system_schema(&mut self, session: &Session) -> Result<(), errors::DbSchemaParserError> {
         // get tables as a HashMap of column_name => column_type
         // Parse row as a single column containing an int value
         let cql = r#"
@@ -219,7 +263,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn get_mvs_from_system_schema(&mut self, session: &Session) -> Result<(), CharybdisError> {
+    async fn get_mvs_from_system_schema(&mut self, session: &Session) -> Result<(), errors::DbSchemaParserError> {
         // get tables as a HashMap of column_name => column_type
         let cql = r#"
             SELECT view_name
@@ -238,7 +282,11 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn populate_mv_columns(&mut self, view_name: &String, session: &Session) -> Result<(), CharybdisError> {
+    async fn populate_mv_columns(
+        &mut self,
+        view_name: &String,
+        session: &Session,
+    ) -> Result<(), errors::DbSchemaParserError> {
         // get columns and types for views
         let cql = r#"
             SELECT column_name, type
@@ -260,7 +308,11 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    async fn populate_mv_partition_key(&mut self, view_name: &String, session: &Session) -> Result<(), CharybdisError> {
+    async fn populate_mv_partition_key(
+        &mut self,
+        view_name: &String,
+        session: &Session,
+    ) -> Result<(), errors::DbSchemaParserError> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -287,7 +339,7 @@ impl CurrentDbSchema {
         &mut self,
         view_name: &String,
         session: &Session,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), errors::DbSchemaParserError> {
         let cql = r#"
             SELECT column_name
             FROM system_schema.columns
@@ -310,7 +362,7 @@ impl CurrentDbSchema {
         Ok(())
     }
 
-    pub(crate) fn get_current_schema_as_json(&self) -> String {
+    pub fn get_current_schema_as_json(&self) -> String {
         let json = to_string_pretty(&self).unwrap_or_else(|e| {
             panic!("Error serializing schema to json: {}", e);
         });
@@ -318,7 +370,7 @@ impl CurrentDbSchema {
         json
     }
 
-    pub(crate) fn write_schema_to_json(&self, project_root: PathBuf) {
+    pub fn write_schema_to_json(&self, project_root: PathBuf) {
         let json = self.get_current_schema_as_json();
 
         let path = project_root.to_str().unwrap().to_string() + "/current_schema.json";
