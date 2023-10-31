@@ -81,7 +81,7 @@ impl FlowStep {
     }
 
     pub(crate) async fn workflow(&self, session: &CachingSession) -> Result<RefMut<Option<Workflow>>, NodecosmosError> {
-        if self.workflow.borrow().is_none() {
+        if self.workflow.borrow_mut().is_none() {
             let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
             *self.workflow.borrow_mut() = Some(workflow);
         }
@@ -212,9 +212,9 @@ impl FlowStep {
                 output.root_node_id = workflow.root_node_id;
                 output.node_id = workflow.node_id;
                 output.workflow_id = workflow.id;
+                output.flow_step_id = self.next_flow_step_id;
                 output.id = id;
                 output.workflow = RefCell::new(Some(workflow.clone()));
-                output.flow_step = RefCell::new(Some(self.clone()));
 
                 output.pull_from_next_workflow_step(session).await?;
             }

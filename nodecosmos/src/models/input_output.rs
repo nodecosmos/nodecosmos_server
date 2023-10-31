@@ -123,7 +123,7 @@ impl Io {
     }
 
     pub async fn workflow(&self, session: &CachingSession) -> Result<RefMut<Option<Workflow>>, NodecosmosError> {
-        if self.workflow.borrow().is_none() {
+        if self.workflow.borrow_mut().is_none() {
             let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
             *self.workflow.borrow_mut() = Some(workflow);
         }
@@ -133,7 +133,7 @@ impl Io {
 
     pub async fn flow_step(&self, session: &CachingSession) -> Result<RefMut<Option<FlowStep>>, NodecosmosError> {
         if let Some(flow_step_id) = self.flow_step_id {
-            if self.flow_step.borrow().is_none() {
+            if self.flow_step.borrow_mut().is_none() {
                 let flow_step = FlowStep::find_by_node_id_and_id(session, self.node_id, flow_step_id).await?;
                 *self.flow_step.borrow_mut() = Some(flow_step);
             }
@@ -199,13 +199,12 @@ impl Io {
     pub async fn pull_from_next_workflow_step(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let current_step_wf_index;
         let mut workflow = self.workflow(session).await?;
-        let flow_step = &self.flow_step(session).await?;
 
         if let Some(workflow) = workflow.as_mut() {
             let diagram = workflow.diagram(session).await?;
 
-            if let Some(flow_step) = flow_step.as_ref() {
-                let wf_index = diagram.flow_step_index(flow_step.id);
+            if let Some(flow_step_id) = self.flow_step_id {
+                let wf_index = diagram.flow_step_index(flow_step_id);
                 if let Some(wf_index) = wf_index {
                     current_step_wf_index = wf_index;
                 } else {
