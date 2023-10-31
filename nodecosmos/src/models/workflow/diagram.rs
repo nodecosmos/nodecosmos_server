@@ -7,6 +7,15 @@ use scylla::CachingSession;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+/// ### Workflow back-end structure
+/// - Each `Workflow` has multiple `Flows`
+/// - Each `Flow` represents isolated process within the `Workflow`
+/// - Each `Flow` has multiple `FlowSteps`
+/// - Each `FlowStep` represents a single step within a `Flow`
+/// ### Front-end structureNote that in back-end we don't have `WorkflowSteps` so in front-end we have to build
+/// them by understanding that each `WorkflowStep` have corresponding `FlowSteps` that are calculated
+/// by `Flow.startIndex` + index of a `FlowStep` within `Flow`.
+/// Each Flow starting position, within the `Workflow`, is determined by `flow.startIndex` attribute.
 #[derive(Clone)]
 pub struct WorkflowDiagram {
     pub flow_step_by_id: HashMap<Uuid, RefCell<FlowStep>>,

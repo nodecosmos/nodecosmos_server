@@ -5,6 +5,10 @@ pub struct CharybdisFields<'a> {
 }
 
 impl<'a> CharybdisFields<'a> {
+    pub fn new(named_fields: &'a FieldsNamed) -> Self {
+        Self { named_fields }
+    }
+
     pub fn from_input(input: &'a DeriveInput) -> Self {
         match &input.data {
             Data::Struct(data) => match &data.fields {

@@ -38,9 +38,11 @@ impl CodeSchema {
                         continue;
                     }
 
-                    if entry.path().to_str().unwrap().contains("materialized_views") {
+                    let entry_path = entry.path().to_str().unwrap().to_string();
+
+                    if entry_path.contains("materialized_views") {
                         self.populate_materialized_views(entry);
-                    } else if entry.path().to_str().unwrap().contains("udts") {
+                    } else if entry_path.contains("udts") {
                         self.populate_udts(entry);
                     } else {
                         self.populate_tables(entry);

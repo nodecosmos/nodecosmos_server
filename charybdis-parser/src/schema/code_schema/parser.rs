@@ -1,3 +1,4 @@
+use crate::fields::CharybdisFields;
 use crate::macro_args::CharybdisMacroArgs;
 use crate::schema::SchemaObject;
 use colored::Colorize;
@@ -51,7 +52,8 @@ pub(crate) fn parse_charybdis_model_def(file_content: &str, macro_name: &str) ->
             }
 
             if let Fields::Named(fields_named) = item_struct.fields {
-                for field in fields_named.named {
+                let fields = CharybdisFields::new(&fields_named);
+                for field in fields.db_fields() {
                     if let Field {
                         ident: Some(ident),
                         ty: syn::Type::Path(type_path),
