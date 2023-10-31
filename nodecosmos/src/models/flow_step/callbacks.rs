@@ -22,7 +22,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
 
         match (prev_fs, next_fs) {
             (Some(mut prev_fs), Some(mut next_fs)) => {
-                prev_fs.pull_outputs_from_next_workflow_step(session).await?;
+                prev_fs.pull_outputs_from_next_flow_step(session).await?;
                 prev_fs.next_flow_step_id = Some(self.id);
                 prev_fs.update_cb(session).await?;
 

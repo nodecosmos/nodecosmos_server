@@ -185,7 +185,7 @@ impl Io {
         Ok(())
     }
 
-    pub async fn pull_form_flow_step(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn pull_form_flow_step_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.flow_step(session).await?;
 
         if let Some(flow_step) = &mut flow_step.as_mut() {
@@ -203,8 +203,10 @@ impl Io {
         if let Some(workflow) = workflow.as_mut() {
             let diagram = workflow.diagram(session).await?;
 
+            // get current flow step index within diagram
             if let Some(flow_step_id) = self.flow_step_id {
                 let wf_index = diagram.flow_step_index(flow_step_id);
+
                 if let Some(wf_index) = wf_index {
                     current_step_wf_index = wf_index;
                 } else {
@@ -214,6 +216,7 @@ impl Io {
                 current_step_wf_index = 0;
             }
 
+            // get next flow steps within diagram
             let next_wf_index = current_step_wf_index + 1;
             let next_flow_steps = diagram.flow_steps_by_wf_index(next_wf_index)?;
 

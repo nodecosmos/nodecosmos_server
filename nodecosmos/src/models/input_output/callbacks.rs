@@ -87,7 +87,7 @@ impl Callbacks<NodecosmosError> for DeleteIo {
         let mut native_io = self.as_native();
 
         native_io.pull_from_initial_input_ids(session).await?;
-        native_io.pull_form_flow_step(session).await?;
+        native_io.pull_form_flow_step_outputs(session).await?;
         native_io.pull_from_next_workflow_step(session).await?;
 
         Ok(())
