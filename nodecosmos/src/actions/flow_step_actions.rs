@@ -1,7 +1,7 @@
 use crate::authorize::auth_workflow_update;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep, UpdateOutputIdsFlowStep,
+    FlowStep, UpdateDescriptionFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::user::CurrentUser;
 use crate::services::flow_step_idx_calculator::FlowStepIdxCalculator;
@@ -48,7 +48,7 @@ pub async fn create_flow_step(
 pub async fn update_flow_step_nodes(
     db_session: web::Data<CachingSession>,
     current_user: CurrentUser,
-    mut flow_step: web::Json<UpdateFlowStepNodeIds>,
+    mut flow_step: web::Json<UpdateNodeIdsFlowStep>,
 ) -> Result<HttpResponse, NodecosmosError> {
     auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 

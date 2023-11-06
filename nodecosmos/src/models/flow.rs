@@ -71,7 +71,7 @@ partial_flow!(
 );
 
 partial_flow!(
-    UpdateFlowTitle,
+    UpdateTitleFlow,
     node_id,
     workflow_id,
     start_index,
@@ -82,7 +82,7 @@ partial_flow!(
 );
 
 partial_flow!(
-    FlowDescription,
+    DescriptionFlow,
     node_id,
     workflow_id,
     start_index,

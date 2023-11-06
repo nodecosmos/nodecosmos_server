@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::flow::{Flow, FlowDescription, UpdateFlowTitle};
+use crate::models::flow::{DescriptionFlow, Flow, UpdateTitleFlow};
 use crate::models::utils::{created_at_cb_fn, impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::operations::Delete;
@@ -24,6 +24,6 @@ impl Callbacks<NodecosmosError> for Flow {
     }
 }
 
-impl_updated_at_cb!(UpdateFlowTitle);
+impl_updated_at_cb!(UpdateTitleFlow);
 
-sanitize_description_cb!(FlowDescription);
+sanitize_description_cb!(DescriptionFlow);

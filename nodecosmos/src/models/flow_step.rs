@@ -9,7 +9,6 @@ use charybdis::operations::{New, UpdateWithCallbacks};
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::cell::{RefCell, RefMut};
 
 #[charybdis_model(
     table_name = flow_steps,
@@ -65,7 +64,7 @@ pub struct FlowStep {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub workflow: RefCell<Option<Workflow>>,
+    pub workflow: Option<Workflow>,
 }
 
 impl FlowStep {
@@ -79,13 +78,16 @@ impl FlowStep {
         Ok(fs)
     }
 
-    pub(crate) async fn workflow(&self, session: &CachingSession) -> Result<RefMut<Option<Workflow>>, NodecosmosError> {
-        if self.workflow.borrow_mut().is_none() {
+    pub(crate) async fn workflow(
+        &mut self,
+        session: &CachingSession,
+    ) -> Result<&mut Option<Workflow>, NodecosmosError> {
+        if self.workflow.is_none() {
             let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
-            *self.workflow.borrow_mut() = Some(workflow);
+            self.workflow = Some(workflow);
         }
 
-        Ok(self.workflow.borrow_mut())
+        Ok(&mut self.workflow)
     }
 
     pub async fn prev_flow_step(&self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
@@ -141,12 +143,13 @@ impl FlowStep {
 
     pub(crate) async fn delete_fs_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let output_ids_by_node_id = self.output_ids_by_node_id.clone();
+        let id = self.id;
         let workflow = self.workflow(session).await?;
 
         if let Some(output_ids_by_node_id) = output_ids_by_node_id {
             if let Some(workflow) = workflow.as_ref() {
                 let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-                Io::delete_by_ids(session, output_ids.clone(), workflow, Some(self.id)).await?;
+                Io::delete_by_ids(session, output_ids.clone(), workflow, Some(id)).await?;
             }
         }
 
@@ -155,14 +158,16 @@ impl FlowStep {
 
     // delete outputs models
     async fn delete_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let workflow = self.workflow(session).await?;
+        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
         let cloned_node_ids = self.node_ids.cloned_ref();
+        let id = self.id;
+        let workflow = self.workflow(session).await?;
 
-        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.clone() {
+        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
             if let Some(workflow) = workflow.as_ref() {
                 for (node_id, output_ids) in output_ids_by_node_id.iter() {
                     if !cloned_node_ids.contains(node_id) {
-                        Io::delete_by_ids(session, output_ids.clone(), workflow, Some(self.id)).await?;
+                        Io::delete_by_ids(session, output_ids.clone(), workflow, Some(id)).await?;
                     }
                 }
             }
@@ -229,7 +234,7 @@ impl FlowStep {
                 output.node_id = workflow.node_id;
                 output.workflow_id = workflow.id;
                 output.id = id;
-                output.workflow = RefCell::new(Some(workflow.clone()));
+                output.workflow = Some(workflow.clone());
 
                 output.pull_from_next_workflow_step(session).await?;
             }
@@ -262,7 +267,7 @@ partial_flow_step!(
 );
 
 partial_flow_step!(
-    UpdateFlowStepNodeIds,
+    UpdateNodeIdsFlowStep,
     node_id,
     workflow_id,
     flow_id,

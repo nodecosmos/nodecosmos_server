@@ -63,7 +63,7 @@ where
         async move {
             self.before_update(session, extension).await?;
             let res = self.update(session).await;
-            // self.after_update(session, extension).await?;
+            self.after_update(session, extension).await?;
 
             res.map_err(Err::from)
         }

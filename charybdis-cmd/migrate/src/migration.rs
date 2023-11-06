@@ -26,14 +26,14 @@ impl<'a> Migration<'a> {
     }
 
     pub(crate) async fn run(&self) {
-        self.run_udts().await.unwrap();
-        self.run_tables().await.unwrap();
-        self.run_materialized_views().await.unwrap();
+        self.run_udts().await;
+        self.run_tables().await;
+        self.run_materialized_views().await;
 
         println!("\n{}", "Migration plan ran successfully!".bright_green());
     }
 
-    async fn run_udts(&self) -> Result<(), ()> {
+    async fn run_udts(&self) {
         let empty_udt = SchemaObject::new();
 
         for (name, code_udt_schema) in self.current_code_schema.udts.iter() {
@@ -48,11 +48,9 @@ impl<'a> Migration<'a> {
 
             migration.run().await;
         }
-
-        Ok(())
     }
 
-    async fn run_tables(&self) -> Result<(), ()> {
+    async fn run_tables(&self) {
         let empty_table = SchemaObject::new();
 
         for (name, code_table_schema) in self.current_code_schema.tables.iter() {
@@ -67,11 +65,9 @@ impl<'a> Migration<'a> {
 
             migration.run().await;
         }
-
-        Ok(())
     }
 
-    async fn run_materialized_views(&self) -> Result<(), ()> {
+    async fn run_materialized_views(&self) {
         let empty_mv = SchemaObject::new();
 
         for (name, code_mv_schema) in self.current_code_schema.materialized_views.iter() {
@@ -86,7 +82,5 @@ impl<'a> Migration<'a> {
 
             migration.run().await;
         }
-
-        Ok(())
     }
 }

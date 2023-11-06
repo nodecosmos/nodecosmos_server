@@ -1,6 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{
-    FlowStep, UpdateDescriptionFlowStep, UpdateFlowStepNodeIds, UpdateInputIdsFlowStep, UpdateOutputIdsFlowStep,
+    FlowStep, UpdateDescriptionFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
@@ -67,7 +67,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
 
 impl_updated_at_cb!(UpdateInputIdsFlowStep);
 
-impl Callbacks<NodecosmosError> for UpdateFlowStepNodeIds {
+impl Callbacks<NodecosmosError> for UpdateNodeIdsFlowStep {
     updated_at_cb_fn!();
 
     async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {

@@ -12,7 +12,8 @@ use std::collections::HashMap;
 /// - Each `Flow` represents isolated process within the `Workflow`
 /// - Each `Flow` has multiple `FlowSteps`
 /// - Each `FlowStep` represents a single step within a `Flow`
-/// ### Front-end structureNote that in back-end we don't have `WorkflowSteps` so in front-end we have to build
+///
+/// In back-end we don't have `WorkflowSteps` so in front-end we have to build
 /// them by understanding that each `WorkflowStep` have corresponding `FlowSteps` that are calculated
 /// by `Flow.startIndex` + index of a `FlowStep` within `Flow`.
 /// Each Flow starting position, within the `Workflow`, is determined by `flow.startIndex` attribute.
@@ -20,7 +21,7 @@ use std::collections::HashMap;
 pub struct WorkflowDiagram {
     pub flow_step_by_id: HashMap<Uuid, RefCell<FlowStep>>,
     pub flow_steps_ids_by_wf_index: HashMap<u32, Vec<Uuid>>,
-    pub flow_step_index_by_id: HashMap<Uuid, u32>,
+    pub workflow_index_by_id: HashMap<Uuid, u32>,
 }
 
 impl WorkflowDiagram {
@@ -28,7 +29,7 @@ impl WorkflowDiagram {
         let mut flows = workflow.flows(session).await?;
         let mut flow_step_by_id = HashMap::new();
         let mut flow_steps_ids_by_wf_index = HashMap::new();
-        let mut flow_step_index_by_id = HashMap::new();
+        let mut workflow_index_by_id = HashMap::new();
 
         while let Some(flow) = flows.try_next().await? {
             let mut flow_steps = flow.flow_steps(session).await?;
@@ -40,7 +41,7 @@ impl WorkflowDiagram {
                     .or_insert_with(Vec::new)
                     .push(flow_step.id);
 
-                flow_step_index_by_id.insert(flow_step.id, workflow_index);
+                workflow_index_by_id.insert(flow_step.id, workflow_index);
 
                 flow_step_by_id.insert(flow_step.id, RefCell::new(flow_step));
 
@@ -51,7 +52,7 @@ impl WorkflowDiagram {
         Ok(WorkflowDiagram {
             flow_step_by_id,
             flow_steps_ids_by_wf_index,
-            flow_step_index_by_id,
+            workflow_index_by_id,
         })
     }
 
@@ -74,7 +75,7 @@ impl WorkflowDiagram {
         }
     }
 
-    pub fn flow_step_index(&self, flow_step_id: Uuid) -> Option<u32> {
-        self.flow_step_index_by_id.get(&flow_step_id).cloned()
+    pub fn workflow_index(&self, flow_step_id: Uuid) -> Option<u32> {
+        self.workflow_index_by_id.get(&flow_step_id).cloned()
     }
 }

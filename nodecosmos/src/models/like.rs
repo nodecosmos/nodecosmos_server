@@ -2,7 +2,7 @@ mod callbacks;
 
 use crate::errors::NodecosmosError;
 use crate::models::likes_count::LikesCount;
-use crate::models::node::{find_update_likes_count_node_query, UpdateLikesCountNode};
+use crate::models::node::UpdateLikesCountNode;
 use crate::models::user::User;
 use crate::CbExtension;
 use charybdis::macros::charybdis_model;
@@ -94,8 +94,12 @@ impl Like {
     ) -> Result<(), NodecosmosError> {
         match ObjectTypes::from_string(self.object_type.as_str()) {
             Some(ObjectTypes::Node) => {
-                let nfq = find_update_likes_count_node_query!("id = ?");
-                let mut node = UpdateLikesCountNode::find_one(session, nfq, (self.object_id,)).await?;
+                let mut node = UpdateLikesCountNode {
+                    id: self.object_id,
+                    ..Default::default()
+                }
+                .find_by_primary_key(session)
+                .await?;
                 let lc = self.likes_count(session).await?;
 
                 node.likes_count = Some(lc.count.0);

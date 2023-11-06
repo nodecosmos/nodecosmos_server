@@ -61,8 +61,10 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let get_clustering_key_values = get_clustering_key_values(&args);
     let get_update_values = get_update_values(&args, &db_fields);
 
-    // ValueList trait methods
+    // ValueList trait
     let serialized = serialized(&db_fields, &all_fields);
+
+    // FromRow trait
     let from_row = from_row(struct_name, &db_fields, &all_fields);
 
     // current model specific rules
@@ -144,6 +146,7 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     strip_charybdis_attributes(&mut input);
 
     let struct_name = &input.ident;
+
     // Model trait consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
