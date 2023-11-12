@@ -1,23 +1,22 @@
-pub mod node_commit;
-pub mod types;
-pub mod workflow_commit;
+mod callbacks;
 
-use crate::actions::commit_actions::CommitParams;
+use crate::actions::types::ActionTypes;
 use crate::errors::NodecosmosError;
-use crate::models::commit::types::CommitTypes;
-use crate::models::utils::impl_default_callbacks;
-
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Delete, InsertWithCallbacks, New};
-use charybdis::types::{Map, Text, Timestamp, Uuid};
+use charybdis::types::{Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
+
+pub type CommitTypes = ActionTypes;
 
 #[charybdis_model(
     table_name = commits,
-    partition_keys = [contribution_request_id],
+    partition_keys = [node_id],
     clustering_keys = [created_at, id],
-    global_secondary_indexes = [],
+    local_secondary_indexes = [
+      ([node_id], [id])
+    ],
     table_options = r#"
         CLUSTERING ORDER BY (created_at DESC)
     "#
@@ -27,92 +26,37 @@ pub struct Commit {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
-    #[serde(rename = "contributionRequestId")]
-    pub contribution_request_id: Uuid,
-
+    pub contribution_request_id: Option<Uuid>,
     pub id: Uuid,
 
-    #[serde(rename = "objectId")]
-    pub object_id: Uuid,
-
-    #[serde(rename = "commitType")]
-    pub commit_type: Text,
-
-    #[serde(rename = "userId")]
-    pub user_id: Uuid,
-
-    pub data: Option<Map<Text, Text>>,
+    #[serde(rename = "prevId")]
+    pub prev_id: Option<Uuid>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub prev_commit: Rc<Option<Commit>>,
 }
 
 impl Commit {
-    async fn init(
-        params: CommitParams,
-        object_id: Uuid,
-        user_id: Uuid,
-        commit_type: CommitTypes,
-    ) -> Result<Commit, NodecosmosError> {
-        let mut commit = Commit::new();
+    pub async fn prev_commit(&mut self, session: &CachingSession) -> Result<&Rc<Option<Commit>>, NodecosmosError> {
+        if self.prev_commit.is_none() {
+            if let Some(prev_id) = self.prev_id {
+                let pc = find_one_commit!(session, "node_id = ? AND id = ?", (self.node_id, prev_id))
+                    .await
+                    .ok();
 
-        commit.node_id = params.node_id;
-        commit.contribution_request_id = params.contribution_request_id;
+                self.prev_commit = Rc::new(pc);
+            } else {
+                self.prev_commit = Rc::new(None);
+            }
+        }
 
-        commit.object_id = object_id;
-        commit.user_id = user_id;
-        commit.commit_type = commit_type.to_string();
-
-        Ok(commit)
-    }
-
-    pub async fn create_update_object_commit(
-        session: &CachingSession,
-        params: CommitParams,
-        user_id: Uuid,
-        object_id: Uuid,
-        attribute: &str,
-        value: Text,
-        commit_type: CommitTypes,
-    ) -> Result<(), NodecosmosError> {
-        let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
-        let mut commit_data: Map<Text, Text> = Map::new();
-
-        commit_data.insert(attribute.to_string(), value);
-        commit.data = Some(commit_data);
-
-        commit.insert_cb(session).await?;
-
-        Ok(())
-    }
-
-    pub async fn create_delete_object_commit(
-        session: &CachingSession,
-        params: CommitParams,
-        user_id: Uuid,
-        object_id: Uuid,
-        commit_type: CommitTypes,
-    ) -> Result<(), NodecosmosError> {
-        let mut commit = Commit::init(params, object_id, user_id, commit_type).await?;
-
-        commit.insert_cb(session).await?;
-
-        Ok(())
-    }
-
-    pub async fn delete_contribution_request_commits(
-        session: &CachingSession,
-        contribution_request_id: Uuid,
-    ) -> Result<(), NodecosmosError> {
-        let mut commit = Commit::new();
-        commit.contribution_request_id = contribution_request_id;
-        commit.delete_by_partition_key(session).await?;
-
-        Ok(())
+        return Ok(&self.prev_commit);
     }
 }
-
-impl_default_callbacks!(Commit);

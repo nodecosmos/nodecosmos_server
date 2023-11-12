@@ -1,5 +1,4 @@
 use crate::errors::NodecosmosError;
-use crate::models::commit::Commit;
 use crate::models::contribution_request::{
     ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
@@ -15,12 +14,6 @@ impl Callbacks<NodecosmosError> for ContributionRequest {
         self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
-
-        Ok(())
-    }
-
-    async fn after_delete(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        Commit::delete_contribution_request_commits(session, self.id).await?;
 
         Ok(())
     }

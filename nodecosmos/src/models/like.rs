@@ -6,7 +6,7 @@ use crate::models::node::UpdateLikesCountNode;
 use crate::models::user::User;
 use crate::CbExtension;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{execute, Find, New, UpdateWithExtCallbacks};
+use charybdis::operations::{execute, Find, UpdateWithExtCallbacks};
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
@@ -30,6 +30,10 @@ pub struct Like {
     pub username: Text,
     pub created_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub likes_count: Option<LikesCount>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,17 +82,26 @@ impl Like {
         self.updated_at = Some(now);
     }
 
-    pub async fn likes_count(&self, session: &CachingSession) -> Result<LikesCount, NodecosmosError> {
-        let mut lc = LikesCount::new();
-        lc.object_id = self.object_id;
+    pub async fn likes_count(&mut self, session: &CachingSession) -> Result<&LikesCount, NodecosmosError> {
+        if let None = &self.likes_count {
+            let lc = LikesCount {
+                object_id: self.object_id,
+                ..Default::default()
+            }
+            .find_by_primary_key(session)
+            .await?;
 
-        let lc = lc.find_by_primary_key(session).await?;
+            self.likes_count = Some(lc);
+        }
 
-        Ok(lc)
+        match &self.likes_count {
+            Some(lc) => Ok(lc),
+            None => Err(NodecosmosError::InternalServerError("Likes count not found".to_string()).into()),
+        }
     }
 
     pub async fn update_model_likes_count(
-        &self,
+        &mut self,
         session: &CachingSession,
         ext: &CbExtension,
     ) -> Result<(), NodecosmosError> {

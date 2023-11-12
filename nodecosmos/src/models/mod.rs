@@ -12,4 +12,7 @@ pub mod node_descendant;
 pub mod udts;
 pub mod user;
 pub mod utils;
+pub mod versioned_description;
+pub mod versioned_node;
+pub mod versioned_workflow;
 pub mod workflow;

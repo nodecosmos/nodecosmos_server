@@ -4,7 +4,6 @@ use crate::models::flow_step::{
     FlowStep, UpdateDescriptionFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::user::CurrentUser;
-use crate::services::flow_step_idx_calculator::FlowStepIdxCalculator;
 use crate::services::resource_locker::ResourceLocker;
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -25,23 +24,22 @@ pub async fn create_flow_step(
     locker.check_resource_lock(&flow_step.flow_id.to_string()).await?;
     locker.lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL).await?;
 
-    let index_calculator = FlowStepIdxCalculator::new(&db_session, &flow_step).await?;
-    let validation = index_calculator.validate();
+    let res = flow_step.insert_cb(&db_session).await;
 
-    if let Err(err) = validation {
-        locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
-        return Err(err);
+    match res {
+        Ok(_) => {
+            locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
+
+            Ok(HttpResponse::Ok().json(json!({
+                "flowStep": flow_step,
+            })))
+        }
+        Err(err) => {
+            locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
+
+            Err(err)
+        }
     }
-
-    flow_step.flow_index = index_calculator.calculate_index();
-
-    flow_step.insert_cb(&db_session).await?;
-
-    locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
 }
 
 #[put("/nodes")]

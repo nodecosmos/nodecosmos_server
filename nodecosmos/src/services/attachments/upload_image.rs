@@ -2,7 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::attachment::Attachment;
 use crate::models::user::CurrentUser;
 use crate::services::aws::s3::upload_s3_object;
-use crate::services::image::{compress_image, convert_image_to_rgb, decode_image, read_image_buffer, resize_image};
+use crate::utils::image::{compress_image, convert_image_to_rgb, decode_image, read_image_buffer, resize_image};
 use actix_multipart::Multipart;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::Uuid;

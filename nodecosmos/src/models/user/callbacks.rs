@@ -17,7 +17,11 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for User {
         Ok(())
     }
 
-    async fn after_insert(&self, _session: &CachingSession, cb_extension: &CbExtension) -> Result<(), NodecosmosError> {
+    async fn after_insert(
+        &mut self,
+        _session: &CachingSession,
+        cb_extension: &CbExtension,
+    ) -> Result<(), NodecosmosError> {
         add_elastic_document(
             &cb_extension.elastic_client,
             User::ELASTIC_IDX_NAME,
@@ -34,7 +38,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for User {
         Ok(())
     }
 
-    async fn after_delete(&self, _: &CachingSession, cb_extension: &CbExtension) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _: &CachingSession, cb_extension: &CbExtension) -> Result<(), NodecosmosError> {
         delete_elastic_document(
             &cb_extension.elastic_client,
             User::ELASTIC_IDX_NAME,

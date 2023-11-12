@@ -143,14 +143,6 @@ async fn main() {
                     .service(delete_contribution_request),
             )
             .service(
-                web::scope("commits")
-                    .service(create_node_commit)
-                    .service(update_node_commit_title)
-                    .service(update_node_commit_description)
-                    .service(delete_node_commit)
-                    .service(create_workflow_commit),
-            )
-            .service(
                 web::scope("attachments")
                     .service(upload_image)
                     .service(get_presigned_url)

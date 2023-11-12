@@ -2442,6 +2442,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "modelize"
+version = "0.1.0"
+dependencies = [
+ "charybdis",
+ "charybdis_parser",
+ "clap",
+ "colored",
+ "dotenv",
+ "futures",
+ "quote",
+ "regex",
+ "scylla",
+ "serde",
+ "serde_json",
+ "strip-ansi-escapes",
+ "syn 2.0.38",
+ "tokio",
+]
+
+[[package]]
 name = "mozjpeg"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

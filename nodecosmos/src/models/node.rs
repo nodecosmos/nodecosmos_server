@@ -1,29 +1,25 @@
 mod callbacks;
 mod create;
 mod delete;
-mod update_title_node;
-
-pub use update_title_node::UpdateTitleNode;
+mod update_description;
+mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::udts::{Creator, Owner, OwnerTypes};
-use crate::models::user::CurrentUser;
+use crate::models::udts::{Creator, Owner};
 use crate::utils::defaults::default_to_0;
-
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
-use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
     clustering_keys = [],
-    global_secondary_indexes = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Node {
@@ -32,6 +28,8 @@ pub struct Node {
 
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
+
+    pub version: Option<Uuid>,
 
     #[serde(rename = "isPublic")]
     pub is_public: Boolean,
@@ -91,19 +89,25 @@ pub struct Node {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub parent: Rc<Option<Node>>,
 }
 
 impl Node {
     pub const ELASTIC_IDX_NAME: &'static str = "nodes";
 
-    pub async fn parent(&self, db_session: &CachingSession) -> Result<Option<Node>, NodecosmosError> {
+    pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Rc<Option<Node>>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
-            let node = Self::find_by_primary_key_value(db_session, (parent_id,)).await?;
+            if self.parent.is_none() {
+                let parent = Self::find_by_primary_key_value(db_session, (parent_id,)).await?;
 
-            Ok(Some(node))
-        } else {
-            Ok(None)
+                self.parent = Rc::new(Some(parent));
+            }
         }
+
+        return Ok(Rc::clone(&self.parent));
     }
 
     pub async fn descendants(
@@ -113,69 +117,6 @@ impl Node {
         let descendants = NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
 
         Ok(descendants)
-    }
-
-    pub fn set_owner(&mut self, current_user: &CurrentUser) {
-        let owner = Owner {
-            id: current_user.id,
-            name: current_user.full_name(),
-            username: Some(current_user.username.clone()),
-            owner_type: OwnerTypes::User.into(),
-            profile_image_url: None,
-        };
-
-        self.owner_id = Some(owner.id);
-        self.owner_type = Some(owner.owner_type.clone());
-
-        self.owner = Some(owner);
-    }
-
-    pub async fn set_defaults(&mut self, parent: &Option<Self>) -> Result<(), NodecosmosError> {
-        self.id = Uuid::new_v4();
-
-        if let Some(parent) = parent {
-            self.root_id = parent.root_id;
-            self.parent_id = Some(parent.id);
-            self.editor_ids = parent.editor_ids.clone();
-            self.is_public = parent.is_public;
-            self.is_root = false;
-
-            let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
-            ancestor_ids.push(parent.id);
-            self.ancestor_ids = Some(ancestor_ids);
-        } else {
-            self.root_id = self.id;
-            self.parent_id = None;
-            self.order_index = 0.0;
-            self.ancestor_ids = None;
-        }
-
-        let now = Utc::now();
-
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
-        Ok(())
-    }
-
-    pub async fn validate_root(&mut self) -> Result<(), NodecosmosError> {
-        if self.is_root {
-            if self.root_id != self.id {
-                return Err(NodecosmosError::ValidationError((
-                    "root_id".to_string(),
-                    "must be equal to id".to_string(),
-                )));
-            }
-        } else {
-            if self.root_id == Uuid::default() || self.root_id == self.id {
-                return Err(NodecosmosError::ValidationError((
-                    "root_id".to_string(),
-                    "is invalid".to_string(),
-                )));
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -215,6 +156,8 @@ partial_node!(GetStructureNode, root_id, id, parent_id, ancestor_ids, order_inde
 partial_node!(UpdateOrderNode, id, parent_id, order_index);
 
 partial_node!(UpdateLikesCountNode, id, likes_count, updated_at);
+
+partial_node!(UpdateTitleNode, root_id, id, title, updated_at);
 
 partial_node!(
     UpdateDescriptionNode,

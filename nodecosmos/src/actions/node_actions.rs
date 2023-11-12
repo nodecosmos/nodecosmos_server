@@ -7,7 +7,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::user::CurrentUser;
 use crate::services::aws::s3::delete_s3_object;
 use crate::services::nodes::cover_image_uploader::handle_cover_image_upload;
-use crate::services::nodes::reorder::{ReorderParams, Reorderer};
+use crate::services::nodes::reorder::{Reorder, ReorderParams};
 use crate::services::nodes::search::{NodeSearchQuery, NodeSearchService};
 use crate::services::resource_locker::ResourceLocker;
 use crate::CbExtension;
@@ -94,14 +94,10 @@ pub async fn create_node(
     current_user: CurrentUser,
     locker: web::Data<ResourceLocker>,
 ) -> Result<HttpResponse, NodecosmosError> {
-    let parent = node.parent(&db_session).await?;
-
-    auth_node_creation(&node, &parent, &current_user).await?;
-
-    node.set_owner(&current_user);
-    node.set_defaults(&parent).await?;
+    auth_node_creation(&db_session, &mut node, &current_user).await?;
 
     locker.check_node_lock(&node).await?;
+    node.set_owner(&current_user);
 
     node.insert_cb(&db_session, &cb_extension).await?;
 
@@ -181,9 +177,9 @@ pub async fn reorder_nodes(
         .check_node_action_lock(ActionTypes::Reorder(ActionObject::Node), &node)
         .await?;
 
-    let mut reorderer = Reorderer::new(&db_session, params.into_inner()).await?;
+    let mut reorder = Reorder::new(&db_session, params.into_inner()).await?;
 
-    reorderer.reorder(&locker).await?;
+    reorder.run(&locker).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

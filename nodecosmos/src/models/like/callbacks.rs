@@ -15,7 +15,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for Like {
         Ok(())
     }
 
-    async fn after_insert(&self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.update_model_likes_count(session, ext).await?;
         self.push_to_user_liked_obj_ids(session).await?;
 
@@ -28,7 +28,7 @@ impl ExtCallbacks<CbExtension, NodecosmosError> for Like {
         Ok(())
     }
 
-    async fn after_delete(&self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, session: &CachingSession, ext: &CbExtension) -> Result<(), NodecosmosError> {
         self.update_model_likes_count(session, ext).await?;
         self.pull_from_user_liked_obj_ids(session).await?;
 

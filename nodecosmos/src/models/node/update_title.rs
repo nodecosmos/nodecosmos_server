@@ -1,6 +1,6 @@
 use crate::actions::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
-use crate::models::node::{partial_node, Node};
+use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::elastic::update_elastic_document;
 use crate::services::logger::log_error;
@@ -8,11 +8,7 @@ use crate::CbExtension;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
-use charybdis::types::{Text, Timestamp, Uuid};
 use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-
-partial_node!(UpdateTitleNode, root_id, id, title, updated_at);
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor

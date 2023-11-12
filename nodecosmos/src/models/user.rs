@@ -2,16 +2,14 @@ mod callbacks;
 mod current_user;
 
 pub use super::udts::Address;
-pub use current_user::CurrentUser;
-
 use crate::errors::NodecosmosError;
 use crate::utils::defaults::default_to_false;
-
 use bcrypt::{hash, verify};
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
+pub use current_user::CurrentUser;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 

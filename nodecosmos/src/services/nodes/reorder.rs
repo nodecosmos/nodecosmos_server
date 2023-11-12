@@ -33,15 +33,15 @@ pub struct ReorderParams {
     pub new_bottom_sibling_id: Option<Uuid>,
 }
 
-pub struct Reorderer<'a> {
+pub struct Reorder<'a> {
     pub db_session: &'a CachingSession,
     pub reorder_data: ReorderData,
 }
 
 const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
 
-impl<'a> Reorderer<'a> {
-    pub async fn new(db_session: &'a CachingSession, params: ReorderParams) -> Result<Reorderer<'a>, NodecosmosError> {
+impl<'a> Reorder<'a> {
+    pub async fn new(db_session: &'a CachingSession, params: ReorderParams) -> Result<Reorder<'a>, NodecosmosError> {
         let reorder_data = ReorderData::from_params(&params, &db_session).await?;
 
         Ok(Self {
@@ -50,7 +50,7 @@ impl<'a> Reorderer<'a> {
         })
     }
 
-    pub async fn reorder(&mut self, locker: &ResourceLocker) -> Result<(), NodecosmosError> {
+    pub async fn run(&mut self, locker: &ResourceLocker) -> Result<(), NodecosmosError> {
         ReorderValidator::new(&self.reorder_data).validate()?;
 
         locker

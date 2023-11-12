@@ -12,7 +12,7 @@ impl Callbacks<NodecosmosError> for Workflow {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         DeleteFlowStep::delete_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
         DeleteFlow::delete_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
 

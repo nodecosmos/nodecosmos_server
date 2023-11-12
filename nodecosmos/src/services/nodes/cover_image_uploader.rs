@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateCoverImageNode};
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
-use crate::services::image::*;
+use crate::utils::image::{compress_image, convert_image_to_rgb, decode_image, read_image_buffer, resize_image};
 use crate::CbExtension;
 use actix_multipart::Multipart;
 use charybdis::operations::{New, UpdateWithExtCallbacks};

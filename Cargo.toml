@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "nodecosmos",
     "charybdis-cmd/migrate",
+    "charybdis-cmd/modelize",
     "charybdis",
     "charybdis-macros",
     "charybdis-parser",

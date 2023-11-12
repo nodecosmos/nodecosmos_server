@@ -5,9 +5,6 @@ use charybdis::types::{Counter, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-// CQL limitation is to have counters in a separate table
-// https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
-
 #[charybdis_model(
     table_name = likes_count,
     partition_keys = [object_id],

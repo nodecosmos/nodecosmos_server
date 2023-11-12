@@ -21,7 +21,7 @@ type Id = Uuid;
 type OrderIndex = f64;
 type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
 
-pub struct NodeDeleter<'a> {
+pub struct NodeDelete<'a> {
     node: &'a Node,
     db_session: &'a CachingSession,
     ext: &'a CbExtension,
@@ -29,8 +29,8 @@ pub struct NodeDeleter<'a> {
     children_by_parent_id: ChildrenByParentId,
 }
 
-impl<'a> NodeDeleter<'a> {
-    pub fn new(node: &'a Node, db_session: &'a CachingSession, ext: &'a CbExtension) -> NodeDeleter<'a> {
+impl<'a> NodeDelete<'a> {
+    pub fn new(node: &'a Node, db_session: &'a CachingSession, ext: &'a CbExtension) -> NodeDelete<'a> {
         Self {
             node,
             db_session,
@@ -41,18 +41,13 @@ impl<'a> NodeDeleter<'a> {
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        self.delete_node_data().await.map_err(|err| {
-            log_error(format!("delete_node_data: {}", err));
+        self.populate_delete_data().await.map_err(|err| {
+            log_error(format!("populate_delete_data: {}", err));
             return err;
         })?;
 
-        self.delete_and_populate_desc_data().await.map_err(|err| {
-            log_error(format!("delete_and_populate: {}", err));
-            return err;
-        })?;
-
-        self.delete_counter_data().await.map_err(|err| {
-            log_error(format!("delete_counter_data: {}", err));
+        self.delete_related_data().await.map_err(|err| {
+            log_error(format!("delete_related_data: {}", err));
             return err;
         })?;
 
@@ -66,82 +61,14 @@ impl<'a> NodeDeleter<'a> {
         Ok(())
     }
 
-    pub async fn delete_node_data(&mut self) -> Result<(), NodecosmosError> {
-        let mut batch = CharybdisModelBatch::unlogged();
-
-        batch.append_delete_by_partition_key(&WorkDeleteFlow {
-            node_id: self.node.id,
-            ..Default::default()
-        })?;
-
-        batch.append_delete_by_partition_key(&DeleteFlow {
-            node_id: self.node.id,
-            ..Default::default()
-        })?;
-
-        batch.append_delete_by_partition_key(&DeleteFlowStep {
-            node_id: self.node.id,
-            ..Default::default()
-        })?;
-
-        batch.append_delete_by_partition_key(&DeleteIo {
-            node_id: self.node.id,
-            ..Default::default()
-        })?;
-
-        batch.append_delete_by_partition_key(&Like {
-            object_id: self.node.id,
-            ..Default::default()
-        })?;
-
-        batch.append_delete(&DeleteNode { id: self.node.id })?;
-
-        batch.execute(self.db_session).await?;
-
-        Ok(())
-    }
-
-    /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node descendants.
-    /// Here we also consume stream of descendants, so we populate children_by_parent_id that
-    /// is used in self.delete_descendants.
-    pub async fn delete_and_populate_desc_data(&mut self) -> Result<(), NodecosmosError> {
+    async fn populate_delete_data(&mut self) -> Result<(), NodecosmosError> {
         let descendants = self.node.descendants(self.db_session).await?;
         let mut chunked_stream = descendants.chunks(100);
 
         while let Some(descendants_chunk) = chunked_stream.next().await {
-            let mut batch = CharybdisModelBatch::unlogged();
-
             for descendant in descendants_chunk {
                 let descendant = descendant?;
-
                 self.node_ids_to_delete.push(descendant.id);
-
-                batch.append_delete_by_partition_key(&WorkDeleteFlow {
-                    node_id: descendant.id,
-                    ..Default::default()
-                })?;
-
-                batch.append_delete_by_partition_key(&DeleteFlow {
-                    node_id: descendant.id,
-                    ..Default::default()
-                })?;
-
-                batch.append_delete_by_partition_key(&DeleteFlowStep {
-                    node_id: descendant.id,
-                    ..Default::default()
-                })?;
-
-                batch.append_delete_by_partition_key(&DeleteIo {
-                    node_id: descendant.id,
-                    ..Default::default()
-                })?;
-
-                batch.append_delete_by_partition_key(&Like {
-                    object_id: descendant.id,
-                    ..Default::default()
-                })?;
-
-                batch.append_delete(&DeleteNode { id: descendant.id })?;
 
                 if !self.node.is_root {
                     self.children_by_parent_id
@@ -150,26 +77,51 @@ impl<'a> NodeDeleter<'a> {
                         .push((descendant.id, descendant.order_index));
                 }
             }
-
-            batch.execute(self.db_session).await?;
         }
 
         Ok(())
     }
 
-    /// In Scylla counter and non-counter data can not be part of the same batch
-    pub async fn delete_counter_data(&mut self) -> Result<(), NodecosmosError> {
+    /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node and its descendants.
+    pub async fn delete_related_data(&mut self) -> Result<(), NodecosmosError> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
-
-            for node_id in node_ids_chunk {
-                batch.append_delete_by_partition_key(&LikesCount {
-                    object_id: *node_id,
+            for id in node_ids_chunk {
+                batch.append_delete_by_partition_key(&WorkDeleteFlow {
+                    node_id: *id,
                     ..Default::default()
                 })?;
-            }
 
-            batch.execute(self.db_session).await?;
+                batch.append_delete_by_partition_key(&DeleteFlow {
+                    node_id: *id,
+                    ..Default::default()
+                })?;
+
+                batch.append_delete_by_partition_key(&DeleteFlowStep {
+                    node_id: *id,
+                    ..Default::default()
+                })?;
+
+                batch.append_delete_by_partition_key(&DeleteIo {
+                    node_id: *id,
+                    ..Default::default()
+                })?;
+
+                batch.append_delete_by_partition_key(&Like {
+                    object_id: *id,
+                    ..Default::default()
+                })?;
+
+                batch.append_delete_by_partition_key(&LikesCount {
+                    object_id: *id,
+                    ..Default::default()
+                })?;
+
+                // root node will be deleted within callback
+                if id != &self.node.id {
+                    batch.append_delete(&DeleteNode { id: *id })?;
+                }
+            }
         }
 
         Ok(())
@@ -222,16 +174,23 @@ impl<'a> NodeDeleter<'a> {
                             delete_stack.push(*child_id);
                         }
 
-                        batch.execute(self.db_session).await?;
+                        batch.execute(self.db_session).await.map_err(|err| {
+                            return NodecosmosError::InternalServerError(format!(
+                                "NodeDelete::delete_descendants: batch.execute: {}",
+                                err
+                            ));
+                        })?;
                     }
                 }
             }
             None => {
                 return Err(NodecosmosError::InternalServerError(
-                    "NodeDeleter::delete_descendants: parent_id is None".to_string(),
+                    "NodeDelete::delete_descendants: parent_id is None".to_string(),
                 ));
             }
         };
+
+        println!("delete delete_descendants");
 
         Ok(())
     }
@@ -243,6 +202,8 @@ impl<'a> NodeDeleter<'a> {
         }
         .delete_by_partition_key(self.db_session)
         .await?;
+
+        println!("delete tree");
 
         return Ok(());
     }

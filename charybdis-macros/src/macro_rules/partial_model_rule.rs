@@ -17,7 +17,6 @@ use syn::{parse_str, Attribute, DeriveInput, Field};
 /// ```ignore
 /// use charybdis::*;
 /// use super::Address;
-/// #[partial_model_generator]
 /// #[charybdis_model(
 ///     table_name = "users",
 ///     partition_keys = ["id"],

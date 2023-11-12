@@ -1,4 +1,3 @@
-pub mod commit_actions;
 pub mod types;
 
 mod attachment_actions;
@@ -14,7 +13,6 @@ mod workflow_actions;
 mod ws;
 
 pub use attachment_actions::*;
-pub use commit_actions::*;
 pub use contribution_request_actions::*;
 pub use flow_actions::*;
 pub use flow_step_actions::*;

@@ -29,8 +29,8 @@ pub async fn auth_node_access(node: &BaseNode, opt_current_user: OptCurrentUser)
 }
 
 pub async fn auth_node_creation(
-    node: &Node,
-    parent: &Option<Node>,
+    db_session: &CachingSession,
+    node: &mut Node,
     current_user: &CurrentUser,
 ) -> Result<(), NodecosmosError> {
     if node.id != Uuid::default() {
@@ -40,7 +40,7 @@ pub async fn auth_node_creation(
         })));
     }
 
-    if let Some(parent) = parent {
+    if let Some(parent) = node.parent(db_session).await?.as_ref() {
         if can_edit_node(current_user, parent) {
             Ok(())
         } else {

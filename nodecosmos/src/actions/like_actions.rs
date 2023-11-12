@@ -75,12 +75,7 @@ pub async fn create_like(
 
     like.insert_cb(&db_session, &cb_extension).await?;
 
-    let likes_count = LikesCount {
-        object_id: params.object_id,
-        ..Default::default()
-    };
-
-    let likes_count = likes_count.find_by_primary_key(&db_session).await?;
+    let likes_count = like.likes_count(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "id": params.object_id,

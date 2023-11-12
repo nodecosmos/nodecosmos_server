@@ -5,7 +5,7 @@ use crate::models::flow_step::{
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
-use charybdis::operations::{Find, UpdateWithCallbacks};
+use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
@@ -17,30 +17,9 @@ impl Callbacks<NodecosmosError> for FlowStep {
         self.created_at = Some(now);
         self.updated_at = Some(now);
 
-        let prev_fs = self.prev_flow_step(session).await?;
-        let next_fs = self.next_flow_step(session).await?;
-
-        match (prev_fs, next_fs) {
-            (Some(mut prev_fs), Some(mut next_fs)) => {
-                prev_fs.pull_outputs_from_next_flow_step(session).await?;
-                prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(session).await?;
-
-                next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(session).await?;
-                next_fs.remove_inputs(session).await?;
-            }
-            (Some(mut prev_fs), None) => {
-                prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(session).await?;
-            }
-            (None, Some(mut next_fs)) => {
-                next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(session).await?;
-                next_fs.remove_inputs(session).await?;
-            }
-            _ => {}
-        }
+        self.validate_conflicts(session).await?;
+        self.calculate_index(session).await?;
+        self.sync_surrounding_fs_on_creation(session).await?;
 
         Ok(())
     }
@@ -50,16 +29,7 @@ impl Callbacks<NodecosmosError> for FlowStep {
     async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         self.pull_outputs_from_next_workflow_step(session).await?;
         self.delete_fs_outputs(session).await?;
-
-        if let Some(mut prev_flow_step) = self.prev_flow_step(session).await? {
-            prev_flow_step.next_flow_step_id = self.next_flow_step_id;
-            prev_flow_step.update_cb(session).await?;
-        }
-
-        if let Some(mut next_flow_step) = self.next_flow_step(session).await? {
-            next_flow_step.prev_flow_step_id = self.prev_flow_step_id;
-            next_flow_step.update_cb(session).await?;
-        }
+        self.sync_surrounding_fs_on_del(session).await?;
 
         Ok(())
     }
@@ -70,7 +40,7 @@ impl_updated_at_cb!(UpdateInputIdsFlowStep);
 impl Callbacks<NodecosmosError> for UpdateNodeIdsFlowStep {
     updated_at_cb_fn!();
 
-    async fn after_update(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut flow_step = self.as_native().find_by_primary_key(session).await?;
 
         flow_step.delete_outputs_from_removed_nodes(session).await?;
