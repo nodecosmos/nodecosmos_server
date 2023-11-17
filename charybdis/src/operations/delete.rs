@@ -17,7 +17,7 @@ impl<T: Model + ValueList> Delete for T {
     fn delete(&self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, CharybdisError>> {
         async move {
             let primary_key_values = self
-                .get_primary_key_values()
+                .primary_key_values()
                 .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
             session
@@ -33,7 +33,7 @@ impl<T: Model + ValueList> Delete for T {
     ) -> impl Future<Output = Result<QueryResult, CharybdisError>> {
         async move {
             let partition_key_values = self
-                .get_partition_key_values()
+                .partition_key_values()
                 .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
             session
@@ -64,19 +64,27 @@ where
     }
 }
 
-pub trait DeleteWithExtCallbacks<E, Err> {
-    fn delete_cb(&mut self, session: &CachingSession, extension: &E) -> impl Future<Output = Result<QueryResult, Err>>;
-}
-
-impl<T, Ext, Err> DeleteWithExtCallbacks<Ext, Err> for T
+pub trait DeleteWithExtCallbacks<Err, T>
 where
     Err: From<CharybdisError>,
-    T: Model + ValueList + Delete + ExtCallbacks<Ext, Err>,
+    T: Model + ValueList + Delete + ExtCallbacks<Err>,
 {
     fn delete_cb(
         &mut self,
         session: &CachingSession,
-        extension: &Ext,
+        extension: &T::Extension,
+    ) -> impl Future<Output = Result<QueryResult, Err>>;
+}
+
+impl<T, Err> DeleteWithExtCallbacks<Err, T> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Delete + ExtCallbacks<Err>,
+{
+    fn delete_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &T::Extension,
     ) -> impl Future<Output = Result<QueryResult, Err>> {
         async move {
             self.before_delete(session, extension).await?;

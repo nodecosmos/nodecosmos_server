@@ -1,10 +1,12 @@
 macro_rules! impl_node_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
-        impl charybdis::callbacks::ExtCallbacks<crate::CbExtension, crate::errors::NodecosmosError> for $struct_name {
+        impl charybdis::callbacks::ExtCallbacks<crate::errors::NodecosmosError> for $struct_name {
+            type Extension = crate::api::data::RequestData;
+
             async fn before_update(
                 &mut self,
                 _session: &charybdis::CachingSession,
-                _ext: &crate::CbExtension,
+                _ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 self.updated_at = Some(chrono::Utc::now());
 
@@ -14,10 +16,12 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
             async fn after_update(
                 &mut self,
                 _session: &charybdis::CachingSession,
-                ext: &crate::CbExtension,
+                ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
+                use crate::services::elastic::index::ElasticIndex;
+
                 crate::services::elastic::update_elastic_document(
-                    &ext.elastic_client,
+                    &ext.app.elastic_client,
                     crate::models::node::Node::ELASTIC_IDX_NAME,
                     self,
                     self.id.to_string(),

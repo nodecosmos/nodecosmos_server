@@ -1,3 +1,4 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
@@ -6,14 +7,16 @@ use crate::models::like::Like;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::versioned_node::VersionedNode;
 use crate::models::workflow::WorkDeleteFlow;
 use crate::services::elastic::bulk_delete_elastic_documents;
-use crate::services::logger::log_error;
-use crate::CbExtension;
+use crate::services::elastic::index::ElasticIndex;
+use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::Delete;
 use charybdis::types::Uuid;
-use futures::StreamExt;
+use elasticsearch::Elasticsearch;
+use futures::{StreamExt, TryFutureExt};
 use scylla::CachingSession;
 use std::collections::HashMap;
 
@@ -21,20 +24,39 @@ type Id = Uuid;
 type OrderIndex = f64;
 type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
 
+impl Node {
+    pub async fn delete_related_data(&self, ext: &RequestData) -> Result<(), NodecosmosError> {
+        NodeDelete::new(self, &ext).run().await
+    }
+
+    pub async fn create_new_version_for_ancestors(&self, ext: &RequestData) {
+        let db_session = &ext.app.db_session;
+        let user_id = ext.current_user.id;
+
+        let _ = VersionedNode::handle_deletion(db_session, &self, user_id)
+            .map_err(|e| {
+                log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
+
+                e
+            })
+            .await;
+    }
+}
+
 pub struct NodeDelete<'a> {
-    node: &'a Node,
     db_session: &'a CachingSession,
-    ext: &'a CbExtension,
+    elastic_client: &'a Elasticsearch,
+    node: &'a Node,
     node_ids_to_delete: Vec<Id>,
     children_by_parent_id: ChildrenByParentId,
 }
 
 impl<'a> NodeDelete<'a> {
-    pub fn new(node: &'a Node, db_session: &'a CachingSession, ext: &'a CbExtension) -> NodeDelete<'a> {
+    pub fn new(node: &'a Node, req_data: &'a RequestData) -> NodeDelete<'a> {
         Self {
+            db_session: &req_data.app.db_session,
+            elastic_client: &req_data.app.elastic_client,
             node,
-            db_session,
-            ext,
             node_ids_to_delete: vec![node.id],
             children_by_parent_id: ChildrenByParentId::new(),
         }
@@ -62,20 +84,18 @@ impl<'a> NodeDelete<'a> {
     }
 
     async fn populate_delete_data(&mut self) -> Result<(), NodecosmosError> {
-        let descendants = self.node.descendants(self.db_session).await?;
-        let mut chunked_stream = descendants.chunks(100);
+        let mut descendants = self.node.descendants(self.db_session).await?;
 
-        while let Some(descendants_chunk) = chunked_stream.next().await {
-            for descendant in descendants_chunk {
-                let descendant = descendant?;
-                self.node_ids_to_delete.push(descendant.id);
+        while let Some(descendant) = descendants.next().await {
+            let descendant = descendant?;
 
-                if !self.node.is_root {
-                    self.children_by_parent_id
-                        .entry(descendant.parent_id)
-                        .or_default()
-                        .push((descendant.id, descendant.order_index));
-                }
+            self.node_ids_to_delete.push(descendant.id);
+
+            if !self.node.is_root {
+                self.children_by_parent_id
+                    .entry(descendant.parent_id)
+                    .or_default()
+                    .push((descendant.id, descendant.order_index));
             }
         }
 
@@ -86,6 +106,7 @@ impl<'a> NodeDelete<'a> {
     pub async fn delete_related_data(&mut self) -> Result<(), NodecosmosError> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
+
             for id in node_ids_chunk {
                 batch.append_delete_by_partition_key(&WorkDeleteFlow {
                     node_id: *id,
@@ -117,11 +138,18 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 })?;
 
-                // root node will be deleted within callback
+                // self.node will be deleted within callback
                 if id != &self.node.id {
                     batch.append_delete(&DeleteNode { id: *id })?;
                 }
             }
+
+            batch.execute(self.db_session).await.map_err(|err| {
+                return NodecosmosError::InternalServerError(format!(
+                    "NodeDelete::delete_related_data: batch.execute: {}",
+                    err
+                ));
+            })?;
         }
 
         Ok(())
@@ -203,17 +231,10 @@ impl<'a> NodeDelete<'a> {
         .delete_by_partition_key(self.db_session)
         .await?;
 
-        println!("delete tree");
-
         return Ok(());
     }
 
     async fn delete_elastic_data(&self) {
-        bulk_delete_elastic_documents(
-            &self.ext.elastic_client,
-            Node::ELASTIC_IDX_NAME,
-            &self.node_ids_to_delete,
-        )
-        .await;
+        bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &self.node_ids_to_delete).await;
     }
 }

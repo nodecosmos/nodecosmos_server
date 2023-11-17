@@ -41,23 +41,27 @@ where
     }
 }
 
-pub trait InsertWithExtCallbacks<Ext, Err> {
-    fn insert_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &Ext,
-    ) -> impl Future<Output = Result<QueryResult, Err>>;
-}
-
-impl<T, Ext, Err> InsertWithExtCallbacks<Ext, Err> for T
+pub trait InsertWithExtCallbacks<Err, T>
 where
     Err: From<CharybdisError>,
-    T: Model + ValueList + Insert + ExtCallbacks<Ext, Err>,
+    T: Model + ValueList + Insert + ExtCallbacks<Err>,
 {
     fn insert_cb(
         &mut self,
         session: &CachingSession,
-        extension: &Ext,
+        extension: &T::Extension,
+    ) -> impl Future<Output = Result<QueryResult, Err>>;
+}
+
+impl<T, Err> InsertWithExtCallbacks<Err, T> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Insert + ExtCallbacks<Err>,
+{
+    fn insert_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &T::Extension,
     ) -> impl Future<Output = Result<QueryResult, Err>> {
         async move {
             self.before_insert(session, extension).await?;

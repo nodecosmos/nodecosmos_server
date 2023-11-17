@@ -12,7 +12,7 @@ pub trait Update {
 impl<T: Model + ValueList> Update for T {
     fn update(&self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, CharybdisError>> {
         async move {
-            let update_values = self.get_update_values()?;
+            let update_values = self.update_values()?;
 
             session
                 .execute(Self::UPDATE_QUERY, update_values)
@@ -22,11 +22,11 @@ impl<T: Model + ValueList> Update for T {
     }
 }
 
-pub trait UpdateWithCallbacks<'a, Err> {
+pub trait UpdateWithCallbacks<Err> {
     fn update_cb(&mut self, session: &CachingSession) -> impl Future<Output = Result<QueryResult, Err>>;
 }
 
-impl<'a, T, Err> UpdateWithCallbacks<'a, Err> for T
+impl<T, Err> UpdateWithCallbacks<Err> for T
 where
     Err: From<CharybdisError>,
     T: Model + ValueList + Update + Callbacks<Err>,
@@ -42,23 +42,27 @@ where
     }
 }
 
-pub trait UpdateWithExtCallbacks<'a, Ext, Err> {
-    fn update_cb(
-        &mut self,
-        session: &CachingSession,
-        extension: &Ext,
-    ) -> impl Future<Output = Result<QueryResult, Err>>;
-}
-
-impl<'a, T, Ext, Err> UpdateWithExtCallbacks<'a, Ext, Err> for T
+pub trait UpdateWithExtCallbacks<Err, T>
 where
     Err: From<CharybdisError>,
-    T: Model + ValueList + Update + ExtCallbacks<Ext, Err>,
+    T: Model + ValueList + Update + ExtCallbacks<Err>,
 {
     fn update_cb(
         &mut self,
         session: &CachingSession,
-        extension: &Ext,
+        extension: &T::Extension,
+    ) -> impl Future<Output = Result<QueryResult, Err>>;
+}
+
+impl<T, Err> UpdateWithExtCallbacks<Err, T> for T
+where
+    Err: From<CharybdisError>,
+    T: Model + ValueList + Update + ExtCallbacks<Err>,
+{
+    fn update_cb(
+        &mut self,
+        session: &CachingSession,
+        extension: &T::Extension,
     ) -> impl Future<Output = Result<QueryResult, Err>> {
         async move {
             self.before_update(session, extension).await?;

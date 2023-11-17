@@ -6,17 +6,11 @@ use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
-use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 impl Callbacks<NodecosmosError> for FlowStep {
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
+        self.set_defaults();
         self.validate_conflicts(session).await?;
         self.calculate_index(session).await?;
         self.sync_surrounding_fs_on_creation(session).await?;

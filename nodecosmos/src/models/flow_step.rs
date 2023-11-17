@@ -42,6 +42,9 @@ pub struct FlowStep {
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
 
+    #[serde(rename = "descriptionBase64")]
+    pub description_base64: Option<Text>,
+
     #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
 
@@ -82,7 +85,7 @@ impl FlowStep {
         node_id: Uuid,
         id: Uuid,
     ) -> Result<FlowStep, NodecosmosError> {
-        let fs = find_one_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+        let fs = find_first_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
 
         Ok(fs)
     }

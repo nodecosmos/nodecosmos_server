@@ -7,7 +7,7 @@ use syn::{parse_str, Field};
 // Here we utilize PUSH_TO_{}_QUERY and PULL_FROM_{}_QUERY consts to generate Model functions
 // for updating collection fields.
 pub fn push_to_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
-    let primary_key = ch_args.get_primary_key();
+    let primary_key = ch_args.primary_key();
     let values_capacity: usize = primary_key.len() + 1; // +1 for the value to be pushed
     let serialized_field_value_adder: TokenStream = serialized_field_value_adder(primary_key);
 
@@ -63,7 +63,7 @@ pub fn push_to_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>
 }
 
 pub fn pull_from_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
-    let primary_key = ch_args.get_primary_key();
+    let primary_key = ch_args.primary_key();
     let values_capacity: usize = primary_key.len() + 1; // +1 for the value to be pushed
     let serialized_field_value_adder: TokenStream = serialized_field_value_adder(primary_key);
 

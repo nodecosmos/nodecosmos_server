@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::types::Text;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default)]
 #[charybdis_udt_model(type_name = property)]
 pub struct Property {
     pub title: Text,
@@ -11,7 +11,7 @@ pub struct Property {
     pub value: Text,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub enum PropDataTypes {
     Node,
     Text,

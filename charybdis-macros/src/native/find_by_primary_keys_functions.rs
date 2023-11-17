@@ -1,8 +1,8 @@
-use crate::utils::comma_sep_cols;
+use crate::utils::{comma_sep_cols, serialized_value_adder, struct_fields_to_fn_args};
 use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, Field, GenericArgument, PathArguments, Type};
+use syn::Field;
 
 const MAX_FIND_BY_FUNCTIONS: usize = 3;
 
@@ -18,7 +18,7 @@ pub(crate) fn find_by_primary_keys_functions(
     let table_name = ch_args.table_name.clone().unwrap();
     let comma_sep_cols = comma_sep_cols(fields);
 
-    let mut primary_key = ch_args.get_primary_key();
+    let mut primary_key = ch_args.primary_key();
     let mut generated = quote! {};
 
     let mut i = 0;
@@ -46,34 +46,9 @@ pub(crate) fn find_by_primary_keys_functions(
         );
         let find_by_fun_name = syn::Ident::new(&find_by_fun_name_str, proc_macro2::Span::call_site());
 
-        let arguments = current_keys
-            .iter()
-            .map(|key| {
-                let key_type = fields
-                    .iter()
-                    .find(|field| field.ident.as_ref().unwrap() == key)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Key {} not found in struct {}. Partial models need to have complete primary key!",
-                            key, struct_name
-                        )
-                    })
-                    .ty
-                    .clone();
-
-                let type_wo_options = type_without_options(&key_type);
-                parse_str::<syn::FnArg>(&format!("{}: {}", key, type_wo_options)).unwrap()
-            })
-            .collect::<Vec<syn::FnArg>>();
-
-        let capacity = arguments.len();
-        let fields_str: String = current_keys
-            .iter()
-            .map(|key| format!("serialized.add_value(&{})?;", key))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        let serialized_adder: TokenStream = parse_str(&fields_str).unwrap();
+        let arguments = struct_fields_to_fn_args(struct_name.to_string(), fields.clone(), current_keys.clone());
+        let capacity = current_keys.len();
+        let serialized_adder = serialized_value_adder(current_keys.clone());
 
         let generated_func = quote! {
             pub async fn #find_by_fun_name(
@@ -99,25 +74,4 @@ pub(crate) fn find_by_primary_keys_functions(
     }
 
     generated
-}
-
-fn type_without_options(o_type: &Type) -> TokenStream {
-    let mut type_name = quote::quote! { #o_type };
-
-    match o_type {
-        Type::Path(type_path) => {
-            let first_segment = &type_path.path.segments[0];
-            if first_segment.ident == "Option" {
-                if let PathArguments::AngleBracketed(angle_bracketed_args) = &first_segment.arguments {
-                    if let Some(GenericArgument::Type(inner_type)) = angle_bracketed_args.args.first() {
-                        // Return the inner type of Option<T>
-                        type_name = quote::quote! { #inner_type };
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-
-    type_name
 }

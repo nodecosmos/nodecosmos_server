@@ -13,9 +13,9 @@ pub trait BaseModel: FromRow + Sized {
 
     const SELECT_FIELDS_CLAUSE: &'static str;
 
-    fn get_primary_key_values(&self) -> SerializedResult;
-    fn get_partition_key_values(&self) -> SerializedResult;
-    fn get_clustering_key_values(&self) -> SerializedResult;
+    fn primary_key_values(&self) -> SerializedResult;
+    fn partition_key_values(&self) -> SerializedResult;
+    fn clustering_key_values(&self) -> SerializedResult;
 }
 
 ///
@@ -58,7 +58,7 @@ pub trait Model: BaseModel {
     const DELETE_QUERY: &'static str;
     const DELETE_BY_PARTITION_KEY_QUERY: &'static str;
 
-    fn get_update_values(&self) -> SerializedResult;
+    fn update_values(&self) -> SerializedResult;
 }
 
 ///

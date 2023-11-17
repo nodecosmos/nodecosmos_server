@@ -26,7 +26,7 @@ pub struct CharybdisMacroArgs {
 }
 
 impl CharybdisMacroArgs {
-    pub fn get_primary_key(&self) -> Vec<String> {
+    pub fn primary_key(&self) -> Vec<String> {
         let mut primary_key: Vec<String> = self.partition_keys.clone().unwrap();
         let mut clustering_keys: Vec<String> = self.clustering_keys.clone().unwrap();
 

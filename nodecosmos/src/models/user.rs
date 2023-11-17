@@ -1,5 +1,6 @@
 mod callbacks;
-mod current_user;
+pub mod current_user;
+pub mod elastic_index;
 
 pub use super::udts::Address;
 use crate::errors::NodecosmosError;
@@ -9,7 +10,6 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
-pub use current_user::CurrentUser;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,7 @@ const BCRYPT_COST: u32 = 6;
     clustering_keys = [],
     global_secondary_indexes = [username, email],
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct User {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -56,14 +56,12 @@ pub struct User {
 }
 
 impl User {
-    pub const ELASTIC_IDX_NAME: &'static str = "users";
-
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-        find_one_user!(session, "username = ?", (&self.username,)).await.ok()
+        find_first_user!(session, "username = ?", (&self.username,)).await.ok()
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-        find_one_user!(session, "email = ?", (&self.email,)).await.ok()
+        find_first_user!(session, "email = ?", (&self.email,)).await.ok()
     }
 
     pub async fn check_existing_user(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -117,3 +115,14 @@ partial_user!(GetUser, id, username, created_at, updated_at);
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
 partial_user!(LikedObjectIdsUser, id, liked_object_ids);
+
+partial_user!(
+    CurrentUser,
+    id,
+    first_name,
+    last_name,
+    username,
+    email,
+    is_confirmed,
+    is_blocked
+);

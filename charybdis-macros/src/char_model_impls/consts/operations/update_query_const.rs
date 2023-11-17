@@ -4,7 +4,7 @@ use syn::{Field, ImplItem};
 
 pub(crate) fn update_query_const(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> ImplItem {
     let table_name = ch_args.table_name.as_ref().unwrap();
-    let primary_key = ch_args.get_primary_key();
+    let primary_key = ch_args.primary_key();
 
     let primary_key_where_clause: String = primary_key.join(" = ? AND ");
 

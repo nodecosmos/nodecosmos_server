@@ -5,7 +5,7 @@ use syn::{Field, ImplItem};
 use crate::utils::comma_sep_cols;
 
 pub(crate) fn find_by_primary_key_query_const(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> ImplItem {
-    let primary_key = ch_args.get_primary_key();
+    let primary_key = ch_args.primary_key();
     let table_name = ch_args.table_name.clone().unwrap();
 
     let comma_sep_cols = comma_sep_cols(fields);

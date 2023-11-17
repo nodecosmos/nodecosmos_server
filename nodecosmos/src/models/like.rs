@@ -1,10 +1,10 @@
 mod callbacks;
 
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::UpdateLikesCountNode;
 use crate::models::user::User;
-use crate::CbExtension;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{execute, Find, UpdateWithExtCallbacks};
 use charybdis::types::{Text, Timestamp, Uuid};
@@ -22,7 +22,7 @@ use std::fmt;
     clustering_keys = [user_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Like {
     pub object_id: Uuid,
     pub object_type: Text,
@@ -36,7 +36,7 @@ pub struct Like {
     pub likes_count: Option<LikesCount>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub enum ObjectTypes {
     Node,
 }
@@ -60,8 +60,7 @@ impl ObjectTypes {
 
 impl Like {
     pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let existing_like_query = find_like_query!("object_id = ? AND user_id = ?");
-        let existing_like = Like::find_one(session, existing_like_query, (self.object_id, self.user_id))
+        let existing_like = Like::find_by_primary_key_value(session, (self.object_id, self.user_id))
             .await
             .ok();
 
@@ -103,7 +102,7 @@ impl Like {
     pub async fn update_model_likes_count(
         &mut self,
         session: &CachingSession,
-        ext: &CbExtension,
+        data: &RequestData,
     ) -> Result<(), NodecosmosError> {
         match ObjectTypes::from_string(self.object_type.as_str()) {
             Some(ObjectTypes::Node) => {
@@ -116,7 +115,7 @@ impl Like {
                 let lc = self.likes_count(session).await?;
 
                 node.likes_count = Some(lc.count.0);
-                node.update_cb(session, ext).await?;
+                node.update_cb(session, data).await?;
 
                 Ok(())
             }

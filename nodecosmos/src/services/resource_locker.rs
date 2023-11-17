@@ -1,20 +1,19 @@
-use crate::actions::types::ActionTypes;
+use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::{redis, Pool};
-use std::sync::Arc;
 
 const LOCK_NAMESPACE: &str = "LOCK";
 
 #[derive(Clone)]
 pub struct ResourceLocker {
-    pool: Arc<Pool>,
+    pool: Pool,
 }
 
 impl ResourceLocker {
-    pub fn new(pool: Arc<Pool>) -> Self {
-        Self { pool }
+    pub fn new(pool: &Pool) -> Self {
+        Self { pool: pool.clone() }
     }
 
     /// Lock complete resource
@@ -111,7 +110,7 @@ impl ResourceLocker {
     pub async fn check_node_lock(&self, node: &Node) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(&node.root_id.to_string()).await? {
             return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked: Reorder in progress. If issue persist contact support".to_string(),
+                "Resource Locked. If issue persist contact support".to_string(),
             ));
         }
 
@@ -124,7 +123,7 @@ impl ResourceLocker {
             .await?
         {
             return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked: Reorder in progress. If issue persist contact support".to_string(),
+                "Resource Locked. If issue persist contact support".to_string(),
             ));
         }
 

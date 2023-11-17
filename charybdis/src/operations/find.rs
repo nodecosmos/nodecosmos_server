@@ -16,7 +16,7 @@ pub trait Find: BaseModel {
         values: impl ValueList,
     ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>>;
 
-    fn find_one(
+    fn find_first(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
@@ -37,7 +37,7 @@ pub trait Find: BaseModel {
 
     fn find_by_primary_key_value(
         session: &CachingSession,
-        value: impl ValueList + std::fmt::Debug,
+        value: impl ValueList,
     ) -> impl Future<Output = Result<Self, CharybdisError>>;
 
     fn find_by_partition_key_value(
@@ -45,7 +45,7 @@ pub trait Find: BaseModel {
         value: impl ValueList,
     ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>>;
 
-    fn find_one_by_partition_key_value(
+    fn find_first_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
     ) -> impl Future<Output = Result<Self, CharybdisError>>;
@@ -74,7 +74,7 @@ impl<T: BaseModel> Find for T {
         }
     }
 
-    fn find_one(
+    fn find_first(
         session: &CachingSession,
         query: &'static str,
         values: impl ValueList,
@@ -120,7 +120,7 @@ impl<T: BaseModel> Find for T {
 
     fn find_by_primary_key_value(
         session: &CachingSession,
-        value: impl ValueList + std::fmt::Debug,
+        value: impl ValueList,
     ) -> impl Future<Output = Result<Self, CharybdisError>> {
         async move {
             let result: QueryResult = session.execute(Self::FIND_BY_PRIMARY_KEY_QUERY, value).await?;
@@ -145,7 +145,7 @@ impl<T: BaseModel> Find for T {
         }
     }
 
-    fn find_one_by_partition_key_value(
+    fn find_first_by_partition_key_value(
         session: &CachingSession,
         value: impl ValueList,
     ) -> impl Future<Output = Result<Self, CharybdisError>> {
@@ -162,7 +162,7 @@ impl<T: BaseModel> Find for T {
     fn find_by_primary_key(&self, session: &CachingSession) -> impl Future<Output = Result<Self, CharybdisError>> {
         async move {
             let primary_key_values = self
-                .get_primary_key_values()
+                .primary_key_values()
                 .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
             let result: QueryResult = session
@@ -181,12 +181,12 @@ impl<T: BaseModel> Find for T {
         session: &CachingSession,
     ) -> impl Future<Output = Result<CharybdisModelStream<Self>, CharybdisError>> {
         async move {
-            let get_partition_key_values = self
-                .get_partition_key_values()
+            let partition_key_values = self
+                .partition_key_values()
                 .map_err(|e| CharybdisError::SerializeValuesError(e, Self::DB_MODEL_NAME.to_string()))?;
 
             let rows = session
-                .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, get_partition_key_values)
+                .execute_iter(Self::FIND_BY_PARTITION_KEY_QUERY, partition_key_values)
                 .await?
                 .into_typed::<Self>();
 

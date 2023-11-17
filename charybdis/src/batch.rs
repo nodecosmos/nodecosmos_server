@@ -168,7 +168,7 @@ impl CharybdisModelBatch {
         self.append_statement_to_batch(T::UPDATE_QUERY);
 
         let update_values = model
-            .get_update_values()
+            .update_values()
             .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
 
         self.values.push(update_values.into_owned());
@@ -189,7 +189,7 @@ impl CharybdisModelBatch {
         self.append_statement_to_batch(T::DELETE_QUERY);
 
         let primary_key_values = model
-            .get_primary_key_values()
+            .primary_key_values()
             .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
 
         self.values.push(primary_key_values.into_owned());
@@ -214,7 +214,7 @@ impl CharybdisModelBatch {
         self.append_statement_to_batch(T::DELETE_BY_PARTITION_KEY_QUERY);
 
         let partition_key_values = model
-            .get_partition_key_values()
+            .partition_key_values()
             .map_err(|e| CharybdisError::SerializeValuesError(e, T::DB_MODEL_NAME.to_string()))?;
 
         self.values.push(partition_key_values.into_owned());

@@ -1,15 +1,18 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Owner, OwnerTypes};
 use crate::models::user::CurrentUser;
+use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::add_elastic_document;
-use crate::services::logger::log_error;
-use crate::CbExtension;
+use crate::services::elastic::index::ElasticIndex;
+use crate::utils::logger::log_error;
+use crate::App;
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::errors::CharybdisError;
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
+use futures::TryFutureExt;
 use scylla::CachingSession;
 
 impl Node {
@@ -95,9 +98,9 @@ impl Node {
         Ok(())
     }
 
-    pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), CharybdisError> {
+    pub async fn append_to_ancestors(&self, db_session: &CachingSession) {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            let mut batch = CharybdisModelBatch::new();
+            let mut batch = CharybdisModelBatch::unlogged();
 
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
@@ -109,22 +112,40 @@ impl Node {
                     title: self.title.clone(),
                 };
 
-                batch.append_insert(&node_descendant)?;
+                let _ = batch.append_insert(&node_descendant).map_err(|e| {
+                    log_error(format!(
+                        "Error appending node {} to ancestor {} descendants. {:?}",
+                        self.id, ancestor_id, e
+                    ));
+
+                    e
+                });
             }
 
-            batch.execute(db_session).await.map_err(|e| {
-                log_error(format!("Error appending node {} to ancestors. {:?}", self.id, e));
+            let _ = batch
+                .execute(db_session)
+                .map_err(|e| {
+                    log_error(format!("Error appending node {} to ancestors. {:?}", self.id, e));
 
-                e
-            })?;
+                    e
+                })
+                .await;
         }
+    }
+
+    pub async fn add_to_elastic(&self, app: &App) -> Result<(), NodecosmosError> {
+        add_elastic_document(&app.elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
 
         Ok(())
     }
 
-    pub async fn add_to_elastic(&self, ext: &CbExtension) -> Result<(), CharybdisError> {
-        add_elastic_document(&ext.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+    pub async fn create_new_version(&self, ext: &RequestData) {
+        let _ = VersionedNode::handle_creation(&ext.app.db_session, &self, ext.current_user.id)
+            .map_err(|e| {
+                log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
 
-        Ok(())
+                e
+            })
+            .await;
     }
 }

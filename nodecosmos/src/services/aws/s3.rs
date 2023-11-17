@@ -31,12 +31,8 @@ pub async fn delete_s3_object(s3_client: &aws_sdk_s3::Client, bucket: &str, key:
     Ok(())
 }
 
-pub async fn get_s3_presigned_url(
-    s3_client: &aws_sdk_s3::Client,
-    bucket: &str,
-    key: &str,
-) -> Result<String, NodecosmosError> {
-    let put_object = s3_client.put_object().key(key).bucket(bucket);
+pub async fn get_s3_presigned_url(app: &crate::App, key: &str) -> Result<String, NodecosmosError> {
+    let put_object = app.s3_client.put_object().key(key).bucket(app.s3_bucket.clone());
     let presigned_config = aws_sdk_s3::presigning::PresigningConfig::expires_in(Duration::from_secs(300))
         .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to set presigned config: {:?}", e)))?;
 

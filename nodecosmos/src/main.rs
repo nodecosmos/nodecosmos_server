@@ -1,74 +1,46 @@
 #![feature(const_option)]
 
-mod actions;
+mod api;
 mod app;
-mod authorize;
-mod callback_extension;
-mod client_session;
+mod constants;
 mod errors;
 mod models;
 mod services;
 mod utils;
 
-use crate::app::*;
-use crate::services::elastic;
-use crate::services::resource_locker::ResourceLocker;
-
-use actions::*;
 use actix_web::middleware::Logger;
-use actix_web::{web, App, HttpServer};
-use app::App as NodecosmosApp;
-use callback_extension::CbExtension;
-use deadpool_redis::Pool;
+use actix_web::{web, App as ActixWebApp, HttpServer};
+use api::*;
+use app::App;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    let app = App::new().await;
+    let port = app.port();
 
-    let nodecosmos = NodecosmosApp::new();
-    let nodecosmos_web_data = web::Data::new(nodecosmos.clone());
-
-    let port = get_port(&nodecosmos);
+    app.init().await;
+    let app_web_data = web::Data::new(app);
 
     // web data
-    let db_session = get_db_session(&nodecosmos).await;
-    let db_session_web_data = web::Data::new(db_session);
-
-    let elastic_client = get_elastic_client(&nodecosmos).await;
-    let elastic_client_web_data = web::Data::new(elastic_client.clone());
-
-    let s3_client = get_aws_s3_client().await;
-    let s3_client_web_data = web::Data::new(s3_client.clone());
-
+    let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
+    let elastic_client_web_data = web::Data::from(app_web_data.elastic_client.clone());
+    let s3_client_web_data = web::Data::from(app_web_data.s3_client.clone());
+    let redis_pool_web_data = web::Data::from(app_web_data.redis_pool.clone());
+    let resource_locker_web_data = web::Data::from(app_web_data.resource_locker.clone());
     let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
 
-    let redis_pool: Pool = get_redis_pool(&nodecosmos).await;
-    let redis_pool_web_data = web::Data::new(redis_pool.clone());
-
-    let redis_pool_arc = Arc::clone(&redis_pool_web_data);
-    let resource_locker = ResourceLocker::new(redis_pool_arc);
-    let resource_locker_web_data = web::Data::new(resource_locker.clone());
-
-    let cb_extension = CbExtension::new(elastic_client.clone(), resource_locker.clone());
-    let cb_extension_web_data = web::Data::new(cb_extension);
-
-    nodecosmos
-        .init(&db_session_web_data, &resource_locker_web_data, &elastic_client)
-        .await;
-
     HttpServer::new(move || {
-        App::new()
+        ActixWebApp::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
-            .wrap(get_cors(&nodecosmos))
-            .wrap(get_session_middleware(&nodecosmos))
+            .wrap(app_web_data.cors())
+            .wrap(app_web_data.session_middleware())
+            .app_data(app_web_data.clone())
             .app_data(db_session_web_data.clone())
             .app_data(elastic_client_web_data.clone())
-            .app_data(cb_extension_web_data.clone())
             .app_data(redis_pool_web_data.clone())
             .app_data(resource_locker_web_data.clone())
             .app_data(s3_client_web_data.clone())
-            .app_data(nodecosmos_web_data.clone())
             .app_data(desc_ws_conn_pool.clone())
             .service(web::scope("/ws").service(description_ws))
             .service(

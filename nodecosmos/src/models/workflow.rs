@@ -46,7 +46,12 @@ pub struct Workflow {
 
     pub title: Option<Text>,
     pub description: Option<Text>,
+
+    #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
+
+    #[serde(rename = "descriptionBase64")]
+    pub description_base64: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -68,7 +73,7 @@ impl Workflow {
         node_id: Uuid,
         id: Uuid,
     ) -> Result<Workflow, NodecosmosError> {
-        let workflow = find_one_workflow!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+        let workflow = find_first_workflow!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
 
         Ok(workflow)
     }

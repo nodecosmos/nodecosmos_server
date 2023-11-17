@@ -1,5 +1,5 @@
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Text, Uuid};
+use charybdis::types::{List, Text, Uuid};
 use serde::{Deserialize, Serialize};
 
 /// Node version acts as snapshot of the current state of the node.
@@ -10,15 +10,13 @@ use serde::{Deserialize, Serialize};
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
-        compression = {'sstable_compression': 'DEFLATE'};
+        compression = {'sstable_compression': 'DeflateCompressor', 'chunk_length_in_kb': 4};
     "#,
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct VersionedWorkflow {
+    pub workflow_id: Uuid,
     pub id: Uuid,
-    pub node_id: Uuid,
     pub title: Text,
-    pub parent_id: Uuid,
-    pub descendant_ids: Vec<Uuid>,
-    pub order_index: i32,
+    pub versioned_flow_ids: List<Uuid>,
 }

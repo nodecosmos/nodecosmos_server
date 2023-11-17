@@ -60,6 +60,9 @@ pub struct Io {
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
 
+    #[serde(rename = "descriptionBase64")]
+    pub description_base64: Option<Text>,
+
     pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
     #[serde(rename = "createdAt")]
@@ -123,7 +126,7 @@ impl Io {
     pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let original_io =
-                find_one_io!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id)).await?;
+                find_first_io!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id)).await?;
             Ok(Some(original_io))
         } else {
             Ok(None)

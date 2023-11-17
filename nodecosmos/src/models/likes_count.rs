@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct LikesCount {
     pub object_id: Uuid,
     pub count: Counter,

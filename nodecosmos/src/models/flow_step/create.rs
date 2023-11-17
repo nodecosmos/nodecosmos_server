@@ -1,9 +1,18 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use charybdis::operations::UpdateWithCallbacks;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 impl FlowStep {
+    pub fn set_defaults(&mut self) {
+        let now = chrono::Utc::now();
+
+        self.id = Uuid::new_v4();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+    }
+
     pub async fn validate_conflicts(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let prev_flow_step = self.prev_flow_step(session).await?;
         let next_flow_step = self.next_flow_step(session).await?;

@@ -1,5 +1,4 @@
 pub mod attachment;
-pub mod commit;
 pub mod contribution_request;
 pub mod flow;
 pub mod flow_step;
@@ -13,6 +12,12 @@ pub mod udts;
 pub mod user;
 pub mod utils;
 pub mod versioned_description;
+pub mod versioned_flow;
+pub mod versioned_flow_step;
+pub mod versioned_flows;
+pub mod versioned_input_output;
 pub mod versioned_node;
+pub mod versioned_node_ancestors;
+pub mod versioned_node_descendants;
 pub mod versioned_workflow;
 pub mod workflow;

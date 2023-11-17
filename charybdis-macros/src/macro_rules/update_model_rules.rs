@@ -6,7 +6,7 @@ use syn::parse_str;
 
 pub fn update_model_query_rule(args: &CharybdisMacroArgs, struct_name: &Ident) -> TokenStream {
     let table_name = args.table_name.as_ref().unwrap();
-    let primary_key = args.get_primary_key();
+    let primary_key = args.primary_key();
 
     let struct_name_str = camel_to_snake_case(&struct_name.to_string());
     let macro_name_str = format!("update_{}_query", struct_name_str);

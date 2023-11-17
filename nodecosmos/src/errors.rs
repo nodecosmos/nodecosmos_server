@@ -128,10 +128,6 @@ impl ResponseError for NodecosmosError {
     }
 }
 
-// TODO: Map CharybdisError to HTTP errors accordingly
-//  ATM, we just return InternalServerError.
-//  We should make clear distinction between user errors (validation, etc.)
-//  and internal errors.
 impl From<CharybdisError> for NodecosmosError {
     fn from(e: CharybdisError) -> Self {
         NodecosmosError::CharybdisError(e)

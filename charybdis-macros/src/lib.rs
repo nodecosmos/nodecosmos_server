@@ -8,14 +8,14 @@ mod utils;
 use crate::char_model_impls::*;
 use crate::macro_rules::*;
 use crate::native::{
-    delete_by_clustering_key_functions, find_by_primary_keys_functions, pull_from_collection_fields_query_consts,
+    delete_by_primary_key_functions, find_by_primary_keys_functions, pull_from_collection_fields_query_consts,
     pull_from_collection_funs, push_to_collection_fields_query_consts, push_to_collection_funs,
 };
 use crate::scylla_impls::{from_row, serialized};
 use charybdis_parser::fields::{strip_charybdis_attributes, CharybdisFields};
 use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse_macro_input;
 use syn::DeriveInput;
 
@@ -56,10 +56,10 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let pull_from_collection_funs = pull_from_collection_funs(&args, &db_fields);
 
     // Model trait methods
-    let get_primary_key_values = get_primary_key_values(&args);
-    let get_partition_key_values = get_partition_key_values(&args);
-    let get_clustering_key_values = get_clustering_key_values(&args);
-    let get_update_values = get_update_values(&args, &db_fields);
+    let primary_key_values = primary_key_values(&args);
+    let partition_key_values = partition_key_values(&args);
+    let clustering_key_values = clustering_key_values(&args);
+    let update_values = update_values(&args, &db_fields);
 
     // ValueList trait
     let serialized = serialized(&db_fields, &all_fields);
@@ -70,12 +70,12 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     // current model specific rules
     let find_model_query_rule = find_model_query_rule(&args, &db_fields, struct_name);
     let find_model_rule = find_model_rule(&args, &db_fields, struct_name);
-    let find_one_model_rule = find_one_model_rule(&args, &db_fields, struct_name);
+    let find_first_model_rule = find_first_model_rule(&args, &db_fields, struct_name);
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
     // Associated functions for finding by partial primary key
     let find_by_key_funs = find_by_primary_keys_functions(&args, &db_fields, struct_name);
-    let delete_by_cks_funs = delete_by_clustering_key_functions(&args, &db_fields, struct_name);
+    let delete_by_cks_funs = delete_by_primary_key_functions(&args, &db_fields, struct_name);
 
     let partial_model_generator = partial_model_macro_generator(args, &input);
 
@@ -102,9 +102,9 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #find_by_partition_key_query_const
             #select_fields_clause
             // methods
-            #get_primary_key_values
-            #get_partition_key_values
-            #get_clustering_key_values
+            #primary_key_values
+            #partition_key_values
+            #clustering_key_values
         }
 
         impl charybdis::model::Model for #struct_name {
@@ -114,7 +114,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
             #delete_query_const
             #delete_by_partition_key_query_const
             // methods
-            #get_update_values
+            #update_values
         }
 
         impl charybdis::ValueList for #struct_name {
@@ -127,7 +127,7 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 
         #find_model_query_rule
         #find_model_rule
-        #find_one_model_rule
+        #find_first_model_rule
         #update_model_query_rule
         #partial_model_generator
     };
@@ -157,9 +157,9 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
     let select_fields_clause = select_fields_clause(&args, &db_fields);
 
     // Model trait methods
-    let get_primary_key_values = get_primary_key_values(&args);
-    let get_partition_key_values = get_partition_key_values(&args);
-    let get_clustering_key_values = get_clustering_key_values(&args);
+    let primary_key_values = primary_key_values(&args);
+    let partition_key_values = partition_key_values(&args);
+    let clustering_key_values = clustering_key_values(&args);
 
     // model specific rules
     let find_model_query_rule = find_model_query_rule(&args, &db_fields, struct_name);
@@ -185,9 +185,9 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
             #find_by_partition_key_query_const
             #select_fields_clause
             // methods
-            #get_primary_key_values
-            #get_partition_key_values
-            #get_clustering_key_values
+            #primary_key_values
+            #partition_key_values
+            #clustering_key_values
         }
 
         impl charybdis::model::MaterializedView for #struct_name {}

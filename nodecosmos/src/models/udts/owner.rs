@@ -19,7 +19,7 @@ pub struct Owner {
     pub profile_image_url: Option<Text>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub enum OwnerTypes {
     User,
     Organization,

@@ -8,3 +8,6 @@ members = [
     "charybdis-macros",
     "charybdis-parser",
 ]
+[profile.release]
+opt-level = 3
+lto = true

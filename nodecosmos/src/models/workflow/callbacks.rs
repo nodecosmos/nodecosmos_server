@@ -17,10 +17,7 @@ impl Callbacks<NodecosmosError> for Workflow {
         DeleteFlow::delete_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
 
         DeleteIo::delete_by_root_node_id_and_node_id(session, self.root_node_id, self.node_id).await?;
-        DeleteIo::delete_by_root_node_id_and_node_id(session, self.root_node_id, self.node_id)
-            .await?
-            .try_collect()
-            .await?;
+        DeleteIo::delete_by_root_node_id_and_node_id(session, self.root_node_id, self.node_id).await?;
 
         Ok(())
     }

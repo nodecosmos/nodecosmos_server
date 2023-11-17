@@ -18,7 +18,7 @@
 - It expects `CachingSession` as a session arg for operations
 - Queries are macro generated str constants (no concatenation at runtime)
 - By using `find_<model>!` macro we can run complex queries that are generated at compile time as `&'static str`
-- While it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
+- Although it has expressive API it's thin layer on top of scylla_rust_driver, and it does not introduce any significant overhead
 
 
 ## Table of Contents
@@ -233,7 +233,7 @@ find_by_primary_key_val `associated fun`, as it will automatically provide corre
 based on primary key definition.
 ```rust
   let user = User {id, ..Default::default()};
-  let user: User = user.find_by_primary_key(&session).await?;
+  let user = user.find_by_primary_key(&session).await?;
 ```
 `find_by_partition_key`
 ```rust
@@ -266,11 +266,11 @@ let res = find_post!(
 ).await?;
 ```
 
-We can also use `find_one_post!` macro to get single result:
+We can also use `find_first_post!` macro to get single result:
 ```rust
-let res = find_one_post!(
+let post = find_first_post!(
     session,
-    "category_id in ? AND date > ?",
+    "category_id in ? AND date > ? LIMIT 1",
     (date, categor_vec]
 ).await?;
 ```
@@ -289,7 +289,7 @@ Lets say we have model:
 #[charybdis_model(
     table_name = posts,
     partition_keys = [date],
-    clustering_keys = [categogry_id, title, id],
+    clustering_keys = [categogry_id, title],
     global_secondary_indexes = [])
 ]
 pub struct Post {
@@ -412,7 +412,7 @@ pub struct Organization {
 
 impl Organization {
   pub async fn find_by_name(&self, session: &CachingSession) -> Option<Organization> {
-    find_one_organization!(session, "name = ?", (&self.name,)).await.ok()
+    find_first_organization!(session, "name = ?", (&self.name,)).await.ok()
   }
 }
 
@@ -465,18 +465,19 @@ pub struct CustomExtension {
 ```
 
 We can define `after_update` callback on `Post`  
-that has custom extension as argument:
+that has custom extension as type:
 ```rust
 #[charybdis_model(...)]
 pub struct Post {}
 
-impl ExtCallbacks<CustomExtension> for Post {
+impl ExtCallbacks<CustomError> for Post {
+    type Extention = CustomExtension;
 
     async fn after_update(
         &mut self,
         _db_session: &CachingSession,
         extension: &CustomExtension,
-    ) -> Result<(), CharybdisError> {
+    ) -> Result<(), CustomError> {
         extension.elastic_client.update(...).await?;
 
         Ok(())
@@ -489,6 +490,7 @@ So to trigger callback we use same `update_cb` method:
 let post = Post::from_json(json);
 let res = post.update_cb(&session, custom_extensions).await;
 ```
+Note that CustomError has to implement `From<CharybdisError>`.
 
 ## Batch Operations
 

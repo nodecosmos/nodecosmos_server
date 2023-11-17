@@ -1,5 +1,5 @@
-use crate::services::elastic;
-use crate::services::nodes::reorder::{Recovery, RECOVERY_DATA_DIR};
+use crate::models::node::reorder::Recovery;
+use crate::services::elastic::ElasticIndexBuilder;
 use crate::services::resource_locker::ResourceLocker;
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
@@ -11,18 +11,23 @@ use deadpool_redis::{Config, Pool, Runtime};
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
-use std::fs::create_dir_all;
+use std::sync::Arc;
 use std::{env, fs, time::Duration};
 use toml::Value;
 
 #[derive(Clone)]
 pub struct App {
     pub config: Value,
-    pub bucket: String,
+    pub db_session: Arc<CachingSession>,
+    pub elastic_client: Arc<Elasticsearch>,
+    pub redis_pool: Arc<Pool>,
+    pub resource_locker: Arc<ResourceLocker>,
+    pub s3_bucket: String,
+    pub s3_client: Arc<aws_sdk_s3::Client>,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         dotenv::dotenv().ok();
 
         let env = env::var("ENV").expect("ENV must be set");
@@ -30,29 +35,98 @@ impl App {
 
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let config = contents.parse::<Value>().expect("Unable to parse TOML");
-        let bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
+        let s3_bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
+        let s3_client = create_s3_client().await;
 
-        Self { config, bucket }
+        let db_session = create_caching_session(&config).await;
+        let elastic_client = create_elastic_client(&config).await;
+        let redis_pool = create_redis_pool(&config).await;
+
+        let resource_locker = ResourceLocker::new(&redis_pool);
+
+        Self {
+            config,
+            db_session: Arc::new(db_session),
+            elastic_client: Arc::new(elastic_client),
+            resource_locker: Arc::new(resource_locker),
+            redis_pool: Arc::new(redis_pool),
+            s3_bucket,
+            s3_client: Arc::new(s3_client),
+        }
     }
 
     /// Init processes that need to be run on startup
-    pub async fn init(&self, db_session: &CachingSession, locker: &ResourceLocker, elastic_client: &Elasticsearch) {
-        elastic::build(&elastic_client).await;
-
-        self.create_tmp_directories();
-
-        Recovery::recover_from_stored_data(&db_session, locker).await;
+    pub async fn init(&self) {
+        // init logger
+        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+        // init elastic
+        ElasticIndexBuilder::new(&self.elastic_client).build().await;
+        // init recovery in case reordering was interrupted or failed
+        Recovery::recover_from_stored_data(&self.db_session, &self.resource_locker).await;
+        // init job queue
     }
 
-    fn create_tmp_directories(&self) {
-        create_dir_all(RECOVERY_DATA_DIR).unwrap();
+    pub fn cors(&self) -> Cors {
+        let allowed_origin = self.config["allowed_origin"]
+            .as_str()
+            .expect("Missing allowed_origin")
+            .to_string();
+
+        Cors::default()
+            .allowed_origin(allowed_origin.as_str())
+            .supports_credentials()
+            .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![
+                http::header::AUTHORIZATION,
+                http::header::ACCEPT,
+                http::header::ORIGIN,
+                http::header::USER_AGENT,
+                http::header::DNT,
+                http::header::CONTENT_TYPE,
+                http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+            ])
+            .expose_headers(vec![http::header::LOCATION, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
+            .max_age(86400)
+    }
+
+    pub fn port(&self) -> u16 {
+        self.config["port"].as_integer().expect("Missing port") as u16
+    }
+
+    pub fn session_middleware(&self) -> SessionMiddleware<RedisActorSessionStore> {
+        let secret_key = self.secret_key();
+        let redis_actor_session_store = self.redis_actor_session_store();
+        let expiration = self.config["session_expiration_in_days"]
+            .as_integer()
+            .expect("Missing session_expiration");
+        let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
+
+        SessionMiddleware::builder(redis_actor_session_store, secret_key)
+            .session_lifecycle(ttl)
+            .cookie_secure(false)
+            .build()
+    }
+
+    fn secret_key(&self) -> Key {
+        let secret_key = self.config["secret_key"]
+            .as_str()
+            .expect("Missing secret_key")
+            .to_string();
+
+        Key::from(secret_key.as_ref())
+    }
+
+    fn redis_actor_session_store(&self) -> RedisActorSessionStore {
+        let redis_host = self.config["redis"]["host"].as_str().expect("Missing redis url");
+
+        RedisActorSessionStore::new(redis_host)
     }
 }
 
-pub async fn get_db_session(app: &App) -> CachingSession {
-    let hosts = app.config["scylla"]["hosts"].as_array().expect("Missing hosts");
+async fn create_caching_session(config: &Value) -> CachingSession {
+    let hosts = config["scylla"]["hosts"].as_array().expect("Missing hosts");
 
-    let keyspace = app.config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
+    let keyspace = config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
 
     let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
 
@@ -67,86 +141,28 @@ pub async fn get_db_session(app: &App) -> CachingSession {
     CachingSession::from(session, 1000)
 }
 
-pub async fn get_elastic_client(app: &App) -> Elasticsearch {
-    let host = app.config["elasticsearch"]["host"]
-        .as_str()
-        .expect("Missing elastic host");
+async fn create_elastic_client(config: &Value) -> Elasticsearch {
+    let host = config["elasticsearch"]["host"].as_str().expect("Missing elastic host");
 
     let transport = Transport::single_node(host).unwrap_or_else(|e| {
         panic!(
             "Unable to connect to elastic host: {}. \nError: {}",
-            app.config["elasticsearch"]["host"], e
+            config["elasticsearch"]["host"], e
         )
     });
 
     Elasticsearch::new(transport)
 }
 
-pub fn get_cors(app: &App) -> Cors {
-    let allowed_origin = app.config["allowed_origin"]
-        .as_str()
-        .expect("Missing allowed_origin")
-        .to_string();
-
-    Cors::default()
-        .allowed_origin(allowed_origin.as_str())
-        .supports_credentials()
-        .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-        .allowed_headers(vec![
-            http::header::AUTHORIZATION,
-            http::header::ACCEPT,
-            http::header::ORIGIN,
-            http::header::USER_AGENT,
-            http::header::DNT,
-            http::header::CONTENT_TYPE,
-            http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
-        ])
-        .expose_headers(vec![http::header::LOCATION, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
-        .max_age(86400)
-}
-
-pub fn get_port(app: &App) -> u16 {
-    app.config["port"].as_integer().expect("Missing port") as u16
-}
-
-pub fn get_secret_key(app: &App) -> Key {
-    let secret_key = app.config["secret_key"]
-        .as_str()
-        .expect("Missing secret_key")
-        .to_string();
-
-    Key::from(secret_key.as_ref())
-}
-
-pub fn get_redis_actor_session_store(app: &App) -> RedisActorSessionStore {
-    let redis_host = app.config["redis"]["host"].as_str().expect("Missing redis url");
-
-    RedisActorSessionStore::new(redis_host)
-}
-
-pub fn get_session_middleware(app: &App) -> SessionMiddleware<RedisActorSessionStore> {
-    let secret_key = get_secret_key(app);
-    let redis_actor_session_store = get_redis_actor_session_store(app);
-    let expiration = app.config["session_expiration_in_days"]
-        .as_integer()
-        .expect("Missing session_expiration");
-    let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
-
-    SessionMiddleware::builder(redis_actor_session_store, secret_key)
-        .session_lifecycle(ttl)
-        .cookie_secure(false)
-        .build()
-}
-
-pub async fn get_redis_pool(app: &App) -> Pool {
-    let redis_url = app.config["redis"]["url"].as_str().expect("Missing redis url");
+async fn create_redis_pool(config: &Value) -> Pool {
+    let redis_url = config["redis"]["url"].as_str().expect("Missing redis url");
 
     let cfg = Config::from_url(redis_url);
 
     cfg.create_pool(Some(Runtime::Tokio1)).expect("Failed to create pool.")
 }
 
-pub async fn get_aws_s3_client() -> aws_sdk_s3::Client {
+async fn create_s3_client() -> aws_sdk_s3::Client {
     let config = aws_config::from_env().load().await;
 
     let client = aws_sdk_s3::Client::new(&config);

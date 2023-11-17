@@ -1,6 +1,12 @@
-mod callbacks;
+pub mod callbacks;
+/// TODO: consider moving all of this to node model
+///       so we keep services dir only for generic use cases
+pub mod cover_image_uploader;
 mod create;
 mod delete;
+pub mod elastic_index;
+pub mod reorder;
+pub mod search;
 mod update_description;
 mod update_title;
 
@@ -14,14 +20,14 @@ use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
     clustering_keys = [],
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Node {
     #[serde(default)]
     pub id: Uuid,
@@ -29,7 +35,8 @@ pub struct Node {
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
 
-    pub version: Option<Uuid>,
+    #[serde(rename = "versionId")]
+    pub version_id: Option<Uuid>,
 
     #[serde(rename = "isPublic")]
     pub is_public: Boolean,
@@ -92,22 +99,20 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub parent: Rc<Option<Node>>,
+    pub parent: Arc<Option<Node>>,
 }
 
 impl Node {
-    pub const ELASTIC_IDX_NAME: &'static str = "nodes";
-
-    pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Rc<Option<Node>>, NodecosmosError> {
+    pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Arc<Option<Node>>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
             if self.parent.is_none() {
                 let parent = Self::find_by_primary_key_value(db_session, (parent_id,)).await?;
 
-                self.parent = Rc::new(Some(parent));
+                self.parent = Arc::new(Some(parent));
             }
         }
 
-        return Ok(Rc::clone(&self.parent));
+        return Ok(Arc::clone(&self.parent));
     }
 
     pub async fn descendants(
