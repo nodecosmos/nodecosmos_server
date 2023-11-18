@@ -7,7 +7,7 @@ use crate::App;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks};
+use charybdis::operations::{DeleteWithExtCallbacks, InsertWithExtCallbacks, UpdateWithExtCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
@@ -15,12 +15,7 @@ use std::sync::Arc;
 
 #[get("/{id}")]
 pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let user = GetUser {
-        id: id.into_inner(),
-        ..Default::default()
-    };
-
-    let user = user.find_by_primary_key(&db_session).await?;
+    let user = GetUser::find_by_id(&db_session, *id).await?;
 
     Ok(HttpResponse::Ok().json(user))
 }
@@ -40,9 +35,7 @@ pub async fn update_user(
     mut user: web::Json<UpdateUser>,
     current_user: CurrentUser,
 ) -> Response {
-    let native_user = user.as_native();
-
-    auth_user_update(&native_user, &current_user).await?;
+    auth_user_update(&user.as_native(), &current_user).await?;
 
     user.update_cb(&app.db_session, &app).await?;
 
@@ -54,13 +47,8 @@ pub async fn delete_user(
     db_session: web::Data<CachingSession>,
     app: web::Data<Arc<App>>,
     current_user: CurrentUser,
-    id: web::Path<Uuid>,
+    mut user: web::Path<User>,
 ) -> Response {
-    let mut user = User {
-        id: id.into_inner(),
-        ..Default::default()
-    };
-
     auth_user_update(&user, &current_user).await?;
 
     user.delete_cb(&db_session, &app).await?;

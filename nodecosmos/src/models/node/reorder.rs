@@ -9,27 +9,32 @@ use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::{execute, Update};
-use charybdis::types::Uuid;
 use scylla::CachingSession;
-use serde::Deserialize;
 
+use crate::api::data::RequestData;
+use crate::api::types::{ActionObject, ActionTypes};
+use crate::api::ReorderParams;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 pub(crate) use recovery::Recovery;
 
-#[derive(Deserialize)]
-pub struct ReorderParams {
-    #[serde(rename = "nodeId")]
-    pub node_id: Uuid,
+impl Node {
+    pub async fn reorder(&self, ext: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
+        let db_session = &ext.app.db_session;
+        let resource_locker = &ext.app.resource_locker;
 
-    #[serde(rename = "newParentId")]
-    pub new_parent_id: Uuid,
+        resource_locker.check_node_lock(&self).await?;
+        resource_locker
+            .check_node_action_lock(&self, ActionTypes::Reorder(ActionObject::Node))
+            .await?;
 
-    #[serde(rename = "newUpperSiblingId")]
-    pub new_upper_sibling_id: Option<Uuid>,
+        let reorder_data = ReorderData::from_params(&params, &db_session).await?;
+        let mut reorder = Reorder::new(&ext.app.db_session, reorder_data).await?;
 
-    #[serde(rename = "newBottomSiblingId")]
-    pub new_bottom_sibling_id: Option<Uuid>,
+        reorder.run(&ext.app.resource_locker).await?;
+
+        Ok(())
+    }
 }
 
 pub struct Reorder<'a> {
@@ -40,12 +45,10 @@ pub struct Reorder<'a> {
 const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
 
 impl<'a> Reorder<'a> {
-    pub async fn new(db_session: &'a CachingSession, params: ReorderParams) -> Result<Reorder<'a>, NodecosmosError> {
-        let reorder_data = ReorderData::from_params(&params, &db_session).await?;
-
+    pub async fn new(db_session: &'a CachingSession, data: ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
         Ok(Self {
             db_session,
-            reorder_data,
+            reorder_data: data,
         })
     }
 

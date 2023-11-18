@@ -4,7 +4,6 @@ mod session;
 
 use crate::modelization::Modelization;
 
-use charybdis_parser::schema::code_schema::CodeSchema;
 use charybdis_parser::schema::db_schema::DbSchema;
 
 use clap::Parser;

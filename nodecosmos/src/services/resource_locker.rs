@@ -117,7 +117,7 @@ impl ResourceLocker {
         Ok(())
     }
 
-    pub async fn check_node_action_lock(&self, action_type: ActionTypes, node: &Node) -> Result<(), NodecosmosError> {
+    pub async fn check_node_action_lock(&self, node: &Node, action_type: ActionTypes) -> Result<(), NodecosmosError> {
         if self
             .is_resource_action_locked(action_type, &node.root_id.to_string())
             .await?

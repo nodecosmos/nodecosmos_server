@@ -1,6 +1,6 @@
 # High-Performance ORM for ScyllaDB in Rust
 ### Use monstrous tandem of scylla and charybdis for your next project
-⚠️ *WIP: This project is currently in an experimental stage; It uses async trait support from rust nightly release*
+⚠️ *WIP: This project is currently in an experimental stage; It uses async trait support from rust beta release*
 
 <img src="https://www.scylladb.com/wp-content/uploads/scylla-opensource-1.png" height="250">
 
@@ -13,7 +13,7 @@
 - Automatic migration tool that analyzes the `src/model/*.rs` files and runs migrations according to differences between the model definition and database
 
 ## Performance consideration:
-- It's build by nightly release, so it uses builtin support for `async/await` in traits
+- It's build by beta release, so it uses builtin support for `async/await` in traits that will be stabilized in Rust `1.75`
 - It uses prepared statements (shard/token aware) -> bind values
 - It expects `CachingSession` as a session arg for operations
 - Queries are macro generated str constants (no concatenation at runtime)
@@ -53,7 +53,7 @@ Declare model as a struct within `src/models` dir:
 // src/modles/user.rs
 #[charybdis_model(
     table_name = users,
-    partition_keys = [id],
+    partition_keys = [id],n
     clustering_keys = [],
     global_secondary_indexes = [],
     local_secondary_indexes = [],
@@ -122,9 +122,9 @@ It expects `src/models` files and generates migrations based on differences betw
 It supports following operations:
 - Create new tables
 - Create new columns
-- Delete columns
+- Drop columns
 - Create secondary indexes
-- Delete secondary indexes
+- Drop secondary indexes
 - Create UDTs (`src/models/udts`)
 - Create materialized views (`src/models/materialized_views`)
 - Table options
@@ -227,7 +227,7 @@ async fn main() {
 
 ## Find
 
-#### `find_by_primary_key`
+#### Find by primary key
 This is preferred way to query data rather then
 find_by_primary_key_val `associated fun`, as it will automatically provide correct order
 based on primary key definition.
@@ -235,10 +235,42 @@ based on primary key definition.
   let user = User {id, ..Default::default()};
   let user = user.find_by_primary_key(&session).await?;
 ```
-`find_by_partition_key`
+#### Find by partition key
+
 ```rust
   let users =  User {id, ..Default::default()}.find_by_partition_key(&session).await;
 ```
+
+#### Macro generated find helpers
+Lets say we have model:
+```rust
+#[charybdis_model(
+    table_name = posts,
+    partition_keys = [date],
+    clustering_keys = [categogry_id, title],
+    global_secondary_indexes = [])
+]
+pub struct Post {
+    date: Date,
+    category_id: Uuid,
+    title: String,
+    id: Uuid,
+    ...
+}
+```
+
+```rust
+Post::find_by_date(session: &Session, date: Date) -> Result<CharybdisModelStream<Post>, CharybdisError>
+Post::find_by_date_and_category_id(session: &Session, date: Date, category_id: Uuid) ->  Result<CharybdisModelStream<Post>, CharybdisError>
+Post::find_by_date_and_category_id_and_title(session: &Session, date: Date, category_id: Uuid, title: String) -> Result<Post, CharybdisError>
+```
+We generate functions for up to 3 fields. 
+
+🟢 Note that if **complete** primary key is provided, we get single typed result.
+
+So for our user
+model we get `find_by_id` function that returns `Result<User, CharybdisError>`.
+
 
 ### Custom filtering:
 Let's say we have a model:
@@ -282,32 +314,6 @@ let query = find_post_query!(
     (date, categor_vec])
 ```
 
-
-### Additional helpers 
-Lets say we have model:
-```rust
-#[charybdis_model(
-    table_name = posts,
-    partition_keys = [date],
-    clustering_keys = [categogry_id, title],
-    global_secondary_indexes = [])
-]
-pub struct Post {
-    date: Date,
-    category_id: Uuid,
-    title: String,
-    id: Uuid,
-    ...
-}
-```
-
-```rust
-Post::find_by_date(session: &Session, date: Date) -> CharybdisModelStream<Post>
-Post::find_by_date_and_category_id(session: &Session, date: Date, category_id: Uuid) -> CharybdisModelStream<Post>
-Post::find_by_date_and_category_id_and_title(session: &Session, date: Date, category_id: Uuid, title: String) -> CharybdisModelStream<Post>
-```
-We generate functions for up to 3 fields.
-
 ## Update
 ```rust
 let user = User::from_json(json);
@@ -337,58 +343,33 @@ It follows convention `partial_<struct_name>!`.
 partial_user!(UpdateUsernameUser, id, username);
 
 let id = Uuid::new_v4();
-let partial_user = UpdateUsernameUser { id, username: "scylla".to_string() };
+let user = UpdateUsernameUser { id, username: "scylla".to_string() };
 
 // we can have same operations as on base model
 // INSERT into users (id, username) VALUES (?, ?)
-partial_user.insert(&session).await;
+user.insert(&session).await;
 
 // UPDATE users SET username = ? WHERE id = ?
-partial_user.update(&session).await;
+user.update(&session).await;
 
 // DELETE FROM users WHERE id = ?
-partial_user.delete(&session).await;
+user.delete(&session).await;
 
 // get partial PartUser
-let partial_user = partial_user.find_by_primary_key(&:session).await?;
+let partial_user = user.find_by_primary_key(&:session).await?;
 
 // get native user model by primary key
-let user = partial_user.as_native().find_by_primary_key(&session).await?;
+let user = user.as_native().find_by_primary_key(&session).await?;
 ```
 
-Derives that are defined bellow `charybdis_model` and custom attributes on model fields 
-will be automatically added to partial fields.
-
-```rust
-#[charybdis_model(
-    table_name = nodes,
-    partition_keys = [root_id],
-    clustering_keys = [id],
-    global_secondary_indexes = []
-)]
-#[derive(Serialize, Deserialize, Default)]
-pub struct Node {
-    // descendable
-    pub id: Uuid,
-
-    #[serde(rename = "rootId")]
-    pub root_id: Uuid, 
-    
-    pub title: String,
-}
-
-partial_node!(PartialNode, id, root_id);
-```
 
 ### Partial Model Considerations:
 1) `partial_<model>` require complete primary key in definition
 
 2) All derives that are defined bellow `#charybdis_model` macro will be automatically added to partial model.
 
-3) `partial_<model>` struct implement everything that is **internal** to native struct and library
-   traits that are required for basic operations. Unsurprisingly, it doesn't implement `Callbacks`
-   unless they are derives.
-   We can either manually implement `Callbacks`, use macro helpers.
+3) `partial_<model>` struct implements same field attributes as original model, 
+    so if we have `#[serde(rename = "rootId")]` on original model field, it will be present on partial model field.
 
 Recommended naming convention is `Purpose` + `Original Struct Name`. E.g: 
 `UpdateAdresssUser`, `UpdateDescriptionPost`. 

@@ -32,16 +32,14 @@ impl App {
 
         let env = env::var("ENV").expect("ENV must be set");
         let config_file = format!("config.{}.toml", env);
-
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let config = contents.parse::<Value>().expect("Unable to parse TOML");
         let s3_bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
-        let s3_client = create_s3_client().await;
 
+        let s3_client = create_s3_client().await;
         let db_session = create_caching_session(&config).await;
         let elastic_client = create_elastic_client(&config).await;
         let redis_pool = create_redis_pool(&config).await;
-
         let resource_locker = ResourceLocker::new(&redis_pool);
 
         Self {
@@ -63,7 +61,6 @@ impl App {
         ElasticIndexBuilder::new(&self.elastic_client).build().await;
         // init recovery in case reordering was interrupted or failed
         Recovery::recover_from_stored_data(&self.db_session, &self.resource_locker).await;
-        // init job queue
     }
 
     pub fn cors(&self) -> Cors {

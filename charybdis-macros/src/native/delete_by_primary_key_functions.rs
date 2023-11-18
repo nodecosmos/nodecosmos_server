@@ -25,22 +25,21 @@ pub(crate) fn delete_by_primary_key_functions(
     fields: &Vec<Field>,
     struct_name: &syn::Ident,
 ) -> TokenStream {
-    let partition_keys = ch_args.partition_keys.clone().unwrap();
     let table_name = ch_args.table_name.clone().unwrap();
 
-    let mut primary_key = ch_args.primary_key();
+    let mut primary_key_stack = ch_args.primary_key();
     let mut generated = quote! {};
 
     let mut i = 0;
 
-    while primary_key.len() >= partition_keys.len() {
+    while !primary_key_stack.is_empty() {
         if i > MAX_DELETE_BY_FUNCTIONS {
             break;
         }
 
         i += 1;
 
-        let current_keys = primary_key.clone();
+        let current_keys = primary_key_stack.clone();
         let primary_key_where_clause: String = current_keys.join(" = ? AND ");
         let query_str = format!("DELETE FROM {} WHERE {} = ?", table_name, primary_key_where_clause);
         let find_by_fun_name_str = format!(
@@ -73,7 +72,7 @@ pub(crate) fn delete_by_primary_key_functions(
             }
         };
 
-        primary_key.pop();
+        primary_key_stack.pop();
 
         generated.extend(generated_func);
     }

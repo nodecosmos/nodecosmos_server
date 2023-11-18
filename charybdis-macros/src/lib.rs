@@ -15,7 +15,7 @@ use crate::scylla_impls::{from_row, serialized};
 use charybdis_parser::fields::{strip_charybdis_attributes, CharybdisFields};
 use charybdis_parser::macro_args::CharybdisMacroArgs;
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 

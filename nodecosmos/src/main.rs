@@ -1,5 +1,3 @@
-#![feature(const_option)]
-
 mod api;
 mod app;
 mod constants;

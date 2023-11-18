@@ -1,12 +1,10 @@
 pub mod callbacks;
-/// TODO: consider moving all of this to node model
-///       so we keep services dir only for generic use cases
-pub mod cover_image_uploader;
 mod create;
 mod delete;
 pub mod elastic_index;
 pub mod reorder;
 pub mod search;
+pub mod update_cover_image;
 mod update_description;
 mod update_title;
 
