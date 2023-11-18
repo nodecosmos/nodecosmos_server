@@ -19,42 +19,30 @@ impl<T: Model + ValueList> Update for T {
     }
 }
 
-pub trait UpdateWithCallbacks<Err> {
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err>;
+pub trait UpdateWithCallbacks<T: Update + Callbacks> {
+    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, T::Error>;
 }
 
-impl<T, Err> UpdateWithCallbacks<Err> for T
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Update + Callbacks<Err>,
-{
-    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err> {
+impl<T: Update + Callbacks> UpdateWithCallbacks<T> for T {
+    async fn update_cb(&mut self, session: &CachingSession) -> Result<QueryResult, T::Error> {
         self.before_update(session).await?;
         let res = self.update(session).await;
         self.after_update(session).await?;
 
-        res.map_err(Err::from)
+        res.map_err(T::Error::from)
     }
 }
 
-pub trait UpdateWithExtCallbacks<Err, T>
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Update + ExtCallbacks<Err>,
-{
-    async fn update_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, Err>;
+pub trait UpdateWithExtCallbacks<T: Update + ExtCallbacks> {
+    async fn update_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, T::Error>;
 }
 
-impl<T, Err> UpdateWithExtCallbacks<Err, T> for T
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Update + ExtCallbacks<Err>,
-{
-    async fn update_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, Err> {
+impl<T: Update + ExtCallbacks> UpdateWithExtCallbacks<T> for T {
+    async fn update_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, T::Error> {
         self.before_update(session, extension).await?;
         let res = self.update(session).await;
         self.after_update(session, extension).await?;
 
-        res.map_err(Err::from)
+        res.map_err(T::Error::from)
     }
 }

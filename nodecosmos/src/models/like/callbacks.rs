@@ -5,8 +5,9 @@ use crate::models::likes_count::LikesCount;
 use charybdis::callbacks::ExtCallbacks;
 use scylla::CachingSession;
 
-impl ExtCallbacks<NodecosmosError> for Like {
+impl ExtCallbacks for Like {
     type Extension = RequestData;
+    type Error = NodecosmosError;
 
     async fn before_insert(&mut self, session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
         self.validate_not_liked(session).await?;

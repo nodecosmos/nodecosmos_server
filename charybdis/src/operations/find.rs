@@ -28,12 +28,6 @@ pub trait Find: BaseModel {
         page_size: Option<Bytes>,
     ) -> Result<(CharybdisModelIterator<Self>, Option<Bytes>), CharybdisError>;
 
-    async fn find_all(
-        session: &CachingSession,
-        query: &'static str,
-        values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError>;
-
     async fn find_by_primary_key_value(session: &CachingSession, value: impl ValueList)
         -> Result<Self, CharybdisError>;
 
@@ -92,19 +86,6 @@ impl<T: BaseModel> Find for T {
         let typed_rows = CharybdisModelIterator::from(rows.into_typed());
 
         Ok((typed_rows, paging_state))
-    }
-
-    async fn find_all(
-        session: &CachingSession,
-        query: &'static str,
-        values: impl ValueList,
-    ) -> Result<CharybdisModelIterator<Self>, CharybdisError> {
-        let result: QueryResult = session.execute(query, values).await?;
-
-        let rows = result.rows()?;
-        let typed_rows = CharybdisModelIterator::from(rows.into_typed());
-
-        Ok(typed_rows)
     }
 
     async fn find_by_primary_key_value(

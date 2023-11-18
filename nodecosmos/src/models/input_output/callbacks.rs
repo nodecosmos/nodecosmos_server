@@ -6,7 +6,9 @@ use charybdis::model::AsNative;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
-impl Callbacks<NodecosmosError> for Io {
+impl Callbacks for Io {
+    type Error = NodecosmosError;
+
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
@@ -20,7 +22,9 @@ impl Callbacks<NodecosmosError> for Io {
     }
 }
 
-impl Callbacks<NodecosmosError> for UpdateDescriptionIo {
+impl Callbacks for UpdateDescriptionIo {
+    type Error = NodecosmosError;
+
     sanitize_description_cb_fn!();
 
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -30,7 +34,9 @@ impl Callbacks<NodecosmosError> for UpdateDescriptionIo {
     }
 }
 
-impl Callbacks<NodecosmosError> for UpdateTitleIo {
+impl Callbacks for UpdateTitleIo {
+    type Error = NodecosmosError;
+
     updated_at_cb_fn!();
 
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -40,7 +46,9 @@ impl Callbacks<NodecosmosError> for UpdateTitleIo {
     }
 }
 
-impl Callbacks<NodecosmosError> for DeleteIo {
+impl Callbacks for DeleteIo {
+    type Error = NodecosmosError;
+
     async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut native_io = self.as_native();
 

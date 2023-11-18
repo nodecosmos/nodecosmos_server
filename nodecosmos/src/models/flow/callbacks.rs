@@ -6,7 +6,9 @@ use charybdis::operations::Delete;
 use futures::TryStreamExt;
 use scylla::CachingSession;
 
-impl Callbacks<NodecosmosError> for Flow {
+impl Callbacks for Flow {
+    type Error = NodecosmosError;
+
     created_at_cb_fn!();
 
     updated_at_cb_fn!();

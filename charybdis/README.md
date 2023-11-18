@@ -397,7 +397,9 @@ impl Organization {
   }
 }
 
-impl Callbacks<CustomError> for Organization {
+impl Callbacks for Organization {
+  type Error = CustomError;
+
   async fn before_insert(&self, session: &CachingSession) -> Result<(), CustomError> {
     if self.find_by_name(session).await.is_some() {
       return Err(CustomError::ValidationError((
@@ -451,8 +453,9 @@ that has custom extension as type:
 #[charybdis_model(...)]
 pub struct Post {}
 
-impl ExtCallbacks<CustomError> for Post {
+impl ExtCallbacks for Post {
     type Extention = CustomExtension;
+    type Error = CustomError;
 
     async fn after_update(
         &mut self,

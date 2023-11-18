@@ -7,7 +7,9 @@ use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, 
 use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 
-impl Callbacks<NodecosmosError> for Workflow {
+impl Callbacks for Workflow {
+    type Error = NodecosmosError;
+
     created_at_cb_fn!();
 
     updated_at_cb_fn!();

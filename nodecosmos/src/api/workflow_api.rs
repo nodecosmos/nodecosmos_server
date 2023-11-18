@@ -109,7 +109,7 @@ pub async fn delete_workflow(
     current_user: CurrentUser,
     params: web::Path<DeleteWfParams>,
 ) -> Response {
-    let mut workflow = Workflow::find_by_primary_key_value(&db_session, (params.node_id, params.workflow_id)).await?;
+    let mut workflow = Workflow::find_by_node_id_and_id(&db_session, params.node_id, params.workflow_id).await?;
 
     auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
 

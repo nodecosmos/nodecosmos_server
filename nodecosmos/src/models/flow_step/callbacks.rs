@@ -8,7 +8,9 @@ use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use scylla::CachingSession;
 
-impl Callbacks<NodecosmosError> for FlowStep {
+impl Callbacks for FlowStep {
+    type Error = NodecosmosError;
+
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         self.set_defaults();
         self.validate_conflicts(session).await?;
@@ -31,7 +33,9 @@ impl Callbacks<NodecosmosError> for FlowStep {
 
 impl_updated_at_cb!(UpdateInputIdsFlowStep);
 
-impl Callbacks<NodecosmosError> for UpdateNodeIdsFlowStep {
+impl Callbacks for UpdateNodeIdsFlowStep {
+    type Error = NodecosmosError;
+
     updated_at_cb_fn!();
 
     async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {

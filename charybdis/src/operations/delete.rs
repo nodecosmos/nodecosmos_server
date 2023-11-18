@@ -33,16 +33,12 @@ impl<T: Model + ValueList> Delete for T {
     }
 }
 
-pub trait DeleteWithCallbacks<Err> {
-    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err>;
+pub trait DeleteWithCallbacks<T: Delete + Callbacks> {
+    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, T::Error>;
 }
 
-impl<Err, T> DeleteWithCallbacks<Err> for T
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Delete + Callbacks<Err>,
-{
-    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, Err> {
+impl<T: Delete + Callbacks> DeleteWithCallbacks<T> for T {
+    async fn delete_cb(&mut self, session: &CachingSession) -> Result<QueryResult, T::Error> {
         self.before_delete(session).await?;
         let res = self.delete(session).await;
         self.after_delete(session).await?;
@@ -51,20 +47,12 @@ where
     }
 }
 
-pub trait DeleteWithExtCallbacks<Err, T>
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Delete + ExtCallbacks<Err>,
-{
-    async fn delete_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, Err>;
+pub trait DeleteWithExtCallbacks<T: Delete + ExtCallbacks> {
+    async fn delete_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, T::Error>;
 }
 
-impl<T, Err> DeleteWithExtCallbacks<Err, T> for T
-where
-    Err: From<CharybdisError>,
-    T: Model + ValueList + Delete + ExtCallbacks<Err>,
-{
-    async fn delete_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, Err> {
+impl<T: Delete + ExtCallbacks> DeleteWithExtCallbacks<T> for T {
+    async fn delete_cb(&mut self, session: &CachingSession, extension: &T::Extension) -> Result<QueryResult, T::Error> {
         self.before_delete(session, extension).await?;
         let res = self.delete(session).await;
         self.after_delete(session, extension).await?;

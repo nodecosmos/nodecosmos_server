@@ -5,8 +5,9 @@ use crate::models::utils::impl_node_updated_at_with_elastic_ext_cb;
 use charybdis::callbacks::ExtCallbacks;
 use scylla::CachingSession;
 
-impl ExtCallbacks<NodecosmosError> for Node {
+impl ExtCallbacks for Node {
     type Extension = RequestData;
+    type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
         self.set_defaults(db_session).await?;
@@ -50,8 +51,9 @@ impl ExtCallbacks<NodecosmosError> for Node {
     }
 }
 
-impl ExtCallbacks<NodecosmosError> for UpdateDescriptionNode {
+impl ExtCallbacks for UpdateDescriptionNode {
     type Extension = RequestData;
+    type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
         self.sanitize_description();
@@ -73,8 +75,9 @@ impl ExtCallbacks<NodecosmosError> for UpdateDescriptionNode {
     }
 }
 
-impl ExtCallbacks<NodecosmosError> for UpdateTitleNode {
+impl ExtCallbacks for UpdateTitleNode {
     type Extension = RequestData;
+    type Error = NodecosmosError;
 
     async fn before_update(&mut self, session: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
         self.update_title_for_ancestors(session, &ext.app).await?;

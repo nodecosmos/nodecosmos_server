@@ -9,8 +9,9 @@ use chrono::Utc;
 use scylla::CachingSession;
 use std::sync::Arc;
 
-impl ExtCallbacks<NodecosmosError> for User {
+impl ExtCallbacks for User {
     type Extension = Arc<App>;
+    type Error = NodecosmosError;
 
     async fn before_insert(&mut self, session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
         self.check_existing_user(session).await?;

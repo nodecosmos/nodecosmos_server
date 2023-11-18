@@ -28,7 +28,7 @@ pub(crate) fn find_by_primary_keys_functions(
 
         i += 1;
 
-        let is_complete_pk = i == primary_key_len;
+        let is_complete_pk = primary_key_stack.len() == primary_key_len;
         let current_keys = primary_key_stack.clone();
         let primary_key_where_clause: String = current_keys.join(" = ? AND ");
         let query_str = format!(

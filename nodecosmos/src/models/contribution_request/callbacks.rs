@@ -7,7 +7,9 @@ use charybdis::callbacks::Callbacks;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
-impl Callbacks<NodecosmosError> for ContributionRequest {
+impl Callbacks for ContributionRequest {
+    type Error = NodecosmosError;
+
     async fn before_insert(&mut self, _session: &CachingSession) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
