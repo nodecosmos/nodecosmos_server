@@ -18,15 +18,15 @@ impl ExtCallbacks for Like {
         Ok(())
     }
 
-    async fn after_insert(&mut self, _: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
         let mut self_clone = self.clone();
-        let app = ext.app.clone();
-        let ext = ext.clone();
+        let app = req_data.app.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_likes_count(session, &ext).await.unwrap();
+            self_clone.update_model_likes_count(session, &req_data).await.unwrap();
             self_clone.push_to_user_liked_obj_ids(session).await.unwrap();
         });
 
@@ -39,15 +39,15 @@ impl ExtCallbacks for Like {
         Ok(())
     }
 
-    async fn after_delete(&mut self, _: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
         let mut self_clone = self.clone();
-        let app = ext.app.clone();
-        let ext = ext.clone();
+        let app = req_data.app.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_likes_count(session, &ext).await.unwrap();
+            self_clone.update_model_likes_count(session, &req_data).await.unwrap();
             self_clone.pull_from_user_liked_obj_ids(session).await.unwrap();
         });
 

@@ -10,7 +10,7 @@ use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ReorderData {
     pub node: Node,
     pub descendants: Vec<NodeDescendant>,
@@ -19,8 +19,11 @@ pub struct ReorderData {
     pub old_parent: GetStructureNode,
     pub new_parent: GetStructureNode,
 
-    pub old_node_ancestor_ids: Vec<Uuid>,
-    pub new_node_ancestor_ids: Vec<Uuid>,
+    pub old_ancestor_ids: Vec<Uuid>,
+    pub new_ancestor_ids: Vec<Uuid>,
+
+    pub removed_ancestor_ids: Vec<Uuid>,
+    pub added_ancestor_ids: Vec<Uuid>,
 
     pub new_upper_sibling: Option<GetStructureNode>,
     pub new_bottom_sibling: Option<GetStructureNode>,
@@ -61,8 +64,20 @@ impl ReorderData {
         .find_by_primary_key(&db_session)
         .await?;
 
-        let old_node_ancestor_ids = node.ancestor_ids.cloned_ref();
-        let new_node_ancestor_ids = build_new_ancestor_ids(&new_parent);
+        let old_ancestor_ids = node.ancestor_ids.cloned_ref();
+        let new_ancestor_ids = build_new_ancestor_ids(&new_parent);
+
+        let removed_ancestor_ids: Vec<Uuid> = old_ancestor_ids
+            .iter()
+            .filter(|&id| !new_ancestor_ids.contains(id))
+            .cloned()
+            .collect();
+
+        let added_ancestor_ids: Vec<Uuid> = new_ancestor_ids
+            .iter()
+            .filter(|&id| !old_ancestor_ids.contains(id))
+            .cloned()
+            .collect();
 
         let new_upper_sibling = init_sibling(params.new_upper_sibling_id, &db_session).await?;
         let new_bottom_sibling = init_sibling(params.new_bottom_sibling_id, &db_session).await?;
@@ -94,8 +109,11 @@ impl ReorderData {
             old_parent,
             new_parent,
 
-            old_node_ancestor_ids,
-            new_node_ancestor_ids,
+            old_ancestor_ids,
+            new_ancestor_ids,
+
+            removed_ancestor_ids,
+            added_ancestor_ids,
 
             new_upper_sibling,
             new_bottom_sibling,
@@ -110,7 +128,7 @@ impl ReorderData {
         Ok(data)
     }
 
-    pub fn is_parent_changed(&self) -> bool {
+    pub fn parent_changed(&self) -> bool {
         if let Some(current_parent_id) = self.node.parent_id {
             return current_parent_id != self.new_parent.id;
         }

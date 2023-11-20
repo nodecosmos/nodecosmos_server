@@ -28,14 +28,10 @@ pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Que
 }
 
 #[get("/{id}")]
-pub async fn get_node(
-    db_session: web::Data<CachingSession>,
-    id: web::Path<Uuid>,
-    opt_current_user: OptCurrentUser,
-) -> Response {
+pub async fn get_node(db_session: web::Data<CachingSession>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
     let node = BaseNode::find_by_id(&db_session, *id).await?;
 
-    auth_node_access(&node, opt_current_user).await?;
+    auth_node_access(&node, opt_cu).await?;
 
     let descendants: Vec<NodeDescendant> = node.as_native().descendants(&db_session).await?.try_collect().await?;
 
@@ -70,31 +66,23 @@ pub async fn get_node_description_base64(db_session: web::Data<CachingSession>, 
 
 #[post("")]
 pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Response {
-    let db_session = &data.app.db_session;
-    let current_user = &data.current_user;
-    let resource_locker = &data.app.resource_locker;
+    auth_node_creation(data.db_session(), &mut node, &data.current_user).await?;
 
-    auth_node_creation(&db_session, &mut node, current_user).await?;
+    data.resource_locker().check_node_lock(&node).await?;
+    node.set_owner(&data.current_user);
 
-    resource_locker.check_node_lock(&node).await?;
-    node.set_owner(current_user);
-
-    node.insert_cb(db_session, &data).await?;
+    node.insert_cb(data.db_session(), &data).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
 
 #[put("/title")]
 pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: RequestData) -> Response {
-    let db_session = &data.app.db_session;
-    let current_user = &data.current_user;
-    let resource_locker = &data.app.resource_locker;
+    let native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
 
-    let native_node = node.as_native().find_by_primary_key(&db_session).await?;
-
-    auth_node_update(&native_node, current_user).await?;
-    resource_locker.check_node_lock(&native_node).await?;
-    node.update_cb(db_session, &data).await?;
+    auth_node_update(&native_node, &data.current_user).await?;
+    data.resource_locker().check_node_lock(&native_node).await?;
+    node.update_cb(data.db_session(), &data).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }

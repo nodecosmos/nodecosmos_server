@@ -17,34 +17,35 @@ impl ExtCallbacks for Node {
         Ok(())
     }
 
-    async fn after_insert(&mut self, _: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
-        let ext = ext.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let db_session = &ext.app.db_session;
-            let app = &ext.app;
-
-            let _ = self_clone.append_to_ancestors(&db_session).await;
-            let _ = self_clone.add_to_elastic(&app).await;
-            self_clone.create_new_version(&ext).await;
+            let _ = self_clone.append_to_ancestors(req_data.db_session()).await;
+            let _ = self_clone.add_to_elastic(req_data.elastic_client()).await;
+            self_clone.create_new_version(&req_data).await;
         });
 
         Ok(())
     }
 
-    async fn before_delete(&mut self, _: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
-        self.delete_related_data(&ext).await?;
+    async fn before_delete(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+        self.delete_related_data(&req_data).await?;
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, _session: &CachingSession, ext: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn after_delete(
+        &mut self,
+        _session: &CachingSession,
+        req_data: &Self::Extension,
+    ) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
-        let ext = ext.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            self_clone.create_new_version_for_ancestors(&ext).await;
+            self_clone.create_new_version_for_ancestors(&req_data).await;
         });
 
         Ok(())
@@ -62,13 +63,17 @@ impl ExtCallbacks for UpdateDescriptionNode {
         Ok(())
     }
 
-    async fn after_update(&mut self, _db_session: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_update(
+        &mut self,
+        _db_session: &CachingSession,
+        req_data: &RequestData,
+    ) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
-        let ext = ext.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone.update_elastic_index(&ext.app).await;
-            let _ = self_clone.create_new_version(&ext).await;
+            let _ = self_clone.update_elastic_index(req_data.elastic_client()).await;
+            let _ = self_clone.create_new_version(&req_data).await;
         });
 
         Ok(())
@@ -79,20 +84,24 @@ impl ExtCallbacks for UpdateTitleNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, session: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
-        self.update_title_for_ancestors(session, &ext.app).await?;
+    async fn before_update(&mut self, session: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+        self.update_title_for_ancestors(session, &req_data.app).await?;
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())
     }
 
-    async fn after_update(&mut self, _db_session: &CachingSession, ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_update(
+        &mut self,
+        _db_session: &CachingSession,
+        req_data: &RequestData,
+    ) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
-        let ext = ext.clone();
+        let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone.update_elastic_index(&ext.app).await;
-            let _ = self_clone.create_new_version(&ext).await;
+            let _ = self_clone.update_elastic_index(req_data.elastic_client()).await;
+            let _ = self_clone.create_new_version(&req_data).await;
         });
 
         Ok(())

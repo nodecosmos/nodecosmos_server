@@ -2,9 +2,13 @@ use crate::api::current_user::get_current_user;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
+use crate::services::resource_locker::ResourceLocker;
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
+use charybdis::types::Uuid;
+use elasticsearch::Elasticsearch;
+use scylla::CachingSession;
 use serde_json::json;
 use std::future::{ready, Ready};
 
@@ -13,6 +17,32 @@ use std::future::{ready, Ready};
 pub struct RequestData {
     pub app: web::Data<App>,
     pub current_user: CurrentUser,
+}
+
+impl RequestData {
+    pub fn db_session(&self) -> &CachingSession {
+        &self.app.db_session
+    }
+
+    pub fn elastic_client(&self) -> &Elasticsearch {
+        &self.app.elastic_client
+    }
+
+    pub fn s3_client(&self) -> &aws_sdk_s3::Client {
+        &self.app.s3_client
+    }
+
+    pub fn s3_bucket(&self) -> &String {
+        &self.app.s3_bucket
+    }
+
+    pub fn resource_locker(&self) -> &ResourceLocker {
+        &self.app.resource_locker
+    }
+
+    pub fn current_user_id(&self) -> Uuid {
+        self.current_user.id
+    }
 }
 
 impl FromRequest for RequestData {
@@ -28,12 +58,12 @@ impl FromRequest for RequestData {
 
                 match app {
                     Some(app) => {
-                        let ext = RequestData {
+                        let req_data = RequestData {
                             app: web::Data::clone(app),
                             current_user,
                         };
 
-                        ready(Ok(ext))
+                        ready(Ok(req_data))
                     }
                     None => {
                         let err = NodecosmosError::InternalServerError("Could not get app data".to_string());

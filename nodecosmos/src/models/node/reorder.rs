@@ -1,27 +1,28 @@
 mod recovery;
-mod reorder_data;
+pub mod reorder_data;
 mod validator;
-
-use crate::errors::NodecosmosError;
-use crate::models::node::{Node, UpdateOrderNode};
-use crate::models::node_descendant::NodeDescendant;
-use crate::services::resource_locker::ResourceLocker;
-use crate::utils::logger::log_fatal;
-use charybdis::batch::CharybdisModelBatch;
-use charybdis::operations::{execute, Update};
-use scylla::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::api::ReorderParams;
+use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
+use crate::models::node::{Node, UpdateOrderNode};
+use crate::models::node_descendant::NodeDescendant;
+use crate::models::versioned_node::VersionedNode;
+use crate::services::resource_locker::ResourceLocker;
+use crate::utils::logger::log_fatal;
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::operations::{execute, Update};
 pub(crate) use recovery::Recovery;
+use scylla::CachingSession;
+use std::sync::Arc;
 
 impl Node {
-    pub async fn reorder(&self, ext: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        let db_session = &ext.app.db_session;
-        let resource_locker = &ext.app.resource_locker;
+    pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
+        let db_session = &req_data.app.db_session;
+        let resource_locker = &req_data.app.resource_locker;
 
         resource_locker.check_node_lock(&self).await?;
         resource_locker
@@ -29,9 +30,13 @@ impl Node {
             .await?;
 
         let reorder_data = ReorderData::from_params(&params, &db_session).await?;
-        let mut reorder = Reorder::new(&ext.app.db_session, reorder_data).await?;
+        let reorder_data = Arc::new(reorder_data);
 
-        reorder.run(&ext.app.resource_locker).await?;
+        let mut reorder = Reorder::new(&req_data.app.db_session, &reorder_data).await?;
+
+        reorder.run(&req_data.app.resource_locker).await?;
+
+        VersionedNode::handle_reorder(&req_data, &reorder_data).await?;
 
         Ok(())
     }
@@ -39,13 +44,13 @@ impl Node {
 
 pub struct Reorder<'a> {
     pub db_session: &'a CachingSession,
-    pub reorder_data: ReorderData,
+    pub reorder_data: &'a ReorderData,
 }
 
 const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
 
 impl<'a> Reorder<'a> {
-    pub async fn new(db_session: &'a CachingSession, data: ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
+    pub async fn new(db_session: &'a CachingSession, data: &'a ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
         Ok(Self {
             db_session,
             reorder_data: data,
@@ -88,14 +93,14 @@ impl<'a> Reorder<'a> {
         self.remove_node_from_old_ancestors().await?;
         self.add_node_to_new_ancestors().await?;
 
-        if self.reorder_data.is_parent_changed() {
-            self.remove_old_ancestors_from_node().await?;
-            self.remove_old_ancestors_from_descendants().await?;
-            self.remove_node_descendants_from_old_ancestors().await?;
+        if self.reorder_data.parent_changed() {
+            self.pull_removed_ancestors_from_node().await?;
+            self.pull_removed_ancestors_from_descendants().await?;
+            self.delete_node_descendants_from_removed_ancestors().await?;
 
-            self.add_new_ancestors_to_node().await?;
-            self.add_new_ancestors_to_descendants().await?;
-            self.add_node_descendants_to_new_ancestors().await?;
+            self.push_added_ancestors_to_node().await?;
+            self.push_added_ancestors_to_descendants().await?;
+            self.insert_node_descendants_to_added_ancestors().await?;
         }
 
         Ok(())
@@ -118,7 +123,7 @@ impl<'a> Reorder<'a> {
     async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_delete = vec![];
 
-        for ancestor_id in self.reorder_data.old_node_ancestor_ids.clone() {
+        for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
                 node_id: ancestor_id,
@@ -133,17 +138,17 @@ impl<'a> Reorder<'a> {
         CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("remove_node_from_old_ancestors: {:?}", err));
+                log_fatal(format!("remove_node_from_removed_ancestors: {:?}", err));
                 return err;
             })?;
 
         Ok(())
     }
 
-    async fn remove_node_descendants_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
+    async fn delete_node_descendants_from_removed_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_delete = vec![];
 
-        for ancestor_id in self.reorder_data.old_node_ancestor_ids.clone() {
+        for ancestor_id in self.reorder_data.removed_ancestor_ids.clone() {
             for descendant in &self.reorder_data.descendants {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
@@ -160,7 +165,7 @@ impl<'a> Reorder<'a> {
         CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("remove_node_descendants_from_old_ancestors: {:?}", err));
+                log_fatal(format!("delete_node_descendants_from_removed_ancestors: {:?}", err));
                 return err;
             })?;
 
@@ -170,7 +175,7 @@ impl<'a> Reorder<'a> {
     async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_add = vec![];
 
-        for ancestor_id in self.reorder_data.new_node_ancestor_ids.clone() {
+        for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
                 node_id: ancestor_id,
@@ -193,10 +198,10 @@ impl<'a> Reorder<'a> {
         Ok(())
     }
 
-    async fn add_node_descendants_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
-        let mut descendants_to_add = vec![];
+    async fn insert_node_descendants_to_added_ancestors(&mut self) -> Result<(), NodecosmosError> {
+        let mut descendants = vec![];
 
-        for ancestor_id in self.reorder_data.new_node_ancestor_ids.clone() {
+        for ancestor_id in self.reorder_data.added_ancestor_ids.clone() {
             for descendant in self.reorder_data.descendants.clone() {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
@@ -207,11 +212,11 @@ impl<'a> Reorder<'a> {
                     parent_id: descendant.parent_id,
                 };
 
-                descendants_to_add.push(descendant);
+                descendants.push(descendant);
             }
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add, 100)
+        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
@@ -221,12 +226,12 @@ impl<'a> Reorder<'a> {
         Ok(())
     }
 
-    async fn remove_old_ancestors_from_node(&mut self) -> Result<(), NodecosmosError> {
+    async fn pull_removed_ancestors_from_node(&mut self) -> Result<(), NodecosmosError> {
         execute(
             self.db_session,
             Node::PULL_FROM_ANCESTOR_IDS_QUERY,
             (
-                self.reorder_data.old_node_ancestor_ids.clone(),
+                self.reorder_data.removed_ancestor_ids.clone(),
                 self.reorder_data.node.id,
             ),
         )
@@ -235,14 +240,14 @@ impl<'a> Reorder<'a> {
         Ok(())
     }
 
-    async fn remove_old_ancestors_from_descendants(&mut self) -> Result<(), NodecosmosError> {
+    async fn pull_removed_ancestors_from_descendants(&mut self) -> Result<(), NodecosmosError> {
         for descendant_chunk in self.reorder_data.descendant_ids.chunks(100) {
             let mut batch = CharybdisModelBatch::new();
 
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PULL_FROM_ANCESTOR_IDS_QUERY,
-                    (self.reorder_data.old_node_ancestor_ids.clone(), descendant_id),
+                    (self.reorder_data.removed_ancestor_ids.clone(), descendant_id),
                 )?;
             }
 
@@ -252,28 +257,25 @@ impl<'a> Reorder<'a> {
         Ok(())
     }
 
-    async fn add_new_ancestors_to_node(&mut self) -> Result<(), NodecosmosError> {
+    async fn push_added_ancestors_to_node(&mut self) -> Result<(), NodecosmosError> {
         execute(
             self.db_session,
             Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-            (
-                self.reorder_data.new_node_ancestor_ids.clone(),
-                self.reorder_data.node.id,
-            ),
+            (self.reorder_data.added_ancestor_ids.clone(), self.reorder_data.node.id),
         )
         .await?;
 
         Ok(())
     }
 
-    async fn add_new_ancestors_to_descendants(&mut self) -> Result<(), NodecosmosError> {
+    async fn push_added_ancestors_to_descendants(&mut self) -> Result<(), NodecosmosError> {
         for descendant_chunk in self.reorder_data.descendant_ids.chunks(100) {
             let mut batch = CharybdisModelBatch::new();
 
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-                    (self.reorder_data.new_node_ancestor_ids.clone(), descendant_id),
+                    (self.reorder_data.added_ancestor_ids.clone(), descendant_id),
                 )?;
             }
 

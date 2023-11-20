@@ -56,9 +56,9 @@ impl UpdateCoverImageNode {
             );
 
             upload_s3_object(
-                &data.app.s3_client,
+                &data.s3_client(),
                 compressed,
-                &data.app.s3_bucket,
+                &data.s3_bucket(),
                 &new_cover_image_filename,
             )
             .await?;
@@ -66,7 +66,7 @@ impl UpdateCoverImageNode {
             self.cover_image_url = Some(url.clone());
             self.cover_image_filename = Some(new_cover_image_filename);
 
-            self.update_cb(&data.app.db_session, data).await?;
+            self.update_cb(&data.db_session(), data).await?;
 
             return Ok(());
         }

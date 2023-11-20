@@ -25,15 +25,12 @@ type OrderIndex = f64;
 type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
 
 impl Node {
-    pub async fn delete_related_data(&self, ext: &RequestData) -> Result<(), NodecosmosError> {
-        NodeDelete::new(self, &ext).run().await
+    pub async fn delete_related_data(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
+        NodeDelete::new(self, &req_data).run().await
     }
 
-    pub async fn create_new_version_for_ancestors(&self, ext: &RequestData) {
-        let db_session = &ext.app.db_session;
-        let user_id = ext.current_user.id;
-
-        let _ = VersionedNode::handle_deletion(db_session, &self, user_id)
+    pub async fn create_new_version_for_ancestors(&self, req_data: &RequestData) {
+        let _ = VersionedNode::handle_deletion(req_data, &self)
             .map_err(|e| {
                 log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
 
@@ -70,6 +67,11 @@ impl<'a> NodeDelete<'a> {
 
         self.delete_related_data().await.map_err(|err| {
             log_error(format!("delete_related_data: {}", err));
+            return err;
+        })?;
+
+        self.delete_counter_data().await.map_err(|err| {
+            log_error(format!("delete_counter_data: {}", err));
             return err;
         })?;
 
@@ -133,15 +135,33 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&LikesCount {
-                    object_id: *id,
-                    ..Default::default()
-                })?;
-
                 // self.node will be deleted within callback
                 if id != &self.node.id {
                     batch.append_delete(&DeleteNode { id: *id })?;
                 }
+            }
+
+            batch.execute(self.db_session).await.map_err(|err| {
+                return NodecosmosError::InternalServerError(format!(
+                    "NodeDelete::delete_related_data: batch.execute: {}",
+                    err
+                ));
+            })?;
+        }
+
+        Ok(())
+    }
+
+    //  Counter and non-counter mutations cannot exist in the same batch
+    pub async fn delete_counter_data(&mut self) -> Result<(), NodecosmosError> {
+        for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
+            let mut batch = CharybdisModelBatch::unlogged();
+
+            for id in node_ids_chunk {
+                batch.append_delete_by_partition_key(&LikesCount {
+                    object_id: *id,
+                    ..Default::default()
+                })?;
             }
 
             batch.execute(self.db_session).await.map_err(|err| {

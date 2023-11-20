@@ -166,7 +166,7 @@ impl<'a> Recovery<'a> {
                 batch
                     .append_statement(
                         Node::PULL_FROM_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.new_node_ancestor_ids, id),
+                        (&self.reorder_data.added_ancestor_ids, id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for remove_new_ancestor_ids: {}", err));
@@ -199,7 +199,7 @@ impl<'a> Recovery<'a> {
                 batch
                     .append_statement(
                         Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.old_node_ancestor_ids, id),
+                        (&self.reorder_data.removed_ancestor_ids, id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for append_old_ancestor_ids: {}", err));

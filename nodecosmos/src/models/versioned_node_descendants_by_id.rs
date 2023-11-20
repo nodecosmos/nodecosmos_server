@@ -1,13 +1,13 @@
 use crate::errors::NodecosmosError;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Map, Uuid};
+use charybdis::types::{Frozen, Map, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[charybdis_model(
-    table_name = versioned_node_descendants,
+    table_name = versioned_node_descendants_by_id,
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
@@ -15,13 +15,13 @@ use std::collections::HashMap;
     "#,
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct VersionedNodeDescendants {
+pub struct VersionedNodeDescendantIds {
     pub id: Uuid,
     pub node_id: Uuid,
-    pub descendant_version_by_id: Map<Uuid, Uuid>,
+    pub descendant_version_by_id: Frozen<Map<Uuid, Uuid>>,
 }
 
-impl VersionedNodeDescendants {
+impl VersionedNodeDescendantIds {
     pub fn new(node_id: Uuid, descendant_version_by_id: HashMap<Uuid, Uuid>) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -33,7 +33,7 @@ impl VersionedNodeDescendants {
     pub async fn find_by_ids(session: &CachingSession, ids: Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
         let mut res = vec![];
 
-        let mut v_node_descendants = find_versioned_node_descendants!(session, "id IN ?", (ids,)).await?;
+        let mut v_node_descendants = find_versioned_node_descendant_ids!(session, "id IN ?", (ids,)).await?;
 
         while let Some(ver_desc) = v_node_descendants.next().await {
             res.push(ver_desc?);

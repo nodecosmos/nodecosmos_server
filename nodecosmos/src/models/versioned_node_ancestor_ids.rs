@@ -4,7 +4,7 @@ use charybdis::types::{Set, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
-    table_name = versioned_node_ancestors,
+    table_name = versioned_node_ancestor_ids,
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
@@ -12,14 +12,14 @@ use serde::{Deserialize, Serialize};
     "#,
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct VersionedNodeAncestors {
+pub struct VersionedNodeAncestorIds {
     pub id: Uuid,
     pub ancestor_ids: Option<Set<Uuid>>,
 }
 
-impl VersionedNodeAncestors {
-    pub fn new(node: &Node) -> Self {
-        VersionedNodeAncestors {
+impl VersionedNodeAncestorIds {
+    pub fn from_node(node: &Node) -> Self {
+        VersionedNodeAncestorIds {
             id: Uuid::new_v4(),
             ancestor_ids: node.ancestor_ids.clone(),
         }

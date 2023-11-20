@@ -32,20 +32,24 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let struct_name = &input.ident;
 
-    // Model trait consts
+    // Charybdis::Model consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
     let primary_key_const = primary_key_const(&args);
     let select_fields_clause = select_fields_clause(&args, &db_fields);
-
-    // Model trait operation consts
     let find_by_primary_key_query_const = find_by_primary_key_query_const(&args, &db_fields);
     let find_by_partition_key_query_const = find_by_partition_key_query_const(&args, &db_fields);
     let insert_query_const = insert_query_const(&args, &db_fields);
     let update_query_const = update_query_const(&args, &db_fields);
     let delete_query_const = delete_query_const(&args);
     let delete_by_partition_key_query_const = delete_by_partition_key_query_const(&args);
+
+    // Charybdis::Model methods
+    let primary_key_values = primary_key_values(&args);
+    let partition_key_values = partition_key_values(&args);
+    let clustering_key_values = clustering_key_values(&args);
+    let update_values = update_values(&args, &db_fields);
 
     // Collection consts
     let push_to_collection_fields_query_consts = push_to_collection_fields_query_consts(&args, &db_fields);
@@ -55,25 +59,19 @@ pub fn charybdis_model(args: TokenStream, input: TokenStream) -> TokenStream {
     let push_to_collection_funs = push_to_collection_funs(&args, &db_fields);
     let pull_from_collection_funs = pull_from_collection_funs(&args, &db_fields);
 
-    // Model trait methods
-    let primary_key_values = primary_key_values(&args);
-    let partition_key_values = partition_key_values(&args);
-    let clustering_key_values = clustering_key_values(&args);
-    let update_values = update_values(&args, &db_fields);
-
     // ValueList trait
     let serialized = serialized(&db_fields, &all_fields);
 
     // FromRow trait
     let from_row = from_row(struct_name, &db_fields, &all_fields);
 
-    // current model specific rules
+    // Current model rules
     let find_model_query_rule = find_model_query_rule(&args, &db_fields, struct_name);
     let find_model_rule = find_model_rule(&args, &db_fields, struct_name);
     let find_first_model_rule = find_first_model_rule(&args, &db_fields, struct_name);
     let update_model_query_rule = update_model_query_rule(&args, struct_name);
 
-    // Associated functions for finding by partial primary key
+    // Associated functions for finding by primary key
     let find_by_key_funs = find_by_primary_keys_functions(&args, &db_fields, struct_name);
     let delete_by_cks_funs = delete_by_primary_key_functions(&args, &db_fields, struct_name);
 
@@ -147,24 +145,24 @@ pub fn charybdis_view_model(args: TokenStream, input: TokenStream) -> TokenStrea
 
     let struct_name = &input.ident;
 
-    // Model trait consts
+    // Charybdis::MaterializedView consts
     let db_model_name_const = db_model_name_const(&args);
     let partition_keys_const = partition_keys_const(&args);
     let clustering_keys_const = clustering_keys_const(&args);
     let primary_key_const = primary_key_const(&args);
+    let select_fields_clause = select_fields_clause(&args, &db_fields);
     let find_by_primary_key_query_const = find_by_primary_key_query_const(&args, &db_fields);
     let find_by_partition_key_query_const = find_by_partition_key_query_const(&args, &db_fields);
-    let select_fields_clause = select_fields_clause(&args, &db_fields);
 
-    // Model trait methods
+    // Charybdis::MaterializedView methods
     let primary_key_values = primary_key_values(&args);
     let partition_key_values = partition_key_values(&args);
     let clustering_key_values = clustering_key_values(&args);
 
-    // model specific rules
+    // Current model rules
     let find_model_query_rule = find_model_query_rule(&args, &db_fields, struct_name);
 
-    // Associated functions for finding by partial primary key
+    // Associated functions for finding by  primary key
     let find_by_key_funs = find_by_primary_keys_functions(&args, &db_fields, struct_name);
 
     let expanded = quote! {

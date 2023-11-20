@@ -6,10 +6,9 @@ use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::index::ElasticIndex;
 use crate::services::elastic::update_elastic_document;
 use crate::utils::logger::log_error;
-use crate::App;
 use ammonia::clean;
-use charybdis::model::AsNative;
 use charybdis::operations::Insert;
+use elasticsearch::Elasticsearch;
 
 impl UpdateDescriptionNode {
     pub fn sanitize_description(&mut self) {
@@ -18,13 +17,11 @@ impl UpdateDescriptionNode {
         }
     }
 
-    pub async fn update_elastic_index(&self, app: &App) {
-        update_elastic_document(&app.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+    pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
+        update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
     }
 
-    pub async fn create_new_version(&self, ext: &RequestData) {
-        let native = self.as_native();
-        let session = &ext.app.db_session;
+    pub async fn create_new_version(&self, req_data: &RequestData) {
         let description_version = VersionedDescription::new(
             self.description.clone(),
             self.short_description.clone(),
@@ -32,13 +29,24 @@ impl UpdateDescriptionNode {
             self.description_base64.clone(),
         );
 
-        let change = NodeChange::Description(description_version.id);
-        let _ = description_version.insert(session).await;
+        let _ = description_version.insert(req_data.db_session()).await.map_err(|e| {
+            log_error(format!("Failed to create new description version: {}", e));
+            e
+        });
 
-        let _ = VersionedNode::handle_change(session, &native, vec![change], ext.current_user.id)
-            .await
-            .map_err(|e| {
-                log_error(format!("Failed to create new versioned node: {}", e));
-            });
+        let changes = vec![NodeChange::Description(description_version.id)];
+
+        let _ = VersionedNode::handle_change(
+            req_data.db_session(),
+            self.id,
+            req_data.current_user_id(),
+            &changes,
+            true,
+        )
+        .await
+        .map_err(|e| {
+            log_error(format!("Failed to create new node version: {}", e));
+            e
+        });
     }
 }

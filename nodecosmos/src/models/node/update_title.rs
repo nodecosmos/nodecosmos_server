@@ -12,6 +12,7 @@ use crate::App;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
+use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 
 impl UpdateTitleNode {
@@ -76,20 +77,23 @@ impl UpdateTitleNode {
         Ok(())
     }
 
-    pub async fn update_elastic_index(&self, app: &App) {
-        update_elastic_document(&app.elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+    pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
+        update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
     }
 
-    pub async fn create_new_version(&self, ext: &RequestData) {
-        let native = self.as_native();
-        let session = &ext.app.db_session;
+    pub async fn create_new_version(&self, req_data: &RequestData) {
+        let changes = vec![NodeChange::Title(self.title.clone())];
 
-        let change = NodeChange::Title(self.title.clone());
-
-        let _ = VersionedNode::handle_change(session, &native, vec![change], ext.current_user.id)
-            .await
-            .map_err(|e| {
-                log_error(format!("Failed to create new versioned node: {}", e));
-            });
+        let _ = VersionedNode::handle_change(
+            req_data.db_session(),
+            self.id,
+            req_data.current_user_id(),
+            &changes,
+            true,
+        )
+        .await
+        .map_err(|e| {
+            log_error(format!("Failed to create new versioned node: {}", e));
+        });
     }
 }

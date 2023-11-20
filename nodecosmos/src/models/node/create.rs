@@ -8,10 +8,10 @@ use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::logger::log_error;
-use crate::App;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
+use elasticsearch::Elasticsearch;
 use futures::TryFutureExt;
 use scylla::CachingSession;
 
@@ -133,14 +133,14 @@ impl Node {
         }
     }
 
-    pub async fn add_to_elastic(&self, app: &App) -> Result<(), NodecosmosError> {
-        add_elastic_document(&app.elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+    pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) -> Result<(), NodecosmosError> {
+        add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
 
         Ok(())
     }
 
-    pub async fn create_new_version(&self, ext: &RequestData) {
-        let _ = VersionedNode::handle_creation(&ext.app.db_session, &self, ext.current_user.id)
+    pub async fn create_new_version(&self, req_data: &RequestData) {
+        let _ = VersionedNode::handle_creation(&req_data.db_session(), &self, req_data.current_user_id())
             .map_err(|e| {
                 log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
 

@@ -46,7 +46,7 @@ impl<'a> ReorderValidator<'a> {
     }
 
     fn validate_reorder_limit(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.is_parent_changed() && self.reorder_data.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
+        if self.reorder_data.parent_changed() && self.reorder_data.descendant_ids.len() > REORDER_DESCENDANTS_LIMIT {
             return Err(NodecosmosError::Forbidden(format!(
                 "Can not reorder more than {} descendants",
                 REORDER_DESCENDANTS_LIMIT
