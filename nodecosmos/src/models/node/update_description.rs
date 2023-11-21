@@ -34,6 +34,7 @@ impl UpdateDescriptionNode {
         let _ = VersionedNode::handle_change(
             req_data.db_session(),
             self.id,
+            self.branch_id,
             req_data.current_user_id(),
             &changes,
             true,

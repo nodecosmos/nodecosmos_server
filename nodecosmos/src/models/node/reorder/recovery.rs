@@ -5,7 +5,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::{log_error, log_fatal, log_success, log_warning};
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::operations::{Delete, Update};
+use charybdis::operations::Update;
 use scylla::CachingSession;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -114,12 +114,11 @@ impl<'a> Recovery<'a> {
     }
 
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
-        NodeDescendant {
-            root_id: self.reorder_data.tree_root.id,
-            branch_id: self.reorder_data.branch_id,
-            ..Default::default()
-        }
-        .delete_by_partition_key(self.db_session)
+        NodeDescendant::delete_by_root_id_and_branch_id(
+            self.db_session,
+            self.reorder_data.tree_root.id,
+            self.reorder_data.branch_id,
+        )
         .await
         .map_err(|err| {
             log_error(format!("delete_tree: {}", err));

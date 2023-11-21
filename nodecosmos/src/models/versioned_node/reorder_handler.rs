@@ -15,6 +15,7 @@ pub struct VersionReorderHandler {
     session: Arc<CachingSession>,
     current_user_id: Uuid,
     node_id: Uuid,
+    branch_id: Uuid,
     descendant_ids: Vec<Uuid>,
     new_parent_id: Uuid,
     new_order_index: f64,
@@ -29,6 +30,7 @@ impl VersionReorderHandler {
             session,
             current_user_id,
             node_id: reorder_data.node.id,
+            branch_id: reorder_data.branch_id,
             descendant_ids: reorder_data.descendant_ids.clone(),
             new_parent_id: reorder_data.new_parent.id,
             new_order_index: reorder_data.new_order_index,
@@ -83,6 +85,7 @@ impl VersionReorderHandler {
         let new_node_version = VersionedNode::handle_change(
             &self.session,
             self.node_id,
+            self.branch_id,
             self.current_user_id,
             &changes,
             update_ancestors,
@@ -111,10 +114,17 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for id in id_chunk {
-                let future = VersionedNode::handle_change(&self.session, *id, self.current_user_id, &changes, false)
-                    .map_err(|e| {
-                        log_fatal(format!("create_new_version_for_descendants: {:?}", e));
-                    });
+                let future = VersionedNode::handle_change(
+                    &self.session,
+                    *id,
+                    self.branch_id,
+                    self.current_user_id,
+                    &changes,
+                    false,
+                )
+                .map_err(|e| {
+                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                });
 
                 futures.push(future);
             }
@@ -143,11 +153,17 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for ancestor_id in id_chunk {
-                let f =
-                    VersionedNode::handle_change(&self.session, *ancestor_id, self.current_user_id, &changes, false)
-                        .map_err(|e| {
-                            log_fatal(format!("create_new_version_for_descendants: {:?}", e));
-                        });
+                let f = VersionedNode::handle_change(
+                    &self.session,
+                    *ancestor_id,
+                    self.branch_id,
+                    self.current_user_id,
+                    &changes,
+                    false,
+                )
+                .map_err(|e| {
+                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                });
 
                 futures.push(f);
             }
@@ -169,11 +185,17 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for ancestor_id in id_chunk {
-                let f =
-                    VersionedNode::handle_change(&self.session, *ancestor_id, self.current_user_id, &changes, false)
-                        .map_err(|e| {
-                            log_fatal(format!("create_new_version_for_descendants: {:?}", e));
-                        });
+                let f = VersionedNode::handle_change(
+                    &self.session,
+                    *ancestor_id,
+                    self.branch_id,
+                    self.current_user_id,
+                    &changes,
+                    false,
+                )
+                .map_err(|e| {
+                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                });
 
                 futures.push(f);
             }

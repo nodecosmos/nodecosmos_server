@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = versioned_nodes,
     partition_keys = [node_id],
-    clustering_keys = [created_at, id],
+    clustering_keys = [branch_id, created_at, id],
     table_options = r#"
         CLUSTERING ORDER BY (created_at DESC)
     "#
@@ -25,6 +25,9 @@ use serde::{Deserialize, Serialize};
 pub struct VersionedNode {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
 
     #[serde(rename = "createdAt")]
     pub created_at: Timestamp,
@@ -60,29 +63,48 @@ pub struct VersionedNode {
 }
 
 impl VersionedNode {
-    async fn find_first_by_node_id<'a>(session: &CachingSession, node_id: &Uuid) -> Result<Self, CharybdisError> {
-        let res = find_first_versioned_node!(session, "node_id = ? LIMIT 1", (node_id,)).await?;
+    async fn find_first_by_node_id<'a>(
+        session: &CachingSession,
+        node_id: &Uuid,
+        branch_id: &Uuid,
+    ) -> Result<Self, CharybdisError> {
+        let res = find_first_versioned_node!(
+            session,
+            "node_id = ? AND branch_id = ? OR branch_id = ? LIMIT 1",
+            (node_id, branch_id, node_id)
+        )
+        .await?;
 
         Ok(res)
     }
 
-    pub fn init_from(v_node: &Self) -> Self {
+    pub fn init_from(v_node: &Self, branch_id: Uuid) -> Self {
         let mut v_node = v_node.clone();
         v_node.id = Uuid::new_v4();
         v_node.created_at = Utc::now();
+        v_node.branch_id = branch_id;
 
         v_node
     }
 
-    pub async fn init_from_latest(session: &CachingSession, node_id: &Uuid) -> Result<Self, NodecosmosError> {
-        let mut v_node = VersionedNode::find_first_by_node_id(session, node_id).await?;
+    pub async fn init_from_latest(
+        session: &CachingSession,
+        node_id: &Uuid,
+        branch_id: &Uuid,
+    ) -> Result<Self, NodecosmosError> {
+        let mut v_node = VersionedNode::find_first_by_node_id(session, node_id, branch_id).await?;
         v_node.id = Uuid::new_v4();
         v_node.created_at = Utc::now();
+        v_node.branch_id = *branch_id;
 
         Ok(v_node)
     }
 
-    async fn find_latest_by_node_ids(session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
+    async fn find_latest_by_node_ids(
+        &self,
+        session: &CachingSession,
+        ids: &Vec<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
         let mut versioned_nodes = vec![];
 
         let ids_chunks = ids.chunks(MAX_PARALLEL_REQUESTS);
@@ -90,7 +112,7 @@ impl VersionedNode {
             let mut futures = vec![];
 
             for ancestor_id in ids_chunk {
-                let future = VersionedNode::find_first_by_node_id(session, ancestor_id);
+                let future = VersionedNode::find_first_by_node_id(session, ancestor_id, &self.branch_id);
                 futures.push(future);
             }
 
@@ -142,7 +164,7 @@ impl VersionedNode {
         let vtp = self.versioned_tree_position(session).await?;
 
         if let Some(ancestor_ids) = &vtp.ancestor_ids {
-            return Self::find_latest_by_node_ids(session, ancestor_ids).await;
+            return self.find_latest_by_node_ids(session, ancestor_ids).await;
         }
 
         Ok(vec![])
@@ -154,7 +176,7 @@ impl VersionedNode {
         if let Some(vd) = vd {
             let descendant_ids = vd.descendant_version_by_id.keys().cloned().collect();
 
-            return Self::find_latest_by_node_ids(session, &descendant_ids).await;
+            return self.find_latest_by_node_ids(session, &descendant_ids).await;
         }
 
         Ok(vec![])
