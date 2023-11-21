@@ -43,6 +43,7 @@ impl UpdateTitleNode {
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
                     root_id: self.root_id,
+                    branch_id: self.branch_id,
                     node_id: ancestor_id,
                     id: self.id,
                     parent_id: native.parent_id.unwrap(), // we must have parent_id as we have ancestor_ids

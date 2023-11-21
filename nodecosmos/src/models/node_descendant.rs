@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = node_descendants,
     partition_keys = [root_id],
-    clustering_keys = [node_id, order_index, id],
+    clustering_keys = [branch_id, node_id, order_index, id],
     global_secondary_indexes = [],
     table_options = r#"
         gc_grace_seconds = 432000
@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 pub struct NodeDescendant {
     #[serde(rename = "rootId")]
     pub root_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
 
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

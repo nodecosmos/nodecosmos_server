@@ -15,6 +15,7 @@ impl UpdateCoverImageNode {
     pub fn from_native(node: &Node) -> UpdateCoverImageNode {
         Self {
             id: node.id,
+            branch_id: node.branch_id,
             cover_image_url: node.cover_image_url.clone(),
             cover_image_filename: node.cover_image_filename.clone(),
             updated_at: None,

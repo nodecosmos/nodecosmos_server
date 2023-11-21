@@ -9,8 +9,9 @@ impl ExtCallbacks for Node {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.set_defaults(db_session).await?;
+        self.set_owner(data).await?;
         self.validate_root().await?;
         self.validate_owner().await?;
 

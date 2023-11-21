@@ -4,7 +4,6 @@ mod validator;
 
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::api::ReorderParams;
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
@@ -15,26 +14,44 @@ use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::{execute, Update};
+use charybdis::types::Uuid;
 pub(crate) use recovery::Recovery;
 use scylla::CachingSession;
+use serde::Deserialize;
 use std::sync::Arc;
+
+#[derive(Deserialize)]
+pub struct ReorderParams {
+    #[serde(rename = "nodeId")]
+    pub node_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
+
+    #[serde(rename = "newParentId")]
+    pub new_parent_id: Uuid,
+
+    #[serde(rename = "newUpperSiblingId")]
+    pub new_upper_sibling_id: Option<Uuid>,
+
+    #[serde(rename = "newBottomSiblingId")]
+    pub new_bottom_sibling_id: Option<Uuid>,
+}
 
 impl Node {
     pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        let db_session = &req_data.app.db_session;
-        let resource_locker = &req_data.app.resource_locker;
-
-        resource_locker.check_node_lock(&self).await?;
-        resource_locker
+        req_data.resource_locker().check_node_lock(&self).await?;
+        req_data
+            .resource_locker()
             .check_node_action_lock(&self, ActionTypes::Reorder(ActionObject::Node))
             .await?;
 
-        let reorder_data = ReorderData::from_params(&params, &db_session).await?;
+        let reorder_data = ReorderData::from_params(&params, req_data.db_session()).await?;
         let reorder_data = Arc::new(reorder_data);
 
-        let mut reorder = Reorder::new(&req_data.app.db_session, &reorder_data).await?;
+        let mut reorder = Reorder::new(req_data.db_session(), &reorder_data).await?;
 
-        reorder.run(&req_data.app.resource_locker).await?;
+        reorder.run(req_data.resource_locker()).await?;
 
         VersionedNode::handle_reorder(&req_data, &reorder_data).await?;
 
@@ -109,13 +126,12 @@ impl<'a> Reorder<'a> {
     async fn update_node_order(&mut self) -> Result<(), NodecosmosError> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
+            branch_id: self.reorder_data.branch_id,
             parent_id: Some(self.reorder_data.new_parent.id),
             order_index: self.reorder_data.new_order_index,
         };
 
         update_order_node.update(&self.db_session).await?;
-
-        println!("Updated node order: {:?}", update_order_node.id);
 
         Ok(())
     }
@@ -126,6 +142,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
+                branch_id: self.reorder_data.branch_id,
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.old_order_index,
@@ -154,6 +171,7 @@ impl<'a> Reorder<'a> {
                     root_id: self.reorder_data.tree_root.id,
                     node_id: ancestor_id,
                     id: descendant.id,
+                    branch_id: self.reorder_data.branch_id,
                     order_index: descendant.order_index,
                     ..Default::default()
                 };
@@ -178,6 +196,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
+                branch_id: self.reorder_data.branch_id,
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
@@ -205,6 +224,7 @@ impl<'a> Reorder<'a> {
             for descendant in self.reorder_data.descendants.clone() {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
+                    branch_id: self.reorder_data.branch_id,
                     node_id: ancestor_id,
                     id: descendant.id,
                     order_index: descendant.order_index,
@@ -233,6 +253,7 @@ impl<'a> Reorder<'a> {
             (
                 self.reorder_data.removed_ancestor_ids.clone(),
                 self.reorder_data.node.id,
+                self.reorder_data.branch_id,
             ),
         )
         .await?;
@@ -247,7 +268,11 @@ impl<'a> Reorder<'a> {
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PULL_FROM_ANCESTOR_IDS_QUERY,
-                    (self.reorder_data.removed_ancestor_ids.clone(), descendant_id),
+                    (
+                        self.reorder_data.removed_ancestor_ids.clone(),
+                        descendant_id,
+                        self.reorder_data.branch_id,
+                    ),
                 )?;
             }
 
@@ -261,7 +286,11 @@ impl<'a> Reorder<'a> {
         execute(
             self.db_session,
             Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-            (self.reorder_data.added_ancestor_ids.clone(), self.reorder_data.node.id),
+            (
+                self.reorder_data.added_ancestor_ids.clone(),
+                self.reorder_data.node.id,
+                self.reorder_data.branch_id,
+            ),
         )
         .await?;
 
@@ -275,7 +304,11 @@ impl<'a> Reorder<'a> {
             for descendant_id in descendant_chunk {
                 batch.append_statement(
                     Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-                    (self.reorder_data.added_ancestor_ids.clone(), descendant_id),
+                    (
+                        self.reorder_data.added_ancestor_ids.clone(),
+                        descendant_id,
+                        self.reorder_data.branch_id,
+                    ),
                 )?;
             }
 

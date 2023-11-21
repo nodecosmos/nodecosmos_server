@@ -19,6 +19,18 @@ pub struct Owner {
     pub profile_image_url: Option<Text>,
 }
 
+impl Owner {
+    pub fn init_from(owner: &Self) -> Self {
+        Self {
+            id: owner.id,
+            owner_type: owner.owner_type.clone(),
+            name: owner.name.clone(),
+            username: owner.username.clone(),
+            profile_image_url: owner.profile_image_url.clone(),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub enum OwnerTypes {
     User,

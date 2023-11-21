@@ -9,8 +9,8 @@ mod update_description;
 mod update_title;
 
 use crate::errors::NodecosmosError;
-use crate::models::node_descendant::NodeDescendant;
-use crate::models::udts::{Creator, Owner};
+use crate::models::node_descendant::{find_node_descendant, NodeDescendant};
+use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
@@ -23,12 +23,15 @@ use std::sync::Arc;
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
-    clustering_keys = [],
+    clustering_keys = [branch_id],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Node {
     #[serde(default)]
     pub id: Uuid,
+
+    #[serde(default)]
+    pub branch_id: Uuid,
 
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
@@ -77,7 +80,6 @@ pub struct Node {
     pub editor_ids: Option<Set<Uuid>>,
 
     pub owner: Option<Owner>, // for front-end compatibility
-    pub creator: Option<Creator>,
 
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub likes_count: Option<BigInt>,
@@ -101,6 +103,10 @@ pub struct Node {
 }
 
 impl Node {
+    pub fn is_main_branch_node(&self) -> bool {
+        self.branch_id == self.id
+    }
+
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Arc<Option<Node>>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
             if self.parent.is_none() {
@@ -117,7 +123,38 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-        let descendants = NodeDescendant::find_by_root_id_and_node_id(db_session, self.root_id, self.id).await?;
+        let descendants = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
+            db_session,
+            self.root_id,
+            self.branch_id,
+            self.id,
+        )
+        .await?;
+
+        Ok(descendants)
+    }
+
+    pub async fn branch_descendants(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
+        let all_descendants = find_node_descendant!(
+            db_session,
+            "root_id = ? AND branch_id in ? AND node_id = ?",
+            (self.root_id, vec![self.id, self.branch_id], self.id)
+        )
+        .await?
+        .try_collect()
+        .await?;
+
+        // sort by so that the branch node is first
+        let mut descendants: Vec<NodeDescendant> = all_descendants
+            .into_iter()
+            .filter(|descendant| descendant.branch_id == self.branch_id)
+            .collect();
+
+        // filter duplicates
+        descendants.dedup_by(|a, b| a.id == b.id);
 
         Ok(descendants)
     }
@@ -127,6 +164,7 @@ partial_node!(
     BaseNode,
     root_id,
     id,
+    branch_id,
     is_root,
     short_description,
     ancestor_ids,
@@ -147,24 +185,34 @@ partial_node!(
     GetDescriptionNode,
     root_id,
     id,
+    branch_id,
     description,
     description_markdown,
     cover_image_url
 );
 
-partial_node!(GetDescriptionBase64Node, id, description_base64);
+partial_node!(GetDescriptionBase64Node, id, branch_id, description_base64);
 
-partial_node!(GetStructureNode, root_id, id, parent_id, ancestor_ids, order_index);
+partial_node!(
+    GetStructureNode,
+    root_id,
+    id,
+    branch_id,
+    parent_id,
+    ancestor_ids,
+    order_index
+);
 
-partial_node!(UpdateOrderNode, id, parent_id, order_index);
+partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 
-partial_node!(UpdateLikesCountNode, id, likes_count, updated_at);
+partial_node!(UpdateLikesCountNode, id, branch_id, likes_count, updated_at);
 
-partial_node!(UpdateTitleNode, root_id, id, title, updated_at);
+partial_node!(UpdateTitleNode, root_id, id, branch_id, title, updated_at);
 
 partial_node!(
     UpdateDescriptionNode,
     id,
+    branch_id,
     description,
     short_description,
     description_markdown,
@@ -175,9 +223,10 @@ partial_node!(
 partial_node!(
     UpdateCoverImageNode,
     id,
+    branch_id,
     cover_image_url,
     cover_image_filename,
     updated_at
 );
 
-partial_node!(DeleteNode, id);
+partial_node!(DeleteNode, id, branch_id);

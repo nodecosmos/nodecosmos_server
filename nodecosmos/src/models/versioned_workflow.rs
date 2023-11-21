@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = versioned_workflows,
     partition_keys = [id],
-    clustering_keys = [],
-    table_options = r#"
-        compression = {'sstable_compression': 'DeflateCompressor', 'chunk_length_in_kb': 4};
-    "#,
+    clustering_keys = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct VersionedWorkflow {

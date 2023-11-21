@@ -3,7 +3,6 @@ use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Owner, OwnerTypes};
-use crate::models::user::CurrentUser;
 use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
@@ -16,19 +15,45 @@ use futures::TryFutureExt;
 use scylla::CachingSession;
 
 impl Node {
-    pub fn set_owner(&mut self, current_user: &CurrentUser) {
-        let owner = Owner {
-            id: current_user.id,
-            name: current_user.full_name(),
-            username: Some(current_user.username.clone()),
-            owner_type: OwnerTypes::User.into(),
-            profile_image_url: None,
-        };
+    pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_main_branch_node() {
+            let current_user = &data.current_user;
 
-        self.owner_id = Some(owner.id);
-        self.owner_type = Some(owner.owner_type.clone());
+            let owner = Owner {
+                id: current_user.id,
+                name: current_user.full_name(),
+                username: Some(current_user.username.clone()),
+                owner_type: OwnerTypes::User.into(),
+                profile_image_url: None,
+            };
 
-        self.owner = Some(owner);
+            self.owner_id = Some(owner.id);
+            self.owner_type = Some(owner.owner_type.clone());
+
+            self.owner = Some(owner);
+        } else {
+            if let Some(parent) = self.parent(data.db_session()).await?.as_ref() {
+                if let Some(owner) = parent.owner.as_ref() {
+                    let owner = Owner::init_from(owner);
+                    self.owner_id = Some(owner.id);
+                    self.owner_type = Some(owner.owner_type.clone());
+
+                    self.owner = Some(owner);
+                } else {
+                    return Err(NodecosmosError::ValidationError((
+                        "parent.owner".to_string(),
+                        "must be present".to_string(),
+                    )));
+                }
+            } else {
+                return Err(NodecosmosError::ValidationError((
+                    "parent_id".to_string(),
+                    "must be present".to_string(),
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn set_defaults(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -107,6 +132,7 @@ impl Node {
                     root_id: self.root_id,
                     node_id: *ancestor_id,
                     id: self.id,
+                    branch_id: self.branch_id,
                     order_index: self.order_index,
                     parent_id: self.parent_id.unwrap(),
                     title: self.title.clone(),
@@ -134,7 +160,9 @@ impl Node {
     }
 
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) -> Result<(), NodecosmosError> {
-        add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+        if self.is_main_branch_node() {
+            add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+        }
 
         Ok(())
     }

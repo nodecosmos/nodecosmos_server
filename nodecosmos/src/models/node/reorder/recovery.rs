@@ -96,7 +96,7 @@ impl<'a> Recovery<'a> {
             Err(err) => {
                 self.serialize_and_store_to_disk();
 
-                log_error(format!("{}", err));
+                log_fatal(format!("recover: {}", err));
             }
         }
 
@@ -116,6 +116,7 @@ impl<'a> Recovery<'a> {
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
         NodeDescendant {
             root_id: self.reorder_data.tree_root.id,
+            branch_id: self.reorder_data.branch_id,
             ..Default::default()
         }
         .delete_by_partition_key(self.db_session)
@@ -146,7 +147,8 @@ impl<'a> Recovery<'a> {
     async fn restore_node_order(&mut self) -> Result<(), NodecosmosError> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
-            parent_id: Some(self.reorder_data.old_parent.id),
+            branch_id: self.reorder_data.branch_id,
+            parent_id: self.reorder_data.old_parent_id,
             order_index: self.reorder_data.old_order_index,
         };
 
@@ -166,7 +168,7 @@ impl<'a> Recovery<'a> {
                 batch
                     .append_statement(
                         Node::PULL_FROM_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.added_ancestor_ids, id),
+                        (&self.reorder_data.added_ancestor_ids, id, self.reorder_data.branch_id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for remove_new_ancestor_ids: {}", err));
@@ -199,7 +201,7 @@ impl<'a> Recovery<'a> {
                 batch
                     .append_statement(
                         Node::PUSH_TO_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.removed_ancestor_ids, id),
+                        (&self.reorder_data.removed_ancestor_ids, id, self.reorder_data.branch_id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for append_old_ancestor_ids: {}", err));

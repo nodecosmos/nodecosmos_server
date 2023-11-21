@@ -53,7 +53,7 @@ Declare model as a struct within `src/models` dir:
 // src/modles/user.rs
 #[charybdis_model(
     table_name = users,
-    partition_keys = [id],n
+    partition_keys = [id],
     clustering_keys = [],
     global_secondary_indexes = [],
     local_secondary_indexes = [],

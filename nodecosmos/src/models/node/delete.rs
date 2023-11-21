@@ -21,6 +21,7 @@ use scylla::CachingSession;
 use std::collections::HashMap;
 
 type Id = Uuid;
+type BranchId = Uuid;
 type OrderIndex = f64;
 type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
 
@@ -44,7 +45,7 @@ pub struct NodeDelete<'a> {
     db_session: &'a CachingSession,
     elastic_client: &'a Elasticsearch,
     node: &'a Node,
-    node_ids_to_delete: Vec<Id>,
+    node_ids_to_delete: Vec<(Id, BranchId)>,
     children_by_parent_id: ChildrenByParentId,
 }
 
@@ -54,7 +55,7 @@ impl<'a> NodeDelete<'a> {
             db_session: &req_data.app.db_session,
             elastic_client: &req_data.app.elastic_client,
             node,
-            node_ids_to_delete: vec![node.id],
+            node_ids_to_delete: vec![(node.id, node.branch_id)],
             children_by_parent_id: ChildrenByParentId::new(),
         }
     }
@@ -91,7 +92,7 @@ impl<'a> NodeDelete<'a> {
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
 
-            self.node_ids_to_delete.push(descendant.id);
+            self.node_ids_to_delete.push((descendant.id, descendant.branch_id));
 
             if !self.node.is_root {
                 self.children_by_parent_id
@@ -109,7 +110,7 @@ impl<'a> NodeDelete<'a> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
 
-            for id in node_ids_chunk {
+            for (id, branch_id) in node_ids_chunk {
                 batch.append_delete_by_partition_key(&WorkDeleteFlow {
                     node_id: *id,
                     ..Default::default()
@@ -137,7 +138,10 @@ impl<'a> NodeDelete<'a> {
 
                 // self.node will be deleted within callback
                 if id != &self.node.id {
-                    batch.append_delete(&DeleteNode { id: *id })?;
+                    batch.append_delete(&DeleteNode {
+                        id: *id,
+                        branch_id: *branch_id,
+                    })?;
                 }
             }
 
@@ -157,7 +161,7 @@ impl<'a> NodeDelete<'a> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
 
-            for id in node_ids_chunk {
+            for (id, _) in node_ids_chunk {
                 batch.append_delete_by_partition_key(&LikesCount {
                     object_id: *id,
                     ..Default::default()
@@ -255,6 +259,9 @@ impl<'a> NodeDelete<'a> {
     }
 
     async fn delete_elastic_data(&self) {
-        bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &self.node_ids_to_delete).await;
+        if self.node.is_main_branch_node() {
+            let node_ids_to_delete = self.node_ids_to_delete.iter().map(|(id, _)| *id).collect::<Vec<Uuid>>();
+            bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &node_ids_to_delete).await;
+        }
     }
 }

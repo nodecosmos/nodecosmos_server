@@ -13,10 +13,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ReorderData {
     pub node: Node,
+    pub branch_id: Uuid,
+
     pub descendants: Vec<NodeDescendant>,
     pub descendant_ids: Vec<Uuid>,
 
-    pub old_parent: GetStructureNode,
+    pub old_parent_id: Option<Uuid>,
     pub new_parent: GetStructureNode,
 
     pub old_ancestor_ids: Vec<Uuid>,
@@ -37,25 +39,16 @@ pub struct ReorderData {
 
 impl ReorderData {
     pub async fn from_params(params: &ReorderParams, db_session: &CachingSession) -> Result<Self, NodecosmosError> {
-        let node = Node {
-            id: params.node_id,
-            ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        let node = Node::find_by_id_and_branch_id(&db_session, params.node_id, params.node_id).await?;
 
-        let descendants = NodeDescendant::find_by_root_id_and_node_id(&db_session, node.root_id, node.id)
-            .await?
-            .try_collect()
-            .await?;
+        let descendants =
+            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(&db_session, node.root_id, node.id, node.id)
+                .await?
+                .try_collect()
+                .await?;
         let descendant_ids = descendants.pluck_id();
 
-        let old_parent = GetStructureNode {
-            id: node.parent_id.unwrap_or_default(),
-            ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        let old_parent_id = node.parent_id;
 
         let new_parent = GetStructureNode {
             id: params.new_parent_id,
@@ -94,6 +87,7 @@ impl ReorderData {
 
         let tree_descendants = NodeDescendant {
             root_id: tree_root.id,
+            branch_id: params.branch_id,
             ..Default::default()
         }
         .find_by_partition_key(&db_session)
@@ -103,10 +97,11 @@ impl ReorderData {
 
         let data = ReorderData {
             node,
+            branch_id: params.branch_id,
             descendants,
             descendant_ids,
 
-            old_parent,
+            old_parent_id,
             new_parent,
 
             old_ancestor_ids,

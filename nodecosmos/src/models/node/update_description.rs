@@ -22,12 +22,7 @@ impl UpdateDescriptionNode {
     }
 
     pub async fn create_new_version(&self, req_data: &RequestData) {
-        let description_version = VersionedDescription::new(
-            self.description.clone(),
-            self.short_description.clone(),
-            self.description_markdown.clone(),
-            self.description_base64.clone(),
-        );
+        let description_version = VersionedDescription::new(self.description_base64.clone());
 
         let _ = description_version.insert(req_data.db_session()).await.map_err(|e| {
             log_error(format!("Failed to create new description version: {}", e));

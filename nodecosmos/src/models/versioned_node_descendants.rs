@@ -7,12 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[charybdis_model(
-    table_name = versioned_node_descendants_by_id,
+    table_name = versioned_node_descendant_ids,
     partition_keys = [id],
-    clustering_keys = [],
-    table_options = r#"
-        compression = {'sstable_compression': 'DeflateCompressor', 'chunk_length_in_kb': 4};
-    "#,
+    clustering_keys = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct VersionedNodeDescendantIds {
