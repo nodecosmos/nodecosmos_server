@@ -63,7 +63,7 @@ pub struct VersionedNode {
 }
 
 impl VersionedNode {
-    async fn find_first_by_node_id<'a>(
+    async fn find_first_by_node_id(
         session: &CachingSession,
         node_id: &Uuid,
         branch_id: &Uuid,
@@ -78,24 +78,27 @@ impl VersionedNode {
         Ok(res)
     }
 
-    pub fn init_from(v_node: &Self, branch_id: Uuid) -> Self {
+    pub fn init_from(v_node: &Self, branch_id: Uuid, user_id: Option<Uuid>) -> Self {
         let mut v_node = v_node.clone();
         v_node.id = Uuid::new_v4();
         v_node.created_at = Utc::now();
         v_node.branch_id = branch_id;
+        v_node.user_id = user_id;
 
         v_node
     }
 
     pub async fn init_from_latest(
         session: &CachingSession,
-        node_id: &Uuid,
-        branch_id: &Uuid,
+        node_id: Uuid,
+        branch_id: Uuid,
+        user_id: Uuid,
     ) -> Result<Self, NodecosmosError> {
-        let mut v_node = VersionedNode::find_first_by_node_id(session, node_id, branch_id).await?;
+        let mut v_node = VersionedNode::find_first_by_node_id(session, &node_id, &branch_id).await?;
         v_node.id = Uuid::new_v4();
         v_node.created_at = Utc::now();
-        v_node.branch_id = *branch_id;
+        v_node.branch_id = branch_id;
+        v_node.user_id = Some(user_id);
 
         Ok(v_node)
     }

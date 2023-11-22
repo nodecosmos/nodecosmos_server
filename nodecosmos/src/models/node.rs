@@ -224,6 +224,8 @@ partial_node!(
     UpdateCoverImageNode,
     id,
     branch_id,
+    owner_id,
+    editor_ids,
     cover_image_url,
     cover_image_filename,
     updated_at

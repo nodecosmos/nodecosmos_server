@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::node::{Node, UpdateCoverImageNode};
+use crate::models::node::UpdateCoverImageNode;
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::services::image::Image;
 use crate::utils::logger::log_error;
@@ -12,16 +12,6 @@ const IMG_WIDTH: u32 = 850;
 const IMG_HEIGHT: u32 = 375;
 
 impl UpdateCoverImageNode {
-    pub fn from_native(node: &Node) -> UpdateCoverImageNode {
-        Self {
-            id: node.id,
-            branch_id: node.branch_id,
-            cover_image_url: node.cover_image_url.clone(),
-            cover_image_filename: node.cover_image_filename.clone(),
-            updated_at: None,
-        }
-    }
-
     pub async fn update_cover_image(
         &mut self,
         mut payload: Multipart,

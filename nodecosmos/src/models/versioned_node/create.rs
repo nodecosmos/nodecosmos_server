@@ -23,9 +23,8 @@ pub struct TreePositionChange {
     pub added_ancestor_ids: Option<Vec<Uuid>>,
 }
 
-pub type RemovedIds = Vec<Uuid>;
-pub type AddedIds = Vec<Uuid>;
-pub type NewDescendantVersionById = HashMap<Uuid, Uuid>;
+type RemovedIds = Vec<Uuid>;
+pub(crate) type NewDescendantVersionById = HashMap<Uuid, Uuid>;
 
 pub enum NodeChange {
     Title(String),
@@ -72,8 +71,7 @@ impl VersionedNode {
         changes: &Vec<NodeChange>,
         update_ancestors: bool,
     ) -> Result<VersionedNode, NodecosmosError> {
-        let mut new_version = VersionedNode::init_from_latest(session, &node_id, &branch_id).await?;
-        new_version.user_id = Some(user_id);
+        let mut new_version = VersionedNode::init_from_latest(session, node_id, branch_id, user_id).await?;
 
         for attribute in changes {
             match attribute {
@@ -147,8 +145,13 @@ impl VersionedNode {
     }
 
     pub async fn handle_deletion(request_data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        let mut new_version =
-            VersionedNode::init_from_latest(request_data.db_session(), &node.id, &node.branch_id).await?;
+        let mut new_version = VersionedNode::init_from_latest(
+            request_data.db_session(),
+            node.id,
+            node.branch_id,
+            request_data.current_user_id(),
+        )
+        .await?;
         new_version.node_deleted_at = Some(Utc::now());
         new_version.insert(request_data.db_session()).await?;
 
@@ -188,7 +191,7 @@ impl VersionedNode {
             let mut batch = CharybdisModelBatch::unlogged();
 
             for lvd_node in lvd_nodes_chunk {
-                let mut versioned_desc_node = VersionedNode::init_from(lvd_node, self.branch_id);
+                let mut versioned_desc_node = VersionedNode::init_from(lvd_node, self.branch_id, self.user_id);
                 versioned_desc_node.node_deleted_at = self.node_deleted_at;
 
                 let _ = batch.append_insert(&versioned_desc_node).map_err(|err| {
@@ -230,9 +233,8 @@ impl VersionedNode {
 
             let new_v_node_descendant =
                 VersionedNodeDescendantIds::new(versioned_ancestor.node_id, descendant_version_by_id);
-            let mut new_v_node = VersionedNode::init_from(&versioned_ancestor, self.branch_id);
+            let mut new_v_node = VersionedNode::init_from(&versioned_ancestor, self.branch_id, self.user_id);
             new_v_node.versioned_descendants_id = Some(new_v_node_descendant.id);
-            new_v_node.user_id = self.user_id;
 
             batch.append_insert(&new_v_node_descendant)?;
             batch.append_insert(&new_v_node)?;
@@ -267,10 +269,8 @@ impl VersionedNode {
             });
 
             let new_v_node_descendant = VersionedNodeDescendantIds::new(ancestor.node_id, anc_descendant_version_by_id);
-            let mut new_v_node = VersionedNode::init_from(&ancestor, self.branch_id);
-            new_v_node.branch_id = self.branch_id;
+            let mut new_v_node = VersionedNode::init_from(&ancestor, self.branch_id, self.user_id);
             new_v_node.versioned_descendants_id = Some(new_v_node_descendant.id);
-            new_v_node.user_id = self.user_id;
 
             batch.append_insert(&new_v_node_descendant)?;
             batch.append_insert(&new_v_node)?;

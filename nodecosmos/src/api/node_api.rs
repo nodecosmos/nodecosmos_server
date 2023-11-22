@@ -135,30 +135,26 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/{id}/upload_cover_image")]
-async fn upload_cover_image(id: web::Path<Uuid>, data: RequestData, payload: Multipart) -> Response {
-    let node = Node::find_by_id_and_branch_id(data.db_session(), *id, *id).await?;
+#[post("/{id}/{branchId}/upload_cover_image")]
+async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData, payload: Multipart) -> Response {
+    let mut node = node.find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&node, &data.current_user).await?;
+    auth_node_update(&node.as_native(), &data.current_user).await?;
 
-    UpdateCoverImageNode::from_native(&node)
-        .update_cover_image(payload, &data)
-        .await?;
+    node.update_cover_image(payload, &data).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "coverImageUrl": node.cover_image_url
     })))
 }
 
-#[delete("/{id}/delete_cover_image")]
-async fn delete_cover_image(id: web::Path<Uuid>, data: RequestData) -> Response {
-    let node = Node::find_by_id_and_branch_id(data.db_session(), *id, *id).await?;
+#[delete("/{id}/{branchId}/delete_cover_image")]
+async fn delete_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
+    let mut node = node.find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&node, &data.current_user).await?;
+    auth_node_update(&node.as_native(), &data.current_user).await?;
 
-    UpdateCoverImageNode::from_native(&node)
-        .delete_cover_image(&data)
-        .await?;
+    node.delete_cover_image(&data).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
