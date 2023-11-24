@@ -166,7 +166,7 @@ impl<'a> Recovery<'a> {
             for id in chunk {
                 batch
                     .append_statement(
-                        Node::PULL_FROM_ANCESTOR_IDS_QUERY,
+                        Node::PULL_ANCESTOR_IDS_QUERY,
                         (&self.reorder_data.added_ancestor_ids, id, self.reorder_data.branch_id),
                     )
                     .map_err(|err| {
@@ -199,7 +199,7 @@ impl<'a> Recovery<'a> {
             for id in chunk {
                 batch
                     .append_statement(
-                        Node::PUSH_TO_ANCESTOR_IDS_QUERY,
+                        Node::PUSH_ANCESTOR_IDS_QUERY,
                         (&self.reorder_data.removed_ancestor_ids, id, self.reorder_data.branch_id),
                     )
                     .map_err(|err| {

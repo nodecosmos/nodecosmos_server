@@ -1,9 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
+use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::{Owner, OwnerTypes};
-use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::logger::log_error;
@@ -168,7 +168,7 @@ impl Node {
     }
 
     pub async fn create_new_version(&self, req_data: &RequestData) {
-        let _ = VersionedNode::handle_creation(&req_data.db_session(), &self, req_data.current_user_id())
+        let _ = NodeCommit::handle_creation(&req_data.db_session(), &self, req_data.current_user_id())
             .map_err(|e| {
                 log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
 

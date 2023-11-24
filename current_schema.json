@@ -4,7 +4,7 @@
       "fields": {
         "id": "uuid",
         "node_id": "uuid",
-        "descendant_version_by_id": "map<uuid, uuid>"
+        "descendant_node_commit_id_by_id": "map<uuid, uuid>"
       },
       "type_name": "",
       "table_name": "",
@@ -40,7 +40,7 @@
     },
     "versioned_nodes": {
       "fields": {
-        "versioned_descendants_id": "uuid",
+        "node_descendants_commit_id": "uuid",
         "versioned_description_id": "uuid",
         "order_index": "double",
         "id": "uuid",

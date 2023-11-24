@@ -124,7 +124,7 @@ impl Like {
     }
 
     pub async fn push_to_user_liked_obj_ids(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let q = User::PUSH_TO_LIKED_OBJECT_IDS_QUERY;
+        let q = User::PUSH_LIKED_OBJECT_IDS_QUERY;
 
         execute(session, q, (vec![self.object_id], self.user_id)).await?;
 
@@ -132,7 +132,7 @@ impl Like {
     }
 
     pub async fn pull_from_user_liked_obj_ids(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let q = User::PULL_FROM_LIKED_OBJECT_IDS_QUERY;
+        let q = User::PULL_LIKED_OBJECT_IDS_QUERY;
 
         execute(session, q, (vec![self.object_id], self.user_id)).await?;
 

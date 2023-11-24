@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_str, Field};
 
-// Here we utilize PUSH_TO_{}_QUERY and PULL_FROM_{}_QUERY consts to generate Model functions
+// Here we utilize PUSH_{}_QUERY and PULL_{}_QUERY consts to generate Model functions
 // for updating collection fields.
 pub fn push_to_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>) -> TokenStream {
     let primary_key = ch_args.primary_key();
@@ -26,10 +26,10 @@ pub fn push_to_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Field>
 
             let field_name_upper = field_name.to_uppercase();
 
-            let push_to_query_str = format!("Self::PUSH_TO_{}_QUERY", field_name_upper);
+            let push_to_query_str = format!("Self::PUSH_{}_QUERY", field_name_upper);
             let push_to_query = parse_str::<TokenStream>(&push_to_query_str).unwrap();
 
-            let fun_name_str = format!("push_to_{}", field_name);
+            let fun_name_str = format!("push_{}", field_name);
             let fun_name = parse_str::<TokenStream>(&fun_name_str).unwrap();
 
             let expanded = quote! {
@@ -82,10 +82,10 @@ pub fn pull_from_collection_funs(ch_args: &CharybdisMacroArgs, fields: &Vec<Fiel
 
             let field_name_upper = field_name.to_uppercase();
 
-            let pull_from_query_str = format!("Self::PULL_FROM_{}_QUERY", field_name_upper);
+            let pull_from_query_str = format!("Self::PULL_{}_QUERY", field_name_upper);
             let pull_from_query = parse_str::<TokenStream>(&pull_from_query_str).unwrap();
 
-            let fun_name_str = format!("pull_from_{}", field_name);
+            let fun_name_str = format!("pull_{}", field_name);
             let fun_name = parse_str::<TokenStream>(&fun_name_str).unwrap();
 
             let expanded = quote! {

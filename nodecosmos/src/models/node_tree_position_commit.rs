@@ -4,12 +4,17 @@ use charybdis::types::{Double, Set, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
-    table_name = versioned_node_tree_position,
+    table_name = node_tree_position_commits,
     partition_keys = [id],
-    clustering_keys = []
+    clustering_keys = [],
+    table_options = r#"
+        compression = { 
+            'sstable_compression': 'DeflateCompressor'
+        }
+    "#
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct VersionedNodeTreePosition {
+pub struct NodeTreePositionCommit {
     pub id: Uuid,
 
     #[serde(rename = "versionedNodeId")]
@@ -22,7 +27,7 @@ pub struct VersionedNodeTreePosition {
     pub ancestor_ids: Option<Set<Uuid>>,
 }
 
-impl VersionedNodeTreePosition {
+impl NodeTreePositionCommit {
     pub fn from_node(node: &Node) -> Self {
         Self {
             id: Uuid::new_v4(),

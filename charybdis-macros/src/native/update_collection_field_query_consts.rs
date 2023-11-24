@@ -35,7 +35,7 @@ pub(crate) fn push_to_collection_fields_query_consts(ch_args: &CharybdisMacroArg
             );
 
             let field_name_upper = field_name.to_uppercase();
-            let const_name = format!("PUSH_TO_{}_QUERY", field_name_upper);
+            let const_name = format!("PUSH_{}_QUERY", field_name_upper);
             let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
             let expanded = quote! {
@@ -88,7 +88,7 @@ pub(crate) fn pull_from_collection_fields_query_consts(
             );
 
             let field_name_upper = field_name.to_uppercase();
-            let const_name = format!("PULL_FROM_{}_QUERY", field_name_upper);
+            let const_name = format!("PULL_{}_QUERY", field_name_upper);
             let const_name: TokenStream = parse_str::<TokenStream>(&const_name).unwrap();
 
             let expanded = quote! {

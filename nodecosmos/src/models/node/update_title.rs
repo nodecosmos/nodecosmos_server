@@ -2,9 +2,9 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateTitleNode};
+use crate::models::node_commit::create::NodeChange;
+use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::versioned_node::create::NodeChange;
-use crate::models::versioned_node::VersionedNode;
 use crate::services::elastic::index::ElasticIndex;
 use crate::services::elastic::update_elastic_document;
 use crate::utils::logger::log_error;
@@ -85,7 +85,7 @@ impl UpdateTitleNode {
     pub async fn create_new_version(&self, req_data: &RequestData) {
         let changes = vec![NodeChange::Title(self.title.clone())];
 
-        let _ = VersionedNode::handle_change(
+        let _ = NodeCommit::handle_change(
             req_data.db_session(),
             self.id,
             self.branch_id,

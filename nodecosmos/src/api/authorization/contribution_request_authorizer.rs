@@ -13,6 +13,7 @@ pub async fn auth_contribution_request_creation(
 ) -> Result<(), NodecosmosError> {
     let node = Node {
         id: contribution_request.node_id,
+        branch_id: contribution_request.node_id,
         ..Default::default()
     }
     .find_by_primary_key(db_session)

@@ -9,7 +9,7 @@ mod update_description;
 mod update_title;
 
 use crate::errors::NodecosmosError;
-use crate::models::node_descendant::{find_node_descendant, NodeDescendant};
+use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
 use charybdis::macros::charybdis_model;
@@ -138,25 +138,27 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        let all_descendants = find_node_descendant!(
-            db_session,
-            "root_id = ? AND branch_id in ? AND node_id = ?",
-            (self.root_id, vec![self.id, self.branch_id], self.id)
-        )
-        .await?
-        .try_collect()
-        .await?;
+        let mut all_descendants = NodeDescendant::all_node_descendants(db_session, self)
+            .await?
+            .try_collect()
+            .await?;
 
-        // sort by so that the branch node is first
-        let mut descendants: Vec<NodeDescendant> = all_descendants
-            .into_iter()
-            .filter(|descendant| descendant.branch_id == self.branch_id)
-            .collect();
+        // Deduplicate by id, prioritizing the one with branch_id == self.branch_id
+        all_descendants.dedup_by(|a, b| {
+            if a.id == b.id {
+                if a.branch_id != self.branch_id {
+                    // Swap a and b if a's branch_id doesn't match self.branch_id
+                    std::mem::swap(a, b);
+                }
+                // Always remove b after potentially swapping
+                true
+            } else {
+                // Different id, so don't remove b
+                false
+            }
+        });
 
-        // filter duplicates
-        descendants.dedup_by(|a, b| a.id == b.id);
-
-        Ok(descendants)
+        Ok(all_descendants)
     }
 }
 

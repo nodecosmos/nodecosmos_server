@@ -6,12 +6,18 @@ use serde::{Deserialize, Serialize};
 /// We keep versions only for node where change has been made, so we
 /// don't duplicate data for each ancestor.
 #[charybdis_model(
-    table_name = versioned_flow_steps,
+    table_name = flow_step_commits,
     partition_keys = [id],
-    clustering_keys = []
+    clustering_keys = [],
+    table_options = r#"
+        compression = { 
+            'sstable_compression': 'DeflateCompressor',
+            'chunk_length_in_kb': 64
+        }
+    "#
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct VersionedFlowStep {
+pub struct FlowStepCommits {
     pub flow_step_id: Uuid,
     pub id: Uuid,
     pub title: Text,

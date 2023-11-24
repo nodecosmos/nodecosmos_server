@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
+use crate::models::description_commit::DescriptionCommit;
 use crate::models::node::{Node, UpdateDescriptionNode};
-use crate::models::versioned_description::VersionedDescription;
-use crate::models::versioned_node::create::NodeChange;
-use crate::models::versioned_node::VersionedNode;
+use crate::models::node_commit::create::NodeChange;
+use crate::models::node_commit::NodeCommit;
 use crate::services::elastic::index::ElasticIndex;
 use crate::services::elastic::update_elastic_document;
 use crate::utils::logger::log_error;
@@ -22,7 +22,7 @@ impl UpdateDescriptionNode {
     }
 
     pub async fn create_new_version(&self, req_data: &RequestData) {
-        let description_version = VersionedDescription::new(self.description_base64.clone());
+        let description_version = DescriptionCommit::new(self.description_base64.clone());
 
         let _ = description_version.insert(req_data.db_session()).await.map_err(|e| {
             log_error(format!("Failed to create new description version: {}", e));
@@ -31,7 +31,7 @@ impl UpdateDescriptionNode {
 
         let changes = vec![NodeChange::Description(description_version.id)];
 
-        let _ = VersionedNode::handle_change(
+        let _ = NodeCommit::handle_change(
             req_data.db_session(),
             self.id,
             self.branch_id,

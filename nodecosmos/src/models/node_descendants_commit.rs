@@ -7,33 +7,39 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[charybdis_model(
-    table_name = versioned_node_descendant_ids,
+    table_name = node_descendants_commits,
     partition_keys = [id],
-    clustering_keys = []
+    clustering_keys = [],
+    table_options = r#"
+        compression = { 
+            'sstable_compression': 'DeflateCompressor',
+            'chunk_length_in_kb': 64
+        }
+    "#
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct VersionedNodeDescendantIds {
+pub struct NodeDescendantsCommit {
     pub id: Uuid,
     pub node_id: Uuid,
-    pub descendant_version_by_id: Frozen<Map<Uuid, Uuid>>,
+    pub descendant_node_commit_id_by_id: Frozen<Map<Uuid, Uuid>>,
 }
 
-impl VersionedNodeDescendantIds {
-    pub fn new(node_id: Uuid, descendant_version_by_id: HashMap<Uuid, Uuid>) -> Self {
+impl NodeDescendantsCommit {
+    pub fn new(node_id: Uuid, descendant_node_commit_id_by_id: HashMap<Uuid, Uuid>) -> Self {
         Self {
             id: Uuid::new_v4(),
             node_id,
-            descendant_version_by_id,
+            descendant_node_commit_id_by_id,
         }
     }
 
     pub async fn find_by_ids(session: &CachingSession, ids: Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
         let mut res = vec![];
 
-        let mut v_node_descendants = find_versioned_node_descendant_ids!(session, "id IN ?", (ids,)).await?;
+        let mut commits = find_node_descendants_commit!(session, "id IN ?", (ids,)).await?;
 
-        while let Some(ver_desc) = v_node_descendants.next().await {
-            res.push(ver_desc?);
+        while let Some(commit) = commits.next().await {
+            res.push(commit?);
         }
 
         Ok(res)
@@ -43,11 +49,11 @@ impl VersionedNodeDescendantIds {
         session: &CachingSession,
         ids: Vec<Uuid>,
     ) -> Result<HashMap<Uuid, Self>, NodecosmosError> {
-        let v_node_descendants = Self::find_by_ids(session, ids).await?;
+        let commits = Self::find_by_ids(session, ids).await?;
         let mut res = HashMap::new();
 
-        for ver_desc in v_node_descendants {
-            res.insert(ver_desc.node_id, ver_desc);
+        for commit in commits {
+            res.insert(commit.node_id, commit);
         }
 
         Ok(res)

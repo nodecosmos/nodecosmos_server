@@ -8,8 +8,8 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
+use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::versioned_node::VersionedNode;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
@@ -53,7 +53,7 @@ impl Node {
 
         reorder.run(req_data.resource_locker()).await?;
 
-        VersionedNode::handle_reorder(&req_data, &reorder_data).await?;
+        NodeCommit::handle_reorder(&req_data, &reorder_data).await?;
 
         Ok(())
     }
@@ -249,7 +249,7 @@ impl<'a> Reorder<'a> {
     async fn pull_removed_ancestors_from_node(&mut self) -> Result<(), NodecosmosError> {
         execute(
             self.db_session,
-            Node::PULL_FROM_ANCESTOR_IDS_QUERY,
+            Node::PULL_ANCESTOR_IDS_QUERY,
             (
                 self.reorder_data.removed_ancestor_ids.clone(),
                 self.reorder_data.node.id,
@@ -267,7 +267,7 @@ impl<'a> Reorder<'a> {
 
             for descendant_id in descendant_chunk {
                 batch.append_statement(
-                    Node::PULL_FROM_ANCESTOR_IDS_QUERY,
+                    Node::PULL_ANCESTOR_IDS_QUERY,
                     (
                         self.reorder_data.removed_ancestor_ids.clone(),
                         descendant_id,
@@ -285,7 +285,7 @@ impl<'a> Reorder<'a> {
     async fn push_added_ancestors_to_node(&mut self) -> Result<(), NodecosmosError> {
         execute(
             self.db_session,
-            Node::PUSH_TO_ANCESTOR_IDS_QUERY,
+            Node::PUSH_ANCESTOR_IDS_QUERY,
             (
                 self.reorder_data.added_ancestor_ids.clone(),
                 self.reorder_data.node.id,
@@ -303,7 +303,7 @@ impl<'a> Reorder<'a> {
 
             for descendant_id in descendant_chunk {
                 batch.append_statement(
-                    Node::PUSH_TO_ANCESTOR_IDS_QUERY,
+                    Node::PUSH_ANCESTOR_IDS_QUERY,
                     (
                         self.reorder_data.added_ancestor_ids.clone(),
                         descendant_id,

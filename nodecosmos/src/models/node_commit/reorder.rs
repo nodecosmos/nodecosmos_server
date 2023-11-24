@@ -1,8 +1,8 @@
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
-use crate::models::versioned_node::create::{NewDescendantVersionById, NodeChange, TreePositionChange};
-use crate::models::versioned_node::VersionedNode;
+use crate::models::node_commit::create::{NewDescendantCommitById, NodeChange, TreePositionChange};
+use crate::models::node_commit::NodeCommit;
 use crate::utils::logger::log_fatal;
 use charybdis::types::Uuid;
 use futures::TryFutureExt;
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct VersionReorderHandler {
+pub struct ReorderCommit {
     session: Arc<CachingSession>,
     current_user_id: Uuid,
     node_id: Uuid,
@@ -24,7 +24,7 @@ pub struct VersionReorderHandler {
     added_ancestor_ids: Vec<Uuid>,
 }
 
-impl VersionReorderHandler {
+impl ReorderCommit {
     pub fn from_reorder_data(session: Arc<CachingSession>, current_user_id: Uuid, reorder_data: &ReorderData) -> Self {
         Self {
             session,
@@ -40,30 +40,29 @@ impl VersionReorderHandler {
         }
     }
 
-    pub async fn run(&self) -> Result<(), NodecosmosError> {
-        // if parent is changed we will update the ancestors in the next step
-        let new_node_version = self.create_new_node_version(!self.parent_changed).await?;
+    pub async fn create(&self) -> Result<(), NodecosmosError> {
+        let new_node_commit = self.create_new_node_commit().await?;
 
         if self.parent_changed {
-            let mut descendant_version_by_id = HashMap::new();
-            descendant_version_by_id.insert(new_node_version.node_id, new_node_version.id);
-            let ext_desc_ver = self.create_new_version_for_descendants().await.map_err(|e| {
-                log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+            let mut descendant_node_commit_id_by_id = HashMap::new();
+            descendant_node_commit_id_by_id.insert(new_node_commit.node_id, new_node_commit.id);
+            let ext_desc_ver = self.create_descendants_commits().await.map_err(|e| {
+                log_fatal(format!("create_descendants_commits: {:?}", e));
                 e
             })?;
 
-            descendant_version_by_id.extend(ext_desc_ver);
+            descendant_node_commit_id_by_id.extend(ext_desc_ver);
 
-            self.create_new_version_for_removed_ancestors().await.map_err(|e| {
-                log_fatal(format!("create_new_version_for_removed_ancestors: {:?}", e));
+            self.create_commits_for_removed_ancestors().await.map_err(|e| {
+                log_fatal(format!("create_commits_for_removed_ancestors: {:?}", e));
 
                 e
             })?;
 
-            self.create_new_version_for_added_ancestors(descendant_version_by_id)
+            self.create_commits_for_added_ancestors(descendant_node_commit_id_by_id)
                 .await
                 .map_err(|e| {
-                    log_fatal(format!("create_new_version_for_removed_ancestors: {:?}", e));
+                    log_fatal(format!("create_commits_for_removed_ancestors: {:?}", e));
 
                     e
                 })?;
@@ -72,7 +71,7 @@ impl VersionReorderHandler {
         Ok(())
     }
 
-    async fn create_new_node_version(&self, update_ancestors: bool) -> Result<VersionedNode, NodecosmosError> {
+    async fn create_new_node_commit(&self) -> Result<NodeCommit, NodecosmosError> {
         let tpc = TreePositionChange {
             parent_id: Some(self.new_parent_id),
             order_index: Some(self.new_order_index),
@@ -82,25 +81,26 @@ impl VersionReorderHandler {
 
         let changes = vec![NodeChange::TreePosition(tpc)];
 
-        let new_node_version = VersionedNode::handle_change(
+        // if parent is changed we will create ancestors commits in the next step
+        let new_node_commit = NodeCommit::handle_change(
             &self.session,
             self.node_id,
             self.branch_id,
             self.current_user_id,
             &changes,
-            update_ancestors,
+            !self.parent_changed,
         )
         .await
         .map_err(|err| {
-            log_fatal(format!("create_new_node_version: {:?}", err));
+            log_fatal(format!("create_new_node_commit: {:?}", err));
             return err;
         })?;
 
-        Ok(new_node_version)
+        Ok(new_node_commit)
     }
 
-    async fn create_new_version_for_descendants(&self) -> Result<NewDescendantVersionById, NodecosmosError> {
-        let mut descendant_version_by_id = HashMap::new();
+    async fn create_descendants_commits(&self) -> Result<NewDescendantCommitById, NodecosmosError> {
+        let mut descendant_node_commit_id_by_id = HashMap::new();
         let tpc = TreePositionChange {
             parent_id: None,
             order_index: None,
@@ -114,7 +114,7 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for id in id_chunk {
-                let future = VersionedNode::handle_change(
+                let future = NodeCommit::handle_change(
                     &self.session,
                     *id,
                     self.branch_id,
@@ -123,7 +123,7 @@ impl VersionReorderHandler {
                     false,
                 )
                 .map_err(|e| {
-                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                    log_fatal(format!("create_descendants_commits: {:?}", e));
                 });
 
                 futures.push(future);
@@ -134,17 +134,17 @@ impl VersionReorderHandler {
             for result in results {
                 match result {
                     Ok(result) => {
-                        descendant_version_by_id.insert(result.node_id, result.id);
+                        descendant_node_commit_id_by_id.insert(result.node_id, result.id);
                     }
                     _ => {}
                 }
             }
         }
 
-        Ok(descendant_version_by_id)
+        Ok(descendant_node_commit_id_by_id)
     }
 
-    async fn create_new_version_for_removed_ancestors(&self) -> Result<(), NodecosmosError> {
+    async fn create_commits_for_removed_ancestors(&self) -> Result<(), NodecosmosError> {
         let mut removed_descendant_ids = vec![self.node_id];
         removed_descendant_ids.extend(self.descendant_ids.clone());
         let changes = vec![NodeChange::Descendants(Some(removed_descendant_ids.clone()), None)];
@@ -153,7 +153,7 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for ancestor_id in id_chunk {
-                let f = VersionedNode::handle_change(
+                let f = NodeCommit::handle_change(
                     &self.session,
                     *ancestor_id,
                     self.branch_id,
@@ -162,7 +162,7 @@ impl VersionReorderHandler {
                     false,
                 )
                 .map_err(|e| {
-                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                    log_fatal(format!("create_descendants_commits: {:?}", e));
                 });
 
                 futures.push(f);
@@ -175,9 +175,9 @@ impl VersionReorderHandler {
         Ok(())
     }
 
-    async fn create_new_version_for_added_ancestors(
+    async fn create_commits_for_added_ancestors(
         &self,
-        dv_by_id: NewDescendantVersionById,
+        dv_by_id: NewDescendantCommitById,
     ) -> Result<(), NodecosmosError> {
         let changes = vec![NodeChange::Descendants(None, Some(dv_by_id.clone()))];
 
@@ -185,7 +185,7 @@ impl VersionReorderHandler {
             let mut futures = vec![];
 
             for ancestor_id in id_chunk {
-                let f = VersionedNode::handle_change(
+                let f = NodeCommit::handle_change(
                     &self.session,
                     *ancestor_id,
                     self.branch_id,
@@ -194,7 +194,7 @@ impl VersionReorderHandler {
                     false,
                 )
                 .map_err(|e| {
-                    log_fatal(format!("create_new_version_for_descendants: {:?}", e));
+                    log_fatal(format!("create_descendants_commits: {:?}", e));
                 });
 
                 futures.push(f);

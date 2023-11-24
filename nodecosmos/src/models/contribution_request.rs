@@ -8,17 +8,23 @@ use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = contribution_requests,
-    partition_keys = [node_id],
+    partition_keys = [node_id, node_branch_id],
     clustering_keys = [id],
     global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct ContributionRequest {
-    #[serde(rename = "nodeId")] // node where the contribution request was created
+    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
+    #[serde(rename = "nodeBranchId")]
+    pub node_branch_id: Option<Uuid>,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Option<Uuid>,
 
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
@@ -54,13 +60,31 @@ impl ContributionRequest {
     }
 }
 
-partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title, created_at, status);
+partial_contribution_request!(
+    BaseContributionRequest,
+    node_id,
+    node_branch_id,
+    id,
+    owner,
+    title,
+    created_at,
+    status
+);
 
-partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, owner_id, title, updated_at);
+partial_contribution_request!(
+    UpdateContributionRequestTitle,
+    node_id,
+    node_branch_id,
+    id,
+    owner_id,
+    title,
+    updated_at
+);
 
 partial_contribution_request!(
     UpdateContributionRequestDescription,
     node_id,
+    node_branch_id,
     id,
     owner_id,
     description,

@@ -6,8 +6,8 @@ use crate::models::input_output::DeleteIo;
 use crate::models::like::Like;
 use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
+use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::versioned_node::VersionedNode;
 use crate::models::workflow::WorkDeleteFlow;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use crate::services::elastic::index::ElasticIndex;
@@ -31,7 +31,7 @@ impl Node {
     }
 
     pub async fn create_new_version_for_ancestors(&self, req_data: &RequestData) {
-        let _ = VersionedNode::handle_deletion(req_data, &self)
+        let _ = NodeCommit::handle_deletion(req_data, &self)
             .map_err(|e| {
                 log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
 

@@ -8,20 +8,18 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [],
     table_options = r#"
         compression = { 
-            'sstable_compression': 'ZstdCompressor',  
-            'compression_level': '1', 
-            'chunk_length_in_kb': 64
+            'sstable_compression': 'DeflateCompressor',  
         }
     "#,
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct VersionedDescription {
+pub struct DescriptionCommit {
     pub id: Uuid,
     pub description_base64: Option<Text>,
 }
 
 // TODO: Use `y-crdt` to extract desc state from only base64 description
-impl VersionedDescription {
+impl DescriptionCommit {
     pub fn new(description_base64: Option<Text>) -> Self {
         Self {
             id: Uuid::new_v4(),

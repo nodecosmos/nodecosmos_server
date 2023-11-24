@@ -522,10 +522,10 @@ For other fields it uses default values.
 
 ## Collection queries
 For every field that is defined with `List<T> `type or `Set<T>`, we get following operations:
-- `PUSH_TO_<field_name>_QUERY`
-- `PULL_FROM_<field_name>_QUERY`
-- `push_to_<field_name>` method
-- `pull_from_<field_name>` method
+- `PUSH_<field_name>_QUERY`
+- `PULL_<field_name>_QUERY`
+- `push_<field_name>` method
+- `pull_<field_name>` method
 
 ```rust
 pub struct User {
@@ -534,18 +534,18 @@ pub struct User {
     post_ids: List<Uuid>,
 }
 
-let query = User::PUSH_TO_TAGS_QUERY;
+let query = User::PUSH_TAGS_QUERY;
 execute(query, (vec![tag], &user.id)).await;
 
-let query = User::PULL_FROM_POST_IDS_QUERY;
+let query = User::PULL_POST_IDS_QUERY;
 execute(query, (post_ids_vec, &user.id)).await;
 ```
 
 Methods take session and value as arguments:
 ```rust
 let user = User::from_json(json);
-user.push_to_tags(&session, vec![tag]).await;
-user.pull_from_post_ids(&session, post_ids_vec).await;
+user.push_tags(&session, vec![tag]).await;
+user.pull_post_ids(&session, post_ids_vec).await;
 ```
 ## Ignored fields
 We can ignore fields by using `#[charybdis(ignore)]` attribute:

@@ -1,5 +1,6 @@
 use crate::api::authorization::auth_node_update_by_id;
 use crate::api::types::Response;
+use crate::app::App;
 use crate::models::attachment::Attachment;
 use crate::models::user::CurrentUser;
 use crate::services::aws::s3::get_s3_presigned_url;
@@ -19,7 +20,7 @@ pub struct ImageAttachmentParams {
 #[post("/{node_id}/{object_id}/upload_image")]
 pub async fn upload_image(
     params: web::Path<ImageAttachmentParams>,
-    app: web::Data<crate::App>,
+    app: web::Data<App>,
     payload: Multipart,
     current_user: CurrentUser,
 ) -> Response {
@@ -44,7 +45,7 @@ pub struct AttachmentParams {
 #[get("/presigned_url")]
 pub async fn get_presigned_url(
     params: web::Query<AttachmentParams>,
-    app: web::Data<crate::App>,
+    app: web::Data<App>,
     current_user: CurrentUser,
 ) -> Response {
     auth_node_update_by_id(&params.node_id, &app.db_session, &current_user).await?;
@@ -62,7 +63,7 @@ pub async fn get_presigned_url(
 #[post("")]
 pub async fn create_attachment(
     mut attachment: web::Json<Attachment>,
-    app: web::Data<crate::App>,
+    app: web::Data<App>,
     current_user: CurrentUser,
 ) -> Response {
     let url = Attachment::build_s3_url(app.s3_bucket.clone(), attachment.key.clone());
