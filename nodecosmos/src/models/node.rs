@@ -30,6 +30,7 @@ pub struct Node {
     #[serde(default)]
     pub id: Uuid,
 
+    // `self.branch_id` is equal to `self.id` for the main node's branch
     #[serde(default)]
     pub branch_id: Uuid,
 

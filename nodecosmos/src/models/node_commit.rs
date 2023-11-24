@@ -38,12 +38,6 @@ pub struct NodeCommit {
 
     pub id: Uuid,
 
-    #[serde(rename = "prevVersionId")]
-    pub prev_commit_id: Option<Uuid>,
-
-    #[serde(rename = "prevVersionBranchId")]
-    pub prev_commit_branch_id: Option<Uuid>,
-
     #[serde(rename = "commonCommitId")]
     pub common_commit_id: Option<Uuid>,
 
@@ -82,8 +76,6 @@ impl NodeCommit {
         commit.created_at = Utc::now();
         commit.branch_id = branch_id;
         commit.user_id = user_id;
-        commit.prev_commit_id = Some(commit.id);
-        commit.prev_commit_branch_id = Some(commit.branch_id);
 
         commit
     }
@@ -96,17 +88,10 @@ impl NodeCommit {
     ) -> Result<Self, NodecosmosError> {
         let mut commit = NodeCommit::find_latest(session, &node_id, &branch_id).await?;
 
-        if commit.branch_id != branch_id {
-            commit.common_commit_id = Some(commit.id);
-            commit.common_commit_branch_id = Some(commit.branch_id);
-        }
-
         commit.id = Uuid::new_v4();
         commit.created_at = Utc::now();
         commit.branch_id = branch_id;
         commit.user_id = Some(user_id);
-        commit.prev_commit_id = Some(commit.id);
-        commit.prev_commit_branch_id = Some(commit.branch_id);
 
         Ok(commit)
     }

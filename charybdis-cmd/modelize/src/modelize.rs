@@ -14,6 +14,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::{env, io};
 
+/// NOTE: WIP
 /// Automatic Modelization Tool
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
