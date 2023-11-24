@@ -18,6 +18,7 @@ use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 #[charybdis_model(
@@ -31,7 +32,7 @@ pub struct Node {
     pub id: Uuid,
 
     // `self.branch_id` is equal to `self.id` for the main node's branch
-    #[serde(default)]
+    #[serde(default, rename = "branchId")]
     pub branch_id: Uuid,
 
     #[serde(default, rename = "rootId")]
@@ -149,27 +150,43 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        let mut all_descendants = NodeDescendant::all_node_descendants(db_session, self)
-            .await?
-            .try_collect()
-            .await?;
+        let main =
+            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(db_session, self.root_id, self.id, self.id)
+                .await?
+                .try_collect()
+                .await?;
 
-        // Deduplicate by id, prioritizing the one with branch_id == self.branch_id
-        all_descendants.dedup_by(|a, b| {
-            if a.id == b.id {
-                if a.branch_id != self.branch_id {
-                    // Swap a and b if a's branch_id doesn't match self.branch_id
-                    std::mem::swap(a, b);
-                }
-                // Always remove b after potentially swapping
-                true
-            } else {
-                // Different id, so don't remove b
-                false
+        let branched = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
+            db_session,
+            self.root_id,
+            self.branch_id,
+            self.id,
+        )
+        .await?
+        .try_collect()
+        .await?;
+
+        let mut branched_ids = HashSet::with_capacity(branched.len());
+        let mut descendants = Vec::with_capacity(main.len() + branched.len());
+
+        for descendant in branched {
+            branched_ids.insert(descendant.id);
+            descendants.push(descendant);
+        }
+
+        for descendant in main {
+            if !branched_ids.contains(&descendant.id) {
+                descendants.push(descendant);
             }
+        }
+
+        descendants.sort_by(|a, b| {
+            a.order_index
+                .partial_cmp(&b.order_index)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        Ok(all_descendants)
+        Ok(descendants)
     }
 }
 
@@ -196,7 +213,6 @@ partial_node!(
 
 partial_node!(
     GetDescriptionNode,
-    root_id,
     id,
     branch_id,
     description,

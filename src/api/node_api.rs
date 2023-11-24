@@ -56,9 +56,12 @@ pub async fn get_branched_node(
     })))
 }
 
-#[get("/{id}/description")]
-pub async fn get_node_description(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let node = GetDescriptionNode::find_by_id_and_branch_id(&db_session, *id, *id).await?;
+#[get("/{id}/{branchId}/description")]
+pub async fn get_node_description(
+    db_session: web::Data<CachingSession>,
+    node: web::Path<GetDescriptionNode>,
+) -> Response {
+    let node = node.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -66,7 +69,7 @@ pub async fn get_node_description(db_session: web::Data<CachingSession>, id: web
     })))
 }
 
-#[get("/{id}/description_base64")]
+#[get("/{id}/{branchId}/description_base64")]
 pub async fn get_node_description_base64(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
     let node = GetDescriptionBase64Node::find_by_id_and_branch_id(&db_session, *id, *id).await?;
 

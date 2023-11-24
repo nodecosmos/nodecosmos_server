@@ -77,7 +77,6 @@ impl Node {
             self.ancestor_ids = None;
         }
 
-        // TODO: make branch_id required
         if self.branch_id == Uuid::default() {
             self.branch_id = self.id;
         }
