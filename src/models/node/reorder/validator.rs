@@ -67,16 +67,16 @@ impl<'a> ReorderValidator<'a> {
             }
         }
 
-        if let Some(new_bottom_sibling) = &self.reorder_data.new_bottom_sibling {
-            if new_bottom_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
+        if let Some(new_lower_sibling) = &self.reorder_data.new_lower_sibling {
+            if new_lower_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
                 return Err(NodecosmosError::Conflict("Bottom Sibling Moved!".to_string()));
             }
 
             if let Some(new_upper_sibling) = &self.reorder_data.new_upper_sibling {
-                let new_bottom_sibling_index = new_bottom_sibling.order_index;
+                let new_lower_sibling_index = new_lower_sibling.order_index;
                 let new_upper_sibling_index = new_upper_sibling.order_index;
 
-                if new_bottom_sibling_index < new_upper_sibling_index {
+                if new_lower_sibling_index < new_upper_sibling_index {
                     return Err(NodecosmosError::Conflict("Siblings Reordered!".to_string()));
                 }
             }

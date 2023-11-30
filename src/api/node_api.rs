@@ -30,7 +30,6 @@ pub async fn get_node(db_session: web::Data<CachingSession>, id: web::Path<Uuid>
 
     Ok(HttpResponse::Ok().json({
         json!({
-            "success": true,
             "node": node,
             "descendants": descendants
         })
@@ -50,7 +49,6 @@ pub async fn get_branched_node(
     let descendants = node.as_native().branch_descendants(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "success": true,
         "node": node,
         "descendants": descendants
     })))
@@ -63,27 +61,21 @@ pub async fn get_node_description(
 ) -> Response {
     let node = node.find_by_primary_key(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "success": true,
-        "node": node
-    })))
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[get("/{id}/{branchId}/description_base64")]
 pub async fn get_node_description_base64(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
     let node = GetDescriptionBase64Node::find_by_id_and_branch_id(&db_session, *id, *id).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "success": true,
-        "node": node
-    })))
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[post("")]
 pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Response {
     auth_node_creation(data.db_session(), &mut node, &data.current_user).await?;
 
-    data.resource_locker().check_node_lock(&node).await?;
+    data.resource_locker().validate_node_unlocked(&node, true).await?;
 
     node.insert_cb(data.db_session(), &data).await?;
 
@@ -96,8 +88,11 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
 
     auth_node_update(&native_node, &data.current_user).await?;
 
-    data.resource_locker().check_node_lock(&native_node).await?;
+    data.resource_locker()
+        .validate_node_unlocked(&native_node, true)
+        .await?;
 
+    node.root_id = native_node.root_id;
     node.update_cb(data.db_session(), &data).await?;
 
     Ok(HttpResponse::Ok().json(node))
@@ -120,16 +115,16 @@ pub async fn delete_node(node: web::Path<DeleteNode>, data: RequestData) -> Resp
 
     auth_node_update(&node, &data.current_user).await?;
 
-    data.resource_locker().check_node_lock(&node).await?;
+    data.resource_locker().validate_node_unlocked(&node, true).await?;
 
     node.delete_cb(data.db_session(), &data).await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let node = Node::find_by_id_and_branch_id(data.db_session(), params.node_id, params.branch_id).await?;
+    let node = Node::find_by_id_and_branch_id(data.db_session(), params.id, params.branch_id).await?;
 
     auth_node_update(&node, &data.current_user).await?;
 

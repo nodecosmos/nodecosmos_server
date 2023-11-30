@@ -1,9 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::udts::{Owner, OwnerTypes};
+use crate::models::udts::{Owner, OwnerType};
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::logger::log_error;
@@ -23,7 +24,7 @@ impl Node {
                 id: current_user.id,
                 name: current_user.full_name(),
                 username: Some(current_user.username.clone()),
-                owner_type: OwnerTypes::User.into(),
+                owner_type: OwnerType::User.into(),
                 profile_image_url: None,
             };
 
@@ -132,17 +133,11 @@ impl Node {
             let mut batch = CharybdisModelBatch::unlogged();
 
             for ancestor_id in ancestor_ids {
-                let branch_id = if self.is_different_branch() {
-                    self.branch_id
-                } else {
-                    *ancestor_id
-                };
-
                 let node_descendant = NodeDescendant {
                     root_id: self.root_id,
                     node_id: *ancestor_id,
                     id: self.id,
-                    branch_id,
+                    branch_id: self.branched_id(*ancestor_id),
                     order_index: self.order_index,
                     parent_id: self.parent_id.unwrap(),
                     title: self.title.clone(),

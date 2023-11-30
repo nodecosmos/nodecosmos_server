@@ -1,10 +1,12 @@
-use crate::api::authorization::auth_node_update_by_id;
+use crate::api::authorization::auth_node_update;
 use crate::api::types::Response;
+use crate::models::node::Node;
 use crate::models::user::CurrentUser;
 use actix::prelude::*;
 use actix_web::{get, web, HttpRequest};
 use actix_web_actors::ws;
 use actix_web_actors::ws::WsResponseBuilder;
+use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use dashmap::DashMap;
 use scylla::CachingSession;
@@ -92,6 +94,7 @@ impl Handler<DescriptionUpdateMessage> for DescriptionWsConnection {
 pub struct PathParams {
     // check if we can route Load Balancer connections based on room_id params
     room_id: Uuid,
+    branch_id: Uuid,
     node_id: Uuid,
 }
 
@@ -99,7 +102,7 @@ pub struct PathParams {
 /// between attached clients.
 ///
 /// It can be used for all models that have description_base64 field.
-#[get("/description/{node_id}/{room_id}")]
+#[get("/description/{node_id}/{branch_id}/{room_id}")]
 pub async fn description_ws(
     req: HttpRequest,
     stream: web::Payload,
@@ -108,7 +111,15 @@ pub async fn description_ws(
     node_ws_desc_conn_pool: web::Data<DescriptionWsConnectionPool>,
     current_user: CurrentUser,
 ) -> Response {
-    auth_node_update_by_id(&params.node_id, &db_session, &current_user).await?;
+    let node = Node {
+        id: params.node_id,
+        branch_id: params.branch_id,
+        ..Default::default()
+    }
+    .find_by_primary_key(&db_session)
+    .await?;
+
+    auth_node_update(&node, &current_user).await?;
 
     let ws_desc_conn = DescriptionWsConnection {
         room_id: params.room_id,

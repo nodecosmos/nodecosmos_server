@@ -12,6 +12,10 @@ pub struct ResourceLocker {
 }
 
 impl ResourceLocker {
+    const RETRY_LOCK_TIMEOUT: u64 = 500;
+    const RESOURCE_LOCK_ERROR: NodecosmosError =
+        NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
+
     pub fn new(pool: &Pool) -> Self {
         Self { pool: pool.clone() }
     }
@@ -66,7 +70,7 @@ impl ResourceLocker {
 
     pub async fn is_resource_action_locked(
         &self,
-        resource_action: ActionTypes,
+        resource_action: &ActionTypes,
         resource_id: &str,
     ) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
@@ -99,32 +103,54 @@ impl ResourceLocker {
         Ok(res)
     }
 
-    pub async fn check_resource_lock(&self, resource_id: &str) -> Result<(), NodecosmosError> {
+    pub async fn validate_resource_unlocked(&self, resource_id: &str) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(resource_id).await? {
-            return Err(NodecosmosError::ResourceLocked("Resource Locked!".to_string()));
+            return Err(Self::RESOURCE_LOCK_ERROR);
         }
 
         Ok(())
     }
 
-    pub async fn check_node_lock(&self, node: &Node) -> Result<(), NodecosmosError> {
+    pub async fn validate_node_unlocked(&self, node: &Node, retry: bool) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(&node.root_id.to_string()).await? {
-            return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked. If issue persist contact support".to_string(),
-            ));
+            if retry {
+                tokio::time::sleep(tokio::time::Duration::from_millis(Self::RETRY_LOCK_TIMEOUT)).await;
+
+                // TODO: introduce recursion & retry count
+                if self.is_resource_locked(&node.root_id.to_string()).await? {
+                    return Err(Self::RESOURCE_LOCK_ERROR);
+                }
+            } else {
+                return Err(Self::RESOURCE_LOCK_ERROR);
+            }
         }
 
         Ok(())
     }
 
-    pub async fn check_node_action_lock(&self, node: &Node, action_type: ActionTypes) -> Result<(), NodecosmosError> {
+    pub async fn validate_action_unlocked(
+        &self,
+        node: &Node,
+        action_type: ActionTypes,
+        retry: bool,
+    ) -> Result<(), NodecosmosError> {
         if self
-            .is_resource_action_locked(action_type, &node.root_id.to_string())
+            .is_resource_action_locked(&action_type, &node.root_id.to_string())
             .await?
         {
-            return Err(NodecosmosError::ResourceLocked(
-                "Resource Locked. If issue persist contact support".to_string(),
-            ));
+            if retry {
+                tokio::time::sleep(tokio::time::Duration::from_millis(Self::RETRY_LOCK_TIMEOUT)).await;
+
+                // TODO: introduce recursion & retry count
+                if self
+                    .is_resource_action_locked(&action_type, &node.root_id.to_string())
+                    .await?
+                {
+                    return Err(Self::RESOURCE_LOCK_ERROR);
+                }
+            } else {
+                return Err(Self::RESOURCE_LOCK_ERROR);
+            }
         }
 
         Ok(())

@@ -6,7 +6,6 @@ use crate::api::types::Response;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
-use serde_json::json;
 
 #[post("")]
 pub async fn create_io(
@@ -18,9 +17,7 @@ pub async fn create_io(
 
     input_output.insert_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "inputOutput": input_output,
-    })))
+    Ok(HttpResponse::Ok().json(input_output))
 }
 
 #[get("/{rootNodeId}/{nodeId}/{workflowId}/{id}/description")]
@@ -30,9 +27,7 @@ pub async fn get_io_description(
 ) -> Response {
     let input_output = input_output.find_by_primary_key(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "inputOutput": input_output,
-    })))
+    Ok(HttpResponse::Ok().json(input_output))
 }
 
 #[put("/title")]
@@ -45,9 +40,7 @@ pub async fn update_io_title(
 
     input_output.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "inputOutput": input_output,
-    })))
+    Ok(HttpResponse::Ok().json(input_output))
 }
 
 #[put("/description")]
@@ -60,9 +53,7 @@ pub async fn update_io_description(
 
     input_output.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "inputOutput": input_output,
-    })))
+    Ok(HttpResponse::Ok().json(input_output))
 }
 
 #[delete("/{rootNodeId}/{nodeId}/{workflowId}/{id}")]
@@ -77,7 +68,5 @@ pub async fn delete_io(
 
     input_output.delete_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "inputOutput": input_output,
-    })))
+    Ok(HttpResponse::Ok().json(input_output))
 }

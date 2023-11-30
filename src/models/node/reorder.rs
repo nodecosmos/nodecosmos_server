@@ -5,6 +5,7 @@ mod validator;
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
@@ -22,8 +23,7 @@ use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct ReorderParams {
-    #[serde(rename = "nodeId")]
-    pub node_id: Uuid,
+    pub id: Uuid,
 
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
@@ -34,16 +34,16 @@ pub struct ReorderParams {
     #[serde(rename = "newUpperSiblingId")]
     pub new_upper_sibling_id: Option<Uuid>,
 
-    #[serde(rename = "newBottomSiblingId")]
-    pub new_bottom_sibling_id: Option<Uuid>,
+    #[serde(rename = "newLowerSiblingId")]
+    pub new_lower_sibling_id: Option<Uuid>,
 }
 
 impl Node {
     pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        req_data.resource_locker().check_node_lock(&self).await?;
+        req_data.resource_locker().validate_node_unlocked(&self, false).await?;
         req_data
             .resource_locker()
-            .check_node_action_lock(&self, ActionTypes::Reorder(ActionObject::Node))
+            .validate_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
             .await?;
 
         let reorder_data = ReorderData::from_params(&params, req_data.db_session()).await?;
@@ -142,7 +142,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branch_id,
+                branch_id: self.reorder_data.branched_id(ancestor_id),
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.old_order_index,
@@ -171,7 +171,7 @@ impl<'a> Reorder<'a> {
                     root_id: self.reorder_data.tree_root.id,
                     node_id: ancestor_id,
                     id: descendant.id,
-                    branch_id: self.reorder_data.branch_id,
+                    branch_id: self.reorder_data.branched_id(ancestor_id),
                     order_index: descendant.order_index,
                     ..Default::default()
                 };
@@ -196,7 +196,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branch_id,
+                branch_id: self.reorder_data.branched_id(ancestor_id),
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
@@ -224,7 +224,7 @@ impl<'a> Reorder<'a> {
             for descendant in self.reorder_data.descendants.clone() {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
-                    branch_id: self.reorder_data.branch_id,
+                    branch_id: self.reorder_data.branched_id(ancestor_id),
                     node_id: ancestor_id,
                     id: descendant.id,
                     order_index: descendant.order_index,
@@ -271,7 +271,7 @@ impl<'a> Reorder<'a> {
                     (
                         self.reorder_data.removed_ancestor_ids.clone(),
                         descendant_id,
-                        self.reorder_data.branch_id,
+                        self.reorder_data.branched_id(*descendant_id),
                     ),
                 )?;
             }
@@ -307,7 +307,7 @@ impl<'a> Reorder<'a> {
                     (
                         self.reorder_data.added_ancestor_ids.clone(),
                         descendant_id,
-                        self.reorder_data.branch_id,
+                        self.reorder_data.branched_id(*descendant_id),
                     ),
                 )?;
             }

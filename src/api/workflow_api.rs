@@ -77,9 +77,7 @@ pub async fn update_initial_inputs(
 
     workflow.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "workflow": workflow,
-    })))
+    Ok(HttpResponse::Ok().json(workflow))
 }
 
 #[put("/title")]
@@ -92,9 +90,7 @@ pub async fn update_workflow_title(
 
     workflow.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "workflow": workflow,
-    })))
+    Ok(HttpResponse::Ok().json(workflow))
 }
 
 #[derive(Deserialize)]
@@ -115,7 +111,5 @@ pub async fn delete_workflow(
 
     workflow.delete_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "workflow": workflow,
-    })))
+    Ok(HttpResponse::Ok().json(workflow))
 }

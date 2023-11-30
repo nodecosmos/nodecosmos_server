@@ -9,6 +9,7 @@ mod update_description;
 mod update_title;
 
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
@@ -105,14 +106,6 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn is_main_branch(&self) -> bool {
-        self.branch_id == self.id
-    }
-
-    pub fn is_different_branch(&self) -> bool {
-        !self.is_main_branch()
-    }
-
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Arc<Option<Node>>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
             let parent_branch_id = if !self.is_main_branch() {
@@ -189,6 +182,31 @@ impl Node {
         Ok(descendants)
     }
 }
+
+impl Branchable for Node {
+    fn id(&self) -> Uuid {
+        self.id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.branch_id
+    }
+}
+
+partial_node!(
+    IndexNode,
+    id,
+    branch_id,
+    is_root,
+    is_public,
+    short_description,
+    title,
+    likes_count,
+    owner,
+    cover_image_url,
+    created_at,
+    updated_at
+);
 
 partial_node!(
     BaseNode,

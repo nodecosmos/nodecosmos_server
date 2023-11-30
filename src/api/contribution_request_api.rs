@@ -3,7 +3,7 @@ use crate::api::types::Response;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
-use crate::models::udts::{Owner, OwnerTypes};
+use crate::models::udts::{Owner, OwnerType};
 use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
@@ -59,7 +59,7 @@ pub async fn create_contribution_request(
         id: current_user.id,
         name: current_user.full_name(),
         username: Some(current_user.username),
-        owner_type: OwnerTypes::User.into(),
+        owner_type: OwnerType::User.into(),
         profile_image_url: None,
     });
 

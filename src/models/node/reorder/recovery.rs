@@ -1,11 +1,12 @@
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::{log_error, log_fatal, log_success, log_warning};
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::operations::Update;
+use charybdis::operations::{Delete, Update};
 use scylla::CachingSession;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -114,16 +115,29 @@ impl<'a> Recovery<'a> {
     }
 
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
-        NodeDescendant::delete_by_root_id_and_branch_id(
-            self.db_session,
-            self.reorder_data.tree_root.id,
-            self.reorder_data.branch_id,
-        )
-        .await
-        .map_err(|err| {
-            log_error(format!("delete_tree: {}", err));
-            return err;
-        })?;
+        if self.reorder_data.node.is_main_branch() {
+            NodeDescendant {
+                root_id: self.reorder_data.tree_root.id,
+                ..Default::default()
+            }
+            .delete_by_partition_key(self.db_session)
+            .await
+            .map_err(|err| {
+                log_error(format!("delete_tree: {}", err));
+                return err;
+            })?;
+        } else {
+            NodeDescendant::delete_by_root_id_and_branch_id(
+                self.db_session,
+                self.reorder_data.tree_root.id,
+                self.reorder_data.branch_id,
+            )
+            .await
+            .map_err(|err| {
+                log_error(format!("delete_tree: {}", err));
+                return err;
+            })?;
+        }
 
         Ok(())
     }
@@ -164,10 +178,12 @@ impl<'a> Recovery<'a> {
             let mut batch = CharybdisModelBatch::new();
 
             for id in chunk {
+                let branch_id = self.reorder_data.branched_id(*id);
+
                 batch
                     .append_statement(
                         Node::PULL_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.added_ancestor_ids, id, self.reorder_data.branch_id),
+                        (&self.reorder_data.added_ancestor_ids, id, branch_id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for remove_new_ancestor_ids: {}", err));
@@ -197,10 +213,12 @@ impl<'a> Recovery<'a> {
             let mut batch = CharybdisModelBatch::new();
 
             for id in chunk {
+                let branch_id = self.reorder_data.branched_id(*id);
+
                 batch
                     .append_statement(
                         Node::PUSH_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.removed_ancestor_ids, id, self.reorder_data.branch_id),
+                        (&self.reorder_data.removed_ancestor_ids, id, branch_id),
                     )
                     .map_err(|err| {
                         log_error(format!("append_statement for append_old_ancestor_ids: {}", err));

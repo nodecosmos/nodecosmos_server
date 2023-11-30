@@ -1,3 +1,5 @@
+pub mod branchable;
+
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Map, Text, Uuid};
 use serde::{Deserialize, Serialize};

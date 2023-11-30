@@ -5,7 +5,6 @@ use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
-use serde_json::json;
 
 #[post("")]
 pub async fn create_flow(
@@ -17,9 +16,7 @@ pub async fn create_flow(
 
     flow.insert_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flow": flow,
-    })))
+    Ok(HttpResponse::Ok().json(flow))
 }
 
 #[get("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}/description")]
@@ -30,9 +27,7 @@ pub async fn get_flow_description(
 ) -> Response {
     let flow = flow.find_by_primary_key(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flow": flow,
-    })))
+    Ok(HttpResponse::Ok().json(flow))
 }
 
 #[put("/title")]
@@ -45,9 +40,7 @@ pub async fn update_flow_title(
 
     flow.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flow": flow,
-    })))
+    Ok(HttpResponse::Ok().json(flow))
 }
 
 #[put("/description")]
@@ -60,9 +53,7 @@ pub async fn update_flow_description(
 
     flow.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flow": flow,
-    })))
+    Ok(HttpResponse::Ok().json(flow))
 }
 
 #[delete("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}")]
@@ -75,7 +66,5 @@ pub async fn delete_flow(
 
     flow.delete_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flow": flow.into_inner(),
-    })))
+    Ok(HttpResponse::Ok().json(flow.into_inner()))
 }

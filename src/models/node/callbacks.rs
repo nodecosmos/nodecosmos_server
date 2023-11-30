@@ -85,8 +85,14 @@ impl ExtCallbacks for UpdateTitleNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, session: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
-        self.update_title_for_ancestors(session, &req_data.app).await?;
+    async fn before_update(
+        &mut self,
+        _session: &CachingSession,
+        req_data: &RequestData,
+    ) -> Result<(), NodecosmosError> {
+        self.validate_root().await?;
+        let _ = self.update_title_for_ancestors(&req_data).await;
+
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())

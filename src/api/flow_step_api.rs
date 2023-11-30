@@ -8,7 +8,6 @@ use crate::services::resource_locker::ResourceLocker;
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
-use serde_json::json;
 
 const LOCKER_TTL: usize = 1000 * 10; // 10 seconds
 
@@ -21,7 +20,9 @@ pub async fn create_flow_step(
 ) -> Response {
     auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
-    locker.check_resource_lock(&flow_step.flow_id.to_string()).await?;
+    locker
+        .validate_resource_unlocked(&flow_step.flow_id.to_string())
+        .await?;
     locker.lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL).await?;
 
     let res = flow_step.insert_cb(&db_session).await;
@@ -30,9 +31,7 @@ pub async fn create_flow_step(
         Ok(_) => {
             locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
 
-            Ok(HttpResponse::Ok().json(json!({
-                "flowStep": flow_step,
-            })))
+            Ok(HttpResponse::Ok().json(flow_step))
         }
         Err(err) => {
             locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
@@ -52,9 +51,7 @@ pub async fn update_flow_step_nodes(
 
     flow_step.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
+    Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[put("/outputs")]
@@ -67,9 +64,7 @@ pub async fn update_flow_step_outputs(
 
     flow_step.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
+    Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[put("/inputs")]
@@ -82,9 +77,7 @@ pub async fn update_flow_step_inputs(
 
     flow_step.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
+    Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[put("/description")]
@@ -97,9 +90,7 @@ pub async fn update_flow_step_description(
 
     flow_step.update_cb(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
+    Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[delete("{nodeId}/{workflowId}/{flowId}/{flowIndex}/{id}")]
@@ -112,14 +103,14 @@ pub async fn delete_flow_step(
     let mut flow_step = flow_step.find_by_primary_key(&db_session).await?;
     auth_workflow_update(&db_session, flow_step.node_id, current_user).await?;
 
-    locker.check_resource_lock(&flow_step.flow_id.to_string()).await?;
+    locker
+        .validate_resource_unlocked(&flow_step.flow_id.to_string())
+        .await?;
     locker.lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL).await?;
 
     flow_step.delete_cb(&db_session).await?;
 
     locker.unlock_resource(&flow_step.flow_id.to_string()).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "flowStep": flow_step,
-    })))
+    Ok(HttpResponse::Ok().json(flow_step))
 }

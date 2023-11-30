@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::node::{BaseNode, Node};
+use crate::models::node::{IndexNode, Node};
 use crate::services::elastic::index::ElasticIndex;
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde::Deserialize;
@@ -32,7 +32,7 @@ impl<'a> NodeSearch<'a> {
         }
     }
 
-    pub async fn index(&self) -> Result<Vec<BaseNode>, NodecosmosError> {
+    pub async fn index(&self) -> Result<Vec<IndexNode>, NodecosmosError> {
         let response = self
             .elastic_client
             .search(SearchParts::Index(&[Node::ELASTIC_IDX_NAME]))
@@ -45,7 +45,7 @@ impl<'a> NodeSearch<'a> {
         let res = vec![];
         let hits = response_body["hits"]["hits"].as_array().unwrap_or(&res);
 
-        let mut nodes: Vec<BaseNode> = Vec::new();
+        let mut nodes: Vec<IndexNode> = Vec::new();
         for hit in hits {
             let document = serde_json::from_value(hit["_source"].clone())?;
 

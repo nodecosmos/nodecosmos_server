@@ -3,6 +3,7 @@ use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::utils::Pluckable;
 
+use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::ReorderParams;
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::operations::Find;
@@ -28,7 +29,7 @@ pub struct ReorderData {
     pub added_ancestor_ids: Vec<Uuid>,
 
     pub new_upper_sibling: Option<GetStructureNode>,
-    pub new_bottom_sibling: Option<GetStructureNode>,
+    pub new_lower_sibling: Option<GetStructureNode>,
 
     pub old_order_index: f64,
     pub new_order_index: f64,
@@ -39,7 +40,7 @@ pub struct ReorderData {
 
 impl ReorderData {
     pub async fn from_params(params: &ReorderParams, db_session: &CachingSession) -> Result<Self, NodecosmosError> {
-        let node = Node::find_by_id_and_branch_id(&db_session, params.node_id, params.node_id).await?;
+        let node = Node::find_by_id_and_branch_id(&db_session, params.id, params.branch_id).await?;
 
         let descendants =
             NodeDescendant::find_by_root_id_and_branch_id_and_node_id(&db_session, node.root_id, node.id, node.id)
@@ -73,10 +74,10 @@ impl ReorderData {
             .collect();
 
         let new_upper_sibling = init_sibling(params.new_upper_sibling_id, &db_session).await?;
-        let new_bottom_sibling = init_sibling(params.new_bottom_sibling_id, &db_session).await?;
+        let new_lower_sibling = init_sibling(params.new_lower_sibling_id, &db_session).await?;
 
         let old_order_index = node.order_index;
-        let new_order_index = build_new_index(&new_upper_sibling, &new_bottom_sibling);
+        let new_order_index = build_new_index(&new_upper_sibling, &new_lower_sibling);
 
         let tree_root = GetStructureNode {
             id: node.root_id,
@@ -111,7 +112,7 @@ impl ReorderData {
             added_ancestor_ids,
 
             new_upper_sibling,
-            new_bottom_sibling,
+            new_lower_sibling,
 
             old_order_index,
             new_order_index,
@@ -129,6 +130,16 @@ impl ReorderData {
         }
 
         false
+    }
+}
+
+impl Branchable for ReorderData {
+    fn id(&self) -> Uuid {
+        self.node.id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.branch_id
     }
 }
 
@@ -160,9 +171,9 @@ pub fn build_new_ancestor_ids(new_parent: &GetStructureNode) -> Vec<Uuid> {
 
 pub fn build_new_index(
     new_upper_sibling: &Option<GetStructureNode>,
-    new_bottom_sibling: &Option<GetStructureNode>,
+    new_lower_sibling: &Option<GetStructureNode>,
 ) -> f64 {
-    if new_upper_sibling.is_none() && new_bottom_sibling.is_none() {
+    if new_upper_sibling.is_none() && new_lower_sibling.is_none() {
         return 0.0;
     }
 
@@ -172,23 +183,23 @@ pub fn build_new_index(
         0.0
     };
 
-    let bottom_sibling_index = if let Some(new_bottom_sibling) = new_bottom_sibling {
-        new_bottom_sibling.order_index
+    let lower_sibling_index = if let Some(new_lower_sibling) = new_lower_sibling {
+        new_lower_sibling.order_index
     } else {
         0.0
     };
 
     // If only the bottom sibling exists, return its order index minus 1
     if new_upper_sibling.is_none() {
-        return bottom_sibling_index - 1.0;
+        return lower_sibling_index - 1.0;
     }
 
     // If only the upper sibling exists, return its order index plus 1
-    if new_bottom_sibling.is_none() {
+    if new_lower_sibling.is_none() {
         return upper_sibling_index + 1.0;
     }
 
     // If both siblings exist, return the average of their order indices
     // TODO: This is not ideal, as it has limited precision.
-    (upper_sibling_index + bottom_sibling_index) / 2.0
+    (upper_sibling_index + lower_sibling_index) / 2.0
 }

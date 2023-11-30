@@ -32,32 +32,32 @@ impl Owner {
 }
 
 #[derive(Deserialize)]
-pub enum OwnerTypes {
+pub enum OwnerType {
     User,
     Organization,
 }
 
-impl fmt::Display for OwnerTypes {
+impl fmt::Display for OwnerType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            OwnerTypes::User => write!(f, "User"),
-            OwnerTypes::Organization => write!(f, "Organization"),
+            OwnerType::User => write!(f, "user"),
+            OwnerType::Organization => write!(f, "organization"),
         }
     }
 }
 
-impl OwnerTypes {
+impl OwnerType {
     pub fn from_string(s: &str) -> Self {
         match s {
-            "User" => OwnerTypes::User,
-            "Organization" => OwnerTypes::Organization,
+            "User" => OwnerType::User,
+            "Organization" => OwnerType::Organization,
             _ => panic!("Invalid owner type"),
         }
     }
 }
 
-impl From<OwnerTypes> for Text {
-    fn from(owner_type: OwnerTypes) -> Self {
+impl From<OwnerType> for Text {
+    fn from(owner_type: OwnerType) -> Self {
         owner_type.to_string()
     }
 }

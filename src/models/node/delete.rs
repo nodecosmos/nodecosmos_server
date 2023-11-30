@@ -1,5 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteIo;
@@ -136,12 +137,14 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 })?;
 
-                // self.node will be deleted within callback
                 if id != &self.node.id {
-                    batch.append_delete(&DeleteNode {
-                        id: *id,
-                        branch_id: *branch_id,
-                    })?;
+                    let branch_id = if self.node.is_different_branch() {
+                        *branch_id
+                    } else {
+                        *id
+                    };
+
+                    batch.append_delete(&DeleteNode { id: *id, branch_id })?;
                 }
             }
 
@@ -162,7 +165,7 @@ impl<'a> NodeDelete<'a> {
             let mut batch = CharybdisModelBatch::unlogged();
 
             for (id, _) in node_ids_chunk {
-                batch.append_delete_by_partition_key(&LikesCount {
+                batch.append_delete(&LikesCount {
                     object_id: *id,
                     ..Default::default()
                 })?;
@@ -213,8 +216,11 @@ impl<'a> NodeDelete<'a> {
                         for (child_id, order_index) in child_ids_and_indices_chunk {
                             // delete node descendants for all of its ancestors
                             for ancestor_id in &current_ancestor_ids {
+                                let branch_id = self.node.branched_id(*ancestor_id);
+
                                 batch.append_delete(&NodeDescendant {
                                     root_id: self.node.root_id,
+                                    branch_id,
                                     node_id: *ancestor_id,
                                     order_index: *order_index,
                                     id: *child_id,

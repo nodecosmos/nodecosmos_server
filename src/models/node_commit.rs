@@ -14,7 +14,7 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
-    table_name = versioned_nodes,
+    table_name = node_commits,
     partition_keys = [node_id, branch_id],
     clustering_keys = [created_at, id],
     table_options = r#"

@@ -34,7 +34,7 @@ impl Error for RedisError {
 pub enum NodecosmosError {
     ClientSessionError(String),
     Unauthorized(serde_json::Value),
-    ResourceLocked(String),
+    ResourceLocked(&'static str),
     CharybdisError(CharybdisError),
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
@@ -92,36 +92,52 @@ impl Error for NodecosmosError {
 impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
-            NodecosmosError::ResourceLocked(e) => HttpResponseBuilder::new(StatusCode::LOCKED).json(e),
+            NodecosmosError::Unauthorized(_) => HttpResponse::Unauthorized().json({
+                json!({
+                    "status": 401,
+                    "message": "Unauthorized"
+                })
+            }),
+            NodecosmosError::ResourceLocked(e) => HttpResponseBuilder::new(StatusCode::LOCKED).json({
+                json!({
+                    "status": 423,
+                    "message": e
+                })
+            }),
             NodecosmosError::CharybdisError(e) => match e {
                 CharybdisError::NotFoundError(e) => HttpResponse::NotFound().json(json!({
-                    "error": "Not Found",
+                    "status": 404,
                     "message": e.to_string()
                 })),
                 _ => {
                     println!("Internal Server Error: {}", e.to_string().red());
 
                     HttpResponse::InternalServerError().json(json!({
-                        "error": "Internal Server Error",
+                        "status": 500,
                         "message": e.to_string()
                     }))
                 }
             },
-            NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().finish(),
+            NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().json({
+                json!({
+                    "status": 415,
+                    "message": "Unsupported Media Type"
+                })
+            }),
             NodecosmosError::Forbidden(e) => HttpResponse::Forbidden().json(json!({
-                "error": "Forbidden",
+                "status": 403,
                 "message": e
             })),
             NodecosmosError::Conflict(e) => HttpResponse::Conflict().json(json!({
-                "error": "Conflict",
+                "status": 409,
                 "message": e
             })),
-            NodecosmosError::ValidationError((field, message)) => {
-                HttpResponse::BadRequest().json(json!({ "error": {field: message} }))
-            }
+            NodecosmosError::ValidationError((field, message)) => HttpResponse::BadRequest().json(json!({
+                "status": 400,
+                "message": {field: message}
+            })),
             _ => HttpResponse::InternalServerError().json(json!({
-                "error": "Internal Server Error",
+                "status": 500,
                 "message": self.to_string()
             })),
         }
