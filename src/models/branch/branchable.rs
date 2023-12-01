@@ -2,6 +2,7 @@ use charybdis::types::Uuid;
 
 pub trait Branchable {
     fn id(&self) -> Uuid;
+
     fn branch_id(&self) -> Uuid;
 
     fn is_main_branch(&self) -> bool {

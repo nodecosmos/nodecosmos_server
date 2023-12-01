@@ -65,8 +65,11 @@ pub async fn get_node_description(
 }
 
 #[get("/{id}/{branchId}/description_base64")]
-pub async fn get_node_description_base64(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let node = GetDescriptionBase64Node::find_by_id_and_branch_id(&db_session, *id, *id).await?;
+pub async fn get_node_description_base64(
+    db_session: web::Data<CachingSession>,
+    node: web::Path<GetDescriptionBase64Node>,
+) -> Response {
+    let node = node.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }

@@ -17,6 +17,7 @@ pub async fn auth_workflow_creation(
 ) -> Result<(), NodecosmosError> {
     let node = Node {
         id: workflow.node_id,
+        branch_id: workflow.node_id, // TODO:
         ..Default::default()
     }
     .find_by_primary_key(&db_session)
@@ -50,6 +51,7 @@ pub async fn auth_input_output_creation(
 ) -> Result<(), NodecosmosError> {
     let node = Node {
         id: io.node_id,
+        branch_id: io.node_id, // TODO:
         ..Default::default()
     }
     .find_by_primary_key(&db_session)

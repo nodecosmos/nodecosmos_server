@@ -253,7 +253,7 @@ impl<'a> Reorder<'a> {
             (
                 self.reorder_data.removed_ancestor_ids.clone(),
                 self.reorder_data.node.id,
-                self.reorder_data.branch_id,
+                self.reorder_data.node.branch_id,
             ),
         )
         .await?;

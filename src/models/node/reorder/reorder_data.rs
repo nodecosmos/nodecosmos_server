@@ -42,17 +42,22 @@ impl ReorderData {
     pub async fn from_params(params: &ReorderParams, db_session: &CachingSession) -> Result<Self, NodecosmosError> {
         let node = Node::find_by_id_and_branch_id(&db_session, params.id, params.branch_id).await?;
 
-        let descendants =
-            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(&db_session, node.root_id, node.id, node.id)
-                .await?
-                .try_collect()
-                .await?;
+        let descendants = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
+            &db_session,
+            node.root_id,
+            params.branch_id,
+            node.id,
+        )
+        .await?
+        .try_collect()
+        .await?;
         let descendant_ids = descendants.pluck_id();
 
         let old_parent_id = node.parent_id;
 
         let new_parent = GetStructureNode {
             id: params.new_parent_id,
+            branch_id: node.branched_id(params.new_parent_id),
             ..Default::default()
         }
         .find_by_primary_key(&db_session)
@@ -81,6 +86,7 @@ impl ReorderData {
 
         let tree_root = GetStructureNode {
             id: node.root_id,
+            branch_id: node.branched_id(node.root_id),
             ..Default::default()
         }
         .find_by_primary_key(&db_session)
@@ -88,7 +94,7 @@ impl ReorderData {
 
         let tree_descendants = NodeDescendant {
             root_id: tree_root.id,
-            branch_id: params.branch_id,
+            branch_id: node.branched_id(tree_root.id),
             ..Default::default()
         }
         .find_by_partition_key(&db_session)
@@ -139,10 +145,12 @@ impl Branchable for ReorderData {
     }
 
     fn branch_id(&self) -> Uuid {
-        self.branch_id
+        self.node.branch_id
     }
 }
 
+// TODO: revise this
+// currently we use the id for branch_id as we suppose that we'll always sync up with latest main version
 pub async fn init_sibling(
     id: Option<Uuid>,
     db_session: &CachingSession,
@@ -150,6 +158,7 @@ pub async fn init_sibling(
     if let Some(id) = id {
         let node = GetStructureNode {
             id,
+            branch_id: id,
             ..Default::default()
         }
         .find_by_primary_key(&db_session)

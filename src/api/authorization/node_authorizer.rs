@@ -61,6 +61,7 @@ pub async fn auth_node_update_by_id(
 ) -> Result<(), NodecosmosError> {
     let node = Node {
         id: id.clone(),
+        branch_id: id.clone(), // TODO:
         ..Default::default()
     }
     .find_by_primary_key(db_session)
