@@ -1,126 +1,69 @@
 use crate::api::data::RequestData;
-use crate::api::request::current_user::OptCurrentUser;
 use crate::api::types::Response;
-use crate::models::like::{Like, ObjectTypes};
-use crate::models::likes_count::LikesCount;
-use crate::models::user::{CurrentUser, LikedObjectIdsUser};
+use crate::models::like::Like;
+use crate::models::materialized_views::likes_by_user_id::LikesByUserId;
+use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, New};
-use charybdis::types::Uuid;
+use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks};
 use scylla::CachingSession;
-use serde::Deserialize;
 use serde_json::json;
 
-#[derive(Deserialize)]
-pub struct LikeParams {
-    object_type: ObjectTypes,
-    object_id: Uuid,
-}
+#[get("/{id}/{branchId}")]
+pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {
+    let mut like = like.find_by_primary_key(&db_session).await?;
+    let like_count = like.like_count(&db_session).await?;
 
-#[get("/{id}")]
-pub async fn get_likes_count(
-    db_session: web::Data<CachingSession>,
-    object_id: web::Path<Uuid>,
-    opt_current_user: OptCurrentUser,
-) -> Response {
-    let object_id = object_id.into_inner();
-
-    let mut liked_by_current_user = false;
-
-    if let Some(opt_current_user) = opt_current_user.0 {
-        let mut cu_like = Like::new();
-        cu_like.object_id = object_id;
-        cu_like.user_id = opt_current_user.id;
-
-        if cu_like.find_by_primary_key(&db_session).await.ok().is_some() {
-            liked_by_current_user = true;
-        }
-    }
-
-    let likes_count = LikesCount {
-        object_id,
-        ..Default::default()
-    };
-
-    let likes_count = likes_count.find_by_primary_key(&db_session).await.ok();
-
-    match likes_count {
-        Some(likes_count) => Ok(HttpResponse::Ok().json(json!({
-            "id": object_id,
-            "likesCount": likes_count.count,
-            "likedByCurrentUser": liked_by_current_user,
-        }))),
-        None => Ok(HttpResponse::Ok().json(json!({
-            "id": object_id,
-            "likesCount": 0,
-            "likedByCurrentUser": liked_by_current_user,
-        }))),
-    }
+    Ok(HttpResponse::Ok().json(json!({
+        "id": like.object_id,
+        "branchId": like.branch_id,
+        "likesCount": like_count,
+    })))
 }
 
 #[post("")]
-pub async fn create_like(data: RequestData, params: web::Json<LikeParams>) -> Response {
-    let db_session = &data.app.db_session;
+pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Response {
     let current_user = &data.current_user;
 
-    let mut like = Like {
-        object_id: params.object_id,
-        object_type: params.object_type.to_string(),
-        user_id: current_user.id,
-        username: current_user.username.clone(),
-        ..Default::default()
-    };
+    like.user_id = current_user.id;
+    like.username = current_user.username.clone();
 
-    like.insert_cb(&db_session, &data).await?;
+    like.insert_cb(data.db_session(), &data).await?;
 
-    let likes_count = like.likes_count(&db_session).await?;
+    let like_count = like.like_count(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "id": params.object_id,
-        "likedByCurrentUser": true,
-        "likesCount": likes_count.count,
+        "id": like.object_id,
+        "branchId": like.branch_id,
+        "likesCount": like_count,
     })))
 }
 
-#[delete("/{id}")]
-pub async fn delete_like(data: RequestData, id: web::Path<Uuid>) -> Response {
-    let db_session = &data.app.db_session;
-    let current_user = &data.current_user;
+#[delete("/{id}/{branchId}")]
+pub async fn delete_like(data: RequestData, mut like: web::Path<Like>) -> Response {
+    like.user_id = data.current_user_id();
+    let mut like = like.find_by_primary_key(data.db_session()).await?;
 
-    let object_id = id.into_inner();
+    like.delete_cb(data.db_session(), &data).await?;
 
-    let like: Like = Like {
-        object_id,
-        user_id: current_user.id,
-        ..Default::default()
-    };
-
-    let mut like = like.find_by_primary_key(&db_session).await?;
-
-    like.delete_cb(&db_session, &data).await?;
-
-    let likes_count = LikesCount {
-        object_id,
-        ..Default::default()
-    };
-    let likes_count = likes_count.find_by_primary_key(&db_session).await?;
+    let like_count = like.like_count(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "id": object_id,
-        "likedByCurrentUser": false,
-        "likesCount": likes_count.count,
+        "id": like.object_id,
+        "branchId": like.branch_id,
+        "likesCount": like_count,
     })))
 }
 
-#[get("/liked_object_ids")]
-pub async fn liked_object_ids(db_session: web::Data<CachingSession>, current_user: CurrentUser) -> Response {
-    let mut user = LikedObjectIdsUser::new();
-    user.id = current_user.id;
+#[get("/user_likes")]
+pub async fn user_likes(db_session: web::Data<CachingSession>, current_user: CurrentUser) -> Response {
+    let user_likes = LikesByUserId {
+        user_id: current_user.id,
+        ..Default::default()
+    }
+    .find_by_partition_key(&db_session)
+    .await?
+    .try_collect()
+    .await?;
 
-    let user = user.find_by_primary_key(&db_session).await?;
-    let liked_object_ids = user.liked_object_ids.unwrap_or(vec![]);
-
-    Ok(HttpResponse::Ok().json(json!({
-        "likedObjectIds": liked_object_ids,
-    })))
+    Ok(HttpResponse::Ok().json(user_likes))
 }

@@ -7,7 +7,7 @@ use crate::errors::NodecosmosError;
 use crate::utils::defaults::default_to_false;
 use bcrypt::{hash, verify};
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use scylla::CachingSession;
@@ -25,6 +25,7 @@ const BCRYPT_COST: u32 = 6;
 pub struct User {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
     pub username: Text,
     pub email: Text,
     pub password: Text,
@@ -50,9 +51,6 @@ pub struct User {
 
     #[serde(rename = "isBlocked", default = "default_to_false")]
     pub is_blocked: Boolean,
-
-    #[serde(rename = "likedObjectIds")]
-    pub liked_object_ids: Option<Set<Uuid>>,
 }
 
 impl User {
@@ -113,8 +111,6 @@ impl User {
 partial_user!(GetUser, id, username, created_at, updated_at);
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
-
-partial_user!(LikedObjectIdsUser, id, liked_object_ids);
 
 partial_user!(
     CurrentUser,

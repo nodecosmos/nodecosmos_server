@@ -5,9 +5,9 @@ use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteIo;
 use crate::models::like::Like;
-use crate::models::likes_count::LikesCount;
 use crate::models::node::{DeleteNode, Node};
 use crate::models::node_commit::NodeCommit;
+use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::workflow::WorkDeleteFlow;
 use crate::services::elastic::bulk_delete_elastic_documents;
@@ -22,7 +22,6 @@ use scylla::CachingSession;
 use std::collections::HashMap;
 
 type Id = Uuid;
-type BranchId = Uuid;
 type OrderIndex = f64;
 type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
 
@@ -46,7 +45,7 @@ pub struct NodeDelete<'a> {
     db_session: &'a CachingSession,
     elastic_client: &'a Elasticsearch,
     node: &'a Node,
-    node_ids_to_delete: Vec<(Id, BranchId)>,
+    node_ids_to_delete: Vec<Uuid>,
     children_by_parent_id: ChildrenByParentId,
 }
 
@@ -56,7 +55,7 @@ impl<'a> NodeDelete<'a> {
             db_session: &req_data.app.db_session,
             elastic_client: &req_data.app.elastic_client,
             node,
-            node_ids_to_delete: vec![(node.id, node.branch_id)],
+            node_ids_to_delete: vec![node.id],
             children_by_parent_id: ChildrenByParentId::new(),
         }
     }
@@ -93,7 +92,7 @@ impl<'a> NodeDelete<'a> {
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
 
-            self.node_ids_to_delete.push((descendant.id, descendant.branch_id));
+            self.node_ids_to_delete.push(descendant.id);
 
             if !self.node.is_root {
                 self.children_by_parent_id
@@ -106,12 +105,12 @@ impl<'a> NodeDelete<'a> {
         Ok(())
     }
 
-    /// Here we delete workflows, flows, flow_steps, ios, likes, likes_counts for node and its descendants.
+    /// Here we delete workflows, flows, flow_steps, ios, likes, like_counts for node and its descendants.
     pub async fn delete_related_data(&mut self) -> Result<(), NodecosmosError> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
 
-            for (id, branch_id) in node_ids_chunk {
+            for id in node_ids_chunk {
                 batch.append_delete_by_partition_key(&WorkDeleteFlow {
                     node_id: *id,
                     ..Default::default()
@@ -138,13 +137,10 @@ impl<'a> NodeDelete<'a> {
                 })?;
 
                 if id != &self.node.id {
-                    let branch_id = if self.node.is_different_branch() {
-                        *branch_id
-                    } else {
-                        *id
-                    };
-
-                    batch.append_delete(&DeleteNode { id: *id, branch_id })?;
+                    batch.append_delete(&DeleteNode {
+                        id: *id,
+                        branch_id: self.node.branched_id(*id),
+                    })?;
                 }
             }
 
@@ -164,9 +160,10 @@ impl<'a> NodeDelete<'a> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
             let mut batch = CharybdisModelBatch::unlogged();
 
-            for (id, _) in node_ids_chunk {
-                batch.append_delete(&LikesCount {
-                    object_id: *id,
+            for id in node_ids_chunk {
+                batch.append_delete(&NodeCounter {
+                    id: *id,
+                    branch_id: self.node.branched_id(*id),
                     ..Default::default()
                 })?;
             }
@@ -266,8 +263,7 @@ impl<'a> NodeDelete<'a> {
 
     async fn delete_elastic_data(&self) {
         if self.node.is_main_branch() {
-            let node_ids_to_delete = self.node_ids_to_delete.iter().map(|(id, _)| *id).collect::<Vec<Uuid>>();
-            bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &node_ids_to_delete).await;
+            bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &self.node_ids_to_delete).await;
         }
     }
 }

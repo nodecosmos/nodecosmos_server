@@ -85,7 +85,7 @@ pub struct Node {
     pub owner: Option<Owner>, // for front-end compatibility
 
     #[serde(rename = "likesCount", default = "default_to_0")]
-    pub likes_count: Option<BigInt>,
+    pub like_count: Option<BigInt>,
 
     #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
@@ -201,7 +201,7 @@ partial_node!(
     is_public,
     short_description,
     title,
-    likes_count,
+    like_count,
     owner,
     cover_image_url,
     created_at,
@@ -221,7 +221,7 @@ partial_node!(
     parent_id,
     owner_id,
     editor_ids,
-    likes_count,
+    like_count,
     owner,
     is_public,
     cover_image_url,
@@ -252,7 +252,7 @@ partial_node!(
 
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 
-partial_node!(UpdateLikesCountNode, id, branch_id, likes_count, updated_at);
+partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
 
 partial_node!(UpdateTitleNode, root_id, id, branch_id, title, updated_at);
 

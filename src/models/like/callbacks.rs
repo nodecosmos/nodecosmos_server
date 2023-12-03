@@ -1,7 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::Like;
-use crate::models::likes_count::LikesCount;
 use charybdis::callbacks::ExtCallbacks;
 use scylla::CachingSession;
 
@@ -12,8 +11,6 @@ impl ExtCallbacks for Like {
     async fn before_insert(&mut self, session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
         self.validate_not_liked(session).await?;
         self.set_defaults();
-
-        LikesCount::increment(session, self.object_id).await?;
 
         Ok(())
     }
@@ -26,15 +23,8 @@ impl ExtCallbacks for Like {
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_likes_count(session, &req_data).await.unwrap();
-            self_clone.push_to_user_liked_obj_ids(session).await.unwrap();
+            self_clone.update_model_like_count(session, &req_data).await.unwrap();
         });
-
-        Ok(())
-    }
-
-    async fn before_delete(&mut self, session: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
-        LikesCount::decrement(session, self.object_id).await?;
 
         Ok(())
     }
@@ -47,8 +37,7 @@ impl ExtCallbacks for Like {
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_likes_count(session, &req_data).await.unwrap();
-            self_clone.pull_from_user_liked_obj_ids(session).await.unwrap();
+            self_clone.update_model_like_count(session, &req_data).await.unwrap();
         });
 
         Ok(())

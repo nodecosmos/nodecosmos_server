@@ -11,7 +11,6 @@ use charybdis::operations::{DeleteWithExtCallbacks, InsertWithExtCallbacks, Upda
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
-use std::sync::Arc;
 
 #[get("/{id}")]
 pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
@@ -21,7 +20,7 @@ pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>
 }
 
 #[post("")]
-pub async fn create_user(app: web::Data<Arc<App>>, client_session: Session, mut user: web::Json<User>) -> Response {
+pub async fn create_user(app: web::Data<App>, client_session: Session, mut user: web::Json<User>) -> Response {
     user.insert_cb(&app.db_session, &app).await?;
 
     let current_user = set_current_user(&client_session, &user)?;
@@ -30,11 +29,7 @@ pub async fn create_user(app: web::Data<Arc<App>>, client_session: Session, mut 
 }
 
 #[put("")]
-pub async fn update_user(
-    app: web::Data<Arc<App>>,
-    mut user: web::Json<UpdateUser>,
-    current_user: CurrentUser,
-) -> Response {
+pub async fn update_user(app: web::Data<App>, mut user: web::Json<UpdateUser>, current_user: CurrentUser) -> Response {
     auth_user_update(&user.as_native(), &current_user).await?;
 
     user.update_cb(&app.db_session, &app).await?;
@@ -45,7 +40,7 @@ pub async fn update_user(
 #[delete("/{id}")]
 pub async fn delete_user(
     db_session: web::Data<CachingSession>,
-    app: web::Data<Arc<App>>,
+    app: web::Data<App>,
     current_user: CurrentUser,
     mut user: web::Path<User>,
 ) -> Response {
