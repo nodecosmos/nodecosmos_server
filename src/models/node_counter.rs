@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct NodeCounter {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
@@ -23,10 +23,10 @@ pub struct NodeCounter {
     pub id: Uuid,
 
     #[serde(rename = "likeCount")]
-    pub like_count: Counter,
+    pub like_count: Option<Counter>,
 
     #[serde(rename = "descendantsCount")]
-    pub descendants_count: Counter,
+    pub descendants_count: Option<Counter>,
 }
 
 impl Likeable for NodeCounter {
@@ -73,13 +73,14 @@ impl Likeable for NodeCounter {
     }
 
     async fn like_count(session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let res = Self::find_by_primary_key_value(session, (id, branch_id))
-            .await
-            .map(|nc| nc.like_count)
-            .ok();
+        let res = Self::find_by_primary_key_value(session, (id, branch_id)).await.ok();
 
         match res {
-            Some(c) => Ok(c.0),
+            Some(c) => {
+                let c = c.like_count.unwrap_or_else(|| Counter(0));
+
+                Ok(c.0)
+            }
             None => {
                 let c = Counter(0);
 

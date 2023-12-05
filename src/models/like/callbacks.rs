@@ -23,7 +23,10 @@ impl ExtCallbacks for Like {
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_like_count(session, &req_data).await.unwrap();
+            self_clone
+                .update_model_like_count(session, &req_data, true)
+                .await
+                .unwrap();
         });
 
         Ok(())
@@ -37,7 +40,10 @@ impl ExtCallbacks for Like {
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone.update_model_like_count(session, &req_data).await.unwrap();
+            self_clone
+                .update_model_like_count(session, &req_data, false)
+                .await
+                .unwrap();
         });
 
         Ok(())

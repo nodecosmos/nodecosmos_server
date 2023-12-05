@@ -18,7 +18,7 @@ use std::fmt;
 #[charybdis_model(
     table_name = likes,
     partition_keys = [object_id],
-    clustering_keys = [branch_id, user_id],
+    clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]

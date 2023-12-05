@@ -37,12 +37,15 @@ impl Like {
         &mut self,
         _: &CachingSession,
         data: &RequestData,
+        increment: bool,
     ) -> Result<(), NodecosmosError> {
         match ObjectType::from_string(self.object_type.as_str()) {
             Some(ObjectType::Node) => {
-                let lc = NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
-
-                self.like_count = Some(lc);
+                if increment {
+                    NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
+                } else {
+                    NodeCounter::decrement_like(data, self.object_id, self.branch_id).await?;
+                }
 
                 Ok(())
             }
