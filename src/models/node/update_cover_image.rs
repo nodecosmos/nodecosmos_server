@@ -48,8 +48,8 @@ impl UpdateCoverImageNode {
 
             upload_s3_object(
                 &data.s3_client(),
-                compressed,
                 &data.s3_bucket(),
+                compressed,
                 &new_cover_image_filename,
             )
             .await?;

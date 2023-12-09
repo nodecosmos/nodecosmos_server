@@ -53,6 +53,7 @@ async fn main() {
                 web::scope("/nodes")
                     .service(get_nodes)
                     .service(get_node)
+                    .service(get_branched_node)
                     .service(create_node)
                     .service(update_node_title)
                     .service(update_node_description)

@@ -45,6 +45,12 @@ impl RequestData {
     }
 }
 
+impl RequestData {
+    pub fn new(app: web::Data<App>, current_user: CurrentUser) -> Self {
+        Self { app, current_user }
+    }
+}
+
 impl FromRequest for RequestData {
     type Error = NodecosmosError;
     type Future = Ready<Result<RequestData, NodecosmosError>>;

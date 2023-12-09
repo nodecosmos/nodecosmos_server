@@ -1,16 +1,16 @@
-use crate::api::authorization::{auth_contribution_request_creation, auth_contribution_request_update};
+use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::models::authorization::Authorization;
+use crate::models::branch::branchable::Branchable;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
-use crate::models::udts::{Owner, OwnerType};
-use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{Delete, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
+use charybdis::operations::{Delete, Find, InsertWithExtCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
-use serde::Deserialize;
+use serde_json::json;
 
 #[get("/{node_id}")]
 pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, node_id: web::Path<Uuid>) -> Response {
@@ -26,102 +26,71 @@ pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, no
     Ok(HttpResponse::Ok().json(contribution_requests))
 }
 
-#[derive(Deserialize)]
-pub struct ContributionRequestParams {
-    pub node_id: Uuid,
-    pub id: Uuid,
-}
-
 #[get("/{node_id}/{id}")]
 pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
-    params: web::Path<ContributionRequestParams>,
+    contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let params = params.into_inner();
-
-    let mut contribution_request = ContributionRequest::new();
-    contribution_request.node_id = params.node_id;
-    contribution_request.id = params.id;
-
     let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
+    let branch = contribution_request.branch(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(contribution_request))
+    Ok(HttpResponse::Ok().json(json!({
+        "contributionRequest": contribution_request,
+        "branch": branch,
+    })))
 }
 
 #[post("")]
 pub async fn create_contribution_request(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
+    data: RequestData,
     mut contribution_request: web::Json<ContributionRequest>,
 ) -> Response {
-    auth_contribution_request_creation(&db_session, &contribution_request, &current_user).await?;
-    contribution_request.set_owner(Owner {
-        id: current_user.id,
-        name: current_user.full_name(),
-        username: Some(current_user.username),
-        owner_type: OwnerType::User.into(),
-        profile_image_url: None,
-    });
+    contribution_request.auth_creation(&data).await?;
 
-    contribution_request.insert_cb(&db_session).await?;
+    contribution_request.insert_cb(data.db_session(), &data).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
 #[put("/title")]
 pub async fn update_contribution_request_title(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
+    data: RequestData,
     contribution_request: web::Json<UpdateContributionRequestTitle>,
 ) -> Response {
-    let native_cr = contribution_request
-        .as_native()
-        .find_by_primary_key(&db_session)
-        .await?;
+    let mut native_cr = contribution_request.as_native();
 
-    auth_contribution_request_update(&db_session, &native_cr, &current_user).await?;
+    native_cr.auth_update(&data).await?;
 
     let mut contribution_request = contribution_request.into_inner();
-    contribution_request.update_cb(&db_session).await?;
+    contribution_request.update_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
 #[put("/description")]
 pub async fn update_contribution_request_description(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
+    data: RequestData,
     mut contribution_request: web::Json<UpdateContributionRequestDescription>,
 ) -> Response {
-    let native_cr = contribution_request
-        .as_native()
-        .find_by_primary_key(&db_session)
-        .await?;
+    let mut native_cr = contribution_request.as_native();
 
-    auth_contribution_request_update(&db_session, &native_cr, &current_user).await?;
+    native_cr.auth_update(&data).await?;
 
-    contribution_request.update_cb(&db_session).await?;
+    contribution_request.update_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
 #[delete("/{node_id}/{id}")]
 pub async fn delete_contribution_request(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    params: web::Path<ContributionRequestParams>,
+    data: RequestData,
+    contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let params = params.into_inner();
+    let mut contribution_request = contribution_request.find_by_primary_key(data.db_session()).await?;
 
-    let mut contribution_request = ContributionRequest::new();
-    contribution_request.node_id = params.node_id;
-    contribution_request.id = params.id;
+    contribution_request.auth_update(&data).await?;
 
-    let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
-
-    auth_contribution_request_update(&db_session, &contribution_request, &current_user).await?;
-
-    contribution_request.delete(&db_session).await?;
+    contribution_request.delete(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }

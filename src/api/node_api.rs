@@ -1,7 +1,8 @@
-use crate::api::authorization::{auth_node_access, auth_node_creation, auth_node_update};
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
 use crate::api::types::Response;
+use crate::app::App;
+use crate::models::authorization::Authorization;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
@@ -21,12 +22,13 @@ pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Que
 }
 
 #[get("/{id}")]
-pub async fn get_node(db_session: web::Data<CachingSession>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode::find_by_id_and_branch_id(&db_session, *id, *id).await?;
+pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
+    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, *id, *id).await?;
+    let mut native_node = node.as_native();
 
-    auth_node_access(&node, opt_cu).await?;
+    native_node.auth_view(&app, opt_cu).await?;
 
-    let descendants = node.as_native().descendants(&db_session).await?.try_collect().await?;
+    let descendants = native_node.descendants(&app.db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -37,16 +39,13 @@ pub async fn get_node(db_session: web::Data<CachingSession>, id: web::Path<Uuid>
 }
 
 #[get("/{id}/{branchId}")]
-pub async fn get_branched_node(
-    db_session: web::Data<CachingSession>,
-    node: web::Path<BaseNode>,
-    opt_cu: OptCurrentUser,
-) -> Response {
-    let node = node.find_by_primary_key(&db_session).await?;
+pub async fn get_branched_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
+    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, *id, *id).await?;
+    let mut native_node = node.as_native();
 
-    auth_node_access(&node, opt_cu).await?;
+    native_node.auth_view(&app, opt_cu).await?;
 
-    let descendants = node.as_native().branch_descendants(&db_session).await?;
+    let descendants = native_node.branch_descendants(&app.db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "node": node,
@@ -76,7 +75,7 @@ pub async fn get_node_description_base64(
 
 #[post("")]
 pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Response {
-    auth_node_creation(data.db_session(), &mut node, &data.current_user).await?;
+    node.auth_creation(&data).await?;
 
     data.resource_locker().validate_node_unlocked(&node, true).await?;
 
@@ -87,9 +86,9 @@ pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Respon
 
 #[put("/title")]
 pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: RequestData) -> Response {
-    let native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
+    let mut native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&native_node, &data.current_user).await?;
+    native_node.auth_update(&data).await?;
 
     data.resource_locker()
         .validate_node_unlocked(&native_node, true)
@@ -103,9 +102,9 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
 
 #[put("/description")]
 pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>, data: RequestData) -> Response {
-    let native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
+    let mut native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&native_node, &data.current_user).await?;
+    native_node.auth_update(&data).await?;
 
     node.update_cb(data.db_session(), &data).await?;
 
@@ -116,7 +115,7 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 pub async fn delete_node(node: web::Path<DeleteNode>, data: RequestData) -> Response {
     let mut node = node.as_native().find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&node, &data.current_user).await?;
+    node.auth_update(&data).await?;
 
     data.resource_locker().validate_node_unlocked(&node, true).await?;
 
@@ -127,9 +126,9 @@ pub async fn delete_node(node: web::Path<DeleteNode>, data: RequestData) -> Resp
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let node = Node::find_by_id_and_branch_id(data.db_session(), params.id, params.branch_id).await?;
+    let mut node = Node::find_by_id_and_branch_id(data.db_session(), params.id, params.branch_id).await?;
 
-    auth_node_update(&node, &data.current_user).await?;
+    node.auth_update(&data).await?;
 
     node.reorder(&data, params.into_inner()).await?;
 
@@ -140,7 +139,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
 async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData, payload: Multipart) -> Response {
     let mut node = node.find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&node.as_native(), &data.current_user).await?;
+    node.as_native().auth_update(&data).await?;
 
     node.update_cover_image(payload, &data).await?;
 
@@ -153,7 +152,7 @@ async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
 async fn delete_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
     let mut node = node.find_by_primary_key(data.db_session()).await?;
 
-    auth_node_update(&node.as_native(), &data.current_user).await?;
+    node.as_native().auth_update(&data).await?;
 
     node.delete_cover_image(&data).await?;
 

@@ -1,7 +1,6 @@
 pub mod types;
 
 mod attachment_api;
-mod authorization;
 mod contribution_request_api;
 mod flow_api;
 mod flow_step_api;

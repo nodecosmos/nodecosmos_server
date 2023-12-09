@@ -1,7 +1,8 @@
 pub mod branchable;
 
+use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Boolean, Map, Text, Uuid};
+use charybdis::types::{Boolean, Map, Set, Text, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
@@ -9,78 +10,129 @@ use serde::{Deserialize, Serialize};
     partition_keys = [id],
     clustering_keys = [],
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Branch {
-    id: Uuid,
+    pub id: Uuid,
 
-    #[serde(rename = "nodeId")]
-    node_id: Uuid,
+    pub title: Option<Text>,
+    pub description: Option<Text>,
 
-    name: Text,
-    description: Option<Text>,
+    #[serde(rename = "ownerId")]
+    pub owner_id: Uuid,
+
+    pub owner: Option<Owner>,
+
+    #[serde(rename = "editorIds")]
+    pub editor_ids: Option<Set<Uuid>>,
+
+    #[serde(rename = "isPublic")]
+    pub is_public: Boolean,
+
+    #[serde(rename = "isContributionRequest")]
+    pub is_contribution_request: Option<Boolean>,
 
     // nodes
     #[serde(default, rename = "createdNodesById")]
-    created_nodes_by_id: Option<Map<Uuid, Boolean>>,
+    pub created_nodes_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "deletedNodesById")]
-    deleted_nodes_by_id: Option<Map<Uuid, Boolean>>,
+    pub deleted_nodes_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedNodeTitlesById")]
-    edited_titles_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_node_titles_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedNodeDescriptionsById")]
-    edited_descriptions_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_node_descriptions_by_id: Option<Map<Uuid, Boolean>>,
 
-    #[serde(default, rename = "editedNodeTreePositionIdById")]
-    edited_node_tree_position_id_by_id: Option<Map<Uuid, Boolean>>,
+    #[serde(default, rename = "editedNodeTreePositionsById")]
+    pub edited_node_tree_positions_by_id: Option<Map<Uuid, Boolean>>,
 
     // workflows
     #[serde(default, rename = "createdWorkflowsById")]
-    created_workflows_by_id: Option<Map<Uuid, Boolean>>,
+    pub created_workflows_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "deletedWorkflowsById")]
-    deleted_workflows_by_id: Option<Map<Uuid, Boolean>>,
+    pub deleted_workflows_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedWorkflowTitlesById")]
-    edited_workflow_titles_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_workflow_titles_by_id: Option<Map<Uuid, Boolean>>,
 
     // flows
     #[serde(default, rename = "createdFlowsById")]
-    created_flows_by_id: Option<Map<Uuid, Boolean>>,
+    pub created_flows_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "deletedFlowsById")]
-    deleted_flows_by_id: Option<Map<Uuid, Boolean>>,
+    pub deleted_flows_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedFlowTitlesById")]
-    edited_flow_titles_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_flow_titles_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedFlowDescriptionsById")]
-    edited_flow_descriptions_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_flow_descriptions_by_id: Option<Map<Uuid, Boolean>>,
 
     // ios
     #[serde(default, rename = "createdIOsById")]
-    created_ios_by_id: Option<Map<Uuid, Uuid>>,
+    pub created_ios_by_id: Option<Map<Uuid, Uuid>>,
 
     #[serde(default, rename = "deletedIOsById")]
-    deleted_ios_by_id: Option<Map<Uuid, Uuid>>,
+    pub deleted_ios_by_id: Option<Map<Uuid, Uuid>>,
 
     #[serde(default, rename = "editedIOTitlesById")]
-    edited_io_titles_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_io_titles_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedIODescriptionsById")]
-    edited_io_descriptions_by_id: Option<Map<Uuid, Boolean>>,
+    pub edited_io_descriptions_by_id: Option<Map<Uuid, Boolean>>,
 
     // flow steps
     #[serde(default, rename = "createdFlowStepsById")]
-    created_flow_steps_by_id: Option<Map<Uuid, Boolean>>,
+    pub created_flow_steps_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "deletedFlowStepsById")]
-    deleted_flow_steps_by_id: Option<Map<Uuid, Boolean>>,
+    pub deleted_flow_steps_by_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedFlowStepTitlesById")]
-    created_flow_step_input_id_by_node_id: Option<Map<Uuid, Boolean>>,
+    pub created_flow_step_input_id_by_node_id: Option<Map<Uuid, Boolean>>,
 
     #[serde(default, rename = "editedFlowStepDescriptionsById")]
-    deleted_flow_step_input_id_by_node_id: Option<Map<Uuid, Boolean>>,
+    pub deleted_flow_step_input_id_by_node_id: Option<Map<Uuid, Boolean>>,
 }
+
+partial_branch!(UpdateCreatedNodesBranch, id, created_nodes_by_id);
+
+partial_branch!(UpdateDeletedNodesBranch, id, deleted_nodes_by_id);
+
+partial_branch!(UpdateEditedNodeTitlesBranch, id, edited_node_titles_by_id);
+
+partial_branch!(UpdateEditedNodeDescriptionsBranch, id, edited_node_descriptions_by_id);
+
+partial_branch!(
+    UpdateEditedNodeTreePositionIdBranch,
+    id,
+    edited_node_tree_positions_by_id
+);
+
+partial_branch!(UpdateCreatedWorkflowsBranch, id, created_workflows_by_id);
+
+partial_branch!(UpdateDeletedWorkflowsBranch, id, deleted_workflows_by_id);
+
+partial_branch!(UpdateEditedWorkflowTitlesBranch, id, edited_workflow_titles_by_id);
+
+partial_branch!(UpdateCreatedFlowsBranch, id, created_flows_by_id);
+
+partial_branch!(UpdateDeletedFlowsBranch, id, deleted_flows_by_id);
+
+partial_branch!(UpdateEditedFlowTitlesBranch, id, edited_flow_titles_by_id);
+
+partial_branch!(UpdateEditedFlowDescriptionsBranch, id, edited_flow_descriptions_by_id);
+
+partial_branch!(UpdateCreatedIOsBranch, id, created_ios_by_id);
+
+partial_branch!(UpdateDeletedIOsBranch, id, deleted_ios_by_id);
+
+partial_branch!(UpdateEditedIOTitlesBranch, id, edited_io_titles_by_id);
+
+partial_branch!(UpdateEditedIODescriptionsBranch, id, edited_io_descriptions_by_id);
+
+partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps_by_id);
+
+partial_branch!(UpdateDeletedFlowStepsBranch, id, deleted_flow_steps_by_id);

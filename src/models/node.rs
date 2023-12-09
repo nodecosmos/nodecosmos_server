@@ -1,3 +1,5 @@
+mod authorization;
+mod branchable;
 pub mod callbacks;
 mod create;
 mod delete;
@@ -10,6 +12,7 @@ mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
+use crate::models::branch::Branch;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
@@ -20,7 +23,6 @@ use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::sync::Arc;
 
 #[charybdis_model(
     table_name = nodes,
@@ -82,7 +84,7 @@ pub struct Node {
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    pub owner: Option<Owner>, // for front-end compatibility
+    pub owner: Option<Owner>,
 
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub like_count: Option<BigInt>,
@@ -102,11 +104,15 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub parent: Arc<Option<Node>>,
+    pub parent: Option<BaseNode>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub branch: Option<Branch>,
 }
 
 impl Node {
-    pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Arc<Option<Node>>, NodecosmosError> {
+    pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let Some(parent_id) = self.parent_id {
             let parent_branch_id = if !self.is_main_branch() {
                 self.branch_id
@@ -115,13 +121,13 @@ impl Node {
             };
 
             if self.parent.is_none() {
-                let parent = Self::find_by_primary_key_value(db_session, (parent_id, parent_branch_id)).await?;
+                let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_branch_id)).await?;
 
-                self.parent = Arc::new(Some(parent));
+                self.parent = Some(parent);
             }
         }
 
-        return Ok(Arc::clone(&self.parent));
+        Ok(self.parent.as_mut())
     }
 
     pub async fn descendants(
@@ -183,15 +189,7 @@ impl Node {
     }
 }
 
-impl Branchable for Node {
-    fn id(&self) -> Uuid {
-        self.id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.branch_id
-    }
-}
+partial_node!(PkNode, id, branch_id);
 
 partial_node!(
     IndexNode,
@@ -279,3 +277,5 @@ partial_node!(
 );
 
 partial_node!(DeleteNode, id, branch_id);
+
+partial_node!(AuthNode, id, branch_id, owner_id, editor_ids);

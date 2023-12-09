@@ -1,4 +1,8 @@
+use crate::errors::NodecosmosError;
+use crate::models::branch::Branch;
+use charybdis::operations::Find;
 use charybdis::types::Uuid;
+use scylla::CachingSession;
 
 pub trait Branchable {
     fn id(&self) -> Uuid;
@@ -19,5 +23,16 @@ pub trait Branchable {
         } else {
             self.branch_id()
         }
+    }
+
+    async fn branch(&self, db_session: &CachingSession) -> Result<Branch, NodecosmosError> {
+        let branch = Branch {
+            id: self.branch_id(),
+            ..Default::default()
+        }
+        .find_by_primary_key(db_session)
+        .await?;
+
+        Ok(branch)
     }
 }

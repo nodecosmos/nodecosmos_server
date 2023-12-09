@@ -4,7 +4,7 @@ use crate::models::branch::branchable::Branchable;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::udts::{Owner, OwnerType};
+use crate::models::udts::Owner;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::logger::log_error;
@@ -19,21 +19,14 @@ impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_main_branch() {
             let current_user = &data.current_user;
-
-            let owner = Owner {
-                id: current_user.id,
-                name: current_user.full_name(),
-                username: Some(current_user.username.clone()),
-                owner_type: OwnerType::User.into(),
-                profile_image_url: None,
-            };
+            let owner = Owner::init(current_user);
 
             self.owner_id = Some(owner.id);
             self.owner_type = Some(owner.owner_type.clone());
 
             self.owner = Some(owner);
         } else {
-            if let Some(parent) = self.parent(data.db_session()).await?.as_ref() {
+            if let Some(parent) = self.parent(data.db_session()).await? {
                 if let Some(owner) = parent.owner.as_ref() {
                     let owner = Owner::init_from(owner);
                     self.owner_id = Some(owner.id);
@@ -59,17 +52,20 @@ impl Node {
 
     pub async fn set_defaults(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
-        let parent = self.parent(session).await?;
 
-        if let Some(parent) = parent.as_ref() {
-            self.root_id = parent.root_id;
-            self.parent_id = Some(parent.id);
-            self.editor_ids = parent.editor_ids.clone();
-            self.is_public = parent.is_public;
-            self.is_root = false;
-
+        if let Some(parent) = self.parent(session).await? {
+            let editor_ids = parent.editor_ids.clone().unwrap_or(Set::new());
+            let root_id = parent.root_id;
+            let is_public = parent.is_public;
+            let parent_id = parent.id;
             let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
-            ancestor_ids.push(parent.id);
+            ancestor_ids.insert(parent.id);
+
+            self.root_id = root_id;
+            self.parent_id = Some(parent_id);
+            self.editor_ids = Some(editor_ids);
+            self.is_public = is_public;
+            self.is_root = false;
             self.ancestor_ids = Some(ancestor_ids);
         } else {
             self.root_id = self.id;

@@ -1,11 +1,12 @@
-use crate::api::authorization::{auth_workflow_creation, auth_workflow_update};
+use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::models::authorization::Authorization;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
-use crate::models::user::CurrentUser;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -47,16 +48,12 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, node_id: web::P
 }
 
 #[post("")]
-pub async fn create_workflow(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    mut workflow: web::Json<Workflow>,
-) -> Response {
-    auth_workflow_creation(&db_session, &workflow, &current_user).await?;
+pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow>) -> Response {
+    workflow.auth_update(&data).await?;
 
-    workflow.insert_cb(&db_session).await?;
+    workflow.insert_cb(data.db_session()).await?;
 
-    let input_outputs = Io::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+    let input_outputs = Io::find_by_partition_key_value(data.db_session(), (workflow.root_node_id,))
         .await?
         .try_collect()
         .await?;
@@ -69,26 +66,21 @@ pub async fn create_workflow(
 
 #[put("/initial_input_ids")]
 pub async fn update_initial_inputs(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
+    data: RequestData,
     mut workflow: web::Json<UpdateInitialInputsWorkflow>,
 ) -> Response {
-    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
+    workflow.as_native().auth_update(&data).await?;
 
-    workflow.update_cb(&db_session).await?;
+    workflow.update_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
 
 #[put("/title")]
-pub async fn update_workflow_title(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    mut workflow: web::Json<UpdateWorkflowTitle>,
-) -> Response {
-    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
+pub async fn update_workflow_title(data: RequestData, mut workflow: web::Json<UpdateWorkflowTitle>) -> Response {
+    workflow.as_native().auth_update(&data).await?;
 
-    workflow.update_cb(&db_session).await?;
+    workflow.update_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
@@ -100,16 +92,11 @@ pub struct DeleteWfParams {
 }
 
 #[delete("/{node_id}/{workflow_id}")]
-pub async fn delete_workflow(
-    db_session: web::Data<CachingSession>,
-    current_user: CurrentUser,
-    params: web::Path<DeleteWfParams>,
-) -> Response {
-    let mut workflow = Workflow::find_by_node_id_and_id(&db_session, params.node_id, params.workflow_id).await?;
+pub async fn delete_workflow(data: RequestData, params: web::Path<DeleteWfParams>) -> Response {
+    let mut workflow = Workflow::find_by_node_id_and_id(data.db_session(), params.node_id, params.workflow_id).await?;
+    workflow.auth_update(&data).await?;
 
-    auth_workflow_update(&db_session, workflow.node_id, current_user).await?;
-
-    workflow.delete_cb(&db_session).await?;
+    workflow.delete_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }

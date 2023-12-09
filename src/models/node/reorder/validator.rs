@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
 
-const TREE_DESCENDANTS_LIMIT: usize = 50000; //  5mb of node_descendants data loaded into memory
+const TREE_DESCENDANTS_LIMIT: usize = 150000;
 const REORDER_DESCENDANTS_LIMIT: usize = 15000;
 
 pub struct ReorderValidator<'a> {

@@ -1,6 +1,6 @@
+use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
 use crate::errors::NodecosmosError;
-use crate::models::user::CurrentUser;
 use crate::models::utils::impl_default_callbacks;
 use crate::services::aws::s3::upload_s3_object;
 use crate::services::image::Image;
@@ -56,8 +56,7 @@ impl Attachment {
 
     pub async fn create_image(
         params: &ImageAttachmentParams,
-        app: &crate::App,
-        user: &CurrentUser,
+        data: &RequestData,
         mut payload: Multipart,
     ) -> Result<Attachment, NodecosmosError> {
         if let Some(item) = payload.next().await {
@@ -78,18 +77,18 @@ impl Attachment {
             let compressed = image.compressed()?;
 
             let key = Attachment::build_s3_filename(params.object_id.to_string());
-            let url = Attachment::build_s3_url(app.s3_bucket.clone(), key.clone());
+            let url = Attachment::build_s3_url(data.s3_bucket().clone(), key.clone());
 
-            upload_s3_object(&app.s3_client, compressed, &app.s3_bucket, &key).await?;
+            upload_s3_object(data.s3_client(), data.s3_bucket(), compressed, &key).await?;
 
             let mut attachment = Attachment::new();
             attachment.node_id = params.node_id;
             attachment.object_id = params.object_id;
             attachment.key = key;
             attachment.url = Some(url);
-            attachment.user_id = Some(user.id);
+            attachment.user_id = Some(data.current_user.id);
 
-            attachment.insert_cb(&app.db_session).await?;
+            attachment.insert_cb(data.db_session()).await?;
 
             return Ok(attachment);
         }

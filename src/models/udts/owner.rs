@@ -1,3 +1,4 @@
+use crate::models::user::CurrentUser;
 use charybdis::macros::charybdis_udt_model;
 use charybdis::types::{Text, Uuid};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,16 @@ pub struct Owner {
 }
 
 impl Owner {
+    pub fn init(current_user: &CurrentUser) -> Owner {
+        Owner {
+            id: current_user.id,
+            name: current_user.full_name(),
+            username: Some(current_user.username.clone()),
+            owner_type: OwnerType::User.into(),
+            profile_image_url: None,
+        }
+    }
+
     pub fn init_from(owner: &Self) -> Self {
         Self {
             id: owner.id,

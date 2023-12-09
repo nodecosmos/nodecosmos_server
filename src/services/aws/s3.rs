@@ -4,8 +4,8 @@ use std::time::Duration;
 
 pub async fn upload_s3_object(
     s3_client: &aws_sdk_s3::Client,
-    bytes: Vec<u8>,
     bucket: &str,
+    bytes: Vec<u8>,
     key: &str,
 ) -> Result<(), NodecosmosError> {
     let put_object = s3_client.put_object().key(key).bucket(bucket);

@@ -1,13 +1,12 @@
 use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
+use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::utils::Pluckable;
-
-use crate::models::branch::branchable::Branchable;
-use crate::models::node::reorder::ReorderParams;
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::operations::Find;
-use charybdis::types::Uuid;
+use charybdis::types::{Set, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -22,8 +21,8 @@ pub struct ReorderData {
     pub old_parent_id: Option<Uuid>,
     pub new_parent: GetStructureNode,
 
-    pub old_ancestor_ids: Vec<Uuid>,
-    pub new_ancestor_ids: Vec<Uuid>,
+    pub old_ancestor_ids: Set<Uuid>,
+    pub new_ancestor_ids: Set<Uuid>,
 
     pub removed_ancestor_ids: Vec<Uuid>,
     pub added_ancestor_ids: Vec<Uuid>,
@@ -51,6 +50,7 @@ impl ReorderData {
         .await?
         .try_collect()
         .await?;
+
         let descendant_ids = descendants.pluck_id();
 
         let old_parent_id = node.parent_id;
@@ -170,10 +170,10 @@ pub async fn init_sibling(
     Ok(None)
 }
 
-pub fn build_new_ancestor_ids(new_parent: &GetStructureNode) -> Vec<Uuid> {
+pub fn build_new_ancestor_ids(new_parent: &GetStructureNode) -> Set<Uuid> {
     let mut new_ancestors = new_parent.ancestor_ids.cloned_ref();
 
-    new_ancestors.push(new_parent.id);
+    new_ancestors.insert(new_parent.id);
 
     new_ancestors
 }

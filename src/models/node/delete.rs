@@ -12,6 +12,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::workflow::WorkDeleteFlow;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use crate::services::elastic::index::ElasticIndex;
+use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::Delete;
@@ -199,10 +200,10 @@ impl<'a> NodeDelete<'a> {
                     .push((self.node.id, order_index));
 
                 let mut delete_stack = vec![parent_id];
-                let mut current_ancestor_ids = self.node.ancestor_ids.clone().unwrap_or(vec![]);
+                let mut current_ancestor_ids = self.node.ancestor_ids.cloned_ref();
 
                 while let Some(parent_id) = delete_stack.pop() {
-                    current_ancestor_ids.push(parent_id);
+                    current_ancestor_ids.insert(parent_id);
 
                     let child_ids_and_indices: Vec<(Id, OrderIndex)> =
                         self.children_by_parent_id.get(&parent_id).unwrap_or(&vec![]).clone();

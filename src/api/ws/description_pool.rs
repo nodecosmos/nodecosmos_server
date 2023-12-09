@@ -1,7 +1,7 @@
-use crate::api::authorization::auth_node_update;
+use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::models::authorization::Authorization;
 use crate::models::node::Node;
-use crate::models::user::CurrentUser;
 use actix::prelude::*;
 use actix_web::{get, web, HttpRequest};
 use actix_web_actors::ws;
@@ -9,7 +9,6 @@ use actix_web_actors::ws::WsResponseBuilder;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use dashmap::DashMap;
-use scylla::CachingSession;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -107,19 +106,18 @@ pub async fn description_ws(
     req: HttpRequest,
     stream: web::Payload,
     params: web::Path<PathParams>,
-    db_session: web::Data<CachingSession>,
     node_ws_desc_conn_pool: web::Data<DescriptionWsConnectionPool>,
-    current_user: CurrentUser,
+    data: RequestData,
 ) -> Response {
-    let node = Node {
+    let mut node = Node {
         id: params.node_id,
         branch_id: params.branch_id,
         ..Default::default()
     }
-    .find_by_primary_key(&db_session)
+    .find_by_primary_key(data.db_session())
     .await?;
 
-    auth_node_update(&node, &current_user).await?;
+    node.auth_update(&data).await?;
 
     let ws_desc_conn = DescriptionWsConnection {
         room_id: params.room_id,

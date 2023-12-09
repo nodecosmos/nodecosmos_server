@@ -1,14 +1,21 @@
+mod authorization;
 mod callbacks;
+pub mod create;
 pub mod status;
+pub mod update;
 
-use crate::models::udts::Owner;
+use crate::errors::NodecosmosError;
+use crate::models::branch::branchable::Branchable;
+use crate::models::branch::Branch;
+use crate::models::node::Node;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{List, Text, Timestamp, Uuid};
+use charybdis::types::{Set, Text, Timestamp, Uuid};
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = contribution_requests,
-    partition_keys = [node_id, node_branch_id],
+    partition_keys = [node_id],
     clustering_keys = [id],
     global_secondary_indexes = []
 )]
@@ -17,31 +24,17 @@ pub struct ContributionRequest {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
-    #[serde(rename = "nodeBranchId")]
-    pub node_branch_id: Option<Uuid>,
-
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "branchId")]
-    pub branch_id: Option<Uuid>,
-
-    #[serde(rename = "ownerId")]
-    pub owner_id: Option<Uuid>,
-
     #[serde(rename = "editorIds")]
-    pub editor_ids: Option<List<Uuid>>,
-
-    pub owner: Option<Owner>,
+    pub editor_ids: Option<Set<Uuid>>,
 
     pub title: Option<Text>,
     pub description: Option<Text>,
 
     #[serde(rename = "descriptionMarkdown")]
     pub description_markdown: Option<Text>,
-
-    #[serde(rename = "commitIds")]
-    pub commit_ids: Option<List<Uuid>>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -51,42 +44,51 @@ pub struct ContributionRequest {
 
     #[serde(default = "status::default_status")]
     pub status: Option<Text>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub branch: Option<Branch>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub node: Option<Node>,
 }
 
 impl ContributionRequest {
-    pub fn set_owner(&mut self, owner: Owner) {
-        self.owner_id = Some(owner.id);
-        self.owner = Some(owner);
+    pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+        self.node = Some(node);
+
+        Ok(())
+    }
+
+    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+        if self.node.is_none() {
+            self.init_node(session).await?;
+        }
+
+        Ok(self.node.as_mut().unwrap())
     }
 }
 
-partial_contribution_request!(
-    BaseContributionRequest,
-    node_id,
-    node_branch_id,
-    id,
-    owner,
-    title,
-    created_at,
-    status
-);
+impl Branchable for ContributionRequest {
+    fn id(&self) -> Uuid {
+        self.id
+    }
 
-partial_contribution_request!(
-    UpdateContributionRequestTitle,
-    node_id,
-    node_branch_id,
-    id,
-    owner_id,
-    title,
-    updated_at
-);
+    fn branch_id(&self) -> Uuid {
+        self.id
+    }
+}
+
+partial_contribution_request!(BaseContributionRequest, node_id, id, title, created_at, status);
+
+partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, title, updated_at);
 
 partial_contribution_request!(
     UpdateContributionRequestDescription,
     node_id,
-    node_branch_id,
     id,
-    owner_id,
     description,
     description_markdown,
     updated_at

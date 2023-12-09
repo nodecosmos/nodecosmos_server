@@ -179,3 +179,9 @@ impl From<actix_web::Error> for NodecosmosError {
         NodecosmosError::ActixError(e)
     }
 }
+
+impl<T> From<std::sync::PoisonError<T>> for NodecosmosError {
+    fn from(e: std::sync::PoisonError<T>) -> Self {
+        NodecosmosError::InternalServerError(e.to_string())
+    }
+}

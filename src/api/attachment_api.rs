@@ -1,8 +1,7 @@
-use crate::api::authorization::auth_node_update_by_id;
+use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::app::App;
 use crate::models::attachment::Attachment;
-use crate::models::user::CurrentUser;
+use crate::models::node::AuthNode;
 use crate::services::aws::s3::get_s3_presigned_url;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
@@ -18,15 +17,10 @@ pub struct ImageAttachmentParams {
 }
 
 #[post("/{node_id}/{object_id}/upload_image")]
-pub async fn upload_image(
-    params: web::Path<ImageAttachmentParams>,
-    app: web::Data<App>,
-    payload: Multipart,
-    current_user: CurrentUser,
-) -> Response {
-    auth_node_update_by_id(&params.node_id, &app.db_session, &current_user).await?;
+pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: RequestData, payload: Multipart) -> Response {
+    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
 
-    let attachment = Attachment::create_image(&params, &app, &current_user, payload).await?;
+    let attachment = Attachment::create_image(&params, &data, payload).await?;
 
     Ok(HttpResponse::Ok().json(attachment))
 }
@@ -43,14 +37,10 @@ pub struct AttachmentParams {
 }
 
 #[get("/presigned_url")]
-pub async fn get_presigned_url(
-    params: web::Query<AttachmentParams>,
-    app: web::Data<App>,
-    current_user: CurrentUser,
-) -> Response {
-    auth_node_update_by_id(&params.node_id, &app.db_session, &current_user).await?;
+pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
+    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
 
-    let url = get_s3_presigned_url(&app, &params.filename).await?;
+    let url = get_s3_presigned_url(&data.app, &params.filename).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "url": url,
@@ -61,17 +51,15 @@ pub async fn get_presigned_url(
 }
 
 #[post("")]
-pub async fn create_attachment(
-    mut attachment: web::Json<Attachment>,
-    app: web::Data<App>,
-    current_user: CurrentUser,
-) -> Response {
-    let url = Attachment::build_s3_url(app.s3_bucket.clone(), attachment.key.clone());
+pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
+    AuthNode::auth_update(&data, attachment.node_id, attachment.node_id).await?;
+
+    let url = Attachment::build_s3_url(data.s3_bucket().clone(), attachment.key.clone());
 
     attachment.url = Some(url);
-    attachment.user_id = Some(current_user.id);
+    attachment.user_id = Some(data.current_user_id());
 
-    attachment.insert_cb(&app.db_session).await?;
+    attachment.insert_cb(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(attachment))
 }

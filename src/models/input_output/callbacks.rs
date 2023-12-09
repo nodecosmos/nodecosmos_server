@@ -3,19 +3,14 @@ use crate::models::input_output::{DeleteIo, Io, UpdateDescriptionIo, UpdateTitle
 use crate::models::utils::{sanitize_description_cb_fn, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
-use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 impl Callbacks for Io {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
+        self.validate_root_node_id(session).await?;
+        self.set_defaults();
         self.copy_vals_from_original(session).await?;
 
         Ok(())

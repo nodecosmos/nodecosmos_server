@@ -1,8 +1,32 @@
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
+use charybdis::types::Uuid;
 use scylla::CachingSession;
+use serde_json::json;
 
 impl Io {
+    pub async fn validate_root_node_id(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node = self.node(session).await?;
+        let root_node_id = node.root_id;
+
+        if self.root_node_id != root_node_id {
+            return Err(NodecosmosError::Unauthorized(json!({
+                "error": "Unauthorized",
+                "message": "Not authorized to add IO for this node!"
+            })));
+        }
+
+        Ok(())
+    }
+
+    pub fn set_defaults(&mut self) {
+        let now = chrono::Utc::now();
+
+        self.id = Uuid::new_v4();
+        self.created_at = Some(now);
+        self.updated_at = Some(now);
+    }
+
     /// We use copy instead of reference, as in future we may add more features
     /// that will require each node within a flow step to have it's own IO.
     pub async fn copy_vals_from_original(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {

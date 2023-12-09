@@ -1,9 +1,11 @@
+mod authorization;
 mod callbacks;
 pub mod diagram;
 mod update;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
+use crate::models::node::Node;
 use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
@@ -11,7 +13,6 @@ use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-///
 /// Workflow model
 ///
 /// Currently we only support one workflow per node,
@@ -65,6 +66,10 @@ pub struct Workflow {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub diagram: Option<WorkflowDiagram>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub node: Option<Node>,
 }
 
 impl Workflow {
@@ -85,6 +90,22 @@ impl Workflow {
         }
 
         Ok(self.diagram.as_mut().unwrap())
+    }
+
+    pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        // TODO: introduce branch_id to workflow
+        let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+        self.node = Some(node);
+
+        Ok(())
+    }
+
+    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+        if self.node.is_none() {
+            self.init_node(session).await?;
+        }
+
+        Ok(self.node.as_mut().unwrap())
     }
 
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {

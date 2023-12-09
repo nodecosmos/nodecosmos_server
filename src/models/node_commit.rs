@@ -178,6 +178,7 @@ impl NodeCommit {
         let vtp = self.tree_position_commit(session).await?;
 
         if let Some(ancestor_ids) = &vtp.ancestor_ids {
+            let ancestor_ids = ancestor_ids.iter().cloned().collect();
             return Self::latest_by_node_ids(session, &self.branch_id, &ancestor_ids).await;
         }
 

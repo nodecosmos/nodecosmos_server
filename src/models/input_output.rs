@@ -6,6 +6,7 @@ mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
+use crate::models::node::Node;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use crate::utils::deserializer::required;
@@ -78,6 +79,10 @@ pub struct Io {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub workflow: Option<Workflow>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub node: Option<Node>,
 }
 
 impl Io {
@@ -110,6 +115,16 @@ impl Io {
         }
 
         Ok(&mut self.workflow)
+    }
+
+    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+        if self.node.is_none() {
+            // TODO: introduce branch_id to workflow
+            let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+            self.node = Some(node);
+        }
+
+        Ok(self.node.as_mut().unwrap())
     }
 
     pub async fn flow_step(&mut self, session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {

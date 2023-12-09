@@ -13,7 +13,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "4.0"
           memory: 16gb
     volumes:
       - ./volumes/scylla1:/var/lib/scylla
@@ -29,7 +29,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "4.0"
           memory: 16gb
     volumes:
       - ./volumes/scylla2:/var/lib/scylla
@@ -46,7 +46,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "4.0"
           memory: 16gb
     volumes:
       - ./volumes/scylla3:/var/lib/scylla
