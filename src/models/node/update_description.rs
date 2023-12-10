@@ -1,4 +1,5 @@
 use crate::api::data::RequestData;
+use crate::models::branch::branchable::Branchable;
 use crate::models::description_commit::DescriptionCommit;
 use crate::models::node::{Node, UpdateDescriptionNode};
 use crate::models::node_commit::create::NodeChange;
@@ -18,7 +19,9 @@ impl UpdateDescriptionNode {
     }
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
-        update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+        if self.is_main_branch() {
+            update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+        }
     }
 
     pub async fn create_new_version(&self, req_data: &RequestData) {

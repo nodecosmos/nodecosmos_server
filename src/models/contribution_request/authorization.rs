@@ -28,11 +28,13 @@ impl Authorization for ContributionRequest {
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_public() {
+        let node = self.node(data.db_session()).await?;
+
+        if node.is_public {
             return Ok(());
         }
 
-        self.auth_update(data).await?;
+        node.auth_update(data).await?;
 
         Ok(())
     }

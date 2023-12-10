@@ -85,14 +85,7 @@ impl ExtCallbacks for UpdateTitleNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(
-        &mut self,
-        _session: &CachingSession,
-        req_data: &RequestData,
-    ) -> Result<(), NodecosmosError> {
-        self.validate_root().await?;
-        let _ = self.update_title_for_ancestors(&req_data).await;
-
+    async fn before_update(&mut self, _session: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())
@@ -107,6 +100,7 @@ impl ExtCallbacks for UpdateTitleNode {
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
+            let _ = self_clone.update_title_for_ancestors(&req_data).await;
             let _ = self_clone.update_elastic_index(req_data.elastic_client()).await;
             let _ = self_clone.create_new_version(&req_data).await;
         });

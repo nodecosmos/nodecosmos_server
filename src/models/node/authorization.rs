@@ -5,6 +5,7 @@ use crate::models::branch::branchable::Branchable;
 use crate::models::node::{AuthNode, Node};
 use crate::utils::logger::log_fatal;
 use charybdis::model::AsNative;
+use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
 use serde_json::json;
 
@@ -13,9 +14,10 @@ use serde_json::json;
 /// Otherwise, the authorization is done by branch.
 impl Authorization for Node {
     async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_different_branch() {
-            let branch = self.branch(data.db_session()).await?;
-            self.branch = Some(branch);
+        if self.is_main_branch() {
+            *self = self.find_by_primary_key(data.db_session()).await?;
+        } else {
+            self.init_auth_branch(data.db_session()).await?;
         }
 
         Ok(())
@@ -30,7 +32,7 @@ impl Authorization for Node {
             return self.owner_id;
         }
 
-        return match &self.branch {
+        return match &self.auth_branch {
             Some(branch) => Some(branch.owner_id),
             None => {
                 log_fatal(format!("Branched node {} has no branch!", self.id));
@@ -45,7 +47,7 @@ impl Authorization for Node {
             return self.editor_ids.clone();
         }
 
-        return match &self.branch {
+        return match &self.auth_branch {
             Some(branch) => branch.editor_ids.clone(),
             None => {
                 log_fatal(format!("Branched node {} has no branch!", self.id));

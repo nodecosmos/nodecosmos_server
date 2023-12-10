@@ -97,6 +97,8 @@ pub struct Branch {
     pub deleted_flow_step_input_id_by_node_id: Option<Map<Uuid, Boolean>>,
 }
 
+partial_branch!(AuthBranch, id, owner_id, editor_ids, is_public);
+
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes_by_id);
 
 partial_branch!(UpdateDeletedNodesBranch, id, deleted_nodes_by_id);

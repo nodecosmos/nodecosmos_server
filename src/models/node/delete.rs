@@ -5,7 +5,7 @@ use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteIo;
 use crate::models::like::Like;
-use crate::models::node::{DeleteNode, Node};
+use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
@@ -138,7 +138,7 @@ impl<'a> NodeDelete<'a> {
                 })?;
 
                 if id != &self.node.id {
-                    batch.append_delete(&DeleteNode {
+                    batch.append_delete(&PrimaryKeyNode {
                         id: *id,
                         branch_id: self.node.branched_id(*id),
                     })?;

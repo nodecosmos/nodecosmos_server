@@ -12,7 +12,7 @@ mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
-use crate::models::branch::Branch;
+use crate::models::branch::AuthBranch;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
@@ -108,22 +108,38 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub branch: Option<Branch>,
+    pub auth_branch: Option<AuthBranch>,
 }
 
 impl Node {
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
-        if let Some(parent_id) = self.parent_id {
-            let parent_branch_id = if !self.is_main_branch() {
-                self.branch_id
-            } else {
-                parent_id
-            };
+        if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
+            if self.is_different_branch() {
+                return self.branch_parent(db_session).await;
+            }
 
-            if self.parent.is_none() {
-                let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_branch_id)).await?;
+            let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
 
-                self.parent = Some(parent);
+            self.parent = Some(parent);
+        }
+
+        Ok(self.parent.as_mut())
+    }
+
+    async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
+        if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
+            let branch_parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, self.branch_id))
+                .await
+                .ok();
+
+            match branch_parent {
+                Some(parent) => {
+                    self.parent = Some(parent);
+                }
+                None => {
+                    let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
+                    self.parent = Some(parent);
+                }
             }
         }
 
@@ -252,7 +268,7 @@ partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 
 partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
 
-partial_node!(UpdateTitleNode, root_id, id, branch_id, title, updated_at);
+partial_node!(UpdateTitleNode, id, branch_id, title, updated_at);
 
 partial_node!(
     UpdateDescriptionNode,
@@ -276,6 +292,6 @@ partial_node!(
     updated_at
 );
 
-partial_node!(DeleteNode, id, branch_id);
+partial_node!(PrimaryKeyNode, id, branch_id);
 
 partial_node!(AuthNode, id, branch_id, owner_id, editor_ids);

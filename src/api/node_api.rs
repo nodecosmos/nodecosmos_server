@@ -39,8 +39,9 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 }
 
 #[get("/{id}/{branchId}")]
-pub async fn get_branched_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, *id, *id).await?;
+pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode>, opt_cu: OptCurrentUser) -> Response {
+    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, pk.id, pk.branch_id).await?;
+
     let mut native_node = node.as_native();
 
     native_node.auth_view(&app, opt_cu).await?;
@@ -86,7 +87,7 @@ pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Respon
 
 #[put("/title")]
 pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: RequestData) -> Response {
-    let mut native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
+    let mut native_node = node.as_native();
 
     native_node.auth_update(&data).await?;
 
@@ -94,7 +95,6 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
         .validate_node_unlocked(&native_node, true)
         .await?;
 
-    node.root_id = native_node.root_id;
     node.update_cb(data.db_session(), &data).await?;
 
     Ok(HttpResponse::Ok().json(node))
@@ -102,7 +102,7 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
 
 #[put("/description")]
 pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>, data: RequestData) -> Response {
-    let mut native_node = node.as_native().find_by_primary_key(data.db_session()).await?;
+    let mut native_node = node.as_native();
 
     native_node.auth_update(&data).await?;
 
@@ -112,8 +112,8 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 }
 
 #[delete("/{id}/{branchId}")]
-pub async fn delete_node(node: web::Path<DeleteNode>, data: RequestData) -> Response {
-    let mut node = node.as_native().find_by_primary_key(data.db_session()).await?;
+pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
+    let mut node = node.as_native();
 
     node.auth_update(&data).await?;
 
