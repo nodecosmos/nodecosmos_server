@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod api;
 mod app;
 mod constants;
@@ -6,11 +8,17 @@ mod models;
 mod services;
 mod utils;
 
+use crate::models::node::Node;
+use crate::services::prosemirror::ProseMirrorDoc;
 use actix_web::middleware::Logger;
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
 use app::App;
+use base64::decode;
 use std::sync::Arc;
+use uuid::uuid;
+use yrs::updates::decoder::Decode;
+use yrs::{Doc, GetString, ReadTxn, Transact, Update};
 
 #[tokio::main]
 async fn main() {
@@ -27,6 +35,33 @@ async fn main() {
     let redis_pool_web_data = web::Data::from(app_web_data.redis_pool.clone());
     let resource_locker_web_data = web::Data::from(app_web_data.resource_locker.clone());
     let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
+
+    let node = Node::find_by_id_and_branch_id(
+        &db_session_web_data,
+        uuid!("f50e03d0-9d5b-442c-aa6e-f0f8caa9c2de"),
+        uuid!("f50e03d0-9d5b-442c-aa6e-f0f8caa9c2de"),
+    )
+    .await
+    .unwrap();
+
+    if let Some(description) = node.description_base64 {
+        let mut doc = Doc::new();
+
+        let current = decode(description).unwrap();
+        let current = Update::decode_v2(&current).unwrap();
+        let text = doc.get_or_insert_xml_fragment("prosemirror");
+
+        let mut transaction = doc.transact_mut();
+
+        {
+            transaction.apply_update(current);
+        }
+
+        let prose_doc = ProseMirrorDoc::from_xml(&text.get_string(&transaction));
+
+        println!("{:?}", prose_doc.html);
+        println!("{:?}", prose_doc.markdown);
+    }
 
     HttpServer::new(move || {
         ActixWebApp::new()

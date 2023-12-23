@@ -49,7 +49,7 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, node_id: web::P
 
 #[post("")]
 pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow>) -> Response {
-    workflow.auth_update(&data).await?;
+    workflow.auth_creation(&data).await?;
 
     workflow.insert_cb(data.db_session()).await?;
 

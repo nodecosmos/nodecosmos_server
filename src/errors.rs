@@ -45,6 +45,7 @@ pub enum NodecosmosError {
     Conflict(String),
     UnsupportedMediaType,
     ValidationError((String, String)),
+    LockerError(String),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -65,6 +66,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ValidationError((field, message)) => {
                 write!(f, "Validation Error: {}: {}", field, message)
             }
+            NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
         }
     }
 }
@@ -85,6 +87,7 @@ impl Error for NodecosmosError {
             NodecosmosError::ActixError(e) => Some(e),
             NodecosmosError::Conflict(_) => None,
             NodecosmosError::ValidationError(_) => None,
+            NodecosmosError::LockerError(_) => None,
         }
     }
 }

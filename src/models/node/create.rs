@@ -1,6 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
@@ -160,12 +162,10 @@ impl Node {
         }
     }
 
-    pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) -> Result<(), NodecosmosError> {
+    pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {
         if self.is_main_branch() {
             add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
         }
-
-        Ok(())
     }
 
     pub async fn create_new_version(&self, req_data: &RequestData) {
@@ -176,5 +176,16 @@ impl Node {
                 e
             })
             .await;
+    }
+
+    pub async fn update_branch(&self, req_data: &RequestData) {
+        if self.is_different_branch() {
+            Branch::update(
+                &req_data.db_session(),
+                self.branch_id,
+                BranchUpdate::CreateNode(self.id),
+            )
+            .await;
+        }
     }
 }

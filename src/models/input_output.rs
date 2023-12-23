@@ -1,8 +1,8 @@
 mod callbacks;
 mod create;
 mod delete;
-mod update_description;
-mod update_title;
+mod description;
+mod title;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;

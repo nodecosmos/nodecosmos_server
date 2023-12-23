@@ -1,7 +1,8 @@
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
 use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
@@ -11,23 +12,35 @@ use crate::services::elastic::update_elastic_document;
 use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::AsNative;
-use charybdis::operations::Find;
 use elasticsearch::Elasticsearch;
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
-    pub async fn update_title_for_ancestors(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
-        let native = self.as_native().find_by_primary_key(req_data.db_session()).await?;
+    pub async fn update_title_for_ancestors(&self, data: &RequestData) {
+        let mut native = self.as_native();
 
-        req_data.resource_locker().validate_node_unlocked(&native, true).await?;
-        req_data
+        if let Err(e) = native.transform_to_branched(data.db_session()).await {
+            log_error(format!("Failed to transform node to branched: {}", e));
+            return;
+        }
+
+        if let Err(e) = data.resource_locker().validate_node_unlocked(&native, true).await {
+            log_error(format!("Failed to validate node unlocked: {}", e));
+            return;
+        }
+
+        if let Err(e) = data
             .resource_locker()
             .lock_resource_action(
                 ActionTypes::Reorder(ActionObject::Node),
                 &native.root_id.to_string(),
                 1000,
             )
-            .await?;
+            .await
+        {
+            log_error(format!("Failed to lock resource: {}", e));
+            return;
+        }
 
         if let Some(ancestor_ids) = native.ancestor_ids.clone() {
             let mut batch = CharybdisModelBatch::new();
@@ -43,33 +56,23 @@ impl UpdateTitleNode {
                     order_index: native.order_index,
                 };
 
-                batch.append_update(&node_descendant)?;
+                if let Err(e) = batch.append_update(&node_descendant) {
+                    log_error(format!("Failed to append update node_descendants: {}", e));
+                }
             }
 
-            let res = batch.execute(req_data.db_session()).await;
-
-            match res {
-                Ok(_) => {
-                    req_data
-                        .resource_locker()
-                        .unlock_resource_action(ActionTypes::Reorder(ActionObject::Node), &native.root_id.to_string())
-                        .await?;
-                }
-                Err(e) => {
-                    log_error(format!(
-                        "Error updating title for node descendants: {}. Node reorder will remain locked",
-                        e
-                    ));
-                }
+            if let Err(e) = batch.execute(data.db_session()).await {
+                log_error(format!("Failed to update node_descendants: {}", e));
             }
         }
 
-        req_data
+        if let Err(e) = data
             .resource_locker()
             .unlock_resource_action(ActionTypes::Reorder(ActionObject::Node), &native.root_id.to_string())
-            .await?;
-
-        Ok(())
+            .await
+        {
+            log_error(format!("Failed to unlock resource: {}", e));
+        }
     }
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
@@ -78,14 +81,14 @@ impl UpdateTitleNode {
         }
     }
 
-    pub async fn create_new_version(&self, req_data: &RequestData) {
+    pub async fn create_new_version(&self, data: &RequestData) {
         let changes = vec![NodeChange::Title(self.title.clone())];
 
         let _ = NodeCommit::handle_change(
-            req_data.db_session(),
+            data.db_session(),
             self.id,
             self.branch_id,
-            req_data.current_user_id(),
+            data.current_user_id(),
             &changes,
             true,
         )
@@ -93,5 +96,15 @@ impl UpdateTitleNode {
         .map_err(|e| {
             log_error(format!("Failed to create new versioned node: {}", e));
         });
+    }
+    pub async fn update_branch(&self, req_data: &RequestData) {
+        if self.is_different_branch() {
+            Branch::update(
+                &req_data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeTitle(self.id),
+            )
+            .await;
+        }
     }
 }

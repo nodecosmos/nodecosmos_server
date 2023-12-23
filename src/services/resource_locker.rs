@@ -32,7 +32,10 @@ impl ResourceLocker {
             .arg("PX")
             .arg(ttl)
             .query_async(&mut *connection)
-            .await?;
+            .await
+            .map_err(|e| {
+                NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", resource_id, e))
+            })?;
 
         Ok(true)
     }
@@ -54,7 +57,13 @@ impl ResourceLocker {
             .arg("PX")
             .arg(ttl)
             .query_async(&mut *connection)
-            .await?;
+            .await
+            .map_err(|e| {
+                NodecosmosError::LockerError(format!(
+                    "Failed to lock resource action: {}! Error: {:?}",
+                    resource_id, e
+                ))
+            })?;
 
         Ok(true)
     }
@@ -63,7 +72,12 @@ impl ResourceLocker {
         let mut connection = self.pool.get().await?;
         let key = format!("{}:{}", LOCK_NAMESPACE, resource_id);
 
-        let res = connection.exists(key).await?;
+        let res = connection.exists(key).await.map_err(|e| {
+            NodecosmosError::LockerError(format!(
+                "Failed to check if resource: {} is locked! Error: {:?}",
+                resource_id, e
+            ))
+        })?;
 
         Ok(res)
     }
@@ -71,12 +85,17 @@ impl ResourceLocker {
     pub async fn is_resource_action_locked(
         &self,
         resource_action: &ActionTypes,
-        resource_id: &str,
+        resource_id: String,
     ) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
         let key = format!("{}:{}:{}", LOCK_NAMESPACE, resource_action, resource_id);
 
-        let res = connection.exists(key).await?;
+        let res = connection.exists(key).await.map_err(|e| {
+            NodecosmosError::LockerError(format!(
+                "Failed to check if resource action: {} for resource: {} is locked! Error: {:?}",
+                resource_action, resource_id, e
+            ))
+        })?;
 
         Ok(res)
     }
@@ -85,7 +104,9 @@ impl ResourceLocker {
         let key = format!("LOCK:{}", resource_id);
         let mut connection = self.pool.get().await?;
 
-        let res = connection.del(key).await?;
+        let res = connection.del(key).await.map_err(|e| {
+            NodecosmosError::LockerError(format!("Failed to unlock resource: {}! Error: {:?}", resource_id, e))
+        })?;
 
         Ok(res)
     }
@@ -98,7 +119,12 @@ impl ResourceLocker {
         let mut connection = self.pool.get().await?;
         let key = format!("LOCK:{}:{}", resource_action, resource_id);
 
-        let res = connection.del(key).await?;
+        let res = connection.del(key).await.map_err(|e| {
+            NodecosmosError::LockerError(format!(
+                "Failed to unlock resource action: {} for resource: {}! Error: {:?}",
+                resource_action, resource_id, e
+            ))
+        })?;
 
         Ok(res)
     }
@@ -135,7 +161,7 @@ impl ResourceLocker {
         retry: bool,
     ) -> Result<(), NodecosmosError> {
         if self
-            .is_resource_action_locked(&action_type, &node.root_id.to_string())
+            .is_resource_action_locked(&action_type, node.root_id.to_string())
             .await?
         {
             if retry {
@@ -143,7 +169,7 @@ impl ResourceLocker {
 
                 // TODO: introduce recursion & retry count
                 if self
-                    .is_resource_action_locked(&action_type, &node.root_id.to_string())
+                    .is_resource_action_locked(&action_type, node.root_id.to_string())
                     .await?
                 {
                     return Err(Self::RESOURCE_LOCK_ERROR);

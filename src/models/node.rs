@@ -3,12 +3,12 @@ mod branchable;
 pub mod callbacks;
 mod create;
 mod delete;
+mod description;
 pub mod elastic_index;
 pub mod reorder;
 pub mod search;
+mod title;
 pub mod update_cover_image;
-mod update_description;
-mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
@@ -19,7 +19,7 @@ use crate::utils::defaults::default_to_0;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{BigInt, Boolean, Double, Set, Text, Timestamp, Uuid};
+use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -84,7 +84,7 @@ pub struct Node {
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    pub owner: Option<Owner>,
+    pub owner: Option<Frozen<Owner>>,
 
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub like_count: Option<BigInt>,
@@ -112,6 +112,19 @@ pub struct Node {
 }
 
 impl Node {
+    pub async fn find_branch_nodes(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        ids: Set<Uuid>,
+    ) -> Result<Vec<Node>, NodecosmosError> {
+        let res = find_node!(db_session, "branch_id = ? AND id IN (?)", (branch_id, ids))
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(res)
+    }
+
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
             if self.is_different_branch() {
@@ -144,6 +157,33 @@ impl Node {
         }
 
         Ok(self.parent.as_mut())
+    }
+
+    pub async fn transform_to_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
+            .await
+            .ok();
+
+        match branch_self {
+            Some(mut branch_self) => {
+                branch_self.parent = self.parent.take();
+                branch_self.auth_branch = self.auth_branch.take();
+
+                *self = branch_self;
+            }
+            None => {
+                let parent = self.parent.take();
+                let auth_branch = self.auth_branch.take();
+                let branch_id = self.branch_id;
+
+                *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
+                self.branch_id = branch_id;
+                self.parent = parent;
+                self.auth_branch = auth_branch;
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn descendants(

@@ -113,9 +113,8 @@ pub async fn description_ws(
         id: params.node_id,
         branch_id: params.branch_id,
         ..Default::default()
-    }
-    .find_by_primary_key(data.db_session())
-    .await?;
+    };
+    node.transform_to_branched(data.db_session()).await?;
 
     node.auth_update(&data).await?;
 

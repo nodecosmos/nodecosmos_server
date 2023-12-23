@@ -17,9 +17,7 @@ pub trait Authorization {
 
     fn editor_ids(&self) -> Option<Set<Uuid>>;
 
-    async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
-        Ok(())
-    }
+    async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError>;
 
     async fn can_edit(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
         self.before_auth(data).await?;

@@ -8,8 +8,9 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
+use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Set, Text, Timestamp, Uuid};
+use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +45,11 @@ pub struct ContributionRequest {
 
     #[serde(default = "status::default_status")]
     pub status: Option<Text>,
+
+    #[serde(default, rename = "ownerId")]
+    pub owner_id: Uuid,
+
+    pub owner: Option<Frozen<Owner>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -81,7 +87,7 @@ impl Branchable for ContributionRequest {
     }
 }
 
-partial_contribution_request!(BaseContributionRequest, node_id, id, title, created_at, status);
+partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title, created_at, status);
 
 partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, title, updated_at);
 

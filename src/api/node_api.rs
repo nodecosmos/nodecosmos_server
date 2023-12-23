@@ -57,21 +57,21 @@ pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode
 #[get("/{id}/{branchId}/description")]
 pub async fn get_node_description(
     db_session: web::Data<CachingSession>,
-    node: web::Path<GetDescriptionNode>,
+    mut node: web::Path<GetDescriptionNode>,
 ) -> Response {
-    let node = node.find_by_primary_key(&db_session).await?;
+    node.find_branched(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(node))
+    Ok(HttpResponse::Ok().json(node.into_inner()))
 }
 
 #[get("/{id}/{branchId}/description_base64")]
 pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
-    node: web::Path<GetDescriptionBase64Node>,
+    mut node: web::Path<GetDescriptionBase64Node>,
 ) -> Response {
-    let node = node.find_by_primary_key(&db_session).await?;
+    node.find_branched(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(node))
+    Ok(HttpResponse::Ok().json(node.into_inner()))
 }
 
 #[post("")]
@@ -114,6 +114,8 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 #[delete("/{id}/{branchId}")]
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
+
+    node.transform_to_branched(data.db_session()).await?;
 
     node.auth_update(&data).await?;
 

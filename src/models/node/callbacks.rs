@@ -23,9 +23,10 @@ impl ExtCallbacks for Node {
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone.append_to_ancestors(req_data.db_session()).await;
-            let _ = self_clone.add_to_elastic(req_data.elastic_client()).await;
+            self_clone.append_to_ancestors(req_data.db_session()).await;
+            self_clone.add_to_elastic(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
+            self_clone.update_branch(&req_data).await;
         });
 
         Ok(())
@@ -47,6 +48,7 @@ impl ExtCallbacks for Node {
 
         tokio::spawn(async move {
             self_clone.create_new_version_for_ancestors(&req_data).await;
+            self_clone.update_branch_with_deletion(&req_data).await;
         });
 
         Ok(())
@@ -73,8 +75,9 @@ impl ExtCallbacks for UpdateDescriptionNode {
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone.update_elastic_index(req_data.elastic_client()).await;
-            let _ = self_clone.create_new_version(&req_data).await;
+            self_clone.update_elastic_index(req_data.elastic_client()).await;
+            self_clone.create_new_version(&req_data).await;
+            self_clone.update_branch(&req_data).await;
         });
 
         Ok(())
@@ -100,9 +103,10 @@ impl ExtCallbacks for UpdateTitleNode {
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone.update_title_for_ancestors(&req_data).await;
-            let _ = self_clone.update_elastic_index(req_data.elastic_client()).await;
-            let _ = self_clone.create_new_version(&req_data).await;
+            self_clone.update_title_for_ancestors(&req_data).await;
+            self_clone.update_elastic_index(req_data.elastic_client()).await;
+            self_clone.create_new_version(&req_data).await;
+            self_clone.update_branch(&req_data).await;
         });
 
         Ok(())

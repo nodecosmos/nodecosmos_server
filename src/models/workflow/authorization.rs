@@ -41,4 +41,8 @@ impl Authorization for Workflow {
 
         None
     }
+
+    async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
+        self.auth_update(_data).await
+    }
 }

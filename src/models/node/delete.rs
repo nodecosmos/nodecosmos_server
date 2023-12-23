@@ -1,6 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteIo;
@@ -22,10 +24,6 @@ use futures::{StreamExt, TryFutureExt};
 use scylla::CachingSession;
 use std::collections::HashMap;
 
-type Id = Uuid;
-type OrderIndex = f64;
-type ChildrenByParentId = HashMap<Uuid, Vec<(Id, OrderIndex)>>;
-
 impl Node {
     pub async fn delete_related_data(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
         NodeDelete::new(self, &req_data).run().await
@@ -40,7 +38,23 @@ impl Node {
             })
             .await;
     }
+
+    pub async fn update_branch_with_deletion(&self, req_data: &RequestData) {
+        if self.is_different_branch() {
+            Branch::update(
+                &req_data.db_session(),
+                self.branch_id,
+                BranchUpdate::DeleteNode(self.id),
+            )
+            .await;
+        }
+    }
 }
+
+type Id = Uuid;
+type OrderIndex = f64;
+type Children = Vec<(Id, OrderIndex)>;
+type ChildrenByParentId = HashMap<Uuid, Children>;
 
 pub struct NodeDelete<'a> {
     db_session: &'a CachingSession,
@@ -205,13 +219,12 @@ impl<'a> NodeDelete<'a> {
                 while let Some(parent_id) = delete_stack.pop() {
                     current_ancestor_ids.insert(parent_id);
 
-                    let child_ids_and_indices: Vec<(Id, OrderIndex)> =
-                        self.children_by_parent_id.get(&parent_id).unwrap_or(&vec![]).clone();
+                    let children: Children = self.children_by_parent_id.get(&parent_id).unwrap_or(&vec![]).clone();
 
-                    for child_ids_and_indices_chunk in child_ids_and_indices.chunks(100) {
+                    for children_chunk in children.chunks(100) {
                         let mut batch = CharybdisModelBatch::unlogged();
 
-                        for (child_id, order_index) in child_ids_and_indices_chunk {
+                        for (child_id, order_index) in children_chunk {
                             // delete node descendants for all of its ancestors
                             for ancestor_id in &current_ancestor_ids {
                                 let branch_id = self.node.branched_id(*ancestor_id);
@@ -245,8 +258,6 @@ impl<'a> NodeDelete<'a> {
                 ));
             }
         };
-
-        println!("delete delete_descendants");
 
         Ok(())
     }
