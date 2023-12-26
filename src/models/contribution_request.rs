@@ -4,12 +4,15 @@ pub mod create;
 pub mod status;
 pub mod update;
 
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
 use crate::models::branch::Branch;
+use crate::models::contribution_request::status::ContributionRequestStatus;
 use crate::models::node::Node;
 use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::{Update, UpdateWithExtCallbacks};
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -74,6 +77,16 @@ impl ContributionRequest {
         }
 
         Ok(self.node.as_mut().unwrap())
+    }
+
+    pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut branch = self.branch(data.db_session()).await?;
+
+        branch.merge(data).await?;
+
+        self.update_status(data, ContributionRequestStatus::Merged).await?;
+
+        Ok(())
     }
 }
 

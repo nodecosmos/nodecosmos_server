@@ -16,6 +16,7 @@ use crate::models::branch::AuthBranch;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
+use crate::utils::defaults::default_to_false;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
@@ -29,7 +30,7 @@ use std::collections::HashSet;
     partition_keys = [id],
     clustering_keys = [branch_id],
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct Node {
     #[serde(default)]
     pub id: Uuid,
@@ -109,6 +110,10 @@ pub struct Node {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub auth_branch: Option<AuthBranch>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub merge: Boolean,
 }
 
 impl Node {
@@ -117,7 +122,7 @@ impl Node {
         branch_id: Uuid,
         ids: Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        let res = find_node!(db_session, "branch_id = ? AND id IN (?)", (branch_id, ids))
+        let res = find_node!(db_session, "branch_id = ? AND id IN ?", (branch_id, ids))
             .await?
             .try_collect()
             .await?;
@@ -128,6 +133,8 @@ impl Node {
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
             if self.is_different_branch() {
+                println!("hit is_different_branch");
+
                 return self.branch_parent(db_session).await;
             }
 
@@ -145,11 +152,14 @@ impl Node {
                 .await
                 .ok();
 
+            println!("hit branch_parent");
+
             match branch_parent {
                 Some(parent) => {
                     self.parent = Some(parent);
                 }
                 None => {
+                    println!("hit BaseNode");
                     let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
                     self.parent = Some(parent);
                 }

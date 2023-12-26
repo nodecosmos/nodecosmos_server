@@ -48,7 +48,7 @@ impl UpdateDescriptionNode {
         )
         .await
         .map_err(|e| {
-            log_error(format!("Failed to create new node version: {}", e));
+            log_error(format!("Failed to create new description version: {}", e));
             e
         });
     }

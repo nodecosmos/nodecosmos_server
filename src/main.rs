@@ -36,33 +36,6 @@ async fn main() {
     let resource_locker_web_data = web::Data::from(app_web_data.resource_locker.clone());
     let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
 
-    let node = Node::find_by_id_and_branch_id(
-        &db_session_web_data,
-        uuid!("f50e03d0-9d5b-442c-aa6e-f0f8caa9c2de"),
-        uuid!("f50e03d0-9d5b-442c-aa6e-f0f8caa9c2de"),
-    )
-    .await
-    .unwrap();
-
-    if let Some(description) = node.description_base64 {
-        let mut doc = Doc::new();
-
-        let current = decode(description).unwrap();
-        let current = Update::decode_v2(&current).unwrap();
-        let text = doc.get_or_insert_xml_fragment("prosemirror");
-
-        let mut transaction = doc.transact_mut();
-
-        {
-            transaction.apply_update(current);
-        }
-
-        let prose_doc = ProseMirrorDoc::from_xml(&text.get_string(&transaction));
-
-        println!("{:?}", prose_doc.html);
-        println!("{:?}", prose_doc.markdown);
-    }
-
     HttpServer::new(move || {
         ActixWebApp::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
@@ -146,7 +119,8 @@ async fn main() {
                     .service(create_contribution_request)
                     .service(update_contribution_request_title)
                     .service(update_contribution_request_description)
-                    .service(delete_contribution_request),
+                    .service(delete_contribution_request)
+                    .service(merge_contribution_request),
             )
             .service(
                 web::scope("attachments")

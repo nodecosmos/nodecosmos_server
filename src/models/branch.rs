@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
         gc_grace_seconds = 432000
     "#,
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct Branch {
     pub id: Uuid,
 
@@ -148,11 +148,10 @@ impl Branch {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
         if let Some(edited_node_titles) = &self.edited_node_titles {
-            let nodes =
-                find_update_title_node!(db_session, "branch_id = ? AND id IN (?)", (self.id, edited_node_titles))
-                    .await?
-                    .try_collect()
-                    .await?;
+            let nodes = find_update_title_node!(db_session, "branch_id = ? AND id IN ?", (self.id, edited_node_titles))
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(nodes));
         }
@@ -167,7 +166,7 @@ impl Branch {
         if let Some(edited_node_descriptions) = &self.edited_node_descriptions {
             let nodes = find_update_description_node!(
                 db_session,
-                "branch_id = ? AND id IN (?)",
+                "branch_id = ? AND id IN ?",
                 (self.id, edited_node_descriptions)
             )
             .await?

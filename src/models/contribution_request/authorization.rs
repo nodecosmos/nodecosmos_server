@@ -4,6 +4,7 @@ use crate::models::authorization::Authorization;
 use crate::models::branch::branchable::Branchable;
 use crate::models::contribution_request::ContributionRequest;
 use charybdis::types::{Set, Uuid};
+use serde_json::json;
 
 impl Authorization for ContributionRequest {
     async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

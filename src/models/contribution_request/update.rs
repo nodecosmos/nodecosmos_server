@@ -11,7 +11,7 @@ impl ContributionRequest {
         Ok(())
     }
 
-    async fn update_status(
+    pub async fn update_status(
         &mut self,
         data: &RequestData,
         status: ContributionRequestStatus,

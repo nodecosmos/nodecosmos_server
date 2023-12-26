@@ -94,3 +94,25 @@ pub async fn delete_contribution_request(
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }
+
+pub async fn publish(data: &RequestData, contribution_request: &mut ContributionRequest) -> Response {
+    contribution_request.auth_update(data).await?;
+    contribution_request.publish(data).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[put("/merge")]
+pub async fn merge_contribution_request(
+    data: RequestData,
+    contribution_request: web::Json<ContributionRequest>,
+) -> Response {
+    let mut contribution_request = contribution_request.find_by_primary_key(data.db_session()).await?;
+    let node = contribution_request.node(data.db_session()).await?;
+
+    node.auth_update(&data).await?;
+
+    contribution_request.merge(&data).await?;
+
+    Ok(HttpResponse::Ok().json(contribution_request))
+}
