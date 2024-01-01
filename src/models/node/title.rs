@@ -48,7 +48,7 @@ impl UpdateTitleNode {
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
                     root_id: native.root_id,
-                    branch_id: native.branched_id(ancestor_id),
+                    branch_id: native.branchise_id(ancestor_id),
                     node_id: ancestor_id,
                     id: self.id,
                     parent_id: native.parent_id.unwrap(), // we must have parent_id as we have ancestor_ids
@@ -76,7 +76,7 @@ impl UpdateTitleNode {
     }
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
-        if self.is_main_branch() {
+        if self.is_original() {
             update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
         }
     }
@@ -98,7 +98,7 @@ impl UpdateTitleNode {
         });
     }
     pub async fn update_branch(&self, req_data: &RequestData) {
-        if self.is_different_branch() {
+        if self.is_branched() {
             Branch::update(
                 &req_data.db_session(),
                 self.branch_id,

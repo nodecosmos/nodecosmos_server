@@ -142,7 +142,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branched_id(ancestor_id),
+                branch_id: self.reorder_data.branchise_id(ancestor_id),
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.old_order_index,
@@ -171,7 +171,7 @@ impl<'a> Reorder<'a> {
                     root_id: self.reorder_data.tree_root.id,
                     node_id: ancestor_id,
                     id: descendant.id,
-                    branch_id: self.reorder_data.branched_id(ancestor_id),
+                    branch_id: self.reorder_data.branchise_id(ancestor_id),
                     order_index: descendant.order_index,
                     ..Default::default()
                 };
@@ -196,7 +196,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branched_id(ancestor_id),
+                branch_id: self.reorder_data.branchise_id(ancestor_id),
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
@@ -224,7 +224,7 @@ impl<'a> Reorder<'a> {
             for descendant in self.reorder_data.descendants.clone() {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
-                    branch_id: self.reorder_data.branched_id(ancestor_id),
+                    branch_id: self.reorder_data.branchise_id(ancestor_id),
                     node_id: ancestor_id,
                     id: descendant.id,
                     order_index: descendant.order_index,
@@ -271,7 +271,7 @@ impl<'a> Reorder<'a> {
                     (
                         self.reorder_data.removed_ancestor_ids.clone(),
                         descendant_id,
-                        self.reorder_data.branched_id(*descendant_id),
+                        self.reorder_data.branchise_id(*descendant_id),
                     ),
                 )?;
             }
@@ -307,7 +307,7 @@ impl<'a> Reorder<'a> {
                     (
                         self.reorder_data.added_ancestor_ids.clone(),
                         descendant_id,
-                        self.reorder_data.branched_id(*descendant_id),
+                        self.reorder_data.branchise_id(*descendant_id),
                     ),
                 )?;
             }

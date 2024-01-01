@@ -115,7 +115,7 @@ impl<'a> Recovery<'a> {
     }
 
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.node.is_main_branch() {
+        if self.reorder_data.node.is_original() {
             NodeDescendant::delete_by_root_id(self.db_session, self.reorder_data.tree_root.id)
                 .await
                 .map_err(|err| {
@@ -174,7 +174,7 @@ impl<'a> Recovery<'a> {
             let mut batch = CharybdisModelBatch::new();
 
             for id in chunk {
-                let branch_id = self.reorder_data.branched_id(*id);
+                let branch_id = self.reorder_data.branchise_id(*id);
 
                 batch
                     .append_statement(
@@ -209,7 +209,7 @@ impl<'a> Recovery<'a> {
             let mut batch = CharybdisModelBatch::new();
 
             for id in chunk {
-                let branch_id = self.reorder_data.branched_id(*id);
+                let branch_id = self.reorder_data.branchise_id(*id);
 
                 batch
                     .append_statement(

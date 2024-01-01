@@ -24,13 +24,14 @@ use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uu
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::path::Ancestors;
 
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
     clustering_keys = [branch_id],
 )]
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Node {
     #[serde(default)]
     pub id: Uuid,
@@ -117,6 +118,23 @@ pub struct Node {
 }
 
 impl Node {
+    pub async fn find_branched_or_original(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<GetStructureNode, NodecosmosError> {
+        let node = GetStructureNode::find_by_primary_key_value(db_session, (id, branch_id))
+            .await
+            .ok();
+
+        match node {
+            Some(node) => Ok(node),
+            None => GetStructureNode::find_by_primary_key_value(db_session, (id, id))
+                .await
+                .map_err(|err| err.into()),
+        }
+    }
+
     pub async fn find_branch_nodes(
         db_session: &CachingSession,
         branch_id: Uuid,
@@ -132,9 +150,7 @@ impl Node {
 
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-            if self.is_different_branch() {
-                println!("hit is_different_branch");
-
+            if self.is_branched() {
                 return self.branch_parent(db_session).await;
             }
 
@@ -152,14 +168,11 @@ impl Node {
                 .await
                 .ok();
 
-            println!("hit branch_parent");
-
             match branch_parent {
                 Some(parent) => {
                     self.parent = Some(parent);
                 }
                 None => {
-                    println!("hit BaseNode");
                     let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
                     self.parent = Some(parent);
                 }

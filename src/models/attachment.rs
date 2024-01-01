@@ -1,9 +1,11 @@
+pub mod image;
+
 use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
 use crate::errors::NodecosmosError;
+use crate::models::attachment::image::Image;
 use crate::models::utils::impl_default_callbacks;
 use crate::services::aws::s3::upload_s3_object;
-use crate::services::image::Image;
 use actix_multipart::Multipart;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};

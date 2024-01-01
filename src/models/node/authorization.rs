@@ -14,7 +14,7 @@ use serde_json::json;
 /// Otherwise, the authorization is done by branch.
 impl Authorization for Node {
     async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_main_branch() {
+        if self.is_original() {
             *self = self.find_by_primary_key(data.db_session()).await?;
         } else {
             self.init_auth_branch(data.db_session()).await?;
@@ -28,7 +28,7 @@ impl Authorization for Node {
     }
 
     fn owner_id(&self) -> Option<Uuid> {
-        if self.is_main_branch() {
+        if self.is_original() {
             return self.owner_id;
         }
 
@@ -43,7 +43,7 @@ impl Authorization for Node {
     }
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
-        if self.is_main_branch() {
+        if self.is_original() {
             return self.editor_ids.clone();
         }
 
@@ -65,7 +65,7 @@ impl Authorization for Node {
             })));
         }
 
-        if self.is_different_branch() {
+        if self.is_branched() {
             self.auth_update(data).await?;
         } else if let Some(parent) = self.parent(data.db_session()).await? {
             parent.as_native().auth_update(data).await?;
@@ -84,7 +84,7 @@ impl AuthNode {
         }
         .as_native();
 
-        if native.is_main_branch() {
+        if native.is_original() {
             native = AuthNode::find_by_id_and_branch_id(data.db_session(), node_id, branch_id)
                 .await?
                 .as_native();

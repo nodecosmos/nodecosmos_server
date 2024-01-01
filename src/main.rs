@@ -9,12 +9,10 @@ mod services;
 mod utils;
 
 use crate::models::node::Node;
-use crate::services::prosemirror::ProseMirrorDoc;
 use actix_web::middleware::Logger;
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
 use app::App;
-use base64::decode;
 use std::sync::Arc;
 use uuid::uuid;
 use yrs::updates::decoder::Decode;
@@ -120,6 +118,7 @@ async fn main() {
                     .service(update_contribution_request_title)
                     .service(update_contribution_request_description)
                     .service(delete_contribution_request)
+                    .service(publish)
                     .service(merge_contribution_request),
             )
             .service(

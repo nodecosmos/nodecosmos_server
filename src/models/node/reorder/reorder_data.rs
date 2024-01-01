@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{GetStructureNode, Node};
+use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::utils::Pluckable;
 use crate::utils::cloned_ref::ClonedRef;
@@ -19,7 +19,7 @@ pub struct ReorderData {
     pub descendant_ids: Vec<Uuid>,
 
     pub old_parent_id: Option<Uuid>,
-    pub new_parent: GetStructureNode,
+    pub new_parent: BaseNode,
 
     pub old_ancestor_ids: Set<Uuid>,
     pub new_ancestor_ids: Set<Uuid>,
@@ -55,14 +55,22 @@ impl ReorderData {
 
         let old_parent_id = node.parent_id;
 
-        let new_parent = GetStructureNode {
-            id: params.new_parent_id,
-            branch_id: node.branched_id(params.new_parent_id),
+        let mut query_new_parent_node = Node {
+            id: params.id,
+            branch_id: params.branch_id,
+            parent_id: Some(params.new_parent_id),
             ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        };
+        let new_parent = query_new_parent_node.parent(&db_session).await?;
 
+        if new_parent.is_none() {
+            return Err(NodecosmosError::NotFound(format!(
+                "Parent with id {} and branch_id {} not found",
+                params.new_parent_id, params.branch_id
+            )));
+        }
+
+        let new_parent = new_parent.unwrap().clone();
         let old_ancestor_ids = node.ancestor_ids.cloned_ref();
         let new_ancestor_ids = build_new_ancestor_ids(&new_parent);
 
@@ -78,15 +86,15 @@ impl ReorderData {
             .cloned()
             .collect();
 
-        let new_upper_sibling = init_sibling(params.new_upper_sibling_id, &db_session).await?;
-        let new_lower_sibling = init_sibling(params.new_lower_sibling_id, &db_session).await?;
+        let new_upper_sibling = init_sibling(params.new_upper_sibling_id, params.branch_id, &db_session).await?;
+        let new_lower_sibling = init_sibling(params.new_lower_sibling_id, params.branch_id, &db_session).await?;
 
         let old_order_index = node.order_index;
         let new_order_index = build_new_index(&new_upper_sibling, &new_lower_sibling);
 
         let tree_root = GetStructureNode {
             id: node.root_id,
-            branch_id: node.branched_id(node.root_id),
+            branch_id: node.branchise_id(node.root_id),
             ..Default::default()
         }
         .find_by_primary_key(&db_session)
@@ -94,7 +102,7 @@ impl ReorderData {
 
         let tree_descendants = NodeDescendant {
             root_id: tree_root.id,
-            branch_id: node.branched_id(tree_root.id),
+            branch_id: node.branchise_id(tree_root.id),
             ..Default::default()
         }
         .find_by_partition_key(&db_session)
@@ -149,20 +157,13 @@ impl Branchable for ReorderData {
     }
 }
 
-// TODO: revise this
-// currently we use the id for branch_id as we suppose that we'll always sync up with latest main version
 pub async fn init_sibling(
     id: Option<Uuid>,
+    branch_id: Uuid,
     db_session: &CachingSession,
 ) -> Result<Option<GetStructureNode>, NodecosmosError> {
     if let Some(id) = id {
-        let node = GetStructureNode {
-            id,
-            branch_id: id,
-            ..Default::default()
-        }
-        .find_by_primary_key(&db_session)
-        .await?;
+        let node = Node::find_branched_or_original(&db_session, branch_id, id).await?;
 
         return Ok(Some(node));
     }
@@ -170,7 +171,7 @@ pub async fn init_sibling(
     Ok(None)
 }
 
-pub fn build_new_ancestor_ids(new_parent: &GetStructureNode) -> Set<Uuid> {
+pub fn build_new_ancestor_ids(new_parent: &BaseNode) -> Set<Uuid> {
     let mut new_ancestors = new_parent.ancestor_ids.cloned_ref();
 
     new_ancestors.insert(new_parent.id);

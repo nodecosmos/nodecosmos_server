@@ -9,8 +9,11 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
+use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
+use charybdis::callbacks::ExtCallbacks;
+use charybdis::operations::{Find, Insert, InsertWithExtCallbacks};
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
 use elasticsearch::Elasticsearch;
@@ -19,7 +22,7 @@ use scylla::CachingSession;
 
 impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_main_branch() {
+        if self.is_original() {
             let current_user = &data.current_user;
             let owner = Owner::init(current_user);
 
@@ -135,9 +138,9 @@ impl Node {
                     root_id: self.root_id,
                     node_id: *ancestor_id,
                     id: self.id,
-                    branch_id: self.branched_id(*ancestor_id),
+                    branch_id: self.branchise_id(*ancestor_id),
                     order_index: self.order_index,
-                    parent_id: self.parent_id.unwrap(),
+                    parent_id: self.parent_id.expect("parent_id must be present"),
                     title: self.title.clone(),
                 };
 
@@ -162,8 +165,66 @@ impl Node {
         }
     }
 
+    /// When we create node within branch (Contribution Request),
+    /// we need to create branched version for all ancestors,
+    /// so we can preserve branch changes in case any of ancestor is deleted,
+    /// and we can allow users to resolve conflicts.
+    pub async fn preserve_ancestors_for_branch(&self, data: &RequestData) {
+        if self.is_branched() {
+            let mut futures = vec![];
+
+            for ancestor_id in self.ancestor_ids.cloned_ref() {
+                let ancestor = Node {
+                    id: ancestor_id,
+                    branch_id: self.branchise_id(ancestor_id),
+                    ..Default::default()
+                };
+                let future = ancestor.create_branched_if_not_exist(data);
+
+                futures.push(future);
+            }
+
+            futures::future::join_all(futures).await;
+        }
+    }
+
+    /// Create branched version of self if it doesn't exist.
+    pub async fn create_branched_if_not_exist(self, data: &RequestData) {
+        let self_branched = self.find_by_primary_key(data.db_session()).await.ok();
+
+        if self_branched.is_none() {
+            let branch_id = self.branch_id;
+            let non_branched_res = Node {
+                branch_id: self.id,
+                ..self
+            }
+            .find_by_primary_key(data.db_session())
+            .await;
+
+            match non_branched_res {
+                Ok(mut self_branched) => {
+                    self_branched.branch_id = branch_id;
+                    let insert = self_branched.insert(data.db_session()).await;
+
+                    if let Err(e) = insert {
+                        log_error(format!(
+                            "Error creating branched node {} from non-branched node {}: {:?}",
+                            self_branched.id, self.id, e
+                        ));
+                    }
+
+                    self_branched.append_to_ancestors(data.db_session()).await;
+                    self_branched.create_new_version(&data).await;
+                }
+                Err(e) => {
+                    log_error(format!("Error finding non-branched node {}: {:?}", self.id, e));
+                }
+            }
+        }
+    }
+
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {
-        if self.is_main_branch() {
+        if self.is_original() {
             add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
         }
     }
@@ -179,7 +240,7 @@ impl Node {
     }
 
     pub async fn update_branch(&self, req_data: &RequestData) {
-        if self.is_different_branch() {
+        if self.is_branched() {
             Branch::update(
                 &req_data.db_session(),
                 self.branch_id,

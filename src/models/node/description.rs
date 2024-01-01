@@ -23,7 +23,7 @@ impl UpdateDescriptionNode {
     }
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
-        if self.is_main_branch() {
+        if self.is_original() {
             update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
         }
     }
@@ -54,7 +54,7 @@ impl UpdateDescriptionNode {
     }
 
     pub async fn update_branch(&self, req_data: &RequestData) {
-        if self.is_different_branch() {
+        if self.is_branched() {
             Branch::update(
                 &req_data.db_session(),
                 self.branch_id,

@@ -1,4 +1,5 @@
 pub mod branchable;
+pub mod conflict;
 pub mod merge;
 pub mod update;
 
@@ -6,12 +7,14 @@ use crate::errors::NodecosmosError;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
+use crate::models::udts::Conflict;
 use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Update};
-use charybdis::types::{Boolean, Frozen, Map, Set, Text, Uuid};
+use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 #[charybdis_model(
     table_name = branches,
@@ -21,7 +24,7 @@ use serde::{Deserialize, Serialize};
         gc_grace_seconds = 432000
     "#,
 )]
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Branch {
     pub id: Uuid,
 
@@ -49,6 +52,9 @@ pub struct Branch {
     // nodes
     #[serde(default, rename = "createdNodes")]
     pub created_nodes: Option<Set<Uuid>>,
+
+    #[serde(default, rename = "restoredNodes")]
+    pub restored_nodes: Option<Set<Uuid>>,
 
     #[serde(default, rename = "deletedNodes")]
     pub deleted_nodes: Option<Set<Uuid>>,
@@ -117,9 +123,15 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
 
+    pub conflicts: Option<Frozen<Set<Conflict>>>,
+
     #[serde(skip)]
     #[charybdis(ignore)]
     pub node: Option<Node>,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub _created_nodes: Rc<Option<Vec<Node>>>,
 }
 
 impl Branch {
@@ -133,14 +145,14 @@ impl Branch {
         Ok(self.node.as_ref())
     }
 
-    pub async fn created_nodes(&self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let Some(created_nodes) = &self.created_nodes {
+    pub async fn created_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
+        if let (Some(created_nodes), None) = (&self.created_nodes, self._created_nodes.as_ref()) {
             let nodes = Node::find_branch_nodes(db_session, self.id, created_nodes.clone()).await?;
 
-            return Ok(Some(nodes));
+            self._created_nodes = Rc::new(Some(nodes));
         }
 
-        Ok(None)
+        Ok(self._created_nodes.as_ref().clone())
     }
 
     pub async fn edited_title_nodes(

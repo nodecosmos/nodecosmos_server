@@ -40,7 +40,7 @@ impl Node {
     }
 
     pub async fn update_branch_with_deletion(&self, req_data: &RequestData) {
-        if self.is_different_branch() {
+        if self.is_branched() {
             Branch::update(
                 &req_data.db_session(),
                 self.branch_id,
@@ -154,7 +154,7 @@ impl<'a> NodeDelete<'a> {
                 if id != &self.node.id {
                     batch.append_delete(&PrimaryKeyNode {
                         id: *id,
-                        branch_id: self.node.branched_id(*id),
+                        branch_id: self.node.branchise_id(*id),
                     })?;
                 }
             }
@@ -178,7 +178,7 @@ impl<'a> NodeDelete<'a> {
             for id in node_ids_chunk {
                 batch.append_delete(&NodeCounter {
                     id: *id,
-                    branch_id: self.node.branched_id(*id),
+                    branch_id: self.node.branchise_id(*id),
                     ..Default::default()
                 })?;
             }
@@ -227,7 +227,7 @@ impl<'a> NodeDelete<'a> {
                         for (child_id, order_index) in children_chunk {
                             // delete node descendants for all of its ancestors
                             for ancestor_id in &current_ancestor_ids {
-                                let branch_id = self.node.branched_id(*ancestor_id);
+                                let branch_id = self.node.branchise_id(*ancestor_id);
 
                                 batch.append_delete(&NodeDescendant {
                                     root_id: self.node.root_id,
@@ -274,7 +274,7 @@ impl<'a> NodeDelete<'a> {
     }
 
     async fn delete_elastic_data(&self) {
-        if self.node.is_main_branch() {
+        if self.node.is_original() {
             bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &self.node_ids_to_delete).await;
         }
     }

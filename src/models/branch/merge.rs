@@ -5,17 +5,26 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::merge::description::DescriptionMerge;
 use crate::models::branch::Branch;
 use crate::models::node::{Node, UpdateDescriptionNode};
+use crate::models::udts::{Conflict, ConflictStatus, ConflictType};
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::log_error;
 use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks};
+use charybdis::types::Uuid;
 
 impl Branch {
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.validate_no_existing_conflicts().await?;
+        self.check_conflicts(data).await?;
+        self.restore_nodes(data).await?;
         self.create_nodes(data).await?;
         self.delete_nodes(data).await?;
         self.update_nodes_titles(data).await?;
         self.update_nodes_description(data).await?;
 
+        Ok(())
+    }
+
+    async fn restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         Ok(())
     }
 
@@ -80,7 +89,7 @@ impl Branch {
         let deleted_node_ids = self.deleted_nodes.cloned_ref();
 
         if let Some(edited_description_nodes) = self.edited_description_nodes(data.db_session()).await? {
-            for mut edited_description_node in edited_description_nodes {
+            for edited_description_node in edited_description_nodes {
                 if created_node_ids.contains(&edited_description_node.id)
                     || deleted_node_ids.contains(&edited_description_node.id)
                 {
@@ -103,7 +112,7 @@ impl Branch {
                 if let (Some(original_base64), Some(new_base64)) =
                     (original.description_base64, edited_description_node.description_base64)
                 {
-                    let mut description_merge = DescriptionMerge::new(original_base64, new_base64);
+                    let description_merge = DescriptionMerge::new(original_base64, new_base64);
                     original.description = Some(description_merge.html);
                     original.description_markdown = Some(description_merge.markdown);
                     original.description_base64 = Some(description_merge.base64);

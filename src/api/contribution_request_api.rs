@@ -95,9 +95,10 @@ pub async fn delete_contribution_request(
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
-pub async fn publish(data: &RequestData, contribution_request: &mut ContributionRequest) -> Response {
-    contribution_request.auth_update(data).await?;
-    contribution_request.publish(data).await?;
+#[put("/publish")]
+pub async fn publish(data: RequestData, mut contribution_request: web::Json<ContributionRequest>) -> Response {
+    contribution_request.auth_update(&data).await?;
+    contribution_request.publish(&data).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

@@ -26,6 +26,7 @@ impl ExtCallbacks for Node {
 
         tokio::spawn(async move {
             self_clone.append_to_ancestors(req_data.db_session()).await;
+            self_clone.preserve_ancestors_for_branch(&req_data).await;
             self_clone.add_to_elastic(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
             self_clone.update_branch(&req_data).await;

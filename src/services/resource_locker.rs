@@ -6,6 +6,7 @@ use deadpool_redis::{redis, Pool};
 
 const LOCK_NAMESPACE: &str = "LOCK";
 
+/// Resource Locker users redis to lock resources
 #[derive(Clone)]
 pub struct ResourceLocker {
     pool: Pool,

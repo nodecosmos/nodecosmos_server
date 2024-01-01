@@ -52,12 +52,27 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteNode(id) => {
-                res = UpdateDeletedNodesBranch {
+                let response = UpdateDeletedNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
                 .push_deleted_nodes(session, &vec![id])
                 .await;
+
+                match response {
+                    Ok(_) => {
+                        res = UpdateCreatedNodesBranch {
+                            id: branch_id,
+                            ..Default::default()
+                        }
+                        .pull_created_nodes(session, &vec![id])
+                        .await;
+                    }
+                    Err(err) => {
+                        log_fatal(format!("Failed to update branch: {}", err));
+                        return;
+                    }
+                }
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedNodeTitlesBranch {

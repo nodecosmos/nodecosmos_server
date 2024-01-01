@@ -1,0 +1,1 @@
+Services are used only for the logic that is external to the application like: aws, redis, elastic.

@@ -46,6 +46,7 @@ pub enum NodecosmosError {
     UnsupportedMediaType,
     ValidationError((String, String)),
     LockerError(String),
+    NotFound(String),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -67,6 +68,7 @@ impl fmt::Display for NodecosmosError {
                 write!(f, "Validation Error: {}: {}", field, message)
             }
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
+            NodecosmosError::NotFound(e) => write!(f, "Not Found: {}", e),
         }
     }
 }
@@ -88,6 +90,7 @@ impl Error for NodecosmosError {
             NodecosmosError::Conflict(_) => None,
             NodecosmosError::ValidationError(_) => None,
             NodecosmosError::LockerError(_) => None,
+            NodecosmosError::NotFound(_) => None,
         }
     }
 }
