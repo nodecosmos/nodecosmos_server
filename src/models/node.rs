@@ -120,16 +120,14 @@ pub struct Node {
 impl Node {
     pub async fn find_branched_or_original(
         db_session: &CachingSession,
-        branch_id: Uuid,
         id: Uuid,
-    ) -> Result<GetStructureNode, NodecosmosError> {
-        let node = GetStructureNode::find_by_primary_key_value(db_session, (id, branch_id))
-            .await
-            .ok();
+        branch_id: Uuid,
+    ) -> Result<Self, NodecosmosError> {
+        let node = Self::find_by_primary_key_value(db_session, (id, branch_id)).await.ok();
 
         match node {
             Some(node) => Ok(node),
-            None => GetStructureNode::find_by_primary_key_value(db_session, (id, id))
+            None => Self::find_by_primary_key_value(db_session, (id, id))
                 .await
                 .map_err(|err| err.into()),
         }
@@ -326,6 +324,24 @@ partial_node!(
     ancestor_ids,
     order_index
 );
+
+// TODO: DRY this up with trait
+impl GetStructureNode {
+    pub async fn find_branched_or_original(
+        db_session: &CachingSession,
+        id: Uuid,
+        branch_id: Uuid,
+    ) -> Result<Self, NodecosmosError> {
+        let node = Self::find_by_primary_key_value(db_session, (id, branch_id)).await.ok();
+
+        match node {
+            Some(node) => Ok(node),
+            None => Self::find_by_primary_key_value(db_session, (id, id))
+                .await
+                .map_err(|err| err.into()),
+        }
+    }
+}
 
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 

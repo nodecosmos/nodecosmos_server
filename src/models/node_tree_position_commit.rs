@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
         }
     "#
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct NodeTreePositionCommit {
     pub id: Uuid,
 

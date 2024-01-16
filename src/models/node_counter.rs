@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct NodeCounter {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,

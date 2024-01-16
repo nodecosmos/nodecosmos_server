@@ -141,7 +141,7 @@ impl<'a> Recovery<'a> {
     async fn restore_tree(&mut self) -> Result<(), NodecosmosError> {
         let now = std::time::Instant::now();
 
-        CharybdisModelBatch::chunked_insert(self.db_session, &self.reorder_data.tree_descendants, 100)
+        CharybdisModelBatch::chunked_insert(self.db_session, self.reorder_data.tree_descendants.clone(), 100)
             .await
             .map_err(|err| {
                 log_error(format!("restore_tree_descendants: {}", err));

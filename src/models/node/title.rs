@@ -56,7 +56,7 @@ impl UpdateTitleNode {
                     order_index: native.order_index,
                 };
 
-                if let Err(e) = batch.append_update(&node_descendant) {
+                if let Err(e) = batch.append_update(node_descendant) {
                     log_error(format!("Failed to append update node_descendants: {}", e));
                 }
             }

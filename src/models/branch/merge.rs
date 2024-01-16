@@ -4,6 +4,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::merge::description::DescriptionMerge;
 use crate::models::branch::Branch;
+use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{Node, UpdateDescriptionNode};
 use crate::models::udts::{Conflict, ConflictStatus, ConflictType};
 use crate::utils::cloned_ref::ClonedRef;
@@ -70,6 +71,34 @@ impl Branch {
             deleted_node.delete_cb(data.db_session(), data).await?;
         }
 
+        Ok(())
+    }
+
+    async fn reorder_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let deleted_node_ids = self.deleted_nodes.cloned_ref();
+        let created_node_ids = self.created_nodes.cloned_ref();
+
+        if let Some(reordered_nodes) = &self.reordered_nodes {
+            for reorder_node_data in reordered_nodes {
+                if deleted_node_ids.contains(&reorder_node_data.id) || created_node_ids.contains(&reorder_node_data.id)
+                {
+                    continue;
+                };
+
+                let node =
+                    Node::find_by_primary_key_value(data.db_session(), (reorder_node_data.id, reorder_node_data.id))
+                        .await?;
+
+                let reorder_params = ReorderParams {
+                    id: reorder_node_data.id,
+                    branch_id: reorder_node_data.id,
+                    new_parent_id: reorder_node_data.new_parent_id,
+                    new_upper_sibling_id: reorder_node_data.new_upper_sibling_id,
+                    new_lower_sibling_id: reorder_node_data.new_lower_sibling_id,
+                };
+                node.reorder(data, reorder_params).await?;
+            }
+        }
         Ok(())
     }
 

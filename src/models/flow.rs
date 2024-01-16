@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
     partition_keys = [node_id],
     clustering_keys = [workflow_id, vertical_index, start_index, id],
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,

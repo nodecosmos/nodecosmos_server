@@ -57,7 +57,12 @@ impl Display for ConflictStatus {
 #[derive(Serialize, Deserialize, Default, Eq, Hash, PartialEq)]
 #[charybdis_udt_model(type_name = conflict)]
 pub struct Conflict {
+    #[serde(rename = "objectId")]
     pub object_id: Uuid,
+
+    #[serde(rename = "type")]
     pub c_type: Text,
+
+    #[serde(rename = "status")]
     pub status: Text,
 }

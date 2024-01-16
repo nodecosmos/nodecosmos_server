@@ -150,6 +150,16 @@ impl Io {
 }
 
 partial_io!(
+    GetDescriptionIo,
+    root_node_id,
+    node_id,
+    workflow_id,
+    id,
+    description,
+    description_markdown
+);
+
+partial_io!(
     UpdateDescriptionIo,
     root_node_id,
     node_id,

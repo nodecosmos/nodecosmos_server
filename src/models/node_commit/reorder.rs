@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct ReorderCommit {
-    session: Arc<CachingSession>,
+pub struct ReorderCommit<'a> {
+    session: &'a CachingSession,
     current_user_id: Uuid,
     node_id: Uuid,
     branch_id: Uuid,
@@ -24,8 +24,8 @@ pub struct ReorderCommit {
     added_ancestor_ids: Vec<Uuid>,
 }
 
-impl ReorderCommit {
-    pub fn from_reorder_data(session: Arc<CachingSession>, current_user_id: Uuid, reorder_data: &ReorderData) -> Self {
+impl<'a> ReorderCommit<'a> {
+    pub fn from_reorder_data(session: &'a CachingSession, current_user_id: Uuid, reorder_data: &ReorderData) -> Self {
         Self {
             session,
             current_user_id,

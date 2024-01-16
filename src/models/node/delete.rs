@@ -11,7 +11,7 @@ use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::workflow::WorkDeleteFlow;
+use crate::models::workflow::DeleteWorkflow;
 use crate::services::elastic::bulk_delete_elastic_documents;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
@@ -126,27 +126,27 @@ impl<'a> NodeDelete<'a> {
             let mut batch = CharybdisModelBatch::unlogged();
 
             for id in node_ids_chunk {
-                batch.append_delete_by_partition_key(&WorkDeleteFlow {
+                batch.append_delete_by_partition_key(DeleteWorkflow {
                     node_id: *id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&DeleteFlow {
+                batch.append_delete_by_partition_key(DeleteFlow {
                     node_id: *id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&DeleteFlowStep {
+                batch.append_delete_by_partition_key(DeleteFlowStep {
                     node_id: *id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&DeleteIo {
+                batch.append_delete_by_partition_key(DeleteIo {
                     node_id: *id,
                     ..Default::default()
                 })?;
 
-                batch.append_delete_by_partition_key(&Like {
+                batch.append_delete_by_partition_key(Like {
                     object_id: *id,
                     ..Default::default()
                 })?;

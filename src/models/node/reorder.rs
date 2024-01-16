@@ -6,14 +6,18 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::udts::BranchReorderData;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
+use charybdis::model::BaseModel;
 use charybdis::operations::{execute, Update};
 use charybdis::types::Uuid;
 pub(crate) use recovery::Recovery;
@@ -53,7 +57,25 @@ impl Node {
 
         reorder.run(req_data.resource_locker()).await?;
 
-        NodeCommit::handle_reorder(&req_data, &reorder_data).await?;
+        let req_data = req_data.clone();
+
+        tokio::spawn(async move {
+            NodeCommit::handle_reorder(&req_data, &reorder_data).await;
+
+            if reorder_data.node.is_branched() {
+                Branch::update(
+                    req_data.db_session(),
+                    params.branch_id,
+                    BranchUpdate::ReorderNode(BranchReorderData {
+                        id: params.id,
+                        new_parent_id: params.new_parent_id,
+                        new_upper_sibling_id: params.new_upper_sibling_id,
+                        new_lower_sibling_id: params.new_lower_sibling_id,
+                    }),
+                )
+                .await;
+            }
+        });
 
         Ok(())
     }
@@ -207,7 +229,7 @@ impl<'a> Reorder<'a> {
             descendants_to_add.push(descendant);
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants_to_add, 100)
+        CharybdisModelBatch::chunked_insert(&self.db_session, descendants_to_add, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
@@ -236,7 +258,7 @@ impl<'a> Reorder<'a> {
             }
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, &descendants, 100)
+        CharybdisModelBatch::chunked_insert(&self.db_session, descendants, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));

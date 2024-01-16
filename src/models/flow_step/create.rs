@@ -1,5 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
+use charybdis::model::AsNative;
 use charybdis::operations::UpdateWithCallbacks;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -31,23 +32,23 @@ impl FlowStep {
                     }
                 }
                 None => {
-                    return Err(NodecosmosError::Conflict(format!(
-                        "The previous flow step's next flow step id is null"
-                    )));
+                    return Err(NodecosmosError::Conflict(
+                        "The previous flow step's next flow step id is null".to_string(),
+                    ));
                 }
             },
             (Some(prev_flow_step), None) => {
                 if prev_flow_step.next_flow_step_id.is_some() {
-                    return Err(NodecosmosError::Conflict(format!(
-                        "The previous flow step's next flow step id is not null"
-                    )));
+                    return Err(NodecosmosError::Conflict(
+                        "The previous flow step's next flow step id is not null".to_string(),
+                    ));
                 }
             }
             (None, Some(next_flow_step)) => {
                 if next_flow_step.prev_flow_step_id.is_some() {
-                    return Err(NodecosmosError::Conflict(format!(
-                        "The next flow step's previous flow step id is not null"
-                    )));
+                    return Err(NodecosmosError::Conflict(
+                        "The next flow step's previous flow step id is not null".to_string(),
+                    ));
                 }
             }
             (None, None) => {}
@@ -98,11 +99,14 @@ impl FlowStep {
 
     // syncs the prev and next flow steps when a new flow step is created
     pub async fn sync_surrounding_fs_on_creation(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut prev_flow_step = self.prev_flow_step(session).await?.as_ref().clone();
-        let mut next_flow_step = self.next_flow_step(session).await?.as_ref().clone();
+        let mut prev_flow_step = self.prev_flow_step(session).await?;
+        let mut next_flow_step = self.next_flow_step(session).await?;
 
         match (prev_flow_step.as_mut(), next_flow_step.as_mut()) {
             (Some(prev_fs), Some(next_fs)) => {
+                let mut prev_fs = prev_fs.as_native();
+                let mut next_fs = next_fs.as_native();
+
                 prev_fs.pull_outputs_from_next_flow_step(session).await?;
                 prev_fs.next_flow_step_id = Some(self.id);
                 prev_fs.update_cb(session).await?;
@@ -112,10 +116,14 @@ impl FlowStep {
                 next_fs.remove_inputs(session).await?;
             }
             (Some(prev_fs), None) => {
+                let mut prev_fs = prev_fs.as_native();
+
                 prev_fs.next_flow_step_id = Some(self.id);
                 prev_fs.update_cb(session).await?;
             }
             (None, Some(next_fs)) => {
+                let mut next_fs = next_fs.as_native();
+
                 next_fs.prev_flow_step_id = Some(self.id);
                 next_fs.update_cb(session).await?;
                 next_fs.remove_inputs(session).await?;

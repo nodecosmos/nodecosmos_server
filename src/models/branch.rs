@@ -7,8 +7,8 @@ use crate::errors::NodecosmosError;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
-use crate::models::udts::Conflict;
 use crate::models::udts::Owner;
+use crate::models::udts::{BranchReorderData, Conflict};
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
@@ -65,8 +65,8 @@ pub struct Branch {
     #[serde(default, rename = "editedNodeDescriptions")]
     pub edited_node_descriptions: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedNodeTreePositions")]
-    pub edited_node_tree_positions: Option<Set<Uuid>>,
+    #[serde(default, rename = "reorderedNodes")]
+    pub reordered_nodes: Option<Set<Frozen<BranchReorderData>>>,
 
     // workflows
     #[serde(default, rename = "createdWorkflows")]
@@ -123,7 +123,7 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
 
-    pub conflicts: Option<Frozen<Set<Conflict>>>,
+    pub conflicts: Option<Frozen<Set<Frozen<Conflict>>>>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
@@ -131,7 +131,7 @@ pub struct Branch {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub _created_nodes: Rc<Option<Vec<Node>>>,
+    pub _created_nodes: Option<Vec<Node>>,
 }
 
 impl Branch {
@@ -149,10 +149,10 @@ impl Branch {
         if let (Some(created_nodes), None) = (&self.created_nodes, self._created_nodes.as_ref()) {
             let nodes = Node::find_branch_nodes(db_session, self.id, created_nodes.clone()).await?;
 
-            self._created_nodes = Rc::new(Some(nodes));
+            self._created_nodes = Some(nodes);
         }
 
-        Ok(self._created_nodes.as_ref().clone())
+        Ok(self._created_nodes.clone())
     }
 
     pub async fn edited_title_nodes(
@@ -202,7 +202,7 @@ partial_branch!(UpdateEditedNodeTitlesBranch, id, edited_node_titles);
 
 partial_branch!(UpdateEditedNodeDescriptionsBranch, id, edited_node_descriptions);
 
-partial_branch!(UpdateEditedNodeTreePositionIdBranch, id, edited_node_tree_positions);
+partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
 partial_branch!(UpdateCreatedWorkflowsBranch, id, created_workflows);
 

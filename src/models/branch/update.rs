@@ -5,8 +5,9 @@ use crate::models::branch::{
     UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch, UpdateDeletedIOsBranch, UpdateDeletedNodesBranch,
     UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch,
     UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
-    UpdateEditedNodeTitlesBranch, UpdateEditedNodeTreePositionIdBranch, UpdateEditedWorkflowTitlesBranch,
+    UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes,
 };
+use crate::models::udts::BranchReorderData;
 use crate::utils::logger::log_fatal;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
@@ -18,7 +19,7 @@ pub enum BranchUpdate {
     DeleteNode(Uuid),
     EditNodeTitle(Uuid),
     EditNodeDescription(Uuid),
-    EditPosition(Uuid),
+    ReorderNode(BranchReorderData),
     CreateWorkflow(Uuid),
     DeleteWorkflow(Uuid),
     EditWorkflowTitle(Uuid),
@@ -90,12 +91,12 @@ impl Branch {
                 .push_edited_node_descriptions(session, &vec![id])
                 .await;
             }
-            BranchUpdate::EditPosition(id) => {
-                res = UpdateEditedNodeTreePositionIdBranch {
+            BranchUpdate::ReorderNode(reorder_data) => {
+                res = UpdateReorderedNodes {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_tree_positions(session, &vec![id])
+                .push_reordered_nodes(session, &vec![reorder_data])
                 .await;
             }
             BranchUpdate::CreateWorkflow(id) => {

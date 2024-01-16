@@ -128,7 +128,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_by_id_and_branch_id(data.db_session(), params.id, params.branch_id).await?;
+    let mut node = Node::find_branched_or_original(data.db_session(), params.id, params.branch_id).await?;
 
     node.auth_update(&data).await?;
 

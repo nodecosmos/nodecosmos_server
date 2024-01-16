@@ -6,6 +6,7 @@ use futures::TryStreamExt;
 use scylla::CachingSession;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// ### Workflow back-end structure
 /// - Each `Workflow` has multiple `Flows`
@@ -19,7 +20,7 @@ use std::collections::HashMap;
 /// Each Flow starting position, within the `Workflow`, is determined by `flow.startIndex` attribute.
 #[derive(Clone)]
 pub struct WorkflowDiagram {
-    pub flow_step_by_id: HashMap<Uuid, RefCell<FlowStep>>,
+    pub flow_step_by_id: HashMap<Uuid, Arc<Mutex<FlowStep>>>,
     pub flow_steps_ids_by_wf_index: HashMap<u32, Vec<Uuid>>,
     pub workflow_index_by_id: HashMap<Uuid, u32>,
 }
@@ -43,7 +44,7 @@ impl WorkflowDiagram {
 
                 workflow_index_by_id.insert(flow_step.id, workflow_index);
 
-                flow_step_by_id.insert(flow_step.id, RefCell::new(flow_step));
+                flow_step_by_id.insert(flow_step.id, Arc::new(Mutex::new(flow_step)));
 
                 workflow_index += 1;
             }
@@ -56,7 +57,10 @@ impl WorkflowDiagram {
         })
     }
 
-    pub fn flow_steps_by_wf_index(&mut self, index: u32) -> Result<Option<Vec<&RefCell<FlowStep>>>, NodecosmosError> {
+    pub fn flow_steps_by_wf_index(
+        &mut self,
+        index: u32,
+    ) -> Result<Option<Vec<&Arc<Mutex<FlowStep>>>>, NodecosmosError> {
         match self.flow_steps_ids_by_wf_index.get(&index) {
             Some(flow_step_ids) => {
                 let mut flow_steps = Vec::with_capacity(flow_step_ids.len());

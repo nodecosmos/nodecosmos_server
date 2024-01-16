@@ -2,7 +2,6 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Text, Uuid};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
 #[charybdis_model(
     table_name = node_descendants,
     partition_keys = [root_id],
@@ -16,7 +15,7 @@ use serde::{Deserialize, Serialize};
         }
     "#,
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct NodeDescendant {
     #[serde(rename = "rootId")]
     pub root_id: Uuid,

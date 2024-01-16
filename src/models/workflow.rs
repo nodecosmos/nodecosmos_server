@@ -118,6 +118,6 @@ impl Workflow {
 partial_workflow!(UpdateInitialInputsWorkflow, node_id, id, initial_input_ids, updated_at);
 
 // used by node deletion
-partial_workflow!(WorkDeleteFlow, node_id, id);
+partial_workflow!(DeleteWorkflow, node_id, id);
 
 partial_workflow!(UpdateWorkflowTitle, node_id, id, title, updated_at);

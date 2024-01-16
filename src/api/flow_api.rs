@@ -4,6 +4,7 @@ use crate::models::flow::{DescriptionFlow, Flow, UpdateTitleFlow};
 use crate::models::node::AuthNode;
 use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::model::BaseModel;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
 
@@ -22,6 +23,8 @@ pub async fn get_flow_description(
     _current_user: CurrentUser,
     flow: web::Path<DescriptionFlow>,
 ) -> Response {
+    println!("{:?}", flow.primary_key_values());
+
     let flow = flow.find_by_primary_key(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(flow))

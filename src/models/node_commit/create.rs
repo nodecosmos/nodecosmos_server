@@ -7,12 +7,14 @@ use crate::models::node_commit::reorder::ReorderCommit;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendants_commit::NodeDescendantsCommit;
 use crate::models::node_tree_position_commit::NodeTreePositionCommit;
+use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::Insert;
 use charybdis::types::{Double, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct TreePositionChange {
     pub parent_id: Option<Uuid>,
@@ -155,18 +157,16 @@ impl NodeCommit {
         Ok(())
     }
 
-    pub async fn handle_reorder(request_data: &RequestData, reorder_data: &ReorderData) -> Result<(), NodecosmosError> {
-        let session = request_data.app.db_session.clone();
-        let current_user_id = request_data.current_user.id;
-
-        let reorder_commit = ReorderCommit::from_reorder_data(session, current_user_id, &reorder_data);
-
-        // create new thread
-        tokio::spawn(async move {
-            let _ = reorder_commit.create().await;
-        });
-
-        Ok(())
+    pub async fn handle_reorder(request_data: &RequestData, reorder_data: &ReorderData) {
+        let reorder_commit =
+            ReorderCommit::from_reorder_data(request_data.db_session(), request_data.current_user_id(), &reorder_data);
+        let res = reorder_commit.create().await;
+        match res {
+            Ok(_) => {}
+            Err(e) => {
+                log_fatal(format!("handle_reorder: {:?}", e));
+            }
+        }
     }
 
     async fn create_ancestors_commits(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -190,8 +190,8 @@ impl NodeCommit {
             let mut new_v_node = NodeCommit::init_from(&versioned_ancestor, self.branch_id, self.user_id);
             new_v_node.node_descendants_commit_id = Some(new_v_node_descendant.id);
 
-            batch.append_insert(&new_v_node_descendant)?;
-            batch.append_insert(&new_v_node)?;
+            batch.append_insert(new_v_node_descendant)?;
+            batch.append_insert(new_v_node)?;
         }
 
         batch.execute(session).await?;
@@ -238,8 +238,8 @@ impl NodeCommit {
             let mut new_v_node = NodeCommit::init_from(&ancestor, self.branch_id, self.user_id);
             new_v_node.node_descendants_commit_id = Some(new_v_node_descendant.id);
 
-            batch.append_insert(&new_v_node_descendant)?;
-            batch.append_insert(&new_v_node)?;
+            batch.append_insert(new_v_node_descendant)?;
+            batch.append_insert(new_v_node)?;
         }
 
         batch.execute(session).await?;

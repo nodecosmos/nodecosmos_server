@@ -14,6 +14,7 @@ impl UpdateTitleIo {
                 let mut batch = CharybdisModelBatch::new();
 
                 for io in chunk {
+                    let mut io = std::mem::take(io);
                     if io.id == self.id {
                         continue;
                     }

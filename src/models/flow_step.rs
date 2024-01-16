@@ -72,11 +72,11 @@ pub struct FlowStep {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub prev_flow_step: Rc<Option<FlowStep>>,
+    pub prev_flow_step: Option<BaseFlowStep>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub next_flow_step: Rc<Option<FlowStep>>,
+    pub next_flow_step: Option<BaseFlowStep>,
 }
 
 impl FlowStep {
@@ -102,26 +102,57 @@ impl FlowStep {
         Ok(&mut self.workflow)
     }
 
-    pub async fn prev_flow_step(&mut self, session: &CachingSession) -> Result<Rc<Option<FlowStep>>, NodecosmosError> {
+    pub async fn prev_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(prev_flow_step_id) = self.prev_flow_step_id {
             if self.prev_flow_step.is_none() {
-                let res = FlowStep::find_by_node_id_and_id(session, self.node_id, prev_flow_step_id).await?;
-                self.prev_flow_step = Rc::new(Some(res));
+                let res = BaseFlowStep::find_by_node_id_and_id(session, self.node_id, prev_flow_step_id).await?;
+                self.prev_flow_step = Some(res);
             }
         }
 
-        Ok(Rc::clone(&self.prev_flow_step))
+        Ok(self.prev_flow_step.clone())
     }
 
-    pub async fn next_flow_step(&mut self, session: &CachingSession) -> Result<Rc<Option<FlowStep>>, NodecosmosError> {
+    pub async fn next_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(next_flow_step_id) = self.next_flow_step_id {
             if self.next_flow_step.is_none() {
-                let res = FlowStep::find_by_node_id_and_id(session, self.node_id, next_flow_step_id).await?;
-                self.next_flow_step = Rc::new(Some(res));
+                let res = BaseFlowStep::find_by_node_id_and_id(session, self.node_id, next_flow_step_id).await?;
+                self.next_flow_step = Some(res);
             }
         }
 
-        Ok(Rc::clone(&self.next_flow_step))
+        Ok(self.next_flow_step.clone())
+    }
+}
+
+partial_flow_step!(
+    BaseFlowStep,
+    node_id,
+    workflow_id,
+    flow_id,
+    flow_index,
+    id,
+    description,
+    description_markdown,
+    description_base64,
+    node_ids,
+    input_ids_by_node_id,
+    output_ids_by_node_id,
+    prev_flow_step_id,
+    next_flow_step_id,
+    created_at,
+    updated_at
+);
+
+impl BaseFlowStep {
+    pub async fn find_by_node_id_and_id(
+        session: &CachingSession,
+        node_id: Uuid,
+        id: Uuid,
+    ) -> Result<BaseFlowStep, NodecosmosError> {
+        let fs = find_first_base_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+
+        Ok(fs)
     }
 }
 

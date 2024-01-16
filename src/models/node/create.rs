@@ -10,7 +10,7 @@ use crate::models::udts::Owner;
 use crate::services::elastic::add_elastic_document;
 use crate::services::elastic::index::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::logger::log_error;
+use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::callbacks::ExtCallbacks;
 use charybdis::operations::{Find, Insert, InsertWithExtCallbacks};
@@ -144,24 +144,24 @@ impl Node {
                     title: self.title.clone(),
                 };
 
-                let _ = batch.append_insert(&node_descendant).map_err(|e| {
-                    log_error(format!(
-                        "Error appending node {} to ancestor {} descendants. {:?}",
-                        self.id, ancestor_id, e
-                    ));
+                let res = batch.append_insert(node_descendant);
 
-                    e
-                });
+                if let Err(e) = res {
+                    log_fatal(format!(
+                        "Error appending node {} to ancestors::append_insert {:?}",
+                        self.id, e
+                    ));
+                }
             }
 
-            let _ = batch
-                .execute(db_session)
-                .map_err(|e| {
-                    log_error(format!("Error appending node {} to ancestors. {:?}", self.id, e));
+            let res = batch.execute(db_session).await;
 
-                    e
-                })
-                .await;
+            if let Err(e) = res {
+                log_fatal(format!(
+                    "Error appending node {} to ancestors::execute {:?}",
+                    self.id, e
+                ));
+            }
         }
     }
 

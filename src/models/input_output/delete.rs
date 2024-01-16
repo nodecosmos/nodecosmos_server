@@ -89,7 +89,7 @@ impl Io {
 
             if let Some(mut next_flow_steps) = next_flow_steps {
                 for flow_step in next_flow_steps.iter_mut() {
-                    let mut flow_step = flow_step.borrow_mut();
+                    let mut flow_step = flow_step.lock()?;
                     flow_step.pull_input_id(session, id).await?;
                 }
             }

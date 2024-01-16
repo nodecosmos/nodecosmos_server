@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::authorization::Authorization;
-use crate::models::input_output::{DeleteIo, Io, UpdateDescriptionIo, UpdateTitleIo};
+use crate::models::input_output::{DeleteIo, GetDescriptionIo, Io, UpdateDescriptionIo, UpdateTitleIo};
 use crate::models::node::AuthNode;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -18,7 +18,7 @@ pub async fn create_io(data: RequestData, mut input_output: web::Json<Io>) -> Re
 }
 
 #[get("/{rootNodeId}/{nodeId}/{workflowId}/{id}/description")]
-pub async fn get_io_description(data: RequestData, input_output: web::Path<UpdateDescriptionIo>) -> Response {
+pub async fn get_io_description(data: RequestData, input_output: web::Path<GetDescriptionIo>) -> Response {
     let input_output = input_output.find_by_primary_key(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(input_output))
