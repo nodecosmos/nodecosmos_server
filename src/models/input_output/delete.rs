@@ -42,7 +42,7 @@ impl Io {
             let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
 
             if initial_input_ids.contains(&id) {
-                workflow.pull_initial_input_id(session, id).await?;
+                workflow.pull_initial_input_ids(session, &vec![id]).await?;
             }
         }
 

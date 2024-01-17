@@ -1,7 +1,6 @@
 mod authorization;
 mod callbacks;
 pub mod diagram;
-mod update;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;

@@ -146,7 +146,7 @@ async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
     node.update_cover_image(payload, &data).await?;
 
     Ok(HttpResponse::Ok().json(json!({
-        "coverImageURL": node.cover_image_url
+        "url": node.cover_image_url
     })))
 }
 
