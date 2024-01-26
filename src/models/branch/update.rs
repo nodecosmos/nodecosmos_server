@@ -5,18 +5,20 @@ use crate::models::branch::{
     UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch, UpdateDeletedIOsBranch, UpdateDeletedNodesBranch,
     UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch,
     UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
-    UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes,
+    UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
+use crate::models::utils::append_statement_or_log_fatal;
 use crate::utils::logger::log_fatal;
+use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Set, Uuid};
 use scylla::{CachingSession, QueryResult};
-
 pub enum BranchUpdate {
     CreateNode(Uuid),
     DeleteNode(Uuid),
+    RestoreNode(Uuid),
     EditNodeTitle(Uuid),
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
@@ -53,27 +55,66 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteNode(id) => {
-                let response = UpdateDeletedNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_nodes(session, &vec![id])
-                .await;
+                let mut batch = CharybdisModelBatch::new();
+                let params = (vec![id], branch_id);
 
-                match response {
-                    Ok(_) => {
-                        res = UpdateCreatedNodesBranch {
-                            id: branch_id,
-                            ..Default::default()
-                        }
-                        .pull_created_nodes(session, &vec![id])
-                        .await;
-                    }
-                    Err(err) => {
-                        log_fatal(format!("Failed to update branch: {}", err));
-                        return;
-                    }
+                if append_statement_or_log_fatal(
+                    &mut batch,
+                    UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY,
+                    params.clone(),
+                )
+                .is_err()
+                {
+                    return;
                 }
+
+                if append_statement_or_log_fatal(
+                    &mut batch,
+                    UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY,
+                    params.clone(),
+                )
+                .is_err()
+                {
+                    return;
+                }
+
+                if append_statement_or_log_fatal(
+                    &mut batch,
+                    UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY,
+                    params,
+                )
+                .is_err()
+                {
+                    return;
+                }
+
+                res = batch.execute(session).await;
+            }
+            BranchUpdate::RestoreNode(id) => {
+                let mut batch = CharybdisModelBatch::new();
+                let params = (vec![id], branch_id);
+
+                if append_statement_or_log_fatal(
+                    &mut batch,
+                    UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY,
+                    params.clone(),
+                )
+                .is_err()
+                {
+                    return;
+                }
+
+                if append_statement_or_log_fatal(
+                    &mut batch,
+                    UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY,
+                    params.clone(),
+                )
+                .is_err()
+                {
+                    return;
+                }
+
+                res = batch.execute(session).await;
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedNodeTitlesBranch {
@@ -307,6 +348,20 @@ impl Branch {
 
         if let Err(err) = res {
             log_fatal(format!("Failed to update branch: {}", err));
+        }
+
+        let branch = Branch::find_by_id(session, branch_id).await;
+
+        match branch {
+            Ok(mut branch) => {
+                let res = branch.check_conflicts(session).await;
+                if let Err(err) = res {
+                    log_fatal(format!("Failed to check conflicts: {}", err));
+                }
+            }
+            Err(err) => {
+                log_fatal(format!("Failed to find branch: {}", err));
+            }
         }
     }
 }

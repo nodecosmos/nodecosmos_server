@@ -1,9 +1,11 @@
+pub mod authorization;
 pub mod branchable;
 pub mod conflict;
 pub mod merge;
 pub mod update;
 
 use crate::errors::NodecosmosError;
+use crate::models::node::sort::SortNodes;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
@@ -123,15 +125,11 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
 
-    pub conflicts: Option<Frozen<Set<Frozen<Conflict>>>>,
+    pub conflict: Option<Frozen<Conflict>>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
     pub node: Option<Node>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _created_nodes: Option<Vec<Node>>,
 }
 
 impl Branch {
@@ -145,14 +143,26 @@ impl Branch {
         Ok(self.node.as_ref())
     }
 
-    pub async fn created_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let (Some(created_nodes), None) = (&self.created_nodes, self._created_nodes.as_ref()) {
-            let nodes = Node::find_branch_nodes(db_session, self.id, created_nodes.clone()).await?;
+    pub async fn created_nodes(&self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
+        if let Some(created_nodes) = &self.created_nodes {
+            let nodes = Node::find_branch_nodes(db_session, self.id, &created_nodes).await?;
 
-            self._created_nodes = Some(nodes);
+            return Ok(Some(nodes));
         }
 
-        Ok(self._created_nodes.clone())
+        Ok(None)
+    }
+
+    pub async fn restored_nodes(&self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
+        if let Some(restored_nodes) = &self.restored_nodes {
+            let mut nodes = Node::find_branch_nodes(db_session, self.id, &restored_nodes).await?;
+
+            nodes.sort_by_depth();
+
+            return Ok(Some(nodes));
+        }
+
+        Ok(None)
     }
 
     pub async fn edited_title_nodes(
@@ -197,6 +207,8 @@ partial_branch!(AuthBranch, id, owner_id, editor_ids, is_public);
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes);
 
 partial_branch!(UpdateDeletedNodesBranch, id, deleted_nodes);
+
+partial_branch!(UpdateRestoredNodesBranch, id, restored_nodes);
 
 partial_branch!(UpdateEditedNodeTitlesBranch, id, edited_node_titles);
 

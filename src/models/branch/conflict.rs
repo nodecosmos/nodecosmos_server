@@ -3,19 +3,18 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::find_pk_node;
 use crate::models::node::PkNode;
-use crate::models::udts::{Conflict, ConflictStatus, ConflictType};
+use crate::models::udts::{Conflict, ConflictStatus};
+use crate::models::utils::Pluckable;
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::operations::Update;
-use charybdis::types::Uuid;
+use charybdis::types::{Set, Uuid};
+use scylla::CachingSession;
 use std::collections::HashSet;
 
 impl Branch {
     pub async fn validate_no_existing_conflicts(&mut self) -> Result<(), NodecosmosError> {
-        if let Some(conflicts) = &self.conflicts {
-            if conflicts
-                .iter()
-                .any(|c| c.status == ConflictStatus::Pending.to_string())
-            {
+        if let Some(conflicts) = &self.conflict {
+            if conflicts.status == ConflictStatus::Pending.to_string() {
                 return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
             }
         }
@@ -23,29 +22,56 @@ impl Branch {
         Ok(())
     }
 
-    pub async fn check_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.check_ancestors_deletion(data).await?;
-        // self.check_prev_flow_step_deletion(data).await?;
-        // self.check_next_flow_step_deletion(data).await?;
-        // self.check_prev_step_output_deletion(data).await?;
-        // self.check_flow_step_node_deletion(data).await?;
-        // self.check_no_previous_flow(data).await?;
-        // self.check_no_initial_input(data).await?;
+    pub async fn check_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let deleted_ancestors = self.extract_deleted_ancestors(db_session).await?;
+        let has_new_conflicts = deleted_ancestors.is_some();
+        // has_new_conflicts |= deleted_nodes(db_session).await?;
+        // has_new_conflicts |= deleted_workflows(db_session).await?;
+        // has_new_conflicts |= deleted_flows(db_session).await?;
+        // has_new_conflicts |= deleted_flow_steps(db_session).await?;
+        // has_new_conflicts |= deleted_ios(db_session).await?;
 
-        Ok(())
+        match (&mut self.conflict, has_new_conflicts) {
+            (Some(conflict), true) => {
+                conflict.status = ConflictStatus::Pending.to_string();
+                conflict.deleted_ancestors = deleted_ancestors;
+            }
+            (None, true) => {
+                self.conflict = Some(Conflict {
+                    status: ConflictStatus::Pending.to_string(),
+                    deleted_ancestors,
+                });
+            }
+            (Some(conflict), false) => {
+                conflict.status = ConflictStatus::Resolved.to_string();
+                conflict.deleted_ancestors = None;
+            }
+            _ => {}
+        }
+
+        self.update(db_session).await?;
+
+        if has_new_conflicts {
+            Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()))
+        } else {
+            Ok(())
+        }
     }
 
-    /// Check if any of original ancestors of created nodes were deleted
-    pub async fn check_ancestors_deletion(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    /// Checks if any of original ancestors of created nodes were deleted
+    pub async fn extract_deleted_ancestors(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Set<Uuid>>, NodecosmosError> {
         let created_node_ids = self.created_nodes.cloned_ref();
         let restored_node_ids = self.restored_nodes.cloned_ref();
-        let created_nodes = self.created_nodes(data.db_session()).await?;
-        let mut has_conflicts = false;
+        let created_nodes = self.created_nodes(db_session).await?;
+        let mut deleted_ancestor_ids = HashSet::new();
 
         if let Some(created_nodes) = created_nodes {
             for created_node in created_nodes {
                 let ancestor_ids = created_node.ancestor_ids.cloned_ref();
-                let original_ancestors_ids = ancestor_ids
+                let branch_ancestor_ids = ancestor_ids
                     .iter()
                     .filter_map(|id| {
                         if created_node_ids.contains(id) || restored_node_ids.contains(id) {
@@ -56,36 +82,29 @@ impl Branch {
                     })
                     .collect::<Vec<Uuid>>();
 
-                let db_session = data.db_session();
+                let original_ancestor_ids_set = PkNode::find_and_collect_by_ids(&db_session, &branch_ancestor_ids)
+                    .await?
+                    .pluck_id_set();
 
-                let ancestors = find_pk_node!(
-                    db_session,
-                    "id IN ? AND branch_id IN ?",
-                    (original_ancestors_ids.clone(), original_ancestors_ids.clone())
-                )
-                .await?
-                .try_collect()
-                .await?;
+                let branch_node_deleted_ancestor_ids = branch_ancestor_ids
+                    .iter()
+                    .filter_map(|id| {
+                        if original_ancestor_ids_set.contains(id) {
+                            None
+                        } else {
+                            Some(*id)
+                        }
+                    })
+                    .collect::<Vec<Uuid>>();
 
-                if ancestors.len() != original_ancestors_ids.len() {
-                    has_conflicts = true;
-
-                    let conflicts = self.conflicts.get_or_insert_with(|| HashSet::new());
-                    conflicts.insert(Conflict {
-                        object_id: created_node.id,
-                        c_type: ConflictType::AncestorsDeleted.to_string(),
-                        status: ConflictStatus::Pending.to_string(),
-                    });
-                }
+                deleted_ancestor_ids.extend(branch_node_deleted_ancestor_ids);
             }
         }
 
-        if has_conflicts {
-            self.update(data.db_session()).await?;
-
-            return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
+        if deleted_ancestor_ids.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(deleted_ancestor_ids))
         }
-
-        Ok(())
     }
 }

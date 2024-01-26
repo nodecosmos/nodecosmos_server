@@ -80,6 +80,12 @@ impl ContributionRequest {
     }
 
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.status == Some(ContributionRequestStatus::Merged.to_string()) {
+            return Err(NodecosmosError::PreconditionFailed(
+                "Contribution request is already merged",
+            ));
+        }
+
         let mut branch = self.branch(data.db_session()).await?;
 
         branch.merge(data).await?;

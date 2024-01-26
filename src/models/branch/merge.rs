@@ -6,16 +6,16 @@ use crate::models::branch::merge::description::DescriptionMerge;
 use crate::models::branch::Branch;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{Node, UpdateDescriptionNode};
-use crate::models::udts::{Conflict, ConflictStatus, ConflictType};
+use crate::models::udts::{Conflict, ConflictStatus};
 use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::logger::log_error;
+use crate::utils::logger::{log_error, log_warning};
 use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks};
 use charybdis::types::Uuid;
 
 impl Branch {
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         self.validate_no_existing_conflicts().await?;
-        self.check_conflicts(data).await?;
+        self.check_conflicts(data.db_session()).await?;
         self.restore_nodes(data).await?;
         self.create_nodes(data).await?;
         self.delete_nodes(data).await?;
@@ -26,27 +26,32 @@ impl Branch {
     }
 
     async fn restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Ok(())
+        let restored_nodes = self.restored_nodes(data.db_session()).await?;
+
+        self.insert_nodes(data, restored_nodes).await
     }
 
     async fn create_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_node_ids = self.deleted_nodes.cloned_ref();
         let created_nodes = self.created_nodes(data.db_session()).await?;
 
+        self.insert_nodes(data, created_nodes).await
+    }
+
+    async fn insert_nodes(
+        &mut self,
+        data: &RequestData,
+        merge_nodes: Option<Vec<Node>>,
+    ) -> Result<(), NodecosmosError> {
         match self.node(data.db_session()).await? {
             Some(node) => {
-                if let Some(created_nodes) = created_nodes {
-                    for mut created_node in created_nodes {
-                        if deleted_node_ids.contains(&created_node.id) {
-                            continue;
-                        }
-
-                        created_node.merge = true;
-                        created_node.branch_id = created_node.id;
-                        created_node.owner_id = node.owner_id;
-                        created_node.owner_type = node.owner_type.clone();
-                        created_node.editor_ids = node.editor_ids.clone();
-                        created_node.insert_cb(data.db_session(), data).await?;
+                if let Some(merge_nodes) = merge_nodes {
+                    for mut merge_node in merge_nodes {
+                        merge_node.merge = true;
+                        merge_node.branch_id = merge_node.id;
+                        merge_node.owner_id = node.owner_id;
+                        merge_node.owner_type = node.owner_type.clone();
+                        merge_node.editor_ids = node.editor_ids.clone();
+                        merge_node.insert_cb(data.db_session(), data).await?;
                     }
                 }
             }
@@ -57,18 +62,35 @@ impl Branch {
                 )))
             }
         }
-
         Ok(())
     }
 
     async fn delete_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let deleted_node_ids = self.deleted_nodes.cloned_ref();
 
-        for deleted_node_id in deleted_node_ids {
-            let mut deleted_node =
-                Node::find_by_primary_key_value(data.db_session(), (deleted_node_id, deleted_node_id)).await?;
+        for deleted_node_id in deleted_node_ids.clone() {
+            let deleted_node = Node::find_by_id_and_branch_id(data.db_session(), deleted_node_id, deleted_node_id)
+                .await
+                .ok();
 
-            deleted_node.delete_cb(data.db_session(), data).await?;
+            match deleted_node {
+                Some(mut deleted_node) => {
+                    if let Some(ancestor_ids) = deleted_node.ancestor_ids.clone() {
+                        if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
+                            // skip deletion of node if it has an ancestor that is also deleted as it will be removed in the callback
+                            continue;
+                        }
+
+                        deleted_node.delete_cb(data.db_session(), data).await?;
+                    }
+                }
+                None => {
+                    log_warning(format!(
+                        "Failed to find deleted node with id {} and branch id {}",
+                        deleted_node_id, deleted_node_id
+                    ));
+                }
+            }
         }
 
         Ok(())

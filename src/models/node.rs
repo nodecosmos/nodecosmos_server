@@ -7,6 +7,7 @@ mod description;
 pub mod elastic_index;
 pub mod reorder;
 pub mod search;
+pub mod sort;
 mod title;
 pub mod update_cover_image;
 
@@ -94,11 +95,6 @@ pub struct Node {
     #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
 
-    #[serde(rename = "coverImageKey")]
-    pub cover_image_filename: Option<Text>,
-
-    // timestamps
-    #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
     #[serde(rename = "updatedAt")]
@@ -108,6 +104,11 @@ pub struct Node {
     #[serde(skip)]
     pub parent: Option<BaseNode>,
 
+    #[serde(rename = "coverImageKey")]
+    pub cover_image_filename: Option<Text>,
+
+    // timestamps
+    #[serde(rename = "createdAt")]
     #[charybdis(ignore)]
     #[serde(skip)]
     pub auth_branch: Option<AuthBranch>,
@@ -136,7 +137,7 @@ impl Node {
     pub async fn find_branch_nodes(
         db_session: &CachingSession,
         branch_id: Uuid,
-        ids: Set<Uuid>,
+        ids: &Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
         let res = find_node!(db_session, "branch_id = ? AND id IN ?", (branch_id, ids))
             .await?
@@ -267,6 +268,20 @@ impl Node {
 }
 
 partial_node!(PkNode, id, branch_id);
+
+impl PkNode {
+    pub async fn find_and_collect_by_ids(
+        db_session: &CachingSession,
+        ids: &Vec<Uuid>,
+    ) -> Result<Vec<PkNode>, NodecosmosError> {
+        let res = find_pk_node!(db_session, "id IN ? AND branch_id IN ?", (ids, ids))
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(res)
+    }
+}
 
 partial_node!(
     IndexNode,

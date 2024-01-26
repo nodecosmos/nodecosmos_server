@@ -127,6 +127,7 @@ async fn main() {
                     .service(get_presigned_url)
                     .service(create_attachment),
             )
+            .service(web::scope("branches").service(restore_node))
     })
     .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
