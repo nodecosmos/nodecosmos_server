@@ -89,6 +89,7 @@ impl ReorderData {
         let old_order_index = node.order_index;
         let new_order_index = build_new_index(&new_upper_sibling, &new_lower_sibling);
 
+        // used for recovery in case of failure mid-reorder
         let tree_root = GetStructureNode {
             id: node.root_id,
             branch_id: node.branchise_id(node.root_id),
@@ -142,16 +143,6 @@ impl ReorderData {
         }
 
         false
-    }
-}
-
-impl Branchable for ReorderData {
-    fn id(&self) -> Uuid {
-        self.node.id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.branch_id
     }
 }
 

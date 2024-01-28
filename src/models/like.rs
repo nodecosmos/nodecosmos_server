@@ -89,13 +89,3 @@ impl Like {
         }
     }
 }
-
-impl Branchable for Like {
-    fn id(&self) -> Uuid {
-        self.object_id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.branch_id
-    }
-}

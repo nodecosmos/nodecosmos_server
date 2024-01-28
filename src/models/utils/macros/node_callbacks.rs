@@ -21,6 +21,10 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::services::elastic::index::ElasticIndex;
 
+                if self.id != self.branch_id {
+                    return Ok(());
+                }
+
                 crate::services::elastic::update_elastic_document(
                     &req_data.app.elastic_client,
                     crate::models::node::Node::ELASTIC_IDX_NAME,

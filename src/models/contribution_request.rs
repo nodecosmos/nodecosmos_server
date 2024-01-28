@@ -1,4 +1,3 @@
-mod authorization;
 mod callbacks;
 pub mod create;
 pub mod status;
@@ -79,6 +78,15 @@ impl ContributionRequest {
         Ok(self.node.as_mut().unwrap())
     }
 
+    pub async fn branch(&mut self, session: &CachingSession) -> Result<&mut Branch, NodecosmosError> {
+        if self.branch.is_none() {
+            let branch = Branch::find_by_id(session, self.id).await?;
+            self.branch = Some(branch);
+        }
+
+        Ok(self.branch.as_mut().unwrap())
+    }
+
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.status == Some(ContributionRequestStatus::Merged.to_string()) {
             return Err(NodecosmosError::PreconditionFailed(
@@ -86,23 +94,13 @@ impl ContributionRequest {
             ));
         }
 
-        let mut branch = self.branch(data.db_session()).await?;
+        let branch = self.branch(data.db_session()).await?;
 
         branch.merge(data).await?;
 
         self.update_status(data, ContributionRequestStatus::Merged).await?;
 
         Ok(())
-    }
-}
-
-impl Branchable for ContributionRequest {
-    fn id(&self) -> Uuid {
-        self.id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.id
     }
 }
 

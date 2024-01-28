@@ -1,4 +1,3 @@
-pub mod authorization;
 pub mod branchable;
 pub mod conflict;
 pub mod merge;

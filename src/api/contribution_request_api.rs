@@ -1,5 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::errors::NodecosmosError;
 use crate::models::authorization::Authorization;
 use crate::models::branch::branchable::Branchable;
 use crate::models::contribution_request::{
@@ -31,7 +32,7 @@ pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
+    let mut contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
     let branch = contribution_request.branch(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
@@ -113,7 +114,17 @@ pub async fn merge_contribution_request(
 
     node.auth_update(&data).await?;
 
-    contribution_request.merge(&data).await?;
+    let res = contribution_request.merge(&data).await;
 
-    Ok(HttpResponse::Ok().json(contribution_request))
+    match res {
+        Ok(_) => Ok(HttpResponse::Ok().json(contribution_request)),
+        Err(e) => match e {
+            NodecosmosError::Conflict(e) => Ok(HttpResponse::Conflict().json(json!({
+                "status": 409,
+                "message": e,
+                "branch": contribution_request.branch(data.db_session()).await?,
+            }))),
+            _ => Err(e),
+        },
+    }
 }

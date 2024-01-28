@@ -1,5 +1,4 @@
-mod authorization;
-mod branchable;
+mod auth;
 pub mod callbacks;
 mod create;
 mod delete;
@@ -95,6 +94,7 @@ pub struct Node {
     #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
 
+    #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
     #[serde(rename = "updatedAt")]
@@ -107,8 +107,6 @@ pub struct Node {
     #[serde(rename = "coverImageKey")]
     pub cover_image_filename: Option<Text>,
 
-    // timestamps
-    #[serde(rename = "createdAt")]
     #[charybdis(ignore)]
     #[serde(skip)]
     pub auth_branch: Option<AuthBranch>,
@@ -145,6 +143,13 @@ impl Node {
             .await?;
 
         Ok(res)
+    }
+
+    pub async fn init_auth_branch(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let branch = AuthBranch::find_by_id(db_session, self.branch_id).await?;
+        self.auth_branch = Some(branch);
+
+        Ok(())
     }
 
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
