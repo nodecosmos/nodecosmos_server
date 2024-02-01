@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys=[object_id, branch_id]
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct LikesByUserId {
+pub struct LikesByUser {
     #[serde(rename = "userId")]
     pub user_id: Uuid,
 

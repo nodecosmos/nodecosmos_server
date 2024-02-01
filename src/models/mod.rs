@@ -1,5 +1,4 @@
 pub mod attachment;
-pub mod authorization;
 pub mod branch;
 pub mod contribution_request;
 pub mod description_commit;

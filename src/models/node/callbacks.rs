@@ -26,9 +26,9 @@ impl ExtCallbacks for Node {
 
         tokio::spawn(async move {
             self_clone.append_to_ancestors(req_data.db_session()).await;
-            self_clone.preserve_ancestors_for_branch(&req_data).await;
             self_clone.add_to_elastic(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
+            self_clone.preserve_ancestors_for_branch(&req_data).await;
             self_clone.update_branch(&req_data).await;
         });
 
@@ -62,7 +62,8 @@ impl ExtCallbacks for UpdateDescriptionNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _db_session: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.preserve_for_branch(&data).await?;
         self.sanitize_description();
         self.updated_at = Some(chrono::Utc::now());
 

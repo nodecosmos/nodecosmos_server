@@ -1,6 +1,6 @@
+use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::authorization::Authorization;
 use crate::models::node::Node;
 use actix::prelude::*;
 use actix_web::{get, web, HttpRequest};

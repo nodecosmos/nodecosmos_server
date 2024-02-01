@@ -1,3 +1,4 @@
+pub mod authorization;
 pub mod types;
 
 mod attachment_api;
@@ -9,7 +10,6 @@ mod input_output_api;
 mod like_api;
 mod node_api;
 mod request;
-mod session_api;
 mod user_api;
 mod workflow_api;
 mod ws;
@@ -23,7 +23,6 @@ pub use input_output_api::*;
 pub use like_api::*;
 pub use node_api::*;
 pub use request::*;
-pub use session_api::*;
 pub use user_api::*;
 pub use workflow_api::*;
 pub use ws::*;

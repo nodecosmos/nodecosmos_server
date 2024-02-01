@@ -1,8 +1,8 @@
+use crate::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::user::{UpdateUser, User};
+use crate::models::user::{UpdateProfileImageUser, UpdateUser, User};
 use crate::models::utils::impl_user_updated_at_with_elastic_ext_cb;
-use crate::services::elastic::index::ElasticIndex;
-use crate::services::elastic::{add_elastic_document, delete_elastic_document};
+use crate::services::elastic::ElasticDocument;
 use crate::App;
 use charybdis::callbacks::ExtCallbacks;
 use chrono::Utc;
@@ -23,7 +23,7 @@ impl ExtCallbacks for User {
     }
 
     async fn after_insert(&mut self, _session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
-        add_elastic_document(&app.elastic_client, User::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+        self.update_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }
@@ -34,10 +34,11 @@ impl ExtCallbacks for User {
     }
 
     async fn after_delete(&mut self, _: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
-        delete_elastic_document(&app.elastic_client, User::ELASTIC_IDX_NAME, self.id.to_string()).await;
+        self.update_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }
 }
 
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
+impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);

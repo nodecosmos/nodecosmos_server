@@ -1,7 +1,7 @@
+use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
-use crate::models::authorization::Authorization;
 use crate::models::branch::branchable::Branchable;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
@@ -32,7 +32,7 @@ pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let mut contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
+    let contribution_request = contribution_request.find_by_primary_key(&db_session).await?;
     let branch = contribution_request.branch(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({

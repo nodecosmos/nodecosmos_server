@@ -19,19 +19,13 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 req_data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
-                use crate::services::elastic::index::ElasticIndex;
+                use crate::services::elastic::{ElasticDocument, ElasticIndex};
 
                 if self.id != self.branch_id {
                     return Ok(());
                 }
 
-                crate::services::elastic::update_elastic_document(
-                    &req_data.app.elastic_client,
-                    crate::models::node::Node::ELASTIC_IDX_NAME,
-                    self,
-                    self.id.to_string(),
-                )
-                .await;
+                self.update_elastic_document(req_data.elastic_client()).await;
 
                 Ok(())
             }

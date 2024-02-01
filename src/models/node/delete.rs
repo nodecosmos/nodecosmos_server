@@ -12,8 +12,7 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::workflow::DeleteWorkflow;
-use crate::services::elastic::bulk_delete_elastic_documents;
-use crate::services::elastic::index::ElasticIndex;
+use crate::services::elastic::{ElasticDocument, ElasticIndex};
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
@@ -275,7 +274,7 @@ impl<'a> NodeDelete<'a> {
 
     async fn delete_elastic_data(&self) {
         if self.node.is_original() {
-            bulk_delete_elastic_documents(self.elastic_client, Node::ELASTIC_IDX_NAME, &self.node_ids_to_delete).await;
+            Node::bulk_delete_elastic_documents(self.elastic_client, &self.node_ids_to_delete).await;
         }
     }
 }

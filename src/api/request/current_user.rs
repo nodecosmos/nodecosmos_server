@@ -3,6 +3,7 @@ use crate::models::user::{CurrentUser, User};
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
+use scylla::CachingSession;
 use serde_json::json;
 use std::future::{ready, Ready};
 
@@ -49,6 +50,8 @@ pub fn set_current_user(client_session: &Session, user: &User) -> Result<Current
         email: user.email.clone(),
         is_confirmed: user.is_confirmed,
         is_blocked: user.is_blocked,
+        profile_image_filename: user.profile_image_filename.clone(),
+        profile_image_url: user.profile_image_url.clone(),
     };
 
     client_session
@@ -72,5 +75,23 @@ pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
             }
         }
         _ => None,
+    }
+}
+
+pub async fn refresh_current_user(
+    client_session: &Session,
+    db_session: &CachingSession,
+) -> Result<CurrentUser, NodecosmosError> {
+    let current_user = get_current_user(&client_session);
+
+    match current_user {
+        Some(user) => {
+            let user = User::find_by_id(&db_session, user.id).await?;
+            set_current_user(&client_session, &user)
+        }
+        None => Err(NodecosmosError::Unauthorized(json!({
+            "error": "Unauthorized! You must be logged in to perform this action",
+            "message": "You must be logged in to perform this action!"
+        }))),
     }
 }

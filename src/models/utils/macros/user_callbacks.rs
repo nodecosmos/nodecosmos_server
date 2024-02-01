@@ -1,13 +1,13 @@
 macro_rules! impl_user_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
         impl charybdis::callbacks::ExtCallbacks for $struct_name {
-            type Extension = Arc<App>;
+            type Extension = crate::api::data::RequestData;
             type Error = crate::errors::NodecosmosError;
 
             async fn before_update(
                 &mut self,
                 _session: &charybdis::CachingSession,
-                _ext: &crate::Arc<App>,
+                _ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 self.updated_at = Some(Utc::now());
 
@@ -17,15 +17,19 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
             async fn after_update(
                 &mut self,
                 _session: &charybdis::CachingSession,
-                app: &crate::Arc<App>,
+                req_data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
-                crate::services::elastic::update_elastic_document(
-                    &app.elastic_client,
-                    crate::models::user::User::ELASTIC_IDX_NAME,
-                    self,
-                    self.id.to_string(),
-                )
-                .await;
+                use crate::models::node::UpdateOwnerNode;
+                use crate::services::elastic::{ElasticDocument, ElasticIndex};
+
+                self.update_elastic_document(req_data.elastic_client()).await;
+
+                let user_id = self.id.clone();
+                let req_data = req_data.clone();
+
+                tokio::spawn(async move {
+                    UpdateOwnerNode::update_owner_records(&req_data, user_id).await;
+                });
 
                 Ok(())
             }
@@ -33,4 +37,5 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
     };
 }
 
+use crate::models::node::UpdateOwnerNode;
 pub(crate) use impl_user_updated_at_with_elastic_ext_cb;

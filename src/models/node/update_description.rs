@@ -7,10 +7,11 @@ use crate::models::description_commit::DescriptionCommit;
 use crate::models::node::{GetDescriptionBase64Node, GetDescriptionNode, Node, UpdateDescriptionNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
-use crate::services::elastic::index::ElasticIndex;
-use crate::services::elastic::update_elastic_document;
+use crate::services::elastic::ElasticDocument;
+use crate::services::elastic::ElasticIndex;
 use crate::utils::logger::log_error;
 use ammonia::clean;
+use charybdis::model::AsNative;
 use charybdis::operations::{Find, Insert};
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
@@ -24,7 +25,7 @@ impl UpdateDescriptionNode {
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
-            update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+            self.update_elastic_document(elastic_client).await;
         }
     }
 
@@ -53,6 +54,14 @@ impl UpdateDescriptionNode {
         });
     }
 
+    pub async fn preserve_for_branch(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            self.as_native().create_branched_if_not_exist(req_data).await;
+        }
+
+        Ok(())
+    }
+
     pub async fn update_branch(&self, req_data: &RequestData) {
         if self.is_branched() {
             Branch::update(
@@ -62,49 +71,5 @@ impl UpdateDescriptionNode {
             )
             .await;
         }
-    }
-}
-
-impl GetDescriptionNode {
-    pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
-            .await
-            .ok();
-
-        match branch_self {
-            Some(branch_self) => {
-                *self = branch_self;
-            }
-            None => {
-                let branch_id = self.branch_id;
-
-                *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
-                self.branch_id = branch_id;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl GetDescriptionBase64Node {
-    pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
-            .await
-            .ok();
-
-        match branch_self {
-            Some(branch_self) => {
-                *self = branch_self;
-            }
-            None => {
-                let branch_id = self.branch_id;
-
-                *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
-                self.branch_id = branch_id;
-            }
-        }
-
-        Ok(())
     }
 }

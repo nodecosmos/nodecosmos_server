@@ -1,6 +1,6 @@
+use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::authorization::Authorization;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;

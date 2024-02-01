@@ -1,18 +1,18 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::attachment::image::Image;
-use crate::models::node::UpdateCoverImageNode;
+use crate::models::user::UpdateProfileImageUser;
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::utils::logger::log_error;
 use actix_multipart::Multipart;
 use charybdis::operations::UpdateWithExtCallbacks;
 use futures::StreamExt;
 
-const IMG_WIDTH: u32 = 850;
-const IMG_HEIGHT: u32 = 375;
+const IMG_WIDTH: u32 = 296;
+const IMG_HEIGHT: u32 = 296;
 
-impl UpdateCoverImageNode {
-    pub async fn update_cover_image(
+impl UpdateProfileImageUser {
+    pub async fn update_profile_image(
         &mut self,
         data: &RequestData,
         mut payload: Multipart,
@@ -28,34 +28,34 @@ impl UpdateCoverImageNode {
 
             let timestamp = chrono::Utc::now().timestamp();
 
-            if let Some(cover_image_filename) = &self.cover_image_filename {
+            if let Some(profile_image_filename) = &self.profile_image_filename {
                 // delete s3 object asynchronously
                 let bucket = data.app.s3_bucket.clone();
-                let key = cover_image_filename.clone();
+                let key = profile_image_filename.clone();
                 let s3_client = data.app.s3_client.clone();
                 tokio::spawn(async move {
                     let _ = delete_s3_object(&s3_client, &bucket, &key).await.map_err(|e| {
-                        println!("Failed to delete existing cover image from S3: {:?}", e);
+                        println!("Failed to delete existing profile image from S3: {:?}", e);
                     });
                 });
             }
 
-            let new_cover_image_filename = format!("{}/{}-cover.jpeg", self.id, timestamp);
+            let new_profile_image_filename = format!("{}/{}-profile.jpeg", self.id, timestamp);
             let url = format!(
                 "https://{}.s3.amazonaws.com/{}",
-                data.app.s3_bucket, new_cover_image_filename
+                data.app.s3_bucket, new_profile_image_filename
             );
 
             upload_s3_object(
                 &data.s3_client(),
                 &data.s3_bucket(),
                 compressed,
-                &new_cover_image_filename,
+                &new_profile_image_filename,
             )
             .await?;
 
-            self.cover_image_url = Some(url.clone());
-            self.cover_image_filename = Some(new_cover_image_filename);
+            self.profile_image_url = Some(url.clone());
+            self.profile_image_filename = Some(new_profile_image_filename);
 
             self.update_cb(&data.db_session(), data).await?;
 
@@ -67,10 +67,10 @@ impl UpdateCoverImageNode {
         ))
     }
 
-    pub async fn delete_cover_image(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.cover_image_url.is_some() {
+    pub async fn delete_profile_image(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.profile_image_url.is_some() {
             let key = self
-                .cover_image_filename
+                .profile_image_filename
                 .clone()
                 .ok_or_else(|| NodecosmosError::InternalServerError("Missing cover image key".to_string()))?;
 
@@ -85,8 +85,8 @@ impl UpdateCoverImageNode {
             });
         }
 
-        self.cover_image_url = None;
-        self.cover_image_filename = None;
+        self.profile_image_url = None;
+        self.profile_image_filename = None;
 
         self.update_cb(&data.app.db_session, data).await?;
 

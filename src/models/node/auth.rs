@@ -1,6 +1,6 @@
+use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::authorization::Authorization;
 use crate::models::branch::branchable::Branchable;
 use crate::models::node::{AuthNode, Node};
 use crate::utils::logger::log_fatal;
@@ -9,6 +9,7 @@ use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
 use serde_json::json;
 
+/// We use auth node so we query only fields that are needed for authorization.
 impl AuthNode {
     pub async fn auth_update(data: &RequestData, node_id: Uuid, branch_id: Uuid) -> Result<(), NodecosmosError> {
         let mut native = AuthNode {

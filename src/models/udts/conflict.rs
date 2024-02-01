@@ -31,4 +31,7 @@ pub struct Conflict {
 
     #[serde(rename = "deletedAncestors")]
     pub deleted_ancestors: Option<Frozen<Set<Uuid>>>,
+
+    #[serde(rename = "deletedEditedNodes")]
+    pub deleted_edited_nodes: Option<Frozen<Set<Uuid>>>,
 }

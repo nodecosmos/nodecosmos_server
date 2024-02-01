@@ -5,7 +5,7 @@ use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::like::Like;
 use crate::models::node::reorder::reorder_data::ReorderData;
-use crate::models::node::{Node, UpdateDescriptionNode, UpdateTitleNode};
+use crate::models::node::{AuthNode, Node, UpdateDescriptionNode, UpdateTitleNode};
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -23,7 +23,7 @@ pub trait Branchable {
     }
 
     fn is_branched(&self) -> bool {
-        !self.is_original()
+        self.branch_id() != self.id()
     }
 
     fn branchise_id(&self, id: Uuid) -> Uuid {

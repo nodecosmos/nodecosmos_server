@@ -1,8 +1,8 @@
+use crate::api::authorization::Authorization;
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
 use crate::api::types::Response;
 use crate::app::App;
-use crate::models::authorization::Authorization;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
@@ -143,7 +143,7 @@ async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
 
     node.as_native().auth_update(&data).await?;
 
-    node.update_cover_image(payload, &data).await?;
+    node.update_cover_image(&data, payload).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "url": node.cover_image_url

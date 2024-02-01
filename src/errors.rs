@@ -54,15 +54,6 @@ pub enum NodecosmosError {
     InternalServerError(String),
 }
 
-impl NodecosmosError {
-    pub fn handle_append_statement_error(response: Result<(), CharybdisError>) {
-        if let Err(err) = response {
-            log_fatal(format!("Failed to append statement to batch: {}", err));
-            return;
-        }
-    }
-}
-
 impl fmt::Display for NodecosmosError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

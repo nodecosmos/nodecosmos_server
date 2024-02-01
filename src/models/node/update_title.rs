@@ -7,8 +7,7 @@ use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::services::elastic::index::ElasticIndex;
-use crate::services::elastic::update_elastic_document;
+use crate::services::elastic::ElasticDocument;
 use crate::utils::logger::log_error;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::AsNative;
@@ -77,7 +76,7 @@ impl UpdateTitleNode {
 
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
-            update_elastic_document(elastic_client, Node::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+            self.update_elastic_document(elastic_client).await;
         }
     }
 

@@ -50,11 +50,16 @@ async fn main() {
             .service(
                 web::scope("/users")
                     .service(get_user)
+                    .service(get_user_by_username)
                     .service(create_user)
                     .service(update_user)
-                    .service(delete_user),
+                    .service(delete_user)
+                    .service(login)
+                    .service(sync)
+                    .service(logout)
+                    .service(update_profile_image)
+                    .service(delete_profile_image),
             )
-            .service(web::scope("/sessions").service(login).service(sync).service(logout))
             .service(
                 web::scope("/nodes")
                     .service(get_nodes)

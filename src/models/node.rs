@@ -2,13 +2,13 @@ mod auth;
 pub mod callbacks;
 mod create;
 mod delete;
-mod description;
-pub mod elastic_index;
 pub mod reorder;
 pub mod search;
 pub mod sort;
-mod title;
 pub mod update_cover_image;
+mod update_description;
+mod update_owner;
+mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
@@ -91,6 +91,9 @@ pub struct Node {
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub like_count: Option<BigInt>,
 
+    #[serde(rename = "coverImageKey")]
+    pub cover_image_filename: Option<Text>,
+
     #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
 
@@ -104,9 +107,6 @@ pub struct Node {
     #[serde(skip)]
     pub parent: Option<BaseNode>,
 
-    #[serde(rename = "coverImageKey")]
-    pub cover_image_filename: Option<Text>,
-
     #[charybdis(ignore)]
     #[serde(skip)]
     pub auth_branch: Option<AuthBranch>,
@@ -117,21 +117,6 @@ pub struct Node {
 }
 
 impl Node {
-    pub async fn find_branched_or_original(
-        db_session: &CachingSession,
-        id: Uuid,
-        branch_id: Uuid,
-    ) -> Result<Self, NodecosmosError> {
-        let node = Self::find_by_primary_key_value(db_session, (id, branch_id)).await.ok();
-
-        match node {
-            Some(node) => Ok(node),
-            None => Self::find_by_primary_key_value(db_session, (id, id))
-                .await
-                .map_err(|err| err.into()),
-        }
-    }
-
     pub async fn find_branch_nodes(
         db_session: &CachingSession,
         branch_id: Uuid,
@@ -345,24 +330,6 @@ partial_node!(
     order_index
 );
 
-// TODO: DRY this up with trait
-impl GetStructureNode {
-    pub async fn find_branched_or_original(
-        db_session: &CachingSession,
-        id: Uuid,
-        branch_id: Uuid,
-    ) -> Result<Self, NodecosmosError> {
-        let node = Self::find_by_primary_key_value(db_session, (id, branch_id)).await.ok();
-
-        match node {
-            Some(node) => Ok(node),
-            None => Self::find_by_primary_key_value(db_session, (id, id))
-                .await
-                .map_err(|err| err.into()),
-        }
-    }
-}
-
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 
 partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
@@ -386,11 +353,64 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
-    cover_image_url,
     cover_image_filename,
+    cover_image_url,
     updated_at
 );
 
 partial_node!(PrimaryKeyNode, id, branch_id);
 
 partial_node!(AuthNode, id, branch_id, owner_id, editor_ids);
+
+partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
+
+// TODO: this could be replaced with traits by utilizing AsNative from CharybdisModel
+macro_rules! find_branched_or_original {
+    ($struct_name:ident) => {
+        impl $struct_name {
+            #[allow(unused)]
+            pub async fn find_branched_or_original(
+                db_session: &CachingSession,
+                id: Uuid,
+                branch_id: Uuid,
+            ) -> Result<Self, NodecosmosError> {
+                let node = Self::find_by_primary_key_value(db_session, (id, branch_id))
+                    .await
+                    .ok();
+
+                match node {
+                    Some(node) => Ok(node),
+                    None => Self::find_by_primary_key_value(db_session, (id, id))
+                        .await
+                        .map_err(|err| err.into()),
+                }
+            }
+
+            #[allow(unused)]
+            pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+                let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
+                    .await
+                    .ok();
+
+                match branch_self {
+                    Some(branch_self) => {
+                        *self = branch_self;
+                    }
+                    None => {
+                        let branch_id = self.branch_id;
+
+                        *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
+                        self.branch_id = branch_id;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    };
+}
+
+find_branched_or_original!(Node);
+find_branched_or_original!(GetStructureNode);
+find_branched_or_original!(GetDescriptionNode);
+find_branched_or_original!(GetDescriptionBase64Node);

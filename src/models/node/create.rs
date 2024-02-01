@@ -1,4 +1,5 @@
 use crate::api::data::RequestData;
+use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
@@ -7,8 +8,8 @@ use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::udts::Owner;
-use crate::services::elastic::add_elastic_document;
-use crate::services::elastic::index::ElasticIndex;
+use crate::services::elastic::ElasticDocument;
+use crate::services::elastic::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::CharybdisModelBatch;
@@ -17,14 +18,14 @@ use charybdis::operations::{Find, Insert, InsertWithExtCallbacks};
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
 use elasticsearch::Elasticsearch;
-use futures::TryFutureExt;
+use futures::{stream, StreamExt, TryFutureExt};
 use scylla::CachingSession;
 
 impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
             let current_user = &data.current_user;
-            let owner = Owner::init(current_user);
+            let owner = Owner::init_from_current_user(current_user);
 
             self.owner_id = Some(owner.id);
             self.owner_type = Some(owner.owner_type.clone());
@@ -32,8 +33,7 @@ impl Node {
             self.owner = Some(owner);
         } else {
             if let Some(parent) = self.parent(data.db_session()).await? {
-                if let Some(owner) = parent.owner.as_ref() {
-                    let owner = Owner::init_from(owner);
+                if let Some(owner) = parent.owner.clone() {
                     self.owner_id = Some(owner.id);
                     self.owner_type = Some(owner.owner_type.clone());
 
@@ -184,7 +184,9 @@ impl Node {
                 futures.push(future);
             }
 
-            futures::future::join_all(futures).await;
+            let futures_stream = stream::iter(futures);
+
+            let _: Vec<_> = futures_stream.buffer_unordered(MAX_PARALLEL_REQUESTS).collect().await;
         }
     }
 
@@ -207,7 +209,7 @@ impl Node {
                     let insert = self_branched.insert(data.db_session()).await;
 
                     if let Err(e) = insert {
-                        log_error(format!(
+                        log_fatal(format!(
                             "Error creating branched node {} from non-branched node {}: {:?}",
                             self_branched.id, self.id, e
                         ));
@@ -225,7 +227,7 @@ impl Node {
 
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
-            add_elastic_document(elastic_client, Self::ELASTIC_IDX_NAME, self, self.id.to_string()).await;
+            self.add_elastic_document(elastic_client).await;
         }
     }
 

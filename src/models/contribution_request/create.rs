@@ -10,7 +10,7 @@ use charybdis::types::Uuid;
 impl ContributionRequest {
     pub fn set_defaults(&mut self, data: &RequestData) {
         let now = chrono::Utc::now();
-        let owner = Owner::init(&data.current_user);
+        let owner = Owner::init_from_current_user(&data.current_user);
 
         self.id = Uuid::new_v4();
         self.created_at = Some(now);

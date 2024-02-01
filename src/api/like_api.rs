@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::like::Like;
-use crate::models::materialized_views::likes_by_user_id::LikesByUserId;
+use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, web, HttpResponse};
 use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks};
@@ -56,7 +56,7 @@ pub async fn delete_like(data: RequestData, mut like: web::Path<Like>) -> Respon
 
 #[get("/user_likes")]
 pub async fn user_likes(db_session: web::Data<CachingSession>, current_user: CurrentUser) -> Response {
-    let user_likes = LikesByUserId {
+    let user_likes = LikesByUser {
         user_id: current_user.id,
         ..Default::default()
     }

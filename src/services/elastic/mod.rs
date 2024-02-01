@@ -1,7 +1,6 @@
 mod document;
-pub mod index;
-mod index_builder;
+mod index;
 mod utils;
 
 pub use document::*;
-pub use index_builder::*;
+pub use index::*;

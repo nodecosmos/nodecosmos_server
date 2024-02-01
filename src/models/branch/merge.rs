@@ -18,6 +18,7 @@ impl Branch {
         self.check_conflicts(data.db_session()).await?;
         self.restore_nodes(data).await?;
         self.create_nodes(data).await?;
+        // self.reorder_nodes(data).await?;
         self.delete_nodes(data).await?;
         self.update_nodes_titles(data).await?;
         self.update_nodes_description(data).await?;

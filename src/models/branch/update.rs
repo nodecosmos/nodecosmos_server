@@ -1,3 +1,4 @@
+use crate::errors::NodecosmosError;
 use crate::models::branch::{
     Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepOutputsByNodeBranch,
     UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch, UpdateCreatedIOsBranch, UpdateCreatedNodesBranch,
@@ -15,6 +16,7 @@ use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Set, Uuid};
 use scylla::{CachingSession, QueryResult};
+
 pub enum BranchUpdate {
     CreateNode(Uuid),
     DeleteNode(Uuid),
@@ -356,7 +358,10 @@ impl Branch {
             Ok(mut branch) => {
                 let res = branch.check_conflicts(session).await;
                 if let Err(err) = res {
-                    log_fatal(format!("Failed to check conflicts: {}", err));
+                    match err {
+                        NodecosmosError::Conflict(_) => (),
+                        err => log_fatal(format!("Failed to check_conflicts: {}", err)),
+                    }
                 }
             }
             Err(err) => {

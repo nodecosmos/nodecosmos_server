@@ -1,6 +1,5 @@
 mod callbacks;
-pub mod current_user;
-pub mod elastic_index;
+pub mod update_profile_image;
 
 pub use super::udts::Address;
 use crate::errors::NodecosmosError;
@@ -38,19 +37,25 @@ pub struct User {
 
     pub bio: Option<Text>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
-
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
-
     pub address: Option<Address>,
+
+    #[serde(rename = "profileImage")]
+    pub profile_image_filename: Option<Text>,
+
+    #[serde(rename = "profileImageURL")]
+    pub profile_image_url: Option<Text>,
 
     #[serde(rename = "isConfirmed", default = "default_to_false")]
     pub is_confirmed: Boolean,
 
     #[serde(rename = "isBlocked", default = "default_to_false")]
     pub is_blocked: Boolean,
+
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<Timestamp>,
+
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<Timestamp>,
 }
 
 impl User {
@@ -108,7 +113,25 @@ impl User {
     }
 }
 
-partial_user!(GetUser, id, username, created_at, updated_at);
+partial_user!(
+    GetUser,
+    id,
+    username,
+    created_at,
+    updated_at,
+    profile_image_filename,
+    profile_image_url,
+    is_confirmed,
+    is_blocked
+);
+
+impl GetUser {
+    pub async fn find_by_username(session: &CachingSession, username: &String) -> Result<GetUser, NodecosmosError> {
+        find_first_get_user!(session, "username = ?", (&username,))
+            .await
+            .map_err(NodecosmosError::from)
+    }
+}
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
@@ -119,6 +142,40 @@ partial_user!(
     last_name,
     username,
     email,
+    profile_image_filename,
+    profile_image_url,
     is_confirmed,
     is_blocked
 );
+
+impl CurrentUser {
+    pub fn full_name(&self) -> String {
+        format!("{} {}", self.first_name, self.last_name)
+    }
+}
+
+partial_user!(
+    UpdateProfileImageUser,
+    id,
+    profile_image_filename,
+    profile_image_url,
+    updated_at
+);
+
+pub trait FullName {
+    fn full_name(&self) -> String;
+}
+
+macro_rules! impl_full_name {
+    ($($t:ty),+) => {
+        $(
+            impl FullName for $t {
+                fn full_name(&self) -> String {
+                    format!("{} {}", self.first_name, self.last_name)
+                }
+            }
+        )+
+    };
+}
+
+impl_full_name!(User, CurrentUser);
