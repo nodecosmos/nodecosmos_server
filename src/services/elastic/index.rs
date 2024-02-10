@@ -1,7 +1,7 @@
 use crate::models::node::{
     Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode,
 };
-use crate::models::user::{UpdateProfileImageUser, UpdateUser, User};
+use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use crate::services::elastic::utils::idx_exists;
 use charybdis::model::{AsNative, BaseModel, Model};
 use charybdis::types::Uuid;
@@ -224,3 +224,4 @@ impl_elastic_index!(UpdateOwnerNode, Node);
 
 impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);
+impl_elastic_index!(UpdateBioUser, User);

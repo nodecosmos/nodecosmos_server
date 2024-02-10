@@ -117,6 +117,9 @@ partial_user!(
     GetUser,
     id,
     username,
+    bio,
+    first_name,
+    last_name,
     created_at,
     updated_at,
     profile_image_filename,
@@ -161,6 +164,8 @@ partial_user!(
     profile_image_url,
     updated_at
 );
+
+partial_user!(UpdateBioUser, id, username, bio, updated_at);
 
 pub trait FullName {
     fn full_name(&self) -> String;

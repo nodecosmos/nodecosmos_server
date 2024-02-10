@@ -36,6 +36,7 @@ pub enum NodecosmosError {
     // 400s
     Unauthorized(serde_json::Value),
     ResourceLocked(&'static str),
+    ResourceAlreadyLocked(String),
     Forbidden(String),
     NotFound(String),
     Conflict(String),
@@ -51,6 +52,10 @@ pub enum NodecosmosError {
     RedisError(RedisError),
     ActixError(actix_web::Error),
     LockerError(String),
+    DecodeError(base64::DecodeError),
+    YjsError(yrs::encoding::read::Error),
+    MergeError(String),
+    FatalMergeError(String),
     InternalServerError(String),
 }
 
@@ -59,6 +64,7 @@ impl fmt::Display for NodecosmosError {
         match self {
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
             NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: \n{}", e),
+            NodecosmosError::ResourceAlreadyLocked(e) => write!(f, "ResourceAlreadyLocked Error: \n{}", e),
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
@@ -74,6 +80,10 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: \n{}", e),
             NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
+            NodecosmosError::DecodeError(e) => write!(f, "Decode Error: {}", e),
+            NodecosmosError::YjsError(e) => write!(f, "Yjs Error: {}", e),
+            NodecosmosError::MergeError(e) => write!(f, "Merge Error: {}", e),
+            NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
         }
     }
@@ -82,22 +92,15 @@ impl fmt::Display for NodecosmosError {
 impl Error for NodecosmosError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            NodecosmosError::ClientSessionError(_) => None,
-            NodecosmosError::Unauthorized(_) => None,
             NodecosmosError::CharybdisError(e) => Some(e),
             NodecosmosError::SerdeError(e) => Some(e),
             NodecosmosError::ElasticError(e) => Some(e),
             NodecosmosError::ResourceLocked(_) => None,
             NodecosmosError::RedisError(e) => Some(e),
-            NodecosmosError::InternalServerError(_) => None,
-            NodecosmosError::UnsupportedMediaType => None,
-            NodecosmosError::Forbidden(_) => None,
             NodecosmosError::ActixError(e) => Some(e),
-            NodecosmosError::Conflict(_) => None,
-            NodecosmosError::ValidationError(_) => None,
-            NodecosmosError::LockerError(_) => None,
-            NodecosmosError::NotFound(_) => None,
-            NodecosmosError::PreconditionFailed(_) => None,
+            NodecosmosError::DecodeError(e) => Some(e),
+            NodecosmosError::YjsError(e) => Some(e),
+            _ => None,
         }
     }
 }
@@ -153,12 +156,12 @@ impl ResponseError for NodecosmosError {
                 }
             },
             _ => {
-                println!("Internal Server Error: {}", self.to_string().red());
+                log_fatal(format!("Unhandled error: {}", self.to_string()));
 
-                HttpResponse::InternalServerError().json(json!({
+                return HttpResponse::InternalServerError().json(json!({
                     "status": 500,
                     "message": self.to_string()
-                }))
+                }));
             }
         }
     }
@@ -203,5 +206,17 @@ impl From<actix_web::Error> for NodecosmosError {
 impl<T> From<std::sync::PoisonError<T>> for NodecosmosError {
     fn from(e: std::sync::PoisonError<T>) -> Self {
         NodecosmosError::InternalServerError(e.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for NodecosmosError {
+    fn from(e: base64::DecodeError) -> Self {
+        NodecosmosError::DecodeError(e)
+    }
+}
+
+impl From<yrs::encoding::read::Error> for NodecosmosError {
+    fn from(e: yrs::encoding::read::Error) -> Self {
+        NodecosmosError::YjsError(e)
     }
 }

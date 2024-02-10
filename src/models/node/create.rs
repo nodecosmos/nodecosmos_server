@@ -1,12 +1,12 @@
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::models::udts::Owner;
 use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;

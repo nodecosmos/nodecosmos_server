@@ -1,5 +1,4 @@
 pub mod create;
-pub mod pluckable;
 pub mod reorder;
 
 use crate::constants::MAX_PARALLEL_REQUESTS;
@@ -27,7 +26,7 @@ use serde::{Deserialize, Serialize};
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct NodeCommit {
-    #[serde(rename = "nodeId")]
+    #[serde(default, rename = "nodeId")]
     pub node_id: Uuid,
 
     #[serde(rename = "branchId")]

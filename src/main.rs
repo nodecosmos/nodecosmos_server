@@ -52,7 +52,7 @@ async fn main() {
                     .service(get_user)
                     .service(get_user_by_username)
                     .service(create_user)
-                    .service(update_user)
+                    .service(update_bio)
                     .service(delete_user)
                     .service(login)
                     .service(sync)

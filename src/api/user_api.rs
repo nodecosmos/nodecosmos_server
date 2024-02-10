@@ -1,9 +1,9 @@
-use crate::api::authorization::Authorization;
 use crate::api::current_user::{get_current_user, refresh_current_user, set_current_user};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
-use crate::models::user::{GetUser, UpdateProfileImageUser, UpdateUser, User};
+use crate::models::traits::Authorization;
+use crate::models::user::{GetUser, UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use crate::App;
 use actix_multipart::Multipart;
 use actix_session::Session;
@@ -91,8 +91,8 @@ pub async fn create_user(app: web::Data<App>, client_session: Session, mut user:
     Ok(HttpResponse::Ok().json(json!({ "message": "User created", "user": current_user })))
 }
 
-#[put("")]
-pub async fn update_user(data: RequestData, client_session: Session, mut user: web::Json<UpdateUser>) -> Response {
+#[put("/bio")]
+pub async fn update_bio(data: RequestData, client_session: Session, mut user: web::Json<UpdateBioUser>) -> Response {
     user.as_native().auth_update(&data).await?;
 
     user.update_cb(data.db_session(), &data).await?;

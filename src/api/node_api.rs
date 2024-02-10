@@ -1,4 +1,3 @@
-use crate::api::authorization::Authorization;
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
 use crate::api::types::Response;
@@ -6,6 +5,7 @@ use crate::app::App;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
+use crate::models::traits::Authorization;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;

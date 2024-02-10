@@ -1,14 +1,14 @@
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::services::elastic::ElasticDocument;
-use crate::utils::logger::log_error;
+use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::AsNative;
 use elasticsearch::Elasticsearch;
@@ -24,20 +24,20 @@ impl UpdateTitleNode {
         }
 
         if let Err(e) = data.resource_locker().validate_node_unlocked(&native, true).await {
-            log_error(format!("Failed to validate node unlocked: {}", e));
+            log_fatal(format!("Failed to validate node unlocked for title update: {}", e));
             return;
         }
 
         if let Err(e) = data
             .resource_locker()
-            .lock_resource_action(
-                ActionTypes::Reorder(ActionObject::Node),
+            .lock_resource_actions(
                 &native.root_id.to_string(),
+                vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
                 1000,
             )
             .await
         {
-            log_error(format!("Failed to lock resource: {}", e));
+            log_fatal(format!("Failed to lock resource for title update: {}", e));
             return;
         }
 

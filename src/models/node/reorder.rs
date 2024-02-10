@@ -5,7 +5,6 @@ mod validator;
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::reorder::reorder_data::ReorderData;
@@ -13,14 +12,15 @@ use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::model::BaseModel;
 use charybdis::operations::{execute, Update};
-use charybdis::types::Uuid;
-pub(crate) use recovery::Recovery;
+use charybdis::types::{Double, Uuid};
+pub use recovery::Recovery;
 use scylla::CachingSession;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -40,45 +40,9 @@ pub struct ReorderParams {
 
     #[serde(rename = "newLowerSiblingId")]
     pub new_lower_sibling_id: Option<Uuid>,
-}
 
-impl Node {
-    pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        req_data.resource_locker().validate_node_unlocked(&self, false).await?;
-        req_data
-            .resource_locker()
-            .validate_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
-            .await?;
-
-        let reorder_data = ReorderData::from_params(&params, req_data.db_session()).await?;
-        let reorder_data = Arc::new(reorder_data);
-
-        let mut reorder = Reorder::new(req_data.db_session(), &reorder_data).await?;
-
-        reorder.run(req_data.resource_locker()).await?;
-
-        let req_data = req_data.clone();
-
-        tokio::spawn(async move {
-            NodeCommit::handle_reorder(&req_data, &reorder_data).await;
-
-            if reorder_data.node.is_branched() {
-                Branch::update(
-                    req_data.db_session(),
-                    params.branch_id,
-                    BranchUpdate::ReorderNode(BranchReorderData {
-                        id: params.id,
-                        new_parent_id: params.new_parent_id,
-                        new_upper_sibling_id: params.new_upper_sibling_id,
-                        new_lower_sibling_id: params.new_lower_sibling_id,
-                    }),
-                )
-                .await;
-            }
-        });
-
-        Ok(())
-    }
+    // we provide order_index only in context of merge recovery
+    pub new_order_index: Option<Double>,
 }
 
 pub struct Reorder<'a> {
@@ -336,6 +300,47 @@ impl<'a> Reorder<'a> {
 
             batch.execute(&self.db_session).await?;
         }
+
+        Ok(())
+    }
+}
+
+impl Node {
+    pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
+        req_data.resource_locker().validate_node_unlocked(&self, false).await?;
+        req_data
+            .resource_locker()
+            .validate_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
+            .await?;
+
+        let reorder_data = ReorderData::from_params(&params, req_data.db_session()).await?;
+        let reorder_data = Arc::new(reorder_data);
+
+        let mut reorder = Reorder::new(req_data.db_session(), &reorder_data).await?;
+
+        reorder.run(req_data.resource_locker()).await?;
+
+        let req_data = req_data.clone();
+
+        tokio::spawn(async move {
+            NodeCommit::handle_reorder(&req_data, &reorder_data).await;
+
+            if reorder_data.is_branched() {
+                Branch::update(
+                    req_data.db_session(),
+                    params.branch_id,
+                    BranchUpdate::ReorderNode(BranchReorderData {
+                        id: params.id,
+                        new_parent_id: params.new_parent_id,
+                        new_upper_sibling_id: params.new_upper_sibling_id,
+                        new_lower_sibling_id: params.new_lower_sibling_id,
+                        old_parent_id: reorder_data.old_parent_id.expect("old_parent_id not found"),
+                        old_order_index: reorder_data.old_order_index,
+                    }),
+                )
+                .await;
+            }
+        });
 
         Ok(())
     }

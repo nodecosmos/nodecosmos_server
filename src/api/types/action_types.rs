@@ -7,6 +7,7 @@ pub enum ActionTypes {
     Update(ActionObject),
     Delete(ActionObject),
     Reorder(ActionObject),
+    Merge,
 }
 
 impl Display for ActionTypes {
@@ -17,6 +18,7 @@ impl Display for ActionTypes {
             ActionTypes::Update(action_object) => write!(f, "UPDATE_{}", action_object),
             ActionTypes::Delete(action_object) => write!(f, "DELETE_{}", action_object),
             ActionTypes::Reorder(action_object) => write!(f, "REORDER_{}", action_object),
+            ActionTypes::Merge => write!(f, "MERGE"),
         }
     }
 }

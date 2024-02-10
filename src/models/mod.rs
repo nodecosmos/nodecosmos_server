@@ -16,6 +16,7 @@ pub mod node_counter;
 pub mod node_descendant;
 pub mod node_descendants_commit;
 pub mod node_tree_position_commit;
+pub mod traits;
 pub mod udts;
 pub mod user;
 pub mod utils;

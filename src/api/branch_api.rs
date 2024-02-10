@@ -1,8 +1,8 @@
-use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
+use crate::models::traits::Authorization;
 use actix_web::{put, web, HttpResponse};
 use charybdis::operations::Find;
 use charybdis::types::Uuid;

@@ -1,20 +1,29 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::description_commit::DescriptionCommit;
 use crate::models::node::{GetDescriptionBase64Node, GetDescriptionNode, Node, UpdateDescriptionNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
+use crate::models::traits::Branchable;
 use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;
 use crate::utils::logger::log_error;
 use ammonia::clean;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use charybdis::model::AsNative;
 use charybdis::operations::{Find, Insert};
 use elasticsearch::Elasticsearch;
+use quick_xml::events::Event;
+use quick_xml::name::QName;
+use quick_xml::Reader;
 use scylla::CachingSession;
+use serde::de::Unexpected::Option;
+use std::borrow::Cow;
+use yrs::updates::decoder::Decode;
+use yrs::{Doc, GetString, ReadTxn, Transact, TransactionMut, Update, XmlElementRef};
 
 impl UpdateDescriptionNode {
     pub fn sanitize_description(&mut self) {

@@ -1,8 +1,8 @@
-use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::node::{AuthNode, Node};
+use crate::models::traits::Authorization;
+use crate::models::traits::Branchable;
 use crate::utils::logger::log_fatal;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;

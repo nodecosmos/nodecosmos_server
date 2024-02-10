@@ -1,4 +1,3 @@
-pub mod authorization;
 pub mod types;
 
 mod attachment_api;

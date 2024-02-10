@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
-use crate::models::utils::impl_node_updated_at_with_elastic_ext_cb;
+use crate::models::traits::MergeDescription;
 use charybdis::callbacks::ExtCallbacks;
 use scylla::CachingSession;
 
@@ -10,7 +10,7 @@ impl ExtCallbacks for Node {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if !self.merge {
+        if !self.merge_ctx {
             self.set_defaults(db_session).await?;
             self.set_owner(data).await?;
             self.validate_root().await?;
@@ -62,9 +62,14 @@ impl ExtCallbacks for UpdateDescriptionNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.preserve_for_branch(&data).await?;
         self.sanitize_description();
+
+        if !self.recovery_ctx {
+            self.merge_description(&db_session).await?;
+        }
+
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())
@@ -115,6 +120,41 @@ impl ExtCallbacks for UpdateTitleNode {
 
         Ok(())
     }
+}
+
+macro_rules! impl_node_updated_at_with_elastic_ext_cb {
+    ($struct_name:ident) => {
+        impl charybdis::callbacks::ExtCallbacks for $struct_name {
+            type Extension = crate::api::data::RequestData;
+            type Error = crate::errors::NodecosmosError;
+
+            async fn before_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                _ext: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                self.updated_at = Some(chrono::Utc::now());
+
+                Ok(())
+            }
+
+            async fn after_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                req_data: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                use crate::services::elastic::{ElasticDocument, ElasticIndex};
+
+                if self.id != self.branch_id {
+                    return Ok(());
+                }
+
+                self.update_elastic_document(req_data.elastic_client()).await;
+
+                Ok(())
+            }
+        }
+    };
 }
 
 impl_node_updated_at_with_elastic_ext_cb!(UpdateLikesCountNode);

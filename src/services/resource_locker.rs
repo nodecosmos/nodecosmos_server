@@ -26,6 +26,13 @@ impl ResourceLocker {
         let mut connection = self.pool.get().await?;
         let key = format!("{}:{}", LOCK_NAMESPACE, resource_id);
 
+        if self.is_resource_locked(resource_id).await? {
+            return Err(NodecosmosError::ResourceAlreadyLocked(format!(
+                "Resource: {} is already locked",
+                resource_id
+            )));
+        }
+
         redis::cmd("SET")
             .arg(key)
             .arg("1")
@@ -41,15 +48,47 @@ impl ResourceLocker {
         Ok(true)
     }
 
+    pub async fn lock_resource_actions(
+        &self,
+        resource_id: &str,
+        actions: Vec<ActionTypes>,
+        ttl: usize,
+    ) -> Result<bool, NodecosmosError> {
+        let mut connection = self.pool.get().await?;
+        let key = format!("{}:{}", LOCK_NAMESPACE, resource_id);
+
+        let mut pipe = redis::pipe();
+        for action in actions {
+            self.check_resource_action_unlocked(&action, resource_id).await?;
+
+            pipe.cmd("SET")
+                .arg(format!("{}:{}:{}", LOCK_NAMESPACE, action, resource_id))
+                .arg("1")
+                .arg("NX")
+                .arg("PX")
+                .arg(ttl);
+        }
+        pipe.cmd("SET").arg(key).arg("1").arg("NX").arg("PX").arg(ttl);
+
+        pipe.query_async(&mut *connection).await.map_err(|e| {
+            NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", resource_id, e))
+        })?;
+
+        Ok(true)
+    }
+
     /// Lock specific action on resource
     pub async fn lock_resource_action(
         &self,
-        resource_action: ActionTypes,
         resource_id: &str,
+        resource_action: ActionTypes,
         ttl: usize,
     ) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
         let key = format!("{}:{}:{}", LOCK_NAMESPACE, resource_action, resource_id);
+
+        self.check_resource_action_unlocked(&resource_action, resource_id)
+            .await?;
 
         redis::cmd("SET")
             .arg(key)
@@ -67,6 +106,24 @@ impl ResourceLocker {
             })?;
 
         Ok(true)
+    }
+
+    async fn check_resource_action_unlocked(
+        &self,
+        resource_action: &ActionTypes,
+        resource_id: &str,
+    ) -> Result<(), NodecosmosError> {
+        if self
+            .is_resource_action_locked(&resource_action, resource_id.to_string())
+            .await?
+        {
+            return Err(NodecosmosError::ResourceAlreadyLocked(format!(
+                "Resource action: {} for resource: {} is already locked",
+                resource_action, resource_id
+            )));
+        }
+
+        Ok(())
     }
 
     pub async fn is_resource_locked(&self, resource_id: &str) -> Result<bool, NodecosmosError> {

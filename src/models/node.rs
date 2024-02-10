@@ -11,9 +11,9 @@ mod update_owner;
 mod update_title;
 
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::AuthBranch;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::models::udts::Owner;
 use crate::utils::defaults::default_to_0;
 use crate::utils::defaults::default_to_false;
@@ -113,7 +113,11 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub merge: Boolean,
+    pub merge_ctx: Boolean,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub recovery_ctx: Boolean,
 }
 
 impl Node {
@@ -344,7 +348,8 @@ partial_node!(
     short_description,
     description_markdown,
     description_base64,
-    updated_at
+    updated_at,
+    recovery_ctx
 );
 
 partial_node!(

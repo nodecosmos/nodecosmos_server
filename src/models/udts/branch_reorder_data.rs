@@ -1,12 +1,14 @@
 use charybdis::macros::charybdis_udt_model;
-use charybdis::types::Uuid;
+use charybdis::types::{Double, Int, Uuid};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Default, PartialEq)]
 #[charybdis_udt_model(type_name = BranchReorderData)]
 pub struct BranchReorderData {
     pub id: Uuid,
     pub new_parent_id: Uuid,
     pub new_upper_sibling_id: Option<Uuid>,
     pub new_lower_sibling_id: Option<Uuid>,
+    pub old_parent_id: Uuid,
+    pub old_order_index: Double,
 }

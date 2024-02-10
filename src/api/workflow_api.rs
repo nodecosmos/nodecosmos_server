@@ -1,9 +1,9 @@
-use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
+use crate::models::traits::Authorization;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;

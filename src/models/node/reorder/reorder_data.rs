@@ -1,9 +1,8 @@
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::utils::Pluckable;
+use crate::models::traits::{Branchable, Pluck};
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
@@ -86,8 +85,12 @@ impl ReorderData {
         let new_upper_sibling = init_sibling(&db_session, params.new_upper_sibling_id, params.branch_id).await?;
         let new_lower_sibling = init_sibling(&db_session, params.new_lower_sibling_id, params.branch_id).await?;
 
+        let new_order_index = match params.new_order_index {
+            Some(index) => index,
+            None => build_new_index(&new_upper_sibling, &new_lower_sibling),
+        };
+
         let old_order_index = node.order_index;
-        let new_order_index = build_new_index(&new_upper_sibling, &new_lower_sibling);
 
         // used for recovery in case of failure mid-reorder
         let tree_root = GetStructureNode {

@@ -1,11 +1,11 @@
-use crate::api::authorization::Authorization;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
+use crate::models::traits::Authorization;
+use crate::models::traits::Branchable;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{Delete, Find, InsertWithExtCallbacks, New, UpdateWithCallbacks};

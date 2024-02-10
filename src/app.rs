@@ -1,3 +1,5 @@
+use crate::api::data::RequestData;
+use crate::models::branch::merge::BranchMerge;
 use crate::models::node::reorder::Recovery;
 use crate::services::elastic::ElasticIndexBuilder;
 use crate::services::resource_locker::ResourceLocker;
@@ -6,7 +8,7 @@ use actix_session::config::PersistentSession;
 use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
-use actix_web::{cookie, http};
+use actix_web::{cookie, http, web};
 use deadpool_redis::{Config, Pool, Runtime};
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
@@ -61,6 +63,11 @@ impl App {
         ElasticIndexBuilder::new(&self.elastic_client).build().await;
         // init recovery in case reordering was interrupted or failed
         Recovery::recover_from_stored_data(&self.db_session, &self.resource_locker).await;
+        BranchMerge::recover_from_stored_data(&RequestData {
+            app: web::Data::new(self.clone()),
+            current_user: Default::default(),
+        })
+        .await;
     }
 
     pub fn cors(&self) -> Cors {

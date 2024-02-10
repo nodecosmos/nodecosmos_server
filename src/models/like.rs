@@ -3,9 +3,9 @@ mod create;
 pub mod likeable;
 
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::like::likeable::Likeable;
 use crate::models::node_counter::NodeCounter;
+use crate::models::traits::Branchable;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
 use scylla::CachingSession;

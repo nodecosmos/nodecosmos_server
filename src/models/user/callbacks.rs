@@ -1,9 +1,9 @@
 use crate::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::user::{UpdateProfileImageUser, UpdateUser, User};
-use crate::models::utils::impl_user_updated_at_with_elastic_ext_cb;
+use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use crate::services::elastic::ElasticDocument;
 use crate::App;
+use ammonia::clean;
 use charybdis::callbacks::ExtCallbacks;
 use chrono::Utc;
 use scylla::CachingSession;
@@ -40,5 +40,65 @@ impl ExtCallbacks for User {
     }
 }
 
+macro_rules! impl_user_updated_at_with_elastic_ext_cb {
+    ($struct_name:ident) => {
+        impl charybdis::callbacks::ExtCallbacks for $struct_name {
+            type Extension = crate::api::data::RequestData;
+            type Error = crate::errors::NodecosmosError;
+
+            async fn before_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                _ext: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                self.updated_at = Some(Utc::now());
+
+                Ok(())
+            }
+
+            async fn after_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                req_data: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                use crate::models::node::UpdateOwnerNode;
+                use crate::services::elastic::{ElasticDocument, ElasticIndex};
+
+                self.update_elastic_document(req_data.elastic_client()).await;
+
+                let user_id = self.id.clone();
+                let req_data = req_data.clone();
+
+                tokio::spawn(async move {
+                    UpdateOwnerNode::update_owner_records(&req_data, user_id).await;
+                });
+
+                Ok(())
+            }
+        }
+    };
+}
+
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
+
+impl ExtCallbacks for UpdateBioUser {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = Some(Utc::now());
+
+        if let Some(bio) = &self.bio {
+            self.bio = Some(clean(bio));
+        }
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.update_elastic_document(data.elastic_client()).await;
+
+        Ok(())
+    }
+}

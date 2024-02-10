@@ -135,12 +135,27 @@ impl Branch {
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
-                res = UpdateReorderedNodes {
-                    id: branch_id,
-                    ..Default::default()
+                let branch = UpdateReorderedNodes::find_by_id(session, branch_id).await;
+                match branch {
+                    Ok(mut branch) => {
+                        // filter out existing reorder nodes with same id
+                        let mut new_reorder_nodes = branch
+                            .reordered_nodes
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|node| node.id != reorder_data.id)
+                            .collect::<Vec<_>>();
+
+                        new_reorder_nodes.push(reorder_data);
+                        branch.reordered_nodes = Some(new_reorder_nodes);
+
+                        res = branch.update(session).await;
+                    }
+                    Err(err) => {
+                        log_fatal(format!("Failed to find branch: {}", err));
+                        return;
+                    }
                 }
-                .push_reordered_nodes(session, &vec![reorder_data])
-                .await;
             }
             BranchUpdate::CreateWorkflow(id) => {
                 res = UpdateCreatedWorkflowsBranch {
@@ -247,14 +262,14 @@ impl Branch {
                 .await;
             }
             BranchUpdate::AppendFlowStepInput(node_id, io_id) => {
-                let response = UpdateCreatedFlowStepInputsByNodeBranch {
+                let branch = UpdateCreatedFlowStepInputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
                 .find_by_primary_key(session)
                 .await;
 
-                match response {
+                match branch {
                     Ok(mut fs_branch) => {
                         let _ = &mut fs_branch
                             .created_flow_step_inputs_by_node
@@ -272,14 +287,14 @@ impl Branch {
                 }
             }
             BranchUpdate::RemoveFlowStepInput(node_id, io_id) => {
-                let response = UpdateDeletedFlowStepInputsByNodeBranch {
+                let branch = UpdateDeletedFlowStepInputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
                 .find_by_primary_key(session)
                 .await;
 
-                match response {
+                match branch {
                     Ok(mut fs_branch) => {
                         let _ = &mut fs_branch
                             .deleted_flow_step_inputs_by_node
@@ -297,14 +312,14 @@ impl Branch {
                 }
             }
             BranchUpdate::AppendFlowStepOutput(node_id, io_id) => {
-                let response = UpdateCreatedFlowStepOutputsByNodeBranch {
+                let branch = UpdateCreatedFlowStepOutputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
                 .find_by_primary_key(session)
                 .await;
 
-                match response {
+                match branch {
                     Ok(mut fs_branch) => {
                         let _ = &mut fs_branch
                             .created_flow_step_outputs_by_node
@@ -322,14 +337,14 @@ impl Branch {
                 }
             }
             BranchUpdate::RemoveFlowStepOutput(node_id, io_id) => {
-                let response = UpdateDeletedFlowStepOutputsByNodeBranch {
+                let branch = UpdateDeletedFlowStepOutputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
                 .find_by_primary_key(session)
                 .await;
 
-                match response {
+                match branch {
                     Ok(mut fs_branch) => {
                         let _ = &mut fs_branch
                             .deleted_flow_step_outputs_by_node

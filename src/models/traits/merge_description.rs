@@ -1,20 +1,14 @@
 use crate::errors::NodecosmosError;
+use crate::models::node::{GetDescriptionBase64Node, UpdateDescriptionNode};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-use yrs::updates::decoder::Decode;
-use yrs::{Doc, GetString, ReadTxn, Transact, TransactionMut, Update, XmlElementRef};
-
 use quick_xml::events::Event;
 use quick_xml::name::QName;
 use quick_xml::Reader;
-use serde::de::Unexpected::Option;
-use std::borrow::Cow;
+use scylla::CachingSession;
+use yrs::updates::decoder::Decode;
+use yrs::{Doc, GetString, Transact, Update};
 
-// ProseMirror uses json schema to define the structure of the document.
-// Yjs on front-end encodes the document in base64 and sends it to the backend.
-// Yjs uses xml that matches json schema and here we parse the xml to markdown and html.
-// Also, it seems that Yjs uses camelCase for the xml tags.
-// https://prosemirror.net/docs/ref/#schema-basic
 enum ProseMirrorXmlTag {
     Paragraph,
     Heading,
@@ -54,17 +48,17 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
     }
 }
 
-pub struct Description {
-    pub html: String,
-    pub markdown: String,
-    pub short_description: String,
+struct Description {
+    html: String,
+    markdown: String,
+    short_description: String,
 }
 
 impl Description {
     const SHORT_DESCRIPTION_LENGTH: usize = 255;
     const ELLIPSIS: &'static str = "...";
 
-    pub fn from_xml(xml: &str) -> Self {
+    pub fn from_xml(xml: &str) -> Result<Self, NodecosmosError> {
         let mut reader = Reader::from_str(xml);
         let mut html = String::new();
         let mut markdown = String::new();
@@ -86,13 +80,15 @@ impl Description {
                         heading_level = e
                             .attributes()
                             .find_map(|a| {
-                                a.ok()
-                                    .filter(|a| a.key == QName(b"level"))
-                                    .map(|a| a.decode_and_unescape_value(&reader).unwrap().to_string())
+                                a.ok().filter(|a| a.key == QName(b"level")).map(|a| {
+                                    a.decode_and_unescape_value(&reader)
+                                        .expect("Error decoding heading level")
+                                        .to_string()
+                                })
                             })
                             .unwrap_or_else(|| "1".to_string());
                         html.push_str(&format!("<h{}>", heading_level));
-                        let level = heading_level.parse::<u8>().unwrap();
+                        let level = heading_level.parse::<u8>().expect("Error parsing heading level");
 
                         for _ in 0..level {
                             markdown.push('#');
@@ -279,29 +275,32 @@ impl Description {
             }
         }
 
-        Self {
+        Ok(Self {
             html,
             markdown,
             short_description,
-        }
+        })
     }
 }
 
-pub struct DescriptionMerge {
-    pub html: String,
-    pub markdown: String,
-    pub short_description: String,
-    pub base64: String,
-}
+pub trait MergeDescription {
+    const DESCRIPTION_ROOT: &'static str = "prosemirror";
 
-impl DescriptionMerge {
-    pub const DESCRIPTION_ROOT: &'static str = "prosemirror";
+    async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError>;
+    async fn updated_base64(&self) -> Result<String, NodecosmosError>;
 
-    pub fn new(current: String, update: String) -> Self {
-        let current_buf = STANDARD.decode(current).unwrap();
-        let update_buf = STANDARD.decode(update).unwrap();
-        let current = Update::decode_v2(&current_buf).unwrap();
-        let update = Update::decode_v2(&update_buf).unwrap();
+    fn assign_html(&mut self, html: String);
+    fn assign_markdown(&mut self, markdown: String);
+    fn assign_short_description(&mut self, short_description: String);
+    fn assign_base64(&mut self, short_description: String);
+
+    async fn merge_description(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let current_base64 = self.current_base64(db_session).await?;
+        let updated_base64 = self.updated_base64().await?;
+        let current_buf = STANDARD.decode(current_base64)?;
+        let update_buf = STANDARD.decode(updated_base64)?;
+        let current = Update::decode_v2(&current_buf)?;
+        let update = Update::decode_v2(&update_buf)?;
         let doc = Doc::new();
         let xml = doc.get_or_insert_xml_fragment(Self::DESCRIPTION_ROOT);
         let mut transaction = doc.transact_mut();
@@ -309,17 +308,50 @@ impl DescriptionMerge {
         transaction.apply_update(current);
         transaction.apply_update(update);
 
-        let prose_doc = Description::from_xml(&xml.get_string(&transaction));
+        let prose_doc = Description::from_xml(&xml.get_string(&transaction))?;
         let html = prose_doc.html;
         let markdown = prose_doc.markdown;
         let short_description = prose_doc.short_description;
         let base64 = STANDARD.encode(&transaction.encode_update_v2());
 
-        Self {
-            html,
-            markdown,
-            short_description,
-            base64,
-        }
+        self.assign_html(html);
+        self.assign_markdown(markdown);
+        self.assign_short_description(short_description);
+        self.assign_base64(base64);
+
+        Ok(())
+    }
+}
+
+/// In future it can be used for description of other models like IO, Flow, Flow Step, etc.
+impl MergeDescription for UpdateDescriptionNode {
+    async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError> {
+        let node = GetDescriptionBase64Node::find_branched_or_original(db_session, self.id, self.branch_id).await?;
+
+        Ok(node.description_base64.unwrap_or(
+            self.description_base64
+                .clone()
+                .expect("Description base64 is required."),
+        ))
+    }
+
+    async fn updated_base64(&self) -> Result<String, NodecosmosError> {
+        Ok(self.description_base64.clone().unwrap_or_default())
+    }
+
+    fn assign_html(&mut self, html: String) {
+        self.description = Some(html);
+    }
+
+    fn assign_markdown(&mut self, markdown: String) {
+        self.description_markdown = Some(markdown);
+    }
+
+    fn assign_short_description(&mut self, short_description: String) {
+        self.short_description = Some(short_description);
+    }
+
+    fn assign_base64(&mut self, base64: String) {
+        self.description_base64 = Some(base64);
     }
 }

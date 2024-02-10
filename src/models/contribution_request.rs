@@ -5,10 +5,10 @@ pub mod update;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::status::ContributionRequestStatus;
 use crate::models::node::Node;
+use crate::models::traits::Branchable;
 use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Update, UpdateWithExtCallbacks};

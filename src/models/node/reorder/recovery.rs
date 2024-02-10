@@ -1,9 +1,10 @@
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::services::resource_locker::ResourceLocker;
+use crate::utils::file::read_file_names;
 use crate::utils::logger::{log_error, log_fatal, log_success, log_warning};
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::operations::Update;
@@ -11,7 +12,8 @@ use scylla::CachingSession;
 use std::fs::create_dir_all;
 use std::path::Path;
 
-pub const RECOVERY_DATA_DIR: &str = "tmp/recovery";
+pub const RECOVERY_DATA_DIR: &str = "tmp/reorder-recovery";
+pub const RECOVER_FILE_PREFIX: &str = "reorder_recovery_data";
 
 /// Problem with using scylla batches for reordering tree structure is that they are
 /// basically unusable for large trees (1000s nodes). We get a timeout error.
@@ -41,35 +43,26 @@ impl<'a> Recovery<'a> {
     // This may be needed in case of connection loss during reorder.
     pub async fn recover_from_stored_data(db_session: &CachingSession, resource_locker: &ResourceLocker) {
         create_dir_all(RECOVERY_DATA_DIR).unwrap();
+        let files = read_file_names(RECOVERY_DATA_DIR, RECOVER_FILE_PREFIX).await;
 
-        let mut file_names = vec![];
-        for entry in std::fs::read_dir(RECOVERY_DATA_DIR).unwrap() {
-            let entry = entry.unwrap();
-            let file_name = entry.file_name().into_string().unwrap();
-            if file_name.starts_with("recovery_data_") {
-                file_names.push(file_name);
-            }
-        }
-
-        for file_name in file_names {
-            let full_name = format!("{}/{}", RECOVERY_DATA_DIR, file_name);
-            let serialized = std::fs::read_to_string(full_name.clone()).unwrap();
+        for file in files {
+            let serialized = std::fs::read_to_string(file.clone()).unwrap();
             let recovery_data: ReorderData = serde_json::from_str(&serialized)
                 .map_err(|err| {
                     log_fatal(format!(
                         "Error in deserializing recovery data from file {}: {}",
-                        full_name.clone(),
+                        file.clone(),
                         err
                     ));
                 })
                 .unwrap();
-            std::fs::remove_file(full_name.clone()).unwrap();
+            std::fs::remove_file(file.clone()).unwrap();
 
             let mut recovery = Recovery::new(&recovery_data, db_session, resource_locker);
             let _ = recovery
                 .recover()
                 .await
-                .map_err(|err| log_fatal(format!("Error in recovery from file {}: {}", full_name, err)));
+                .map_err(|err| log_fatal(format!("Error in recovery from file {}: {}", file, err)));
         }
     }
 
@@ -235,7 +228,7 @@ impl<'a> Recovery<'a> {
 
     fn serialize_and_store_to_disk(&mut self) {
         let serialized = serde_json::to_string(&self.reorder_data).unwrap();
-        let filename = format!("recovery_data_{}.json", self.reorder_data.tree_root.id);
+        let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.reorder_data.tree_root.id);
         let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
         let path_buf = Path::new(&path);
 

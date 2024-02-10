@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
+use crate::models::traits::Branchable;
 use crate::models::udts::Owner;
 use charybdis::operations::Insert;
 use charybdis::types::Uuid;

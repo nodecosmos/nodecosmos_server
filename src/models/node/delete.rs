@@ -1,6 +1,5 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::branchable::Branchable;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::DeleteFlow;
@@ -11,6 +10,7 @@ use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::Branchable;
 use crate::models::workflow::DeleteWorkflow;
 use crate::services::elastic::{ElasticDocument, ElasticIndex};
 use crate::utils::cloned_ref::ClonedRef;
