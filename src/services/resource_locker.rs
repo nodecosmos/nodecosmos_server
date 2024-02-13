@@ -1,7 +1,7 @@
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
-use deadpool_redis::redis::AsyncCommands;
+use deadpool_redis::redis::{AsyncCommands, Connection};
 use deadpool_redis::{redis, Pool};
 
 const LOCK_NAMESPACE: &str = "LOCK";
@@ -13,6 +13,7 @@ pub struct ResourceLocker {
 }
 
 impl ResourceLocker {
+    const REDIS_INSTANCES: usize = 1;
     const RETRY_LOCK_TIMEOUT: u64 = 500;
     const RESOURCE_LOCK_ERROR: NodecosmosError =
         NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
@@ -45,7 +46,32 @@ impl ResourceLocker {
                 NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", resource_id, e))
             })?;
 
+        // for strong consistency we
+        self.wait_for_write_replication(resource_id).await?;
+
         Ok(true)
+    }
+
+    async fn wait_for_write_replication(&self, resource_id: &str) -> Result<(), NodecosmosError> {
+        let mut connection = self.pool.get().await?;
+
+        let wait_result: redis::RedisResult<i32> = redis::cmd("WAIT")
+            .arg(Self::REDIS_INSTANCES) // Number of replicas to acknowledge the write.
+            .arg(1000) // Timeout in milliseconds.
+            .query_async(&mut *connection)
+            .await;
+
+        match wait_result {
+            Ok(replicas) if replicas >= 1 => Ok(()),
+            Ok(_) => Err(NodecosmosError::LockerError(format!(
+                "Lock not sufficiently replicated for resource: {}",
+                resource_id
+            ))),
+            Err(e) => Err(NodecosmosError::LockerError(format!(
+                "WAIT command failed for resource: {}! Error: {:?}",
+                resource_id, e
+            ))),
+        }
     }
 
     pub async fn lock_resource_actions(
@@ -74,36 +100,7 @@ impl ResourceLocker {
             NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", resource_id, e))
         })?;
 
-        Ok(true)
-    }
-
-    /// Lock specific action on resource
-    pub async fn lock_resource_action(
-        &self,
-        resource_id: &str,
-        resource_action: ActionTypes,
-        ttl: usize,
-    ) -> Result<bool, NodecosmosError> {
-        let mut connection = self.pool.get().await?;
-        let key = format!("{}:{}:{}", LOCK_NAMESPACE, resource_action, resource_id);
-
-        self.check_resource_action_unlocked(&resource_action, resource_id)
-            .await?;
-
-        redis::cmd("SET")
-            .arg(key)
-            .arg("1")
-            .arg("NX")
-            .arg("PX")
-            .arg(ttl)
-            .query_async(&mut *connection)
-            .await
-            .map_err(|e| {
-                NodecosmosError::LockerError(format!(
-                    "Failed to lock resource action: {}! Error: {:?}",
-                    resource_id, e
-                ))
-            })?;
+        self.wait_for_write_replication(resource_id).await?;
 
         Ok(true)
     }

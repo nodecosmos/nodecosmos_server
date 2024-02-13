@@ -6,6 +6,7 @@ use quick_xml::events::Event;
 use quick_xml::name::QName;
 use quick_xml::Reader;
 use scylla::CachingSession;
+use std::borrow::Cow;
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
@@ -70,6 +71,7 @@ impl Description {
         let mut ordered_list_active = false;
         let mut bullet_list_active = false;
         let mut blockquote_active = false;
+        let mut current_text = Cow::Borrowed("");
 
         reader.trim_text(true);
 
@@ -175,31 +177,30 @@ impl Description {
                         current_href = href.to_string();
                     }
                     ProseMirrorXmlTag::HardBreak => {
+                        println!("HardBreak");
                         html.push_str("<br/>");
                         markdown.push_str("\n");
                     }
                 },
                 Ok(Event::Text(e)) => {
-                    let text = e.unescape().unwrap();
+                    current_text = e.unescape()?;
 
-                    html.push_str(&text);
+                    html.push_str(&current_text);
 
                     if blockquote_active {
-                        markdown.push_str(&format!("> {}", text));
+                        markdown.push_str(&format!("> {}", current_text));
                     } else {
-                        markdown.push_str(&text);
+                        markdown.push_str(&current_text);
                     }
 
                     if paragraph_active && short_description.is_empty() {
-                        short_description = text.to_string();
+                        short_description = current_text.to_string();
                         short_description.truncate(Self::SHORT_DESCRIPTION_LENGTH - Self::ELLIPSIS.len());
                         short_description = short_description.trim_end().to_string();
 
-                        if short_description.len() < text.len() {
+                        if short_description.len() < current_text.len() {
                             short_description.push_str(Self::ELLIPSIS);
                         }
-
-                        markdown.push_str(&format!(" ({})", short_description));
                     }
                 }
                 Ok(Event::End(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
@@ -208,15 +209,18 @@ impl Description {
                         markdown.push_str("\n\n");
                     }
                     ProseMirrorXmlTag::Paragraph => {
-                        html.push_str("</p>");
                         if ordered_list_active || bullet_list_active {
+                            html.push_str("</p>");
                             markdown.push_str("\n");
                         } else if blockquote_active {
+                            html.push_str("</p>");
                             markdown.push_str("\n>\n");
-                        } else {
+                        } else if current_text.len() > 0 {
+                            html.push_str("</p>");
                             markdown.push_str("\n\n");
                         }
 
+                        current_text = Cow::Borrowed("");
                         paragraph_active = false;
                     }
                     ProseMirrorXmlTag::Bold => {
@@ -277,7 +281,7 @@ impl Description {
 
         Ok(Self {
             html,
-            markdown,
+            markdown: markdown.trim_end().to_string(),
             short_description,
         })
     }

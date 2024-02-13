@@ -57,6 +57,7 @@ pub enum NodecosmosError {
     MergeError(String),
     FatalMergeError(String),
     InternalServerError(String),
+    QuickXmlError(quick_xml::Error),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -84,6 +85,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::YjsError(e) => write!(f, "Yjs Error: {}", e),
             NodecosmosError::MergeError(e) => write!(f, "Merge Error: {}", e),
             NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
+            NodecosmosError::QuickXmlError(e) => write!(f, "QuickXmlError Error: {}", e),
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
         }
     }
@@ -100,6 +102,7 @@ impl Error for NodecosmosError {
             NodecosmosError::ActixError(e) => Some(e),
             NodecosmosError::DecodeError(e) => Some(e),
             NodecosmosError::YjsError(e) => Some(e),
+            NodecosmosError::QuickXmlError(e) => Some(e),
             _ => None,
         }
     }
@@ -218,5 +221,11 @@ impl From<base64::DecodeError> for NodecosmosError {
 impl From<yrs::encoding::read::Error> for NodecosmosError {
     fn from(e: yrs::encoding::read::Error) -> Self {
         NodecosmosError::YjsError(e)
+    }
+}
+
+impl From<quick_xml::Error> for NodecosmosError {
+    fn from(e: quick_xml::Error) -> Self {
+        NodecosmosError::QuickXmlError(e)
     }
 }

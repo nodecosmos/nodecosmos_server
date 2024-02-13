@@ -103,11 +103,8 @@ impl BranchMerge {
     }
 
     pub async fn run(branch: Branch, data: &RequestData) -> Result<(), NodecosmosError> {
-        let session = data.db_session();
-
-        // Simplified fetching of nodes
-        let original_title_nodes = Self::fetch_original_title_nodes(&session, &branch).await?;
-        let original_description_nodes = Self::fetch_original_description_nodes(&session, &branch).await?;
+        let original_title_nodes = Self::fetch_original_title_nodes(data.db_session(), &branch).await?;
+        let original_description_nodes = Self::fetch_original_description_nodes(data.db_session(), &branch).await?;
 
         let mut branch_merge = BranchMerge {
             branch,
@@ -116,11 +113,11 @@ impl BranchMerge {
             original_description_nodes,
         };
 
-        // Use early return for error handling
         if let Err(e) = branch_merge.merge(data).await {
             if let Err(recovery_err) = branch_merge.recover(data).await {
                 log_fatal(format!("Failed to recover: {}", recovery_err));
                 branch_merge.serialize_and_store_to_disk();
+
                 return Err(NodecosmosError::FatalMergeError(format!(
                     "Failed to merge and recover: {}",
                     e
