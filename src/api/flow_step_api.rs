@@ -14,13 +14,10 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
     data.resource_locker()
-        .validate_resource_unlocked(&flow_step.flow_id.to_string())
-        .await?;
-    data.resource_locker()
         .lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL)
         .await?;
 
-    let res = flow_step.insert_cb(data.db_session()).await;
+    let res = flow_step.insert_cb(&None).execute(data.db_session()).await;
 
     match res {
         Ok(_) => {
@@ -44,7 +41,7 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
 pub async fn update_flow_step_nodes(data: RequestData, mut flow_step: web::Json<UpdateNodeIdsFlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
-    flow_step.update_cb(data.db_session()).await?;
+    flow_step.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -56,7 +53,7 @@ pub async fn update_flow_step_outputs(
 ) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
-    flow_step.update_cb(data.db_session()).await?;
+    flow_step.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -65,7 +62,7 @@ pub async fn update_flow_step_outputs(
 pub async fn update_flow_step_inputs(data: RequestData, mut flow_step: web::Json<UpdateInputIdsFlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
-    flow_step.update_cb(data.db_session()).await?;
+    flow_step.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -77,14 +74,14 @@ pub async fn update_flow_step_description(
 ) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
-    flow_step.update_cb(data.db_session()).await?;
+    flow_step.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[delete("{nodeId}/{workflowId}/{flowId}/{flowIndex}/{id}")]
 pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>) -> Response {
-    let mut flow_step = flow_step.find_by_primary_key(data.db_session()).await?;
+    let mut flow_step = flow_step.find_by_primary_key().execute(data.db_session()).await?;
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
     data.resource_locker()
@@ -94,7 +91,7 @@ pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>)
         .lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL)
         .await?;
 
-    flow_step.delete_cb(data.db_session()).await?;
+    flow_step.delete_cb(&None).execute(data.db_session()).await?;
 
     data.resource_locker()
         .unlock_resource(&flow_step.flow_id.to_string())

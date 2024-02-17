@@ -13,7 +13,7 @@ pub struct ResourceLocker {
 }
 
 impl ResourceLocker {
-    const REDIS_INSTANCES: usize = 1;
+    // const REDIS_INSTANCES: u8 = 1;
     const RETRY_LOCK_TIMEOUT: u64 = 500;
     const RESOURCE_LOCK_ERROR: NodecosmosError =
         NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
@@ -46,32 +46,34 @@ impl ResourceLocker {
                 NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", resource_id, e))
             })?;
 
-        // for strong consistency we
         self.wait_for_write_replication(resource_id).await?;
 
         Ok(true)
     }
 
-    async fn wait_for_write_replication(&self, resource_id: &str) -> Result<(), NodecosmosError> {
-        let mut connection = self.pool.get().await?;
+    /// To be used once we have multiple redis instances
+    async fn wait_for_write_replication(&self, _resource_id: &str) -> Result<(), NodecosmosError> {
+        // let mut connection = self.pool.get().await?;
+        //
+        // let wait_result: redis::RedisResult<usize> = redis::cmd("WAIT")
+        //     .arg(Self::REDIS_INSTANCES) // Number of replicas to acknowledge the write.
+        //     .arg(1000) // Timeout in milliseconds.
+        //     .query_async(&mut *connection)
+        //     .await;
+        //
+        // match wait_result {
+        //     Ok(replicas) if replicas >= Self::REDIS_INSTANCES as usize => Ok(()),
+        //     Ok(replicas) => Err(NodecosmosError::LockerError(format!(
+        //         "Lock not sufficiently replicated for resource: {}. Replicas: {}",
+        //         resource_id, replicas
+        //     ))),
+        //     Err(e) => Err(NodecosmosError::LockerError(format!(
+        //         "WAIT command failed for resource: {}! Error: {:?}",
+        //         resource_id, e
+        //     ))),
+        // }
 
-        let wait_result: redis::RedisResult<i32> = redis::cmd("WAIT")
-            .arg(Self::REDIS_INSTANCES) // Number of replicas to acknowledge the write.
-            .arg(1000) // Timeout in milliseconds.
-            .query_async(&mut *connection)
-            .await;
-
-        match wait_result {
-            Ok(replicas) if replicas >= 1 => Ok(()),
-            Ok(_) => Err(NodecosmosError::LockerError(format!(
-                "Lock not sufficiently replicated for resource: {}",
-                resource_id
-            ))),
-            Err(e) => Err(NodecosmosError::LockerError(format!(
-                "WAIT command failed for resource: {}! Error: {:?}",
-                resource_id, e
-            ))),
-        }
+        Ok(())
     }
 
     pub async fn lock_resource_actions(

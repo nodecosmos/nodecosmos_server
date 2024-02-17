@@ -4,13 +4,13 @@ use crate::models::like::Like;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks};
 use scylla::CachingSession;
 use serde_json::json;
 
 #[get("/{objectId}/{branchId}")]
 pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {
-    let like_count = match like.find_by_primary_key(&db_session).await.ok() {
+    let like_count = match like.find_by_primary_key().execute(&db_session).await.ok() {
         Some(mut like) => like.like_count(&db_session).await?,
         None => 0,
     };
@@ -27,7 +27,7 @@ pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Respon
     like.user_id = data.current_user.id;
     like.username = data.current_user.username.clone();
 
-    like.insert_cb(data.db_session(), &data).await?;
+    like.insert_cb(&data).execute(data.db_session()).await?;
 
     let like_count = like.like_count(data.db_session()).await?;
 
@@ -41,9 +41,9 @@ pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Respon
 #[delete("/{objectId}/{branchId}")]
 pub async fn delete_like(data: RequestData, mut like: web::Path<Like>) -> Response {
     like.user_id = data.current_user_id();
-    let mut like = like.find_by_primary_key(data.db_session()).await?;
+    let mut like = like.find_by_primary_key().execute(data.db_session()).await?;
 
-    like.delete_cb(data.db_session(), &data).await?;
+    like.delete_cb(&data).execute(data.db_session()).await?;
 
     let like_count = like.like_count(data.db_session()).await?;
 
@@ -60,7 +60,8 @@ pub async fn user_likes(db_session: web::Data<CachingSession>, current_user: Cur
         user_id: current_user.id,
         ..Default::default()
     }
-    .find_by_partition_key(&db_session)
+    .find_by_partition_key()
+    .execute(&db_session)
     .await?
     .try_collect()
     .await?;

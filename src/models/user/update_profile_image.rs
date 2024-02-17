@@ -5,7 +5,7 @@ use crate::models::user::UpdateProfileImageUser;
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
 use crate::utils::logger::log_error;
 use actix_multipart::Multipart;
-use charybdis::operations::UpdateWithExtCallbacks;
+use charybdis::operations::UpdateWithCallbacks;
 use futures::StreamExt;
 
 const IMG_WIDTH: u32 = 296;
@@ -57,7 +57,7 @@ impl UpdateProfileImageUser {
             self.profile_image_url = Some(url.clone());
             self.profile_image_filename = Some(new_profile_image_filename);
 
-            self.update_cb(&data.db_session(), data).await?;
+            self.update_cb(data).execute(data.db_session()).await?;
 
             return Ok(());
         }
@@ -88,7 +88,7 @@ impl UpdateProfileImageUser {
         self.profile_image_url = None;
         self.profile_image_filename = None;
 
-        self.update_cb(&data.app.db_session, data).await?;
+        self.update_cb(data).execute(data.db_session()).await?;
 
         Ok(())
     }

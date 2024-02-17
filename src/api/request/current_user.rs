@@ -86,7 +86,7 @@ pub async fn refresh_current_user(
 
     match current_user {
         Some(user) => {
-            let user = User::find_by_id(&db_session, user.id).await?;
+            let user = User::find_by_id(user.id).execute(&db_session).await?;
             set_current_user(&client_session, &user)
         }
         None => Err(NodecosmosError::Unauthorized(json!({

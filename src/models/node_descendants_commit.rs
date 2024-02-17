@@ -36,7 +36,9 @@ impl NodeDescendantsCommit {
     pub async fn find_by_ids(session: &CachingSession, ids: Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
         let mut res = vec![];
 
-        let mut commits = find_node_descendants_commit!(session, "id IN ?", (ids,)).await?;
+        let mut commits = find_node_descendants_commit!("id IN ?", (ids,))
+            .execute(session)
+            .await?;
 
         while let Some(commit) = commits.next().await {
             res.push(commit?);

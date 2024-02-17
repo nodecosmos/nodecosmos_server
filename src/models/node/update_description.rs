@@ -41,10 +41,14 @@ impl UpdateDescriptionNode {
     pub async fn create_new_version(&self, req_data: &RequestData) {
         let description_version = DescriptionCommit::new(self.description_base64.clone());
 
-        let _ = description_version.insert(req_data.db_session()).await.map_err(|e| {
-            log_error(format!("Failed to create new description version: {}", e));
-            e
-        });
+        let _ = description_version
+            .insert()
+            .execute(req_data.db_session())
+            .await
+            .map_err(|e| {
+                log_error(format!("Failed to create new description version: {}", e));
+                e
+            });
 
         let changes = vec![NodeChange::Description(description_version.id)];
 

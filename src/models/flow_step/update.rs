@@ -32,7 +32,7 @@ impl FlowStep {
 
         if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
             output_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
-            self.update_cb(session).await?;
+            self.update_cb(&None).execute(session).await?;
         }
 
         Ok(())
@@ -44,7 +44,7 @@ impl FlowStep {
 
         if let Some(input_ids_by_node_id) = self.input_ids_by_node_id.as_mut() {
             input_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
-            self.update_cb(session).await?;
+            self.update_cb(&None).execute(session).await?;
         }
 
         Ok(())

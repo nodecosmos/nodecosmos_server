@@ -21,7 +21,7 @@ pub struct RestoreNodeParams {
 #[put("/restore_node")]
 pub async fn restore_node(data: RequestData, params: web::Json<RestoreNodeParams>) -> Response {
     let params = params.into_inner();
-    let mut branch = Branch::find_by_id(data.db_session(), params.branch_id).await?;
+    let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
 
     branch.auth_update(&data).await?;
 

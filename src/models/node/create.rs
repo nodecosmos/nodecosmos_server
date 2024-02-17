@@ -13,8 +13,8 @@ use crate::services::elastic::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::callbacks::ExtCallbacks;
-use charybdis::operations::{Find, Insert, InsertWithExtCallbacks};
+use charybdis::callbacks::Callbacks;
+use charybdis::operations::{Find, Insert, InsertWithCallbacks};
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
 use elasticsearch::Elasticsearch;
@@ -192,7 +192,7 @@ impl Node {
 
     /// Create branched version of self if it doesn't exist.
     pub async fn create_branched_if_not_exist(self, data: &RequestData) {
-        let self_branched = self.find_by_primary_key(data.db_session()).await.ok();
+        let self_branched = self.find_by_primary_key().execute(data.db_session()).await.ok();
 
         if self_branched.is_none() {
             let branch_id = self.branch_id;
@@ -200,13 +200,14 @@ impl Node {
                 branch_id: self.id,
                 ..self
             }
-            .find_by_primary_key(data.db_session())
+            .find_by_primary_key()
+            .execute(data.db_session())
             .await;
 
             match non_branched_res {
                 Ok(mut self_branched) => {
                     self_branched.branch_id = branch_id;
-                    let insert = self_branched.insert(data.db_session()).await;
+                    let insert = self_branched.insert().execute(data.db_session()).await;
 
                     if let Err(e) = insert {
                         log_fatal(format!(

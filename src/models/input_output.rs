@@ -91,14 +91,11 @@ impl Io {
         root_node_id: Uuid,
         original_id: Uuid,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = find_io!(
-            session,
-            "root_node_id = ? AND original_id = ?",
-            (root_node_id, original_id)
-        )
-        .await?
-        .try_collect()
-        .await?;
+        let ios = find_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
+            .execute(session)
+            .await?
+            .try_collect()
+            .await?;
 
         Ok(ios)
     }
@@ -120,7 +117,9 @@ impl Io {
     pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
             // TODO: introduce branch_id to workflow
-            let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+            let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
+                .execute(session)
+                .await?;
             self.node = Some(node);
         }
 
@@ -140,8 +139,9 @@ impl Io {
 
     pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let original_io =
-                find_first_io!(session, "root_node_id = ? AND id = ?", (self.root_node_id, original_id)).await?;
+            let original_io = find_first_io!("root_node_id = ? AND id = ?", (self.root_node_id, original_id))
+                .execute(session)
+                .await?;
             Ok(Some(original_io))
         } else {
             Ok(None)

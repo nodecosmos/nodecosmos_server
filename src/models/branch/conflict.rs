@@ -40,13 +40,13 @@ impl Branch {
                 deleted_edited_nodes,
             });
 
-            self.update(db_session).await?;
+            self.update().execute(db_session).await?;
 
             return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
         } else if let Some(conflict) = &mut self.conflict {
             conflict.status = ConflictStatus::Resolved.to_string();
 
-            self.update(db_session).await?;
+            self.update().execute(db_session).await?;
         }
 
         Ok(())

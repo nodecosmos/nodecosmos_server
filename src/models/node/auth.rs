@@ -20,7 +20,8 @@ impl AuthNode {
         .as_native();
 
         if native.is_original() {
-            native = AuthNode::find_by_id_and_branch_id(data.db_session(), node_id, branch_id)
+            native = AuthNode::find_by_id_and_branch_id(node_id, branch_id)
+                .execute(data.db_session())
                 .await?
                 .as_native();
         }

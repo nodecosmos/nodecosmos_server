@@ -109,7 +109,8 @@ impl<'a> Recovery<'a> {
 
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
         if self.reorder_data.node.is_original() {
-            NodeDescendant::delete_by_root_id(self.db_session, self.reorder_data.tree_root.id)
+            NodeDescendant::delete_by_root_id(self.reorder_data.tree_root.id)
+                .execute(self.db_session)
                 .await
                 .map_err(|err| {
                     log_error(format!("delete_by_root_id: {}", err));
@@ -117,10 +118,10 @@ impl<'a> Recovery<'a> {
                 })?;
         } else {
             NodeDescendant::delete_by_root_id_and_branch_id(
-                self.db_session,
                 self.reorder_data.tree_root.id,
                 self.reorder_data.branch_id,
             )
+            .execute(self.db_session)
             .await
             .map_err(|err| {
                 log_error(format!("delete_by_root_id_and_branch_id: {}", err));
@@ -154,7 +155,7 @@ impl<'a> Recovery<'a> {
             order_index: self.reorder_data.old_order_index,
         };
 
-        update_order_node.update(&self.db_session).await?;
+        update_order_node.update().execute(&self.db_session).await?;
 
         Ok(())
     }

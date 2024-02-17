@@ -2,10 +2,10 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
 use crate::models::traits::MergeDescription;
-use charybdis::callbacks::ExtCallbacks;
+use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 
-impl ExtCallbacks for Node {
+impl Callbacks for Node {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
@@ -21,11 +21,12 @@ impl ExtCallbacks for Node {
     }
 
     async fn after_insert(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+        self.append_to_ancestors(req_data.db_session()).await;
+
         let self_clone = self.clone();
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
-            self_clone.append_to_ancestors(req_data.db_session()).await;
             self_clone.add_to_elastic(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
             self_clone.preserve_ancestors_for_branch(&req_data).await;
@@ -58,7 +59,7 @@ impl ExtCallbacks for Node {
     }
 }
 
-impl ExtCallbacks for UpdateDescriptionNode {
+impl Callbacks for UpdateDescriptionNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
@@ -93,7 +94,7 @@ impl ExtCallbacks for UpdateDescriptionNode {
     }
 }
 
-impl ExtCallbacks for UpdateTitleNode {
+impl Callbacks for UpdateTitleNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
@@ -124,7 +125,7 @@ impl ExtCallbacks for UpdateTitleNode {
 
 macro_rules! impl_node_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
-        impl charybdis::callbacks::ExtCallbacks for $struct_name {
+        impl charybdis::callbacks::Callbacks for $struct_name {
             type Extension = crate::api::data::RequestData;
             type Error = crate::errors::NodecosmosError;
 

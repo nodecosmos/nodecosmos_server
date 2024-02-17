@@ -37,7 +37,7 @@ pub enum NodeChange {
 impl NodeCommit {
     pub async fn handle_creation(session: &CachingSession, node: &Node, user_id: Uuid) -> Result<(), NodecosmosError> {
         let tree_position_commit = NodeTreePositionCommit::from_node(node);
-        tree_position_commit.insert(session).await?;
+        tree_position_commit.insert().execute(session).await?;
 
         let now = Utc::now();
 
@@ -58,7 +58,7 @@ impl NodeCommit {
             workflow_commit_id: None,
         };
 
-        node_commit.insert(session).await?;
+        node_commit.insert().execute(session).await?;
         node_commit.create_ancestors_commits(session).await?;
 
         Ok(())
@@ -131,14 +131,14 @@ impl NodeCommit {
                             descendant_node_commit_id_by_id,
                         };
 
-                        new_node_descendants_commit.insert(session).await?;
+                        new_node_descendants_commit.insert().execute(session).await?;
                         new_node_commit.node_descendants_commit_id = Some(new_node_descendants_commit.id);
                     }
                 }
             }
         }
 
-        new_node_commit.insert(session).await?;
+        new_node_commit.insert().execute(session).await?;
 
         if create_ancestors_commits {
             new_node_commit.create_ancestors_commits(session).await?;

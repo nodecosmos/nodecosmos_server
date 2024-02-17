@@ -266,7 +266,8 @@ impl<'a> NodeDelete<'a> {
             root_id: self.node.id,
             ..Default::default()
         }
-        .delete_by_partition_key(self.db_session)
+        .delete_by_partition_key()
+        .execute(self.db_session)
         .await?;
 
         return Ok(());

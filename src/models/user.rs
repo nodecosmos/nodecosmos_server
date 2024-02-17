@@ -60,11 +60,17 @@ pub struct User {
 
 impl User {
     pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
-        find_first_user!(session, "username = ?", (&self.username,)).await.ok()
+        find_first_user!("username = ?", (&self.username,))
+            .execute(session)
+            .await
+            .ok()
     }
 
     pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
-        find_first_user!(session, "email = ?", (&self.email,)).await.ok()
+        find_first_user!("email = ?", (&self.email,))
+            .execute(session)
+            .await
+            .ok()
     }
 
     pub async fn check_existing_user(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -130,7 +136,8 @@ partial_user!(
 
 impl GetUser {
     pub async fn find_by_username(session: &CachingSession, username: &String) -> Result<GetUser, NodecosmosError> {
-        find_first_get_user!(session, "username = ?", (&username,))
+        find_first_get_user!("username = ?", (username,))
+            .execute(session)
             .await
             .map_err(NodecosmosError::from)
     }

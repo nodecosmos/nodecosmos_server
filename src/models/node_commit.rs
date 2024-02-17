@@ -101,10 +101,10 @@ impl NodeCommit {
 
     async fn find_latest(session: &CachingSession, node_id: &Uuid, branch_id: &Uuid) -> Result<Self, CharybdisError> {
         let res = find_first_node_commit!(
-            session,
             "node_id = ? AND branch_id in ? LIMIT 1",
             (node_id, vec![branch_id, node_id])
         )
+        .execute(session)
         .await?;
 
         Ok(res)
@@ -139,10 +139,10 @@ impl NodeCommit {
     pub async fn prev_commit(&self, session: &CachingSession) -> Result<Option<Self>, CharybdisError> {
         if let (Some(prev_commit_id), Some(prev_commit_branch_id)) = (self.prev_commit_id, self.prev_commit_branch_id) {
             let res = find_first_node_commit!(
-                session,
                 "node_id = ? AND branch_id = ? AND created_at =< ? AND id = ? LIMIT 1",
                 (self.node_id, prev_commit_branch_id, self.created_at, prev_commit_id)
             )
+            .execute(session)
             .await?;
 
             return Ok(Some(res));
@@ -155,7 +155,9 @@ impl NodeCommit {
         &mut self,
         session: &CachingSession,
     ) -> Result<NodeTreePositionCommit, NodecosmosError> {
-        let res = NodeTreePositionCommit::find_by_id(session, self.node_tree_position_commit_id).await?;
+        let res = NodeTreePositionCommit::find_by_id(self.node_tree_position_commit_id)
+            .execute(session)
+            .await?;
 
         Ok(res)
     }
@@ -165,7 +167,9 @@ impl NodeCommit {
         session: &CachingSession,
     ) -> Result<Option<NodeDescendantsCommit>, NodecosmosError> {
         if let Some(node_descendants_commit_id) = self.node_descendants_commit_id {
-            let res = NodeDescendantsCommit::find_by_id(session, node_descendants_commit_id).await?;
+            let res = NodeDescendantsCommit::find_by_id(node_descendants_commit_id)
+                .execute(session)
+                .await?;
 
             return Ok(Some(res));
         }

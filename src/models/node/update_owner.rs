@@ -22,7 +22,7 @@ impl UpdateOwnerNode {
     }
 
     pub async fn update_owner_records(data: &RequestData, user_id: Uuid) {
-        let user = User::find_by_id(data.db_session(), user_id).await;
+        let user = User::find_by_id(user_id).execute(data.db_session()).await;
 
         match user {
             Ok(user) => {
@@ -35,7 +35,8 @@ impl UpdateOwnerNode {
     }
 
     async fn run(data: &RequestData, user: User) -> Result<(), NodecosmosError> {
-        let mut nodes_by_owner = NodesByOwner::find_by_owner_id(data.db_session(), user.id)
+        let mut nodes_by_owner = NodesByOwner::find_by_owner_id(user.id)
+            .execute(data.db_session())
             .await
             .map_err(|e| {
                 log_error(format!("Error finding nodes by owner: {}", e));

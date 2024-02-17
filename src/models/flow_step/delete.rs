@@ -13,7 +13,7 @@ impl FlowStep {
                 input_ids.retain(|id| id != &output_id);
             }
 
-            self.update_cb(session).await?;
+            self.update_cb(&None).execute(session).await?;
         }
 
         Ok(())
@@ -25,7 +25,7 @@ impl FlowStep {
                 input_ids.retain(|id| id != &input_id);
             }
 
-            self.update_cb(session).await?;
+            self.update_cb(&None).execute(session).await?;
         }
 
         Ok(())
@@ -33,7 +33,7 @@ impl FlowStep {
 
     pub async fn remove_inputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         self.input_ids_by_node_id = None;
-        self.update_cb(session).await?;
+        self.update_cb(&None).execute(session).await?;
 
         Ok(())
     }
@@ -107,12 +107,12 @@ impl FlowStep {
 
         if let Some(prev_flow_step) = prev_flow_step.as_mut() {
             prev_flow_step.next_flow_step_id = self.next_flow_step_id;
-            prev_flow_step.as_native().update_cb(session).await?;
+            prev_flow_step.as_native().update_cb(&None).execute(session).await?;
         }
 
         if let Some(next_flow_step) = next_flow_step.as_mut() {
             next_flow_step.prev_flow_step_id = self.prev_flow_step_id;
-            next_flow_step.as_native().update_cb(session).await?;
+            next_flow_step.as_native().update_cb(&None).execute(session).await?;
         }
 
         Ok(())

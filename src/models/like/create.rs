@@ -21,7 +21,7 @@ impl Like {
     }
 
     pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let existing_like = self.find_by_primary_key(session).await.ok();
+        let existing_like = self.find_by_primary_key().execute(session).await.ok();
 
         if existing_like.is_some() {
             return Err(NodecosmosError::ValidationError((

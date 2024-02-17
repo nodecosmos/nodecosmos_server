@@ -17,24 +17,33 @@ use serde_json::json;
 pub async fn get_workflow(db_session: web::Data<CachingSession>, node_id: web::Path<Uuid>) -> Response {
     let node_id = node_id.into_inner();
 
-    let workflow = Workflow::find_first_by_partition_key_value(&db_session, (node_id,)).await?;
+    let workflow = Workflow::find_first_by_partition_key_value(&(node_id,))
+        .execute(&db_session)
+        .await?;
 
     // flows
     let mut flow = BaseFlow::new();
     flow.node_id = node_id;
-    let flows = flow.find_by_partition_key(&db_session).await?.try_collect().await?;
+    let flows = flow
+        .find_by_partition_key()
+        .execute(&db_session)
+        .await?
+        .try_collect()
+        .await?;
 
     // flow steps
     let mut flow_step = FlowStep::new();
     flow_step.node_id = node_id;
     let flow_steps = flow_step
-        .find_by_partition_key(&db_session)
+        .find_by_partition_key()
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;
 
     // input outputs
-    let input_outputs = Io::find_by_partition_key_value(&db_session, (workflow.root_node_id,))
+    let input_outputs = Io::find_by_partition_key_value(&(workflow.root_node_id,))
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;
@@ -51,9 +60,10 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, node_id: web::P
 pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow>) -> Response {
     workflow.auth_creation(&data).await?;
 
-    workflow.insert_cb(data.db_session()).await?;
+    workflow.insert_cb(&None).execute(data.db_session()).await?;
 
-    let input_outputs = Io::find_by_partition_key_value(data.db_session(), (workflow.root_node_id,))
+    let input_outputs = Io::find_by_partition_key_value(&(workflow.root_node_id,))
+        .execute(data.db_session())
         .await?
         .try_collect()
         .await?;
@@ -71,7 +81,7 @@ pub async fn update_initial_inputs(
 ) -> Response {
     workflow.as_native().auth_update(&data).await?;
 
-    workflow.update_cb(data.db_session()).await?;
+    workflow.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
@@ -80,7 +90,7 @@ pub async fn update_initial_inputs(
 pub async fn update_workflow_title(data: RequestData, mut workflow: web::Json<UpdateWorkflowTitle>) -> Response {
     workflow.as_native().auth_update(&data).await?;
 
-    workflow.update_cb(data.db_session()).await?;
+    workflow.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
@@ -93,10 +103,12 @@ pub struct DeleteWfParams {
 
 #[delete("/{node_id}/{workflow_id}")]
 pub async fn delete_workflow(data: RequestData, params: web::Path<DeleteWfParams>) -> Response {
-    let mut workflow = Workflow::find_by_node_id_and_id(data.db_session(), params.node_id, params.workflow_id).await?;
+    let mut workflow = Workflow::find_by_node_id_and_id(params.node_id, params.workflow_id)
+        .execute(data.db_session())
+        .await?;
     workflow.auth_update(&data).await?;
 
-    workflow.delete_cb(data.db_session()).await?;
+    workflow.delete_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }

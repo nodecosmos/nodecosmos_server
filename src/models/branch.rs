@@ -7,16 +7,45 @@ use crate::models::node::sort::SortNodes;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, PkNode, UpdateDescriptionNode, UpdateTitleNode,
 };
-use crate::models::traits::Pluck;
-use crate::models::udts::Owner;
+use crate::models::traits::{NodeId, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
+use crate::models::udts::{Owner, TextChange};
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::rc::Rc;
+
+pub enum BranchStatus {
+    Open,
+    Merged,
+    Recovered,
+    RecoveryFailed,
+    Closed,
+}
+
+impl BranchStatus {
+    pub fn default() -> Option<String> {
+        Some(BranchStatus::Open.to_string())
+    }
+}
+
+impl Display for BranchStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BranchStatus::Open => {
+                write!(f, "OPEN")
+            }
+            BranchStatus::Merged => write!(f, "MERGED"),
+            BranchStatus::Recovered => write!(f, "RECOVERED"),
+            BranchStatus::RecoveryFailed => write!(f, "RECOVERY_FAILED"),
+            BranchStatus::Closed => write!(f, "CLOSED"),
+        }
+    }
+}
 
 #[charybdis_model(
     table_name = branches,
@@ -36,6 +65,9 @@ pub struct Branch {
 
     pub title: Option<Text>,
     pub description: Option<Text>,
+
+    #[serde(default = "BranchStatus::default")]
+    pub status: Option<Text>,
 
     #[serde(rename = "ownerId")]
     pub owner_id: Uuid,
@@ -127,6 +159,12 @@ pub struct Branch {
 
     pub conflict: Option<Frozen<Conflict>>,
 
+    #[serde(rename = "descriptionChangeByObject")]
+    pub description_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
+
+    #[serde(rename = "titleChangeByObject")]
+    pub title_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
+
     #[serde(skip)]
     #[charybdis(ignore)]
     pub node: Option<Node>,
@@ -163,7 +201,9 @@ pub struct Branch {
 impl Branch {
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if self.node.is_none() {
-            let node = Node::find_by_primary_key_value(db_session, (self.node_id, self.node_id)).await?;
+            let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
+                .execute(db_session)
+                .await?;
 
             self.node = Some(node);
         }
@@ -200,81 +240,21 @@ impl Branch {
         Ok(self._restored_nodes.clone())
     }
 
-    pub async fn deleted_nodes(&mut self, db_session: &CachingSession) -> Result<Option<&Vec<Node>>, NodecosmosError> {
-        if let (None, Some(deleted_node_ids)) = (&self._deleted_nodes, &self.deleted_nodes) {
-            let mut branched_nodes = Node::find_branch_nodes(db_session, self.id, &deleted_node_ids).await?;
-            let currently_not_deleted = PkNode::find_and_collect_by_ids(db_session, &branched_nodes.pluck_id())
-                .await?
-                .iter()
-                .map(|node| node.id)
-                .collect::<HashSet<Uuid>>();
-
-            branched_nodes.retain(|branched_node| currently_not_deleted.contains(&branched_node.id));
-
-            branched_nodes.sort_by_depth();
-
-            self._deleted_nodes = Some(branched_nodes);
-        }
-
-        Ok(self._deleted_nodes.as_ref())
-    }
-
-    pub async fn original_title_nodes(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
-        if let (None, Some(original_node_title_ids)) = (&self._original_title_nodes, &self.edited_node_titles) {
-            let nodes = find_update_title_node!(
-                db_session,
-                "branch_id = ? AND id IN ?",
-                (original_node_title_ids, original_node_title_ids)
-            )
-            .await?
-            .try_collect()
-            .await?;
-
-            self._original_title_nodes = Some(nodes);
-        }
-
-        Ok(self._original_title_nodes.clone())
-    }
-
     pub async fn edited_title_nodes(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
         if let (None, Some(edited_node_titles)) = (&self._edited_title_nodes, &self.edited_node_titles) {
-            let nodes = find_update_title_node!(db_session, "branch_id = ? AND id IN ?", (self.id, edited_node_titles))
+            let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (self.id, edited_node_titles))
+                .execute(db_session)
                 .await?
                 .try_collect()
                 .await?;
 
-            self._edited_title_nodes = Some(nodes);
+            self._edited_title_nodes = Some(self.retain_branch_nodes(nodes));
         }
 
         Ok(self._edited_title_nodes.clone())
-    }
-
-    pub async fn original_description_nodes(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<UpdateDescriptionNode>>, NodecosmosError> {
-        if let (None, Some(original_node_description_ids)) =
-            (&self._original_description_nodes, &self.edited_node_descriptions)
-        {
-            let nodes = find_update_description_node!(
-                db_session,
-                "branch_id = ? AND id IN ?",
-                (original_node_description_ids, original_node_description_ids)
-            )
-            .await?
-            .try_collect()
-            .await?;
-
-            self._original_description_nodes = Some(nodes);
-        }
-
-        Ok(self._original_description_nodes.clone())
     }
 
     pub async fn edited_description_nodes(
@@ -284,19 +264,55 @@ impl Branch {
         if let (None, Some(edited_node_descriptions)) =
             (&self._edited_description_nodes, &self.edited_node_descriptions)
         {
-            let nodes = find_update_description_node!(
-                db_session,
-                "branch_id = ? AND id IN ?",
-                (self.id, edited_node_descriptions)
-            )
-            .await?
-            .try_collect()
-            .await?;
+            let nodes = find_update_description_node!("branch_id = ? AND id IN ?", (self.id, edited_node_descriptions))
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
 
-            self._edited_description_nodes = Some(nodes);
+            self._edited_description_nodes = Some(self.retain_branch_nodes(nodes));
         }
 
         Ok(self._edited_description_nodes.clone())
+    }
+
+    pub fn reordered_nodes_data(&self) -> Option<List<Frozen<&BranchReorderData>>> {
+        if let Some(reordered_nodes) = &self.reordered_nodes {
+            Some(
+                reordered_nodes
+                    .into_iter()
+                    .filter(|reorder_data| {
+                        !self
+                            .deleted_nodes
+                            .as_ref()
+                            .map_or(false, |deleted_nodes| deleted_nodes.contains(&reorder_data.id))
+                            && !self
+                                .created_nodes
+                                .as_ref()
+                                .map_or(false, |created_nodes| created_nodes.contains(&reorder_data.id))
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Retain only the nodes that are not created or deleted in the branch
+    fn retain_branch_nodes<N: NodeId>(&self, nodes: Vec<N>) -> Vec<N> {
+        nodes
+            .into_iter()
+            .filter(|node| {
+                !self
+                    .created_nodes
+                    .as_ref()
+                    .map_or(false, |created_nodes| created_nodes.contains(&node.id()))
+                    && !self
+                        .deleted_nodes
+                        .as_ref()
+                        .map_or(false, |deleted_nodes| deleted_nodes.contains(&node.id()))
+            })
+            .collect()
     }
 }
 

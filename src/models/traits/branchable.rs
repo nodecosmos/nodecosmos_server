@@ -5,6 +5,7 @@ use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::like::Like;
 use crate::models::node::reorder::reorder_data::ReorderData;
+use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{AuthNode, Node, UpdateDescriptionNode, UpdateTitleNode};
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
@@ -35,7 +36,7 @@ pub trait Branchable {
     }
 
     async fn branch(&self, db_session: &CachingSession) -> Result<Branch, NodecosmosError> {
-        let branch = Branch::find_by_id(db_session, self.branch_id()).await?;
+        let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
 
         Ok(branch)
     }
@@ -58,6 +59,7 @@ macro_rules! impl_branchable {
 impl_branchable!(Node);
 impl_branchable!(UpdateTitleNode);
 impl_branchable!(UpdateDescriptionNode);
+impl_branchable!(ReorderParams);
 
 impl Branchable for ContributionRequest {
     fn id(&self) -> Uuid {

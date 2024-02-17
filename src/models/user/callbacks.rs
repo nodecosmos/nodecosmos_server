@@ -4,12 +4,12 @@ use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, Use
 use crate::services::elastic::ElasticDocument;
 use crate::App;
 use ammonia::clean;
-use charybdis::callbacks::ExtCallbacks;
+use charybdis::callbacks::Callbacks;
 use chrono::Utc;
 use scylla::CachingSession;
 use std::sync::Arc;
 
-impl ExtCallbacks for User {
+impl Callbacks for User {
     type Extension = Arc<App>;
     type Error = NodecosmosError;
 
@@ -42,7 +42,7 @@ impl ExtCallbacks for User {
 
 macro_rules! impl_user_updated_at_with_elastic_ext_cb {
     ($struct_name:ident) => {
-        impl charybdis::callbacks::ExtCallbacks for $struct_name {
+        impl charybdis::callbacks::Callbacks for $struct_name {
             type Extension = crate::api::data::RequestData;
             type Error = crate::errors::NodecosmosError;
 
@@ -82,7 +82,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
 
-impl ExtCallbacks for UpdateBioUser {
+impl Callbacks for UpdateBioUser {
     type Extension = RequestData;
     type Error = NodecosmosError;
 

@@ -77,7 +77,9 @@ impl Workflow {
         node_id: Uuid,
         id: Uuid,
     ) -> Result<Workflow, NodecosmosError> {
-        let workflow = find_first_workflow!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+        let workflow = find_first_workflow!("node_id = ? AND id = ?", (node_id, id))
+            .execute(session)
+            .await?;
 
         Ok(workflow)
     }
@@ -93,7 +95,9 @@ impl Workflow {
 
     pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         // TODO: introduce branch_id to workflow
-        let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+        let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
+            .execute(session)
+            .await?;
         self.node = Some(node);
 
         Ok(())
@@ -108,7 +112,9 @@ impl Workflow {
     }
 
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
-        let flows = Flow::find_by_node_id_and_workflow_id(session, self.node_id, self.id).await?;
+        let flows = Flow::find_by_node_id_and_workflow_id(self.node_id, self.id)
+            .execute(session)
+            .await?;
 
         Ok(flows)
     }

@@ -90,7 +90,7 @@ impl Attachment {
             attachment.url = Some(url);
             attachment.user_id = Some(data.current_user.id);
 
-            attachment.insert_cb(data.db_session()).await?;
+            attachment.insert_cb(&None).execute(data.db_session()).await?;
 
             return Ok(attachment);
         }

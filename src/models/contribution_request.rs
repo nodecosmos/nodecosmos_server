@@ -1,20 +1,47 @@
 mod callbacks;
 pub mod create;
-pub mod status;
 pub mod update;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::contribution_request::status::ContributionRequestStatus;
 use crate::models::node::Node;
 use crate::models::traits::Branchable;
 use crate::models::udts::Owner;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Update, UpdateWithExtCallbacks};
+use charybdis::operations::{Update, UpdateWithCallbacks};
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::fmt::Display;
+use std::rc::Rc;
+
+pub enum ContributionRequestStatus {
+    WorkInProgress,
+    Published,
+    Merged,
+    Closed,
+}
+
+impl ContributionRequestStatus {
+    pub fn default() -> Option<String> {
+        Some(ContributionRequestStatus::WorkInProgress.to_string())
+    }
+}
+
+impl Display for ContributionRequestStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContributionRequestStatus::WorkInProgress => {
+                write!(f, "WORK_IN_PROGRESS")
+            }
+            ContributionRequestStatus::Published => write!(f, "PUBLISHED"),
+            ContributionRequestStatus::Merged => write!(f, "MERGED"),
+            ContributionRequestStatus::Closed => write!(f, "CLOSED"),
+        }
+    }
+}
 
 #[charybdis_model(
     table_name = contribution_requests,
@@ -45,7 +72,7 @@ pub struct ContributionRequest {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
-    #[serde(default = "status::default_status")]
+    #[serde(default = "ContributionRequestStatus::default")]
     pub status: Option<Text>,
 
     #[serde(default, rename = "ownerId")]
@@ -55,7 +82,7 @@ pub struct ContributionRequest {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub branch: Option<Branch>,
+    pub branch: Rc<RefCell<Option<Branch>>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -64,7 +91,9 @@ pub struct ContributionRequest {
 
 impl ContributionRequest {
     pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let node = Node::find_by_id_and_branch_id(session, self.node_id, self.node_id).await?;
+        let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
+            .execute(session)
+            .await?;
         self.node = Some(node);
 
         Ok(())
@@ -78,15 +107,16 @@ impl ContributionRequest {
         Ok(self.node.as_mut().unwrap())
     }
 
-    pub async fn branch(&mut self, session: &CachingSession) -> Result<&mut Branch, NodecosmosError> {
-        if self.branch.is_none() {
-            let branch = Branch::find_by_id(session, self.id).await?;
-            self.branch = Some(branch);
+    pub async fn branch(&self, session: &CachingSession) -> Result<Branch, NodecosmosError> {
+        let mut branch_ref = self.branch.borrow_mut();
+        if branch_ref.is_none() {
+            *branch_ref = Some(Branch::find_by_id(self.id).execute(session).await?);
         }
 
-        Ok(self.branch.as_mut().unwrap())
+        branch_ref.clone().ok_or(NodecosmosError::InternalServerError(
+            "Branch not found for contribution request".to_string(),
+        ))
     }
-
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.status == Some(ContributionRequestStatus::Merged.to_string()) {
             return Err(NodecosmosError::PreconditionFailed(

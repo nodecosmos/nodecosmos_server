@@ -9,8 +9,9 @@ use crate::models::traits::Authorization;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithExtCallbacks, Find, InsertWithExtCallbacks, UpdateWithExtCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use charybdis::Consistency;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
@@ -23,7 +24,15 @@ pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Que
 
 #[get("/{id}")]
 pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, *id, *id).await?;
+    let node = BaseNode {
+        id: *id,
+        branch_id: *id,
+        ..Default::default()
+    }
+    .find_by_primary_key()
+    .execute(&app.db_session)
+    .await?;
+
     let mut native_node = node.as_native();
 
     native_node.auth_view(&app, opt_cu).await?;
@@ -40,7 +49,14 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 
 #[get("/{id}/{branchId}")]
 pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode::find_by_id_and_branch_id(&app.db_session, pk.id, pk.branch_id).await?;
+    let node = BaseNode {
+        id: pk.id,
+        branch_id: pk.branch_id,
+        ..Default::default()
+    }
+    .find_by_primary_key()
+    .execute(&app.db_session)
+    .await?;
 
     let mut native_node = node.as_native();
 
@@ -74,13 +90,24 @@ pub async fn get_node_description_base64(
     Ok(HttpResponse::Ok().json(node.into_inner()))
 }
 
+#[get("/{id}/original/description")]
+pub async fn get_original_node_description(
+    db_session: web::Data<CachingSession>,
+    mut node: web::Path<GetDescriptionNode>,
+) -> Response {
+    node.branch_id = node.id;
+    let node = node.find_by_primary_key().execute(&db_session).await?;
+
+    Ok(HttpResponse::Ok().json(node))
+}
+
 #[post("")]
 pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Response {
     node.auth_creation(&data).await?;
 
     data.resource_locker().validate_node_unlocked(&node, true).await?;
 
-    node.insert_cb(data.db_session(), &data).await?;
+    node.insert_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -95,7 +122,7 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
         .validate_node_unlocked(&native_node, true)
         .await?;
 
-    node.update_cb(data.db_session(), &data).await?;
+    node.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -106,7 +133,7 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 
     native_node.auth_update(&data).await?;
 
-    node.update_cb(data.db_session(), &data).await?;
+    node.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -121,7 +148,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
     data.resource_locker().validate_node_unlocked(&node, true).await?;
 
-    node.delete_cb(data.db_session(), &data).await?;
+    node.delete_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -139,7 +166,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
 
 #[post("/{id}/{branchId}/upload_cover_image")]
 async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData, payload: Multipart) -> Response {
-    let mut node = node.find_by_primary_key(data.db_session()).await?;
+    let mut node = node.find_by_primary_key().execute(data.db_session()).await?;
 
     node.as_native().auth_update(&data).await?;
 
@@ -152,7 +179,7 @@ async fn upload_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
 
 #[delete("/{id}/{branchId}/delete_cover_image")]
 async fn delete_cover_image(node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
-    let mut node = node.find_by_primary_key(data.db_session()).await?;
+    let mut node = node.find_by_primary_key().execute(data.db_session()).await?;
 
     node.as_native().auth_update(&data).await?;
 

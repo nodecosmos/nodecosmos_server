@@ -9,9 +9,10 @@ use charybdis::operations::Find;
 use scylla::CachingSession;
 
 impl Callbacks for FlowStep {
+    type Extension = Option<()>;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, session: &CachingSession, _ext: &Self::Extension) -> Result<(), NodecosmosError> {
         self.set_defaults();
         self.validate_conflicts(session).await?;
         self.calculate_index(session).await?;
@@ -22,7 +23,7 @@ impl Callbacks for FlowStep {
 
     updated_at_cb_fn!();
 
-    async fn before_delete(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn before_delete(&mut self, session: &CachingSession, _ext: &Self::Extension) -> Result<(), NodecosmosError> {
         self.pull_outputs_from_next_workflow_step(session).await?;
         self.delete_fs_outputs(session).await?;
         self.sync_surrounding_fs_on_del(session).await?;
@@ -34,12 +35,13 @@ impl Callbacks for FlowStep {
 impl_updated_at_cb!(UpdateInputIdsFlowStep);
 
 impl Callbacks for UpdateNodeIdsFlowStep {
+    type Extension = Option<()>;
     type Error = NodecosmosError;
 
     updated_at_cb_fn!();
 
-    async fn after_update(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut flow_step = self.as_native().find_by_primary_key(session).await?;
+    async fn after_update(&mut self, session: &CachingSession, _ext: &Self::Extension) -> Result<(), NodecosmosError> {
+        let mut flow_step = self.as_native().find_by_primary_key().execute(session).await?;
 
         flow_step.delete_outputs_from_removed_nodes(session).await?;
         flow_step.remove_outputs_from_removed_nodes(session).await?;

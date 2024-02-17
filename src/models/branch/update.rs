@@ -8,13 +8,13 @@ use crate::models::branch::{
     UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
     UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes, UpdateRestoredNodesBranch,
 };
-use crate::models::udts::BranchReorderData;
+use crate::models::udts::{BranchReorderData, TextChange};
 use crate::models::utils::append_statement_or_log_fatal;
 use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
-use charybdis::types::{Set, Uuid};
+use charybdis::types::{Map, Set, Uuid};
 use scylla::{CachingSession, QueryResult};
 
 pub enum BranchUpdate {
@@ -135,7 +135,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
-                let branch = UpdateReorderedNodes::find_by_id(session, branch_id).await;
+                let branch = UpdateReorderedNodes::find_by_id(branch_id).execute(session).await;
                 match branch {
                     Ok(mut branch) => {
                         // filter out existing reorder nodes with same id
@@ -149,7 +149,7 @@ impl Branch {
                         new_reorder_nodes.push(reorder_data);
                         branch.reordered_nodes = Some(new_reorder_nodes);
 
-                        res = branch.update(session).await;
+                        res = branch.update().execute(session).await;
                     }
                     Err(err) => {
                         log_fatal(format!("Failed to find branch: {}", err));
@@ -266,7 +266,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key(session)
+                .find_by_primary_key()
+                .execute(session)
                 .await;
 
                 match branch {
@@ -278,7 +279,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update(session).await;
+                        res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
                         log_fatal(format!("Failed to find branch: {}", err));
@@ -291,7 +292,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key(session)
+                .find_by_primary_key()
+                .execute(session)
                 .await;
 
                 match branch {
@@ -303,7 +305,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update(session).await;
+                        res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
                         log_fatal(format!("Failed to find branch: {}", err));
@@ -316,7 +318,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key(session)
+                .find_by_primary_key()
+                .execute(session)
                 .await;
 
                 match branch {
@@ -328,7 +331,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update(session).await;
+                        res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
                         log_fatal(format!("Failed to find branch: {}", err));
@@ -341,7 +344,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key(session)
+                .find_by_primary_key()
+                .execute(session)
                 .await;
 
                 match branch {
@@ -353,7 +357,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update(session).await;
+                        res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
                         log_fatal(format!("Failed to find branch: {}", err));
@@ -367,7 +371,7 @@ impl Branch {
             log_fatal(format!("Failed to update branch: {}", err));
         }
 
-        let branch = Branch::find_by_id(session, branch_id).await;
+        let branch = Branch::find_by_id(branch_id).execute(session).await;
 
         match branch {
             Ok(mut branch) => {
@@ -382,6 +386,26 @@ impl Branch {
             Err(err) => {
                 log_fatal(format!("Failed to find branch: {}", err));
             }
+        }
+    }
+
+    pub fn push_title_change_by_object(&mut self, id: Uuid, text_change: TextChange) {
+        if let Some(title_change_by_object) = &mut self.title_change_by_object {
+            title_change_by_object.insert(id, text_change);
+        } else {
+            let mut map = Map::new();
+            map.insert(id, text_change);
+            self.title_change_by_object = Some(map);
+        }
+    }
+
+    pub fn push_description_change_by_object(&mut self, id: Uuid, text_change: TextChange) {
+        if let Some(description_change_by_object) = &mut self.description_change_by_object {
+            description_change_by_object.insert(id, text_change);
+        } else {
+            let mut map = Map::new();
+            map.insert(id, text_change);
+            self.description_change_by_object = Some(map);
         }
     }
 }

@@ -126,7 +126,8 @@ impl Node {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        let res = find_node!(db_session, "branch_id = ? AND id IN ?", (branch_id, ids))
+        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
+            .execute(db_session)
             .await?
             .try_collect()
             .await?;
@@ -135,7 +136,7 @@ impl Node {
     }
 
     pub async fn init_auth_branch(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch = AuthBranch::find_by_id(db_session, self.branch_id).await?;
+        let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
         self.auth_branch = Some(branch);
 
         Ok(())
@@ -147,7 +148,9 @@ impl Node {
                 return self.branch_parent(db_session).await;
             }
 
-            let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
+            let parent = BaseNode::find_by_primary_key_value(&(parent_id, parent_id))
+                .execute(db_session)
+                .await?;
 
             self.parent = Some(parent);
         }
@@ -157,7 +160,8 @@ impl Node {
 
     async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-            let branch_parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, self.branch_id))
+            let branch_parent = BaseNode::find_by_primary_key_value(&(parent_id, self.branch_id))
+                .execute(db_session)
                 .await
                 .ok();
 
@@ -166,7 +170,9 @@ impl Node {
                     self.parent = Some(parent);
                 }
                 None => {
-                    let parent = BaseNode::find_by_primary_key_value(db_session, (parent_id, parent_id)).await?;
+                    let parent = BaseNode::find_by_primary_key_value(&(parent_id, parent_id))
+                        .execute(db_session)
+                        .await?;
                     self.parent = Some(parent);
                 }
             }
@@ -176,7 +182,8 @@ impl Node {
     }
 
     pub async fn transform_to_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
+        let branch_self = Self::find_by_primary_key_value(&(self.id, self.branch_id))
+            .execute(db_session)
             .await
             .ok();
 
@@ -192,7 +199,9 @@ impl Node {
                 let auth_branch = self.auth_branch.take();
                 let branch_id = self.branch_id;
 
-                *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
+                *self = Self::find_by_primary_key_value(&(self.id, self.id))
+                    .execute(db_session)
+                    .await?;
                 self.branch_id = branch_id;
                 self.parent = parent;
                 self.auth_branch = auth_branch;
@@ -206,13 +215,10 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-        let descendants = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
-            db_session,
-            self.root_id,
-            self.branch_id,
-            self.id,
-        )
-        .await?;
+        let descendants =
+            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+                .execute(db_session)
+                .await?;
 
         Ok(descendants)
     }
@@ -221,31 +227,27 @@ impl Node {
         &self,
         db_session: &CachingSession,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        let main =
-            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(db_session, self.root_id, self.id, self.id)
-                .await?
-                .try_collect()
-                .await?;
+        let original = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
 
-        let branched = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
-            db_session,
-            self.root_id,
-            self.branch_id,
-            self.id,
-        )
-        .await?
-        .try_collect()
-        .await?;
+        let branched = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
 
         let mut branched_ids = HashSet::with_capacity(branched.len());
-        let mut descendants = Vec::with_capacity(main.len() + branched.len());
+        let mut descendants = Vec::with_capacity(original.len() + branched.len());
 
         for descendant in branched {
             branched_ids.insert(descendant.id);
             descendants.push(descendant);
         }
 
-        for descendant in main {
+        for descendant in original {
             if !branched_ids.contains(&descendant.id) {
                 descendants.push(descendant);
             }
@@ -268,7 +270,8 @@ impl PkNode {
         db_session: &CachingSession,
         ids: &Vec<Uuid>,
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!(db_session, "id IN ? AND branch_id IN ?", (ids, ids))
+        let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
             .await?
             .try_collect()
             .await?;
@@ -323,6 +326,7 @@ partial_node!(
 );
 
 partial_node!(GetDescriptionBase64Node, id, branch_id, description_base64);
+partial_node!(GetDescriptionMarkdownNode, id, branch_id, description_markdown);
 
 partial_node!(
     GetStructureNode,
@@ -379,13 +383,15 @@ macro_rules! find_branched_or_original {
                 id: Uuid,
                 branch_id: Uuid,
             ) -> Result<Self, NodecosmosError> {
-                let node = Self::find_by_primary_key_value(db_session, (id, branch_id))
+                let node = Self::find_by_primary_key_value(&(id, branch_id))
+                    .execute(db_session)
                     .await
                     .ok();
 
                 match node {
                     Some(node) => Ok(node),
-                    None => Self::find_by_primary_key_value(db_session, (id, id))
+                    None => Self::find_by_primary_key_value(&(id, id))
+                        .execute(db_session)
                         .await
                         .map_err(|err| err.into()),
                 }
@@ -393,7 +399,8 @@ macro_rules! find_branched_or_original {
 
             #[allow(unused)]
             pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-                let branch_self = Self::find_by_primary_key_value(db_session, (self.id, self.branch_id))
+                let branch_self = Self::find_by_primary_key_value(&(self.id, self.branch_id))
+                    .execute(db_session)
                     .await
                     .ok();
 
@@ -404,7 +411,9 @@ macro_rules! find_branched_or_original {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value(db_session, (self.id, self.id)).await?;
+                        *self = Self::find_by_primary_key_value(&(self.id, self.id))
+                            .execute(db_session)
+                            .await?;
                         self.branch_id = branch_id;
                     }
                 }

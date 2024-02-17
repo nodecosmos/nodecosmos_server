@@ -117,7 +117,7 @@ impl<'a> Reorder<'a> {
             order_index: self.reorder_data.new_order_index,
         };
 
-        update_order_node.update(&self.db_session).await?;
+        update_order_node.update().execute(&self.db_session).await?;
 
         Ok(())
     }

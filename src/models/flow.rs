@@ -53,9 +53,9 @@ impl Flow {
         &self,
         session: &CachingSession,
     ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        let res =
-            FlowStep::find_by_node_id_and_workflow_id_and_flow_id(session, self.node_id, self.workflow_id, self.id)
-                .await?;
+        let res = FlowStep::find_by_node_id_and_workflow_id_and_flow_id(self.node_id, self.workflow_id, self.id)
+            .execute(session)
+            .await?;
 
         Ok(res)
     }

@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::node::UpdateLikesCountNode;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{execute, Find, UpdateWithExtCallbacks};
+use charybdis::operations::{execute, Find, UpdateWithCallbacks};
 use charybdis::types::{Counter, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ impl Likeable for NodeCounter {
             updated_at: Some(chrono::Utc::now()),
         };
 
-        node.update_cb(data.db_session(), data).await?;
+        node.update_cb(data).execute(data.db_session()).await?;
 
         Ok(lc)
     }
@@ -67,13 +67,16 @@ impl Likeable for NodeCounter {
             updated_at: Some(chrono::Utc::now()),
         };
 
-        node.update_cb(data.db_session(), data).await?;
+        node.update_cb(data).execute(data.db_session()).await?;
 
         Ok(lc)
     }
 
     async fn like_count(session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let res = Self::find_by_primary_key_value(session, (id, branch_id)).await.ok();
+        let res = Self::find_by_primary_key_value(&(id, branch_id))
+            .execute(session)
+            .await
+            .ok();
 
         match res {
             Some(c) => {

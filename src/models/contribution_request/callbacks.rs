@@ -4,10 +4,10 @@ use crate::models::contribution_request::{
     ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb};
-use charybdis::callbacks::ExtCallbacks;
+use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 
-impl ExtCallbacks for ContributionRequest {
+impl Callbacks for ContributionRequest {
     type Extension = RequestData;
     type Error = NodecosmosError;
 

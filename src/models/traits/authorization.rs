@@ -80,7 +80,7 @@ pub trait Authorization {
 impl Authorization for Node {
     async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
-            *self = self.find_by_primary_key(data.db_session()).await?;
+            *self = self.find_by_primary_key().execute(data.db_session()).await?;
         } else {
             self.init_auth_branch(data.db_session()).await?;
         }
@@ -166,17 +166,21 @@ impl Authorization for ContributionRequest {
     }
 
     fn is_public(&self) -> bool {
-        self.branch.as_ref().map_or(false, |branch| branch.is_public)
+        let branch = self.branch.borrow_mut().clone();
+
+        branch.map_or(false, |branch| branch.is_public)
     }
 
     fn owner_id(&self) -> Option<Uuid> {
-        self.branch.as_ref().map(|branch| branch.owner_id)
+        let branch = self.branch.borrow_mut().clone();
+
+        branch.map(|branch| branch.owner_id)
     }
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
-        self.branch
-            .as_ref()
-            .map(|branch| branch.editor_ids.clone().unwrap_or_default())
+        let branch = self.branch.borrow_mut().clone();
+
+        branch.map(|branch| branch.editor_ids.clone().unwrap_or_default())
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

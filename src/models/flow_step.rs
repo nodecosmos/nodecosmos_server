@@ -85,7 +85,9 @@ impl FlowStep {
         node_id: Uuid,
         id: Uuid,
     ) -> Result<FlowStep, NodecosmosError> {
-        let fs = find_first_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+        let fs = find_first_flow_step!("node_id = ? AND id = ?", (node_id, id))
+            .execute(session)
+            .await?;
 
         Ok(fs)
     }
@@ -150,7 +152,9 @@ impl BaseFlowStep {
         node_id: Uuid,
         id: Uuid,
     ) -> Result<BaseFlowStep, NodecosmosError> {
-        let fs = find_first_base_flow_step!(session, "node_id = ? AND id = ?", (node_id, id)).await?;
+        let fs = find_first_base_flow_step!("node_id = ? AND id = ?", (node_id, id))
+            .execute(session)
+            .await?;
 
         Ok(fs)
     }

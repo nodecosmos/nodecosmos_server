@@ -109,23 +109,23 @@ impl FlowStep {
 
                 prev_fs.pull_outputs_from_next_flow_step(session).await?;
                 prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(session).await?;
+                prev_fs.update_cb(&None).execute(session).await?;
 
                 next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(session).await?;
+                next_fs.update_cb(&None).execute(session).await?;
                 next_fs.remove_inputs(session).await?;
             }
             (Some(prev_fs), None) => {
                 let mut prev_fs = prev_fs.as_native();
 
                 prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(session).await?;
+                prev_fs.update_cb(&None).execute(session).await?;
             }
             (None, Some(next_fs)) => {
                 let mut next_fs = next_fs.as_native();
 
                 next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(session).await?;
+                next_fs.update_cb(&None).execute(session).await?;
                 next_fs.remove_inputs(session).await?;
             }
             _ => {}

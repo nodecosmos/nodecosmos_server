@@ -1,10 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::Like;
-use charybdis::callbacks::ExtCallbacks;
+use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 
-impl ExtCallbacks for Like {
+impl Callbacks for Like {
     type Extension = RequestData;
     type Error = NodecosmosError;
 

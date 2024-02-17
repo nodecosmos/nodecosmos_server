@@ -9,7 +9,7 @@ use actix_multipart::Multipart;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithExtCallbacks, InsertWithExtCallbacks, UpdateWithExtCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -63,14 +63,13 @@ pub async fn sync(client_session: Session) -> Response {
 
 #[delete("/session/logout")]
 pub async fn logout(client_session: Session) -> Response {
-    println!("logout");
     client_session.clear();
     Ok(HttpResponse::Ok().finish())
 }
 
 #[get("/{id}")]
 pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let user = GetUser::find_by_id(&db_session, *id).await?;
+    let user = GetUser::find_by_id(*id).execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(user))
 }
@@ -84,7 +83,7 @@ pub async fn get_user_by_username(db_session: web::Data<CachingSession>, usernam
 
 #[post("")]
 pub async fn create_user(app: web::Data<App>, client_session: Session, mut user: web::Json<User>) -> Response {
-    user.insert_cb(&app.db_session, &app).await?;
+    user.insert_cb(&app).execute(&app.db_session).await?;
 
     let current_user = set_current_user(&client_session, &user)?;
 
@@ -95,7 +94,7 @@ pub async fn create_user(app: web::Data<App>, client_session: Session, mut user:
 pub async fn update_bio(data: RequestData, client_session: Session, mut user: web::Json<UpdateBioUser>) -> Response {
     user.as_native().auth_update(&data).await?;
 
-    user.update_cb(data.db_session(), &data).await?;
+    user.update_cb(&data).execute(data.db_session()).await?;
 
     refresh_current_user(&client_session, data.db_session()).await?;
 
@@ -106,7 +105,7 @@ pub async fn update_bio(data: RequestData, client_session: Session, mut user: we
 pub async fn delete_user(data: RequestData, mut user: web::Path<User>) -> Response {
     user.auth_update(&data).await?;
 
-    user.delete_cb(data.db_session(), &data.app).await?;
+    user.delete_cb(&data.app).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

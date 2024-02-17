@@ -25,7 +25,7 @@ impl ContributionRequest {
 
         node.branch_id = self.id;
 
-        node.insert(data.db_session()).await?;
+        node.insert().execute(data.db_session()).await?;
 
         Ok(())
     }
@@ -45,7 +45,7 @@ impl ContributionRequest {
             ..Default::default()
         };
 
-        branch.insert(data.db_session()).await?;
+        branch.insert().execute(data.db_session()).await?;
 
         Ok(())
     }

@@ -12,7 +12,7 @@ use scylla::CachingSession;
 pub async fn create_flow(data: RequestData, mut flow: web::Json<Flow>) -> Response {
     AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
 
-    flow.insert_cb(data.db_session()).await?;
+    flow.insert_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
@@ -25,7 +25,7 @@ pub async fn get_flow_description(
 ) -> Response {
     println!("{:?}", flow.primary_key_values());
 
-    let flow = flow.find_by_primary_key(&db_session).await?;
+    let flow = flow.find_by_primary_key().execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
@@ -34,7 +34,7 @@ pub async fn get_flow_description(
 pub async fn update_flow_title(data: RequestData, mut flow: web::Json<UpdateTitleFlow>) -> Response {
     AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
 
-    flow.update_cb(data.db_session()).await?;
+    flow.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
@@ -43,7 +43,7 @@ pub async fn update_flow_title(data: RequestData, mut flow: web::Json<UpdateTitl
 pub async fn update_flow_description(data: RequestData, mut flow: web::Json<DescriptionFlow>) -> Response {
     AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
 
-    flow.update_cb(data.db_session()).await?;
+    flow.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
@@ -52,7 +52,7 @@ pub async fn update_flow_description(data: RequestData, mut flow: web::Json<Desc
 pub async fn delete_flow(data: RequestData, mut flow: web::Path<Flow>) -> Response {
     AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
 
-    flow.delete_cb(data.db_session()).await?;
+    flow.delete_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow.into_inner()))
 }
