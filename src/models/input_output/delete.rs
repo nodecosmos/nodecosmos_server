@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::New;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -13,7 +13,7 @@ impl Io {
         workflow: &Workflow,
         flow_step_id: Option<Uuid>,
     ) -> Result<(), NodecosmosError> {
-        let mut batch = CharybdisModelBatch::new();
+        let mut batch = Self::delete_batch();
 
         for output_id in ids.iter() {
             let mut output = Io::new();
@@ -42,7 +42,7 @@ impl Io {
             let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
 
             if initial_input_ids.contains(&id) {
-                workflow.pull_initial_input_ids(session, &vec![id]).await?;
+                workflow.pull_initial_input_ids(&vec![id]).execute(session).await?;
             }
         }
 

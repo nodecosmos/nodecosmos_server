@@ -9,7 +9,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::services::elastic::ElasticDocument;
 use crate::utils::logger::{log_error, log_fatal};
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::AsNative;
 use elasticsearch::Elasticsearch;
 
@@ -42,7 +42,7 @@ impl UpdateTitleNode {
         }
 
         if let Some(ancestor_ids) = native.ancestor_ids.clone() {
-            let mut batch = CharybdisModelBatch::new();
+            let mut node_descendants = Vec::with_capacity(ancestor_ids.len());
 
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
@@ -55,12 +55,13 @@ impl UpdateTitleNode {
                     order_index: native.order_index,
                 };
 
-                if let Err(e) = batch.append_update(node_descendant) {
-                    log_error(format!("Failed to append update node_descendants: {}", e));
-                }
+                node_descendants.push(node_descendant);
             }
 
-            if let Err(e) = batch.execute(data.db_session()).await {
+            if let Err(e) = NodeDescendant::batch()
+                .chunked_update(data.db_session(), &node_descendants, 100)
+                .await
+            {
                 log_error(format!("Failed to update node_descendants: {}", e));
             }
         }

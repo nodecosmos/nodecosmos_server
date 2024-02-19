@@ -6,7 +6,7 @@ use crate::models::udts::{Owner, OwnerType};
 use crate::models::user::{FullName, User};
 use crate::services::elastic::ElasticDocument;
 use crate::utils::logger::{log_error, log_fatal};
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::types::Uuid;
 use futures::StreamExt;
 
@@ -57,10 +57,11 @@ impl UpdateOwnerNode {
         }
 
         UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), nodes_to_update.clone()).await;
-        CharybdisModelBatch::chunked_insert(data.db_session(), nodes_to_update, 100)
+        Self::unlogged_batch()
+            .chunked_insert(data.db_session(), &nodes_to_update, 100)
             .await
             .map_err(|e| {
-                log_error(format!("Error chunked_insert: {}", e));
+                log_error(format!("UpdateOwnerNode: Error chunked_insert: {}", e));
                 e
             })?;
 

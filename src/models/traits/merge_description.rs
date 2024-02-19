@@ -141,7 +141,7 @@ impl Description {
                     }
                     ProseMirrorXmlTag::CodeBlock => {
                         html.push_str("<pre>");
-                        markdown.push_str("```markdown\n");
+                        markdown.push_str("```markup\n");
                     }
                     ProseMirrorXmlTag::Image => {
                         let src = e
@@ -330,7 +330,8 @@ pub trait MergeDescription {
 /// In future it can be used for description of other models like IO, Flow, Flow Step, etc.
 impl MergeDescription for UpdateDescriptionNode {
     async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError> {
-        let node = GetDescriptionBase64Node::find_branched_or_original(db_session, self.id, self.branch_id).await?;
+        let node =
+            GetDescriptionBase64Node::find_branched_or_original(db_session, self.id, self.branch_id, None).await?;
 
         Ok(node.description_base64.unwrap_or(
             self.description_base64

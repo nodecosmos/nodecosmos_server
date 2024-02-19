@@ -32,7 +32,7 @@ actix-web-actors = "4.2.0"
 actix = "0.13.1"
 dashmap = "5.5.3"
 bytestring = "1.3.0"
-charybdis = { path = "../charybdis/charybdis" }
+charybdis = "0.4.0"
 yrs = "0.17.2"
 base64 = "0.21.5"
 uuid = "1.6.1"

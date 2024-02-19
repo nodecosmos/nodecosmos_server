@@ -53,7 +53,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_nodes(session, &vec![id])
+                .push_created_nodes(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::DeleteNode(id) => {
@@ -123,7 +124,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_titles(session, &vec![id])
+                .push_edited_node_titles(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditNodeDescription(id) => {
@@ -131,7 +133,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_descriptions(session, &vec![id])
+                .push_edited_node_descriptions(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
@@ -162,7 +165,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_workflows(session, &vec![id])
+                .push_created_workflows(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::DeleteWorkflow(id) => {
@@ -170,7 +174,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_workflows(session, &vec![id])
+                .push_deleted_workflows(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditWorkflowTitle(id) => {
@@ -178,7 +183,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_workflow_titles(session, &vec![id])
+                .push_edited_workflow_titles(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::CreateFlow(id) => {
@@ -186,7 +192,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_flows(session, &vec![id])
+                .push_created_flows(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
@@ -194,7 +201,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_flows(session, &vec![id])
+                .push_deleted_flows(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditFlowTitle(id) => {
@@ -202,7 +210,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_flow_titles(session, &vec![id])
+                .push_edited_flow_titles(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditFlowDescription(id) => {
@@ -210,7 +219,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_flow_descriptions(session, &vec![id])
+                .push_edited_flow_descriptions(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::CreateIO(id) => {
@@ -218,7 +228,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_ios(session, &vec![id])
+                .push_created_ios(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::DeleteIO(id) => {
@@ -226,7 +237,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_ios(session, &vec![id])
+                .push_deleted_ios(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditIOTitle(id) => {
@@ -234,7 +246,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_io_titles(session, &vec![id])
+                .push_edited_io_titles(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::EditIODescription(id) => {
@@ -242,7 +255,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_io_descriptions(session, &vec![id])
+                .push_edited_io_descriptions(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::CreateFlowStep(id) => {
@@ -250,7 +264,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_flow_steps(session, &vec![id])
+                .push_created_flow_steps(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
@@ -258,7 +273,8 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_flow_steps(session, &vec![id])
+                .push_deleted_flow_steps(&vec![id])
+                .execute(session)
                 .await;
             }
             BranchUpdate::AppendFlowStepInput(node_id, io_id) => {

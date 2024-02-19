@@ -8,7 +8,7 @@ use crate::models::node_descendants_commit::NodeDescendantsCommit;
 use crate::models::node_tree_position_commit::NodeTreePositionCommit;
 use crate::models::traits::VersionedNodePluck;
 use crate::utils::logger::log_fatal;
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Insert;
 use charybdis::types::{Double, Uuid};
 use chrono::Utc;
@@ -170,11 +170,11 @@ impl NodeCommit {
     }
 
     async fn create_ancestors_commits(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut batch = CharybdisModelBatch::unlogged();
-
         let versioned_ancestors = self.latest_ancestor_commits(session).await?;
         let vnd_ids = versioned_ancestors.pluck_node_descendants_commit_id();
         let grouped_v_node_descendants = NodeDescendantsCommit::find_grouped_by_node_id(session, vnd_ids).await?;
+        let mut new_v_node_descendants = vec![];
+        let mut new_v_nodes = vec![];
 
         for versioned_ancestor in versioned_ancestors {
             let default_v_node_descendants = Default::default();
@@ -190,11 +190,17 @@ impl NodeCommit {
             let mut new_v_node = NodeCommit::init_from(&versioned_ancestor, self.branch_id, self.user_id);
             new_v_node.node_descendants_commit_id = Some(new_v_node_descendant.id);
 
-            batch.append_insert(new_v_node_descendant)?;
-            batch.append_insert(new_v_node)?;
+            new_v_node_descendants.push(new_v_node_descendant);
+            new_v_nodes.push(new_v_node);
         }
 
-        batch.execute(session).await?;
+        NodeDescendantsCommit::unlogged_batch()
+            .chunked_insert(session, &new_v_node_descendants, 100)
+            .await?;
+
+        NodeCommit::unlogged_batch()
+            .chunked_insert(session, &new_v_nodes, 100)
+            .await?;
 
         Ok(())
     }
@@ -203,7 +209,8 @@ impl NodeCommit {
         &mut self,
         session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
-        let mut batch = CharybdisModelBatch::unlogged();
+        let mut new_v_node_descendants = vec![];
+        let mut new_v_nodes = vec![];
 
         let ancestors = self.latest_ancestor_commits(session).await?;
         let vnd_ids = ancestors.pluck_node_descendants_commit_id();
@@ -238,11 +245,17 @@ impl NodeCommit {
             let mut new_v_node = NodeCommit::init_from(&ancestor, self.branch_id, self.user_id);
             new_v_node.node_descendants_commit_id = Some(new_v_node_descendant.id);
 
-            batch.append_insert(new_v_node_descendant)?;
-            batch.append_insert(new_v_node)?;
+            new_v_node_descendants.push(new_v_node_descendant);
+            new_v_nodes.push(new_v_node);
         }
 
-        batch.execute(session).await?;
+        NodeDescendantsCommit::unlogged_batch()
+            .chunked_insert(session, &new_v_node_descendants, 100)
+            .await?;
+
+        NodeCommit::unlogged_batch()
+            .chunked_insert(session, &new_v_nodes, 100)
+            .await?;
 
         Ok(())
     }

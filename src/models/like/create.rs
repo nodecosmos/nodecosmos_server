@@ -2,6 +2,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::like::{Like, ObjectType};
+use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::node_counter::NodeCounter;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
@@ -21,7 +22,15 @@ impl Like {
     }
 
     pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let existing_like = self.find_by_primary_key().execute(session).await.ok();
+        let existing_like = LikesByUser {
+            user_id: self.user_id,
+            object_id: self.object_id,
+            branch_id: self.branch_id,
+        }
+        .find_by_primary_key()
+        .execute(session)
+        .await
+        .ok();
 
         if existing_like.is_some() {
             return Err(NodecosmosError::ValidationError((

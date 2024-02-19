@@ -32,11 +32,13 @@ pub struct NodeCounter {
 impl Likeable for NodeCounter {
     async fn increment_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
         let lc = Self::like_count(data.db_session(), id, branch_id).await? + 1;
-        execute(
-            data.db_session(),
-            update_node_counter_query!("like_count = like_count + 1"),
-            (id, branch_id),
-        )
+        Self {
+            id,
+            branch_id,
+            ..Default::default()
+        }
+        .increment_like_count(1)
+        .execute(data.db_session())
         .await?;
 
         let mut node = UpdateLikesCountNode {
@@ -53,11 +55,13 @@ impl Likeable for NodeCounter {
 
     async fn decrement_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
         let lc = Self::like_count(data.db_session(), id, branch_id).await? - 1;
-        execute(
-            data.db_session(),
-            update_node_counter_query!("like_count = like_count - 1"),
-            (id, branch_id),
-        )
+        Self {
+            id,
+            branch_id,
+            ..Default::default()
+        }
+        .decrement_like_count(1)
+        .execute(data.db_session())
         .await?;
 
         let mut node = UpdateLikesCountNode {
@@ -84,11 +88,7 @@ impl Likeable for NodeCounter {
 
                 Ok(c.0)
             }
-            None => {
-                let c = Counter(0);
-
-                Ok(c.0)
-            }
+            None => Ok(0),
         }
     }
 }

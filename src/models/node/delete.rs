@@ -15,7 +15,7 @@ use crate::models::workflow::DeleteWorkflow;
 use crate::services::elastic::{ElasticDocument, ElasticIndex};
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::log_error;
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisBatch, CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Delete;
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
@@ -101,7 +101,7 @@ impl<'a> NodeDelete<'a> {
     }
 
     async fn populate_delete_data(&mut self) -> Result<(), NodecosmosError> {
-        let mut descendants = self.node.descendants(self.db_session).await?;
+        let mut descendants = self.node.descendants(self.db_session, None).await?;
 
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
@@ -122,48 +122,55 @@ impl<'a> NodeDelete<'a> {
     /// Here we delete workflows, flows, flow_steps, ios, likes, like_counts for node and its descendants.
     pub async fn delete_related_data(&mut self) -> Result<(), NodecosmosError> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
-            let mut batch = CharybdisModelBatch::unlogged();
-
             for id in node_ids_chunk {
-                batch.append_delete_by_partition_key(DeleteWorkflow {
+                DeleteWorkflow {
                     node_id: *id,
                     ..Default::default()
-                })?;
+                }
+                .delete_by_partition_key()
+                .execute(self.db_session)
+                .await?;
 
-                batch.append_delete_by_partition_key(DeleteFlow {
+                DeleteFlow {
                     node_id: *id,
                     ..Default::default()
-                })?;
+                }
+                .delete_by_partition_key()
+                .execute(self.db_session)
+                .await?;
 
-                batch.append_delete_by_partition_key(DeleteFlowStep {
+                DeleteFlowStep {
                     node_id: *id,
                     ..Default::default()
-                })?;
+                }
+                .delete_by_partition_key()
+                .execute(self.db_session)
+                .await?;
 
-                batch.append_delete_by_partition_key(DeleteIo {
+                DeleteIo {
                     node_id: *id,
                     ..Default::default()
-                })?;
+                }
+                .delete_by_partition_key()
+                .execute(self.db_session)
+                .await?;
 
-                batch.append_delete_by_partition_key(Like {
+                Like {
                     object_id: *id,
                     ..Default::default()
-                })?;
-
-                if id != &self.node.id {
-                    batch.append_delete(&PrimaryKeyNode {
-                        id: *id,
-                        branch_id: self.node.branchise_id(*id),
-                    })?;
                 }
-            }
+                .delete_by_partition_key()
+                .execute(self.db_session)
+                .await?;
 
-            batch.execute(self.db_session).await.map_err(|err| {
-                return NodecosmosError::InternalServerError(format!(
-                    "NodeDelete::delete_related_data: batch.execute: {}",
-                    err
-                ));
-            })?;
+                PrimaryKeyNode {
+                    id: *id,
+                    branch_id: self.node.branchise_id(*id),
+                }
+                .delete()
+                .execute(self.db_session)
+                .await?;
+            }
         }
 
         Ok(())
@@ -172,7 +179,7 @@ impl<'a> NodeDelete<'a> {
     //  Counter and non-counter mutations cannot exist in the same batch
     pub async fn delete_counter_data(&mut self) -> Result<(), NodecosmosError> {
         for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
-            let mut batch = CharybdisModelBatch::unlogged();
+            let mut batch = NodeCounter::unlogged_batch();
 
             for id in node_ids_chunk {
                 batch.append_delete(&NodeCounter {
@@ -221,7 +228,7 @@ impl<'a> NodeDelete<'a> {
                     let children: Children = self.children_by_parent_id.get(&parent_id).unwrap_or(&vec![]).clone();
 
                     for children_chunk in children.chunks(100) {
-                        let mut batch = CharybdisModelBatch::unlogged();
+                        let mut batch = NodeDescendant::unlogged_delete_batch();
 
                         for (child_id, order_index) in children_chunk {
                             // delete node descendants for all of its ancestors

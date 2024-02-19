@@ -7,6 +7,7 @@ use crate::utils::cloned_ref::ClonedRef;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
+use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -44,13 +45,13 @@ impl ReorderData {
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         return if params.is_branched() {
-            node.descendants(&db_session)
+            node.descendants(&db_session, Some(Consistency::All))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
         } else {
-            node.branch_descendants(&db_session).await
+            node.branch_descendants(&db_session, Some(Consistency::All)).await
         };
     }
 
@@ -93,13 +94,16 @@ impl ReorderData {
         if params.is_branched() {
             tree_root
                 .as_native()
-                .descendants(&db_session)
+                .descendants(&db_session, Some(Consistency::All))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
         } else {
-            tree_root.as_native().branch_descendants(&db_session).await
+            tree_root
+                .as_native()
+                .branch_descendants(&db_session, Some(Consistency::All))
+                .await
         }
     }
 
@@ -109,7 +113,7 @@ impl ReorderData {
         branch_id: Uuid,
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
         if let Some(id) = id {
-            let node = GetStructureNode::find_branched_or_original(&db_session, id, branch_id).await?;
+            let node = GetStructureNode::find_branched_or_original(&db_session, id, branch_id, None).await?;
 
             return Ok(Some(node));
         }
@@ -177,7 +181,8 @@ impl ReorderData {
     }
 
     pub async fn from_params(params: &ReorderParams, db_session: &CachingSession) -> Result<Self, NodecosmosError> {
-        let node = Node::find_branched_or_original(&db_session, params.id, params.branch_id).await?;
+        let node =
+            Node::find_branched_or_original(&db_session, params.id, params.branch_id, Some(Consistency::All)).await?;
         let descendants = Self::find_descendants(&db_session, params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 

@@ -12,7 +12,7 @@ use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::logger::{log_error, log_fatal};
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::callbacks::Callbacks;
 use charybdis::operations::{Find, Insert, InsertWithCallbacks};
 use charybdis::types::{Set, Uuid};
@@ -131,7 +131,7 @@ impl Node {
 
     pub async fn append_to_ancestors(&self, db_session: &CachingSession) {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            let mut batch = CharybdisModelBatch::unlogged();
+            let mut descendants = Vec::with_capacity(ancestor_ids.len());
 
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
@@ -144,19 +144,15 @@ impl Node {
                     title: self.title.clone(),
                 };
 
-                let res = batch.append_insert(node_descendant);
+                println!("descendants: {:?}", node_descendant.node_id);
 
-                if let Err(e) = res {
-                    log_fatal(format!(
-                        "Error appending node {} to ancestors::append_insert {:?}",
-                        self.id, e
-                    ));
-                }
+                descendants.push(node_descendant);
             }
 
-            let res = batch.execute(db_session).await;
-
-            if let Err(e) = res {
+            if let Err(e) = NodeDescendant::batch()
+                .chunked_insert(db_session, &descendants, 100)
+                .await
+            {
                 log_fatal(format!(
                     "Error appending node {} to ancestors::execute {:?}",
                     self.id, e

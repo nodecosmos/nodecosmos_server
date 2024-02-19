@@ -6,7 +6,7 @@ use crate::models::traits::Branchable;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::file::read_file_names;
 use crate::utils::logger::{log_error, log_fatal, log_success, log_warning};
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Update;
 use scylla::CachingSession;
 use std::fs::create_dir_all;
@@ -135,7 +135,8 @@ impl<'a> Recovery<'a> {
     async fn restore_tree(&mut self) -> Result<(), NodecosmosError> {
         let now = std::time::Instant::now();
 
-        CharybdisModelBatch::chunked_insert(self.db_session, self.reorder_data.tree_descendants.clone(), 100)
+        NodeDescendant::unlogged_batch()
+            .chunked_insert(self.db_session, &self.reorder_data.tree_descendants.clone(), 100)
             .await
             .map_err(|err| {
                 log_error(format!("restore_tree_descendants: {}", err));
@@ -163,34 +164,20 @@ impl<'a> Recovery<'a> {
     async fn remove_new_ancestor_ids(&mut self) -> Result<(), NodecosmosError> {
         let mut node_and_descendant_ids = vec![self.reorder_data.node.id];
         node_and_descendant_ids.extend(self.reorder_data.descendant_ids.clone());
+        let mut values = vec![];
 
-        for chunk in node_and_descendant_ids.chunks(100) {
-            let mut batch = CharybdisModelBatch::new();
+        for id in node_and_descendant_ids {
+            let branch_id = self.reorder_data.branchise_id(id);
+            values.push((&self.reorder_data.added_ancestor_ids, id, branch_id));
+        }
 
-            for id in chunk {
-                let branch_id = self.reorder_data.branchise_id(*id);
-
-                batch
-                    .append_statement(
-                        Node::PULL_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.added_ancestor_ids, id, branch_id),
-                    )
-                    .map_err(|err| {
-                        log_error(format!("append_statement for remove_new_ancestor_ids: {}", err));
-
-                        return err;
-                    })?;
-            }
-
-            batch.execute(self.db_session).await.map_err(|err| {
-                log_error(format!(
-                    "removing new ancestor ids from node and its descendants: {}",
-                    err
-                ));
-
+        Node::unlogged_statement_batch()
+            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("remove_new_ancestor_ids: {:?}", err));
                 return err;
             })?;
-        }
 
         Ok(())
     }
@@ -198,31 +185,20 @@ impl<'a> Recovery<'a> {
     async fn append_old_ancestor_ids(&mut self) -> Result<(), NodecosmosError> {
         let mut node_and_descendant_ids = vec![self.reorder_data.node.id];
         node_and_descendant_ids.extend(self.reorder_data.descendant_ids.clone());
+        let mut values = vec![];
 
-        for chunk in node_and_descendant_ids.chunks(100) {
-            let mut batch = CharybdisModelBatch::new();
+        for id in node_and_descendant_ids {
+            let branch_id = self.reorder_data.branchise_id(id);
+            values.push((&self.reorder_data.removed_ancestor_ids, id, branch_id));
+        }
 
-            for id in chunk {
-                let branch_id = self.reorder_data.branchise_id(*id);
-
-                batch
-                    .append_statement(
-                        Node::PUSH_ANCESTOR_IDS_QUERY,
-                        (&self.reorder_data.removed_ancestor_ids, id, branch_id),
-                    )
-                    .map_err(|err| {
-                        log_error(format!("append_statement for append_old_ancestor_ids: {}", err));
-
-                        return err;
-                    })?;
-            }
-
-            batch.execute(self.db_session).await.map_err(|err| {
-                log_error(format!("adding old ancestor ids to node and its descendants: {}", err));
-
+        Node::unlogged_statement_batch()
+            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("append_old_ancestor_ids: {:?}", err));
                 return err;
             })?;
-        }
 
         Ok(())
     }

@@ -1,8 +1,8 @@
 mod callbacks;
 mod create;
 mod delete;
-mod description;
-mod title;
+mod update_description;
+mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
@@ -171,6 +171,22 @@ partial_io!(
     updated_at
 );
 
+impl UpdateDescriptionIo {
+    pub async fn ios_by_original_id(
+        session: &CachingSession,
+        root_node_id: Uuid,
+        original_id: Uuid,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let ios = find_update_description_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
+            .execute(session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(ios)
+    }
+}
+
 partial_io!(
     UpdateTitleIo,
     root_node_id,
@@ -181,6 +197,22 @@ partial_io!(
     title,
     updated_at
 );
+
+impl UpdateTitleIo {
+    pub async fn ios_by_original_id(
+        session: &CachingSession,
+        root_node_id: Uuid,
+        original_id: Uuid,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let ios = find_update_title_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
+            .execute(session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(ios)
+    }
+}
 
 partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, workflow_id, id);
 

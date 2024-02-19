@@ -21,6 +21,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -214,11 +215,15 @@ impl Node {
     pub async fn descendants(
         &self,
         db_session: &CachingSession,
+        consistency: Option<Consistency>,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-        let descendants =
-            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
-                .execute(db_session)
-                .await?;
+        let mut q = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id);
+
+        if let Some(consistency) = consistency {
+            q = q.consistency(consistency)
+        }
+
+        let descendants = q.execute(db_session).await?;
 
         Ok(descendants)
     }
@@ -226,18 +231,19 @@ impl Node {
     pub async fn branch_descendants(
         &self,
         db_session: &CachingSession,
+        consistency: Option<Consistency>,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        let original = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
+        let mut original_q = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id);
+        let mut branched_q =
+            NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id);
+        if let Some(consistency) = consistency {
+            original_q = original_q.consistency(consistency);
+            branched_q = branched_q.consistency(consistency);
+        }
 
-        let branched = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
+        let original = original_q.execute(db_session).await?.try_collect().await?;
+
+        let branched = branched_q.execute(db_session).await?.try_collect().await?;
 
         let mut branched_ids = HashSet::with_capacity(branched.len());
         let mut descendants = Vec::with_capacity(original.len() + branched.len());
@@ -382,18 +388,29 @@ macro_rules! find_branched_or_original {
                 db_session: &CachingSession,
                 id: Uuid,
                 branch_id: Uuid,
+                consistency: Option<Consistency>,
             ) -> Result<Self, NodecosmosError> {
-                let node = Self::find_by_primary_key_value(&(id, branch_id))
-                    .execute(db_session)
-                    .await
-                    .ok();
+                let pk = &(id, branch_id);
+                let mut node_q = Self::find_by_primary_key_value(pk);
+
+                if let Some(consistency) = consistency {
+                    node_q = node_q.consistency(consistency);
+                }
+
+                let node = node_q.execute(db_session).await.ok();
 
                 match node {
                     Some(node) => Ok(node),
-                    None => Self::find_by_primary_key_value(&(id, id))
-                        .execute(db_session)
-                        .await
-                        .map_err(|err| err.into()),
+                    None => {
+                        let pk = &(id, id);
+                        let mut q = Self::find_by_primary_key_value(pk);
+
+                        if let Some(consistency) = consistency {
+                            q = q.consistency(consistency);
+                        }
+
+                        q.execute(db_session).await.map_err(|err| err.into())
+                    }
                 }
             }
 

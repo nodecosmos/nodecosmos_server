@@ -16,9 +16,10 @@ use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::logger::log_fatal;
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::BaseModel;
 use charybdis::operations::{execute, Update};
+use charybdis::options::Consistency;
 use charybdis::types::{Double, Uuid};
 pub use recovery::Recovery;
 use scylla::CachingSession;
@@ -117,7 +118,11 @@ impl<'a> Reorder<'a> {
             order_index: self.reorder_data.new_order_index,
         };
 
-        update_order_node.update().execute(&self.db_session).await?;
+        update_order_node
+            .update()
+            .consistency(Consistency::All)
+            .execute(&self.db_session)
+            .await?;
 
         Ok(())
     }
@@ -138,7 +143,9 @@ impl<'a> Reorder<'a> {
             descendants_to_delete.push(descendant);
         }
 
-        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
+        NodeDescendant::unlogged_delete_batch()
+            .consistency(Consistency::All)
+            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("remove_node_from_removed_ancestors: {:?}", err));
@@ -166,7 +173,9 @@ impl<'a> Reorder<'a> {
             }
         }
 
-        CharybdisModelBatch::chunked_delete(&self.db_session, &descendants_to_delete, 100)
+        NodeDescendant::unlogged_delete_batch()
+            .consistency(Consistency::All)
+            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("delete_node_descendants_from_removed_ancestors: {:?}", err));
@@ -193,7 +202,9 @@ impl<'a> Reorder<'a> {
             descendants_to_add.push(descendant);
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, descendants_to_add, 100)
+        NodeDescendant::unlogged_batch()
+            .consistency(Consistency::All)
+            .chunked_insert(&self.db_session, &descendants_to_add, 100)
             .await
             .map_err(|err| {
                 log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
@@ -222,10 +233,12 @@ impl<'a> Reorder<'a> {
             }
         }
 
-        CharybdisModelBatch::chunked_insert(&self.db_session, descendants, 100)
+        NodeDescendant::unlogged_batch()
+            .consistency(Consistency::All)
+            .chunked_insert(&self.db_session, &descendants, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
+                log_fatal(format!("insert_node_descendants_to_added_ancestors: {:?}", err));
                 return err;
             })?;
 
@@ -233,37 +246,36 @@ impl<'a> Reorder<'a> {
     }
 
     async fn pull_removed_ancestors_from_node(&mut self) -> Result<(), NodecosmosError> {
-        execute(
-            self.db_session,
-            Node::PULL_ANCESTOR_IDS_QUERY,
-            (
-                self.reorder_data.removed_ancestor_ids.clone(),
-                self.reorder_data.node.id,
-                self.reorder_data.node.branch_id,
-            ),
-        )
-        .await?;
+        self.reorder_data
+            .node
+            .pull_ancestor_ids(&self.reorder_data.removed_ancestor_ids)
+            .execute(&self.db_session)
+            .await?;
 
         Ok(())
     }
 
     async fn pull_removed_ancestors_from_descendants(&mut self) -> Result<(), NodecosmosError> {
-        for descendant_chunk in self.reorder_data.descendant_ids.chunks(100) {
-            let mut batch = CharybdisModelBatch::new();
+        let mut values = vec![];
 
-            for descendant_id in descendant_chunk {
-                batch.append_statement(
-                    Node::PULL_ANCESTOR_IDS_QUERY,
-                    (
-                        self.reorder_data.removed_ancestor_ids.clone(),
-                        descendant_id,
-                        self.reorder_data.branchise_id(*descendant_id),
-                    ),
-                )?;
-            }
+        for descendant_id in &self.reorder_data.descendant_ids {
+            let val = (
+                self.reorder_data.removed_ancestor_ids.clone(),
+                descendant_id,
+                self.reorder_data.branchise_id(*descendant_id),
+            );
 
-            batch.execute(&self.db_session).await?;
+            values.push(val);
         }
+
+        Node::unlogged_statement_batch()
+            .consistency(Consistency::All)
+            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("pull_removed_ancestors_from_descendants: {:?}", err));
+                return err;
+            })?;
 
         Ok(())
     }
@@ -284,22 +296,26 @@ impl<'a> Reorder<'a> {
     }
 
     async fn push_added_ancestors_to_descendants(&mut self) -> Result<(), NodecosmosError> {
-        for descendant_chunk in self.reorder_data.descendant_ids.chunks(100) {
-            let mut batch = CharybdisModelBatch::new();
+        let mut values = vec![];
 
-            for descendant_id in descendant_chunk {
-                batch.append_statement(
-                    Node::PUSH_ANCESTOR_IDS_QUERY,
-                    (
-                        self.reorder_data.added_ancestor_ids.clone(),
-                        descendant_id,
-                        self.reorder_data.branchise_id(*descendant_id),
-                    ),
-                )?;
-            }
+        for descendant_id in &self.reorder_data.descendant_ids {
+            let val = (
+                self.reorder_data.added_ancestor_ids.clone(),
+                descendant_id,
+                self.reorder_data.branchise_id(*descendant_id),
+            );
 
-            batch.execute(&self.db_session).await?;
+            values.push(val);
         }
+
+        Node::unlogged_statement_batch()
+            .consistency(Consistency::All)
+            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .await
+            .map_err(|err| {
+                log_fatal(format!("push_added_ancestors_to_descendants: {:?}", err));
+                return err;
+            })?;
 
         Ok(())
     }

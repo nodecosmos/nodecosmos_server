@@ -10,11 +10,12 @@ use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::options::Consistency;
 use charybdis::types::Uuid;
-use charybdis::Consistency;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
+use std::time::Duration;
 
 #[get("")]
 pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Query<NodeSearchQuery>) -> Response {
@@ -30,6 +31,7 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
         ..Default::default()
     }
     .find_by_primary_key()
+    .timeout(Some(Duration::from_secs(5)))
     .execute(&app.db_session)
     .await?;
 
@@ -37,7 +39,11 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 
     native_node.auth_view(&app, opt_cu).await?;
 
-    let descendants = native_node.descendants(&app.db_session).await?.try_collect().await?;
+    let descendants = native_node
+        .descendants(&app.db_session, None)
+        .await?
+        .try_collect()
+        .await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -62,7 +68,7 @@ pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode
 
     native_node.auth_view(&app, opt_cu).await?;
 
-    let descendants = native_node.branch_descendants(&app.db_session).await?;
+    let descendants = native_node.branch_descendants(&app.db_session, None).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "node": node,
@@ -155,7 +161,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_branched_or_original(data.db_session(), params.id, params.branch_id).await?;
+    let mut node = Node::find_branched_or_original(data.db_session(), params.id, params.branch_id, None).await?;
 
     node.auth_update(&data).await?;
 
