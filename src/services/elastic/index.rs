@@ -1,5 +1,5 @@
 use crate::models::node::{
-    Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode,
+    Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateProfileNode, UpdateTitleNode,
 };
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use crate::services::elastic::utils::idx_exists;
@@ -220,7 +220,7 @@ impl_elastic_index!(UpdateTitleNode, Node);
 impl_elastic_index!(UpdateDescriptionNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
 impl_elastic_index!(UpdateLikesCountNode, Node);
-impl_elastic_index!(UpdateOwnerNode, Node);
+impl_elastic_index!(UpdateProfileNode, Node);
 
 impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);

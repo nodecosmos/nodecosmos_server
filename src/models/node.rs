@@ -14,7 +14,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
-use crate::models::udts::Owner;
+use crate::models::udts::Profile;
 use crate::utils::defaults::default_to_0;
 use crate::utils::defaults::default_to_false;
 use charybdis::macros::charybdis_model;
@@ -79,7 +79,7 @@ pub struct Node {
     pub owner_id: Option<Uuid>,
 
     #[serde(rename = "ownerType")]
-    pub owner_type: Option<Text>,
+    pub profile_type: Option<Text>,
 
     #[serde(rename = "creatorId")]
     pub creator_id: Option<Uuid>,
@@ -87,7 +87,7 @@ pub struct Node {
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    pub owner: Option<Frozen<Owner>>,
+    pub owner: Option<Frozen<Profile>>,
 
     #[serde(rename = "likesCount", default = "default_to_0")]
     pub like_count: Option<BigInt>,
@@ -377,7 +377,7 @@ partial_node!(PrimaryKeyNode, id, branch_id);
 
 partial_node!(AuthNode, id, branch_id, owner_id, editor_ids);
 
-partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
+partial_node!(UpdateProfileNode, id, branch_id, owner_id, owner, updated_at);
 
 // TODO: this could be replaced with traits by utilizing AsNative from CharybdisModel
 macro_rules! find_branched_or_original {

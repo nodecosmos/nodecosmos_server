@@ -9,7 +9,7 @@ use crate::models::node::{
 };
 use crate::models::traits::{NodeId, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
-use crate::models::udts::{Owner, TextChange};
+use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
@@ -72,7 +72,7 @@ pub struct Branch {
     #[serde(rename = "ownerId")]
     pub owner_id: Uuid,
 
-    pub owner: Option<Frozen<Owner>>,
+    pub owner: Option<Frozen<Profile>>,
 
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,

@@ -7,7 +7,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::traits::Branchable;
-use crate::models::udts::Owner;
+use crate::models::udts::Profile;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Update, UpdateWithCallbacks};
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
@@ -78,7 +78,7 @@ pub struct ContributionRequest {
     #[serde(default, rename = "ownerId")]
     pub owner_id: Uuid,
 
-    pub owner: Option<Frozen<Owner>>,
+    pub owner: Option<Frozen<Profile>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]

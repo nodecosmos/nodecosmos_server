@@ -25,15 +25,9 @@ pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Que
 
 #[get("/{id}")]
 pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode {
-        id: *id,
-        branch_id: *id,
-        ..Default::default()
-    }
-    .find_by_primary_key()
-    .timeout(Some(Duration::from_secs(5)))
-    .execute(&app.db_session)
-    .await?;
+    let node = BaseNode::find_by_id_and_branch_id(*id, *id)
+        .execute(&app.db_session)
+        .await?;
 
     let mut native_node = node.as_native();
 
@@ -55,14 +49,9 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 
 #[get("/{id}/{branchId}")]
 pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode>, opt_cu: OptCurrentUser) -> Response {
-    let node = BaseNode {
-        id: pk.id,
-        branch_id: pk.branch_id,
-        ..Default::default()
-    }
-    .find_by_primary_key()
-    .execute(&app.db_session)
-    .await?;
+    let node = BaseNode::find_by_id_and_branch_id(pk.id, pk.branch_id)
+        .execute(&app.db_session)
+        .await?;
 
     let mut native_node = node.as_native();
 

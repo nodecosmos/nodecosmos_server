@@ -15,7 +15,6 @@ use std::rc::Rc;
     table_name = flow_steps,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, flow_id, flow_index, id],
-    global_secondary_indexes = [],
     local_secondary_indexes = [
         ([node_id], [id])
     ]

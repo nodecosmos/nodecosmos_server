@@ -1,13 +1,13 @@
 mod address;
 mod branch_reorder_data;
 mod conflict;
-mod text_change;
-mod owner;
+mod profile;
 mod property;
+mod text_change;
 
 pub use address::*;
 pub use branch_reorder_data::*;
 pub use conflict::*;
-pub use text_change::*;
-pub use owner::*;
+pub use profile::*;
 pub use property::*;
+pub use text_change::*;

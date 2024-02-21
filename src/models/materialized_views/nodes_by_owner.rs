@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys=[id, branch_id]
 )]
 #[derive(Serialize, Deserialize, Default)]
-pub struct NodesByOwner {
+pub struct NodesByProfile {
     pub owner_id: Uuid,
 
     pub id: Uuid,

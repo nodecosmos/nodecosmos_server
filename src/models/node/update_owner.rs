@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
-use crate::models::node::UpdateOwnerNode;
-use crate::models::udts::{Owner, OwnerType};
+use crate::models::materialized_views::nodes_by_owner::NodesByProfile;
+use crate::models::node::UpdateProfileNode;
+use crate::models::udts::{Profile, ProfileType};
 use crate::models::user::{FullName, User};
 use crate::services::elastic::ElasticDocument;
 use crate::utils::logger::{log_error, log_fatal};
@@ -10,8 +10,8 @@ use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::types::Uuid;
 use futures::StreamExt;
 
-impl UpdateOwnerNode {
-    fn init(nodes_by_owner: &NodesByOwner, owner: Owner) -> Self {
+impl UpdateProfileNode {
+    fn init(nodes_by_owner: &NodesByProfile, owner: Profile) -> Self {
         Self {
             id: nodes_by_owner.id,
             branch_id: nodes_by_owner.branch_id,
@@ -26,7 +26,7 @@ impl UpdateOwnerNode {
 
         match user {
             Ok(user) => {
-                let _ = UpdateOwnerNode::run(data, user.clone()).await;
+                let _ = UpdateProfileNode::run(data, user.clone()).await;
             }
             Err(e) => {
                 log_error(format!("Error find_by_id: {}", e));
@@ -35,7 +35,7 @@ impl UpdateOwnerNode {
     }
 
     async fn run(data: &RequestData, user: User) -> Result<(), NodecosmosError> {
-        let mut nodes_by_owner = NodesByOwner::find_by_owner_id(user.id)
+        let mut nodes_by_owner = NodesByProfile::find_by_owner_id(user.id)
             .execute(data.db_session())
             .await
             .map_err(|e| {
@@ -43,11 +43,11 @@ impl UpdateOwnerNode {
                 e
             })?;
 
-        let owner = Owner::init(&user);
+        let owner = Profile::init(&user);
         let mut nodes_to_update = vec![];
 
         while let Some(node_by_owner) = nodes_by_owner.next().await {
-            nodes_to_update.push(UpdateOwnerNode::init(
+            nodes_to_update.push(UpdateProfileNode::init(
                 &node_by_owner.map_err(|e| {
                     log_error(format!("Error init: {}", e));
                     e
@@ -56,12 +56,12 @@ impl UpdateOwnerNode {
             ))
         }
 
-        UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), nodes_to_update.clone()).await;
+        UpdateProfileNode::bulk_update_elastic_documents(data.elastic_client(), nodes_to_update.clone()).await;
         Self::unlogged_batch()
             .chunked_insert(data.db_session(), &nodes_to_update, 100)
             .await
             .map_err(|e| {
-                log_error(format!("UpdateOwnerNode: Error chunked_insert: {}", e));
+                log_error(format!("UpdateProfileNode: Error chunked_insert: {}", e));
                 e
             })?;
 

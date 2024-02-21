@@ -1,6 +1,5 @@
 
-## ![](https://via.placeholder.com/20/2adfff/000000?text=+) Installation
----
+paping---
 
 1) **Install related services with docker compose**
    ```shell
@@ -20,7 +19,7 @@
    ```
 3) **Create keyspace and replication factor 3:**
     ```cassandraql
-    CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 2};
+    CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 3};
     ```
 
 ##### TODO:

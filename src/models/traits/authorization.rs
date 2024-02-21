@@ -3,6 +3,7 @@ use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
+use crate::models::comment::{Comment, CommentObject};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::Node;
 use crate::models::traits::Branchable;
@@ -19,7 +20,9 @@ pub trait Authorization {
         Ok(())
     }
 
-    fn is_public(&self) -> bool;
+    fn is_public(&self) -> bool {
+        false
+    }
 
     fn owner_id(&self) -> Option<Uuid>;
 
@@ -197,10 +200,6 @@ impl Authorization for ContributionRequest {
 }
 
 impl Authorization for User {
-    fn is_public(&self) -> bool {
-        false
-    }
-
     fn owner_id(&self) -> Option<Uuid> {
         Some(self.id)
     }
@@ -211,5 +210,30 @@ impl Authorization for User {
 
     async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
         Ok(())
+    }
+}
+
+impl Authorization for Comment {
+    fn owner_id(&self) -> Option<Uuid> {
+        Some(self.author_id)
+    }
+
+    fn editor_ids(&self) -> Option<Set<Uuid>> {
+        None
+    }
+
+    async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let object = self.object(data.db_session()).await?;
+        match object {
+            CommentObject::ContributionRequest(mut contribution_request) => {
+                contribution_request
+                    .auth_view(&data.app, OptCurrentUser(Option::from(data.current_user.clone())))
+                    .await?;
+
+                Ok(())
+            }
+
+            _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
+        }
     }
 }

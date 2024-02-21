@@ -134,6 +134,12 @@ async fn main() {
                     .service(create_attachment),
             )
             .service(web::scope("branches").service(restore_node))
+            .service(
+                web::scope("comments")
+                    .service(get_comments)
+                    .service(create_comment)
+                    .service(delete_comment),
+            )
     })
     .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

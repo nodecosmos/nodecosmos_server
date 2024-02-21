@@ -2,6 +2,7 @@ pub mod types;
 
 mod attachment_api;
 mod branch_api;
+mod comment_api;
 mod contribution_request_api;
 mod flow_api;
 mod flow_step_api;
@@ -15,6 +16,7 @@ mod ws;
 
 pub use attachment_api::*;
 pub use branch_api::*;
+pub use comment_api::*;
 pub use contribution_request_api::*;
 pub use flow_api::*;
 pub use flow_step_api::*;

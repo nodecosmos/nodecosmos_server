@@ -7,7 +7,7 @@ use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
-use crate::models::udts::Owner;
+use crate::models::udts::Profile;
 use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
@@ -25,17 +25,17 @@ impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
             let current_user = &data.current_user;
-            let owner = Owner::init_from_current_user(current_user);
+            let owner = Profile::init_from_current_user(current_user);
 
             self.owner_id = Some(owner.id);
-            self.owner_type = Some(owner.owner_type.clone());
+            self.profile_type = Some(owner.profile_type.clone());
 
             self.owner = Some(owner);
         } else {
             if let Some(parent) = self.parent(data.db_session()).await? {
                 if let Some(owner) = parent.owner.clone() {
                     self.owner_id = Some(owner.id);
-                    self.owner_type = Some(owner.owner_type.clone());
+                    self.profile_type = Some(owner.profile_type.clone());
 
                     self.owner = Some(owner);
                 } else {
@@ -119,9 +119,9 @@ impl Node {
             )));
         }
 
-        if self.owner_type.is_none() {
+        if self.profile_type.is_none() {
             return Err(NodecosmosError::ValidationError((
-                "owner_type".to_string(),
+                "profile_type".to_string(),
                 "must be present".to_string(),
             )));
         }

@@ -5,43 +5,43 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Deserialize)]
-pub enum OwnerType {
+pub enum ProfileType {
     User,
     Organization,
 }
 
-impl fmt::Display for OwnerType {
+impl fmt::Display for ProfileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            OwnerType::User => write!(f, "user"),
-            OwnerType::Organization => write!(f, "organization"),
+            ProfileType::User => write!(f, "user"),
+            ProfileType::Organization => write!(f, "organization"),
         }
     }
 }
 
-impl OwnerType {
+impl ProfileType {
     pub fn from_string(s: &str) -> Self {
         match s {
-            "User" => OwnerType::User,
-            "Organization" => OwnerType::Organization,
+            "User" => ProfileType::User,
+            "Organization" => ProfileType::Organization,
             _ => panic!("Invalid owner type"),
         }
     }
 }
 
-impl From<OwnerType> for Text {
-    fn from(owner_type: OwnerType) -> Self {
-        owner_type.to_string()
+impl From<ProfileType> for Text {
+    fn from(profile_type: ProfileType) -> Self {
+        profile_type.to_string()
     }
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[charybdis_udt_model(type_name = owner)]
-pub struct Owner {
+#[charybdis_udt_model(type_name = profile)]
+pub struct Profile {
     pub id: Uuid,
 
-    #[serde(rename = "ownerType")]
-    pub owner_type: Text, // user or organization
+    #[serde(rename = "profileType")]
+    pub profile_type: Text, // user or organization
 
     pub name: Text,
 
@@ -51,23 +51,23 @@ pub struct Owner {
     pub profile_image_url: Option<Text>,
 }
 
-impl Owner {
+impl Profile {
     pub fn init(user: &User) -> Self {
         Self {
             id: user.id,
-            owner_type: OwnerType::User.into(),
+            profile_type: ProfileType::User.into(),
             name: user.full_name(),
             username: Some(user.username.clone()),
             profile_image_url: user.profile_image_url.clone(),
         }
     }
 
-    pub fn init_from_current_user(current_user: &CurrentUser) -> Owner {
-        Owner {
+    pub fn init_from_current_user(current_user: &CurrentUser) -> Profile {
+        Profile {
             id: current_user.id,
             name: current_user.full_name(),
             username: Some(current_user.username.clone()),
-            owner_type: OwnerType::User.into(),
+            profile_type: ProfileType::User.into(),
             profile_image_url: current_user.profile_image_url.clone(),
         }
     }

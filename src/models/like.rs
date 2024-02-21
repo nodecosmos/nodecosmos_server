@@ -49,28 +49,6 @@ pub struct Like {
     pub like_count: Option<i64>,
 }
 
-#[derive(Deserialize)]
-pub enum ObjectType {
-    Node,
-}
-
-impl fmt::Display for ObjectType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ObjectType::Node => write!(f, "Node"),
-        }
-    }
-}
-
-impl ObjectType {
-    pub fn from_string(s: &str) -> Option<Self> {
-        match s {
-            "Node" => Some(ObjectType::Node),
-            _ => None,
-        }
-    }
-}
-
 impl Like {
     pub async fn like_count(&mut self, session: &CachingSession) -> Result<i64, NodecosmosError> {
         if let Some(c) = self.like_count {
@@ -86,6 +64,34 @@ impl Like {
                 Ok(lc)
             }
             _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string()).into()),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub enum ObjectType {
+    Node,
+    Like,
+    Comment,
+}
+
+impl fmt::Display for ObjectType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ObjectType::Node => write!(f, "Node"),
+            ObjectType::Like => write!(f, "Like"),
+            ObjectType::Comment => write!(f, "Comment"),
+        }
+    }
+}
+
+impl ObjectType {
+    pub fn from_string(s: &str) -> Option<Self> {
+        match s {
+            "Node" => Some(ObjectType::Node),
+            "Like" => Some(ObjectType::Like),
+            "Comment" => Some(ObjectType::Comment),
+            _ => None,
         }
     }
 }
