@@ -331,8 +331,18 @@ partial_node!(
     cover_image_url
 );
 
-partial_node!(GetDescriptionBase64Node, id, branch_id, description_base64);
-partial_node!(GetDescriptionMarkdownNode, id, branch_id, description_markdown);
+partial_node!(
+    GetDescriptionBase64Node,
+    id,
+    branch_id,
+    description,
+    description_markdown,
+    description_base64
+);
+
+impl GetDescriptionBase64Node {
+    
+}
 
 partial_node!(
     GetStructureNode,
@@ -379,7 +389,6 @@ partial_node!(AuthNode, id, branch_id, owner_id, editor_ids);
 
 partial_node!(UpdateProfileNode, id, branch_id, owner_id, owner, updated_at);
 
-// TODO: this could be replaced with traits by utilizing AsNative from CharybdisModel
 macro_rules! find_branched_or_original {
     ($struct_name:ident) => {
         impl $struct_name {
@@ -445,3 +454,4 @@ find_branched_or_original!(Node);
 find_branched_or_original!(GetStructureNode);
 find_branched_or_original!(GetDescriptionNode);
 find_branched_or_original!(GetDescriptionBase64Node);
+find_branched_or_original!(UpdateDescriptionNode);

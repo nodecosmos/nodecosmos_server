@@ -1,5 +1,4 @@
 use crate::services::elastic::ElasticIndex;
-use crate::utils::logger::log_error;
 use charybdis::model::{AsNative, Model};
 use charybdis::types::Uuid;
 use colored::Colorize;

@@ -5,7 +5,7 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::file::read_file_names;
-use crate::utils::logger::{log_error, log_fatal, log_success};
+use crate::utils::logger::log_success;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Update;
 use log::{error, warn};

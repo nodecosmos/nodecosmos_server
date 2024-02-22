@@ -5,7 +5,7 @@ use crate::app::App;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
-use crate::models::traits::Authorization;
+use crate::models::traits::{Authorization, Branchable, MergeDescription};
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
@@ -78,11 +78,26 @@ pub async fn get_node_description(
 #[get("/{id}/{branchId}/description_base64")]
 pub async fn get_node_description_base64(
     db_session: web::Data<CachingSession>,
-    mut node: web::Path<GetDescriptionBase64Node>,
+    node: web::Path<GetDescriptionBase64Node>,
 ) -> Response {
+    let mut node = node.into_inner();
     node.find_branched(&db_session).await?;
 
-    Ok(HttpResponse::Ok().json(node.into_inner()))
+    // we always return merged description as we want to keep branched description in sync with original
+    if node.is_branched() && node.description_base64.is_some() {
+        let mut original = UpdateDescriptionNode::find_by_id_and_branch_id(node.id, node.id)
+            .execute(&db_session)
+            .await?;
+
+        original.description_base64 = node.description_base64;
+        original.merge_description(&db_session).await?;
+
+        node.description = original.description;
+        node.description_markdown = original.description_markdown;
+        node.description_base64 = original.description_base64;
+    }
+
+    Ok(HttpResponse::Ok().json(node))
 }
 
 #[get("/{id}/original/description_base64")]

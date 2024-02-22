@@ -6,7 +6,7 @@ use crate::models::contribution_request::ContributionRequest;
 use crate::models::like::Like;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{AuthNode, Node, UpdateDescriptionNode, UpdateTitleNode};
+use crate::models::node::{AuthNode, GetDescriptionBase64Node, Node, UpdateDescriptionNode, UpdateTitleNode};
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -59,6 +59,7 @@ macro_rules! impl_branchable {
 impl_branchable!(Node);
 impl_branchable!(UpdateTitleNode);
 impl_branchable!(UpdateDescriptionNode);
+impl_branchable!(GetDescriptionBase64Node);
 impl_branchable!(ReorderParams);
 
 impl Branchable for ContributionRequest {
