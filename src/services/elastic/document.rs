@@ -5,6 +5,7 @@ use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::http::response::Response;
 use elasticsearch::{BulkOperation, BulkOperations, BulkParts, DeleteParts, Elasticsearch, IndexParts, UpdateParts};
+use log::error;
 use serde::Serialize;
 use serde_json::json;
 use std::fmt::Display;
@@ -35,7 +36,7 @@ pub trait ElasticDocument<T: Model + ElasticIndex + Serialize> {
 
     async fn handle_response_error(response: Response, op: ElasticDocumentOp) {
         if !response.status_code().is_success() {
-            log_error(format!(
+            error!(
                 "\n{} {} {} \n{} {} \n{} {}\n",
                 "Failed to".bright_red().bold(),
                 op.to_string().bright_yellow(),
@@ -44,7 +45,7 @@ pub trait ElasticDocument<T: Model + ElasticIndex + Serialize> {
                 response.status_code(),
                 "Response body:".bright_red(),
                 response.text().await.unwrap_or("No Body!".to_string()).red(),
-            ));
+            );
         }
     }
 
@@ -66,11 +67,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
                 }),
             );
             let _ = ops.push(op).map_err(|_| {
-                log_error(format!(
+                error!(
                     "Failed to add update operation to bulk request! Index: {}, Id: {}",
                     T::ELASTIC_IDX_NAME,
                     index_id
-                ))
+                )
             });
         }
 
@@ -83,11 +84,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         match bulk_response {
             Ok(bulk_response) => Self::handle_response_error(bulk_response, ElasticDocumentOp::BulkUpdate).await,
             Err(e) => {
-                log_error(format!(
+                error!(
                     "Failed to send bulk update request! Index: {}, \nResponse: {:?}",
                     T::ELASTIC_IDX_NAME,
                     e
-                ));
+                );
             }
         }
     }
@@ -98,11 +99,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         for id in ids {
             ops.push(BulkOperation::<()>::delete(id.to_string()))
                 .unwrap_or_else(|_| {
-                    log_error(format!(
+                    error!(
                         "Failed to add delete operation to bulk request! Index: {}, Id: {}",
                         T::ELASTIC_IDX_NAME,
                         id
-                    ))
+                    )
                 });
         }
 
@@ -115,11 +116,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         match bulk_response {
             Ok(bulk_response) => Self::handle_response_error(bulk_response, ElasticDocumentOp::BulkDelete).await,
             Err(e) => {
-                log_error(format!(
+                error!(
                     "Failed to send bulk delete request! Index: {}, \nResponse: {:?}",
                     T::ELASTIC_IDX_NAME,
                     e
-                ));
+                );
             }
         }
     }
@@ -134,11 +135,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         match response {
             Ok(response) => Self::handle_response_error(response, ElasticDocumentOp::Add).await,
             Err(e) => {
-                log_error(format!(
+                error!(
                     "Failed to send add request! Index: {}, \nResponse: {:?}",
                     T::ELASTIC_IDX_NAME,
                     e
-                ));
+                );
             }
         }
     }
@@ -155,11 +156,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         match response {
             Ok(response) => Self::handle_response_error(response, ElasticDocumentOp::Update).await,
             Err(e) => {
-                log_error(format!(
+                error!(
                     "Failed to send update request! Index: {}, \nResponse: {:?}",
                     T::ELASTIC_IDX_NAME,
                     e
-                ));
+                );
             }
         }
     }
@@ -173,11 +174,11 @@ impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
         match response {
             Ok(response) => Self::handle_response_error(response, ElasticDocumentOp::Delete).await,
             Err(e) => {
-                log_error(format!(
+                error!(
                     "Failed to send delete request! Index: {}, \nResponse: {:?}",
                     T::ELASTIC_IDX_NAME,
                     e
-                ));
+                );
             }
         }
     }

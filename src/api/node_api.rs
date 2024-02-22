@@ -85,10 +85,10 @@ pub async fn get_node_description_base64(
     Ok(HttpResponse::Ok().json(node.into_inner()))
 }
 
-#[get("/{id}/original/description")]
-pub async fn get_original_node_description(
+#[get("/{id}/original/description_base64")]
+pub async fn get_original_node_description_base64(
     db_session: web::Data<CachingSession>,
-    mut node: web::Path<GetDescriptionNode>,
+    mut node: web::Path<GetDescriptionBase64Node>,
 ) -> Response {
     node.branch_id = node.id;
     let node = node.find_by_primary_key().execute(&db_session).await?;

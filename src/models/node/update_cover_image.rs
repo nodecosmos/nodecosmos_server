@@ -3,10 +3,10 @@ use crate::errors::NodecosmosError;
 use crate::models::attachment::image::Image;
 use crate::models::node::UpdateCoverImageNode;
 use crate::services::aws::s3::{delete_s3_object, upload_s3_object};
-use crate::utils::logger::log_error;
 use actix_multipart::Multipart;
 use charybdis::operations::UpdateWithCallbacks;
 use futures::StreamExt;
+use log::error;
 
 const IMG_WIDTH: u32 = 850;
 const IMG_HEIGHT: u32 = 375;
@@ -81,7 +81,7 @@ impl UpdateCoverImageNode {
             tokio::spawn(async move {
                 let _ = delete_s3_object(&s3_client, &bucket, &key)
                     .await
-                    .map_err(|e| log_error(format!("Failed to delete cover image from S3: {:?}", e)));
+                    .map_err(|e| error!("Failed to delete cover image from S3: {:?}", e));
             });
         }
 

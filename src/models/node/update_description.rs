@@ -6,16 +6,17 @@ use crate::models::description_commit::DescriptionCommit;
 use crate::models::node::{GetDescriptionBase64Node, GetDescriptionNode, Node, UpdateDescriptionNode};
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, MergeDescription};
 use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;
-use crate::utils::logger::log_error;
 use ammonia::clean;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use charybdis::model::AsNative;
-use charybdis::operations::{Find, Insert};
+use charybdis::operations::Insert;
 use elasticsearch::Elasticsearch;
+use futures::StreamExt;
+use log::error;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
 use quick_xml::Reader;
@@ -23,7 +24,7 @@ use scylla::CachingSession;
 use serde::de::Unexpected::Option;
 use std::borrow::Cow;
 use yrs::updates::decoder::Decode;
-use yrs::{Doc, GetString, ReadTxn, Transact, TransactionMut, Update, XmlElementRef};
+use yrs::{Doc, GetString, ReadTxn, Transact, TransactionMut, XmlElementRef};
 
 impl UpdateDescriptionNode {
     pub fn sanitize_description(&mut self) {
@@ -46,7 +47,7 @@ impl UpdateDescriptionNode {
             .execute(req_data.db_session())
             .await
             .map_err(|e| {
-                log_error(format!("Failed to create new description version: {}", e));
+                error!("Failed to create new description version: {}", e);
                 e
             });
 
@@ -62,7 +63,7 @@ impl UpdateDescriptionNode {
         )
         .await
         .map_err(|e| {
-            log_error(format!("Failed to create new description version: {}", e));
+            error!("Failed to create new description version: {}", e);
             e
         });
     }

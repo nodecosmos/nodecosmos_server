@@ -5,9 +5,10 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::file::read_file_names;
-use crate::utils::logger::{log_error, log_fatal, log_success, log_warning};
+use crate::utils::logger::{log_error, log_fatal, log_success};
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Update;
+use log::{error, warn};
 use scylla::CachingSession;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -49,11 +50,11 @@ impl<'a> Recovery<'a> {
             let serialized = std::fs::read_to_string(file.clone()).unwrap();
             let recovery_data: ReorderData = serde_json::from_str(&serialized)
                 .map_err(|err| {
-                    log_fatal(format!(
+                    error!(
                         "Error in deserializing recovery data from file {}: {}",
                         file.clone(),
                         err
-                    ));
+                    );
                 })
                 .unwrap();
             std::fs::remove_file(file.clone()).unwrap();
@@ -62,16 +63,13 @@ impl<'a> Recovery<'a> {
             let _ = recovery
                 .recover()
                 .await
-                .map_err(|err| log_fatal(format!("Error in recovery from file {}: {}", file, err)));
+                .map_err(|err| error!("Error in recovery from file {}: {}", file, err));
         }
     }
 
     pub async fn recover(&mut self) -> Result<(), NodecosmosError> {
         let recovery_started = std::time::Instant::now();
-        log_warning(format!(
-            "Recovery started for tree_root: {}",
-            self.reorder_data.tree_root.id
-        ));
+        warn!("Recovery started for tree_root: {}", self.reorder_data.tree_root.id);
 
         let res = self.execute_recovery().await;
 
@@ -90,7 +88,7 @@ impl<'a> Recovery<'a> {
             Err(err) => {
                 self.serialize_and_store_to_disk();
 
-                log_fatal(format!("recover: {}", err));
+                error!("recover: {}", err);
             }
         }
 
@@ -113,7 +111,7 @@ impl<'a> Recovery<'a> {
                 .execute(self.db_session)
                 .await
                 .map_err(|err| {
-                    log_error(format!("delete_by_root_id: {}", err));
+                    error!("delete_by_root_id: {}", err);
                     return err;
                 })?;
         } else {
@@ -124,7 +122,7 @@ impl<'a> Recovery<'a> {
             .execute(self.db_session)
             .await
             .map_err(|err| {
-                log_error(format!("delete_by_root_id_and_branch_id: {}", err));
+                error!("delete_by_root_id_and_branch_id: {}", err);
                 return err;
             })?;
         }
@@ -139,11 +137,11 @@ impl<'a> Recovery<'a> {
             .chunked_insert(self.db_session, &self.reorder_data.tree_descendants.clone(), 100)
             .await
             .map_err(|err| {
-                log_error(format!("restore_tree_descendants: {}", err));
+                error!("restore_tree_descendants: {}", err);
                 return err;
             })?;
 
-        log_warning(format!("Tree descendants stored after: {:?}", now.elapsed()));
+        warn!("Tree descendants stored after: {:?}", now.elapsed());
 
         Ok(())
     }
@@ -175,7 +173,7 @@ impl<'a> Recovery<'a> {
             .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("remove_new_ancestor_ids: {:?}", err));
+                error!("remove_new_ancestor_ids: {:?}", err);
                 return err;
             })?;
 
@@ -196,7 +194,7 @@ impl<'a> Recovery<'a> {
             .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("append_old_ancestor_ids: {:?}", err));
+                error!("append_old_ancestor_ids: {:?}", err);
                 return err;
             })?;
 
@@ -213,15 +211,15 @@ impl<'a> Recovery<'a> {
         // as structure might be compromised later on if
         // user try to reorder again.
         if path_buf.exists() {
-            log_error(format!("Recovery data file already exists: {}", path));
+            error!("Recovery data file already exists: {}", path);
 
             return;
         }
 
         let res = std::fs::write(path.clone(), serialized);
         match res {
-            Ok(_) => log_warning(format!("Recovery data saved to file: {}", path)),
-            Err(err) => log_fatal(format!("Error in saving recovery data: {}", err)),
+            Ok(_) => warn!("Recovery data saved to file: {}", path),
+            Err(err) => error!("Error in saving recovery data: {}", err),
         }
     }
 }

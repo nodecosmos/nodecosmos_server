@@ -10,11 +10,11 @@ use crate::models::branch::{
 };
 use crate::models::udts::{BranchReorderData, TextChange};
 use crate::models::utils::append_statement_or_log_fatal;
-use crate::utils::logger::log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Map, Set, Uuid};
+use log::error;
 use scylla::{CachingSession, QueryResult};
 
 pub enum BranchUpdate {
@@ -155,7 +155,7 @@ impl Branch {
                         res = branch.update().execute(session).await;
                     }
                     Err(err) => {
-                        log_fatal(format!("Failed to find branch: {}", err));
+                        error!("Failed to find branch: {}", err);
                         return;
                     }
                 }
@@ -298,7 +298,7 @@ impl Branch {
                         res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
-                        log_fatal(format!("Failed to find branch: {}", err));
+                        error!("Failed to find branch: {}", err);
                         return;
                     }
                 }
@@ -324,7 +324,7 @@ impl Branch {
                         res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
-                        log_fatal(format!("Failed to find branch: {}", err));
+                        error!("Failed to find branch: {}", err);
                         return;
                     }
                 }
@@ -350,7 +350,7 @@ impl Branch {
                         res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
-                        log_fatal(format!("Failed to find branch: {}", err));
+                        error!("Failed to find branch: {}", err);
                         return;
                     }
                 }
@@ -376,7 +376,7 @@ impl Branch {
                         res = fs_branch.update().execute(session).await;
                     }
                     Err(err) => {
-                        log_fatal(format!("Failed to find branch: {}", err));
+                        error!("Failed to find branch: {}", err);
                         return;
                     }
                 }
@@ -384,7 +384,7 @@ impl Branch {
         }
 
         if let Err(err) = res {
-            log_fatal(format!("Failed to update branch: {}", err));
+            error!("Failed to update branch: {}", err)
         }
 
         let branch = Branch::find_by_id(branch_id).execute(session).await;
@@ -395,12 +395,12 @@ impl Branch {
                 if let Err(err) = res {
                     match err {
                         NodecosmosError::Conflict(_) => (),
-                        err => log_fatal(format!("Failed to check_conflicts: {}", err)),
+                        err => error!("Failed to check_conflicts: {}", err),
                     }
                 }
             }
             Err(err) => {
-                log_fatal(format!("Failed to find branch: {}", err));
+                error!("Failed to find branch: {}", err)
             }
         }
     }

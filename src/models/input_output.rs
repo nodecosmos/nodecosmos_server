@@ -86,20 +86,6 @@ pub struct Io {
 }
 
 impl Io {
-    pub async fn ios_by_original_id(
-        session: &CachingSession,
-        root_node_id: Uuid,
-        original_id: Uuid,
-    ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = find_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
-            .execute(session)
-            .await?
-            .try_collect()
-            .await?;
-
-        Ok(ios)
-    }
-
     pub async fn workflow(&mut self, session: &CachingSession) -> Result<&mut Option<Workflow>, NodecosmosError> {
         if self.workflow.is_none() {
             if let Some(flow_step) = &mut self.flow_step {

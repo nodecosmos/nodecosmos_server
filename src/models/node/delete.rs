@@ -14,12 +14,12 @@ use crate::models::traits::Branchable;
 use crate::models::workflow::DeleteWorkflow;
 use crate::services::elastic::{ElasticDocument, ElasticIndex};
 use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::logger::log_error;
 use charybdis::batch::{CharybdisBatch, CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Delete;
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use futures::{StreamExt, TryFutureExt};
+use log::error;
 use scylla::CachingSession;
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ impl Node {
     pub async fn create_new_version_for_ancestors(&self, req_data: &RequestData) {
         let _ = NodeCommit::handle_deletion(req_data, &self)
             .map_err(|e| {
-                log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
+                error!("Node::create_new_version_for_ancestors:: id {}: {:?}", self.id, e);
 
                 e
             })
@@ -76,22 +76,22 @@ impl<'a> NodeDelete<'a> {
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
         self.populate_delete_data().await.map_err(|err| {
-            log_error(format!("populate_delete_data: {}", err));
+            error!("populate_delete_data: {}", err);
             return err;
         })?;
 
         self.delete_related_data().await.map_err(|err| {
-            log_error(format!("delete_related_data: {}", err));
+            error!("delete_related_data: {}", err);
             return err;
         })?;
 
         self.delete_counter_data().await.map_err(|err| {
-            log_error(format!("delete_counter_data: {}", err));
+            error!("delete_counter_data: {}", err);
             return err;
         })?;
 
         self.delete_descendants().await.map_err(|err| {
-            log_error(format!("delete_descendants: {}", err));
+            error!("delete_descendants: {}", err);
             return err;
         })?;
 

@@ -2365,6 +2365,7 @@ dependencies = [
  "env_logger",
  "futures",
  "image",
+ "log",
  "mozjpeg",
  "quick-xml",
  "scylla",

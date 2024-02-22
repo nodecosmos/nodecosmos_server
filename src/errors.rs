@@ -1,8 +1,8 @@
-use crate::utils::logger::log_fatal;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use charybdis::errors::CharybdisError;
 use colored::Colorize;
+use log::error;
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
@@ -159,7 +159,7 @@ impl ResponseError for NodecosmosError {
                 }
             },
             _ => {
-                log_fatal(format!("Unhandled error: {}", self.to_string()));
+                error!("Unhandled error: {}", self.to_string());
 
                 return HttpResponse::InternalServerError().json(json!({
                     "status": 500,

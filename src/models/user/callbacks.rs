@@ -23,7 +23,7 @@ impl Callbacks for User {
     }
 
     async fn after_insert(&mut self, _session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.update_elastic_document(&app.elastic_client).await;
+        self.add_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }

@@ -2,8 +2,8 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::traits::Authorization;
 use crate::models::workflow::Workflow;
-use crate::utils::logger::log_fatal;
 use charybdis::types::{Set, Uuid};
+use log::error;
 
 impl Authorization for Workflow {
     async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -17,7 +17,7 @@ impl Authorization for Workflow {
             return node.is_public;
         }
 
-        log_fatal(format!("Workflow {} is missing node {}", self.id, self.node_id));
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
 
         false
     }
@@ -27,7 +27,7 @@ impl Authorization for Workflow {
             return node.owner_id;
         }
 
-        log_fatal(format!("Workflow {} is missing node {}", self.id, self.node_id));
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
 
         None
     }
@@ -37,7 +37,7 @@ impl Authorization for Workflow {
             return node.editor_ids.clone();
         }
 
-        log_fatal(format!("Workflow {} is missing node {}", self.id, self.node_id));
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
 
         None
     }

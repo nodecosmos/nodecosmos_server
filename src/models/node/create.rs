@@ -11,7 +11,6 @@ use crate::models::udts::Profile;
 use crate::services::elastic::ElasticDocument;
 use crate::services::elastic::ElasticIndex;
 use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::callbacks::Callbacks;
 use charybdis::operations::{Find, Insert, InsertWithCallbacks};
@@ -19,6 +18,7 @@ use charybdis::types::{Set, Uuid};
 use chrono::Utc;
 use elasticsearch::Elasticsearch;
 use futures::{stream, StreamExt, TryFutureExt};
+use log::error;
 use scylla::CachingSession;
 
 impl Node {
@@ -153,10 +153,7 @@ impl Node {
                 .chunked_insert(db_session, &descendants, 100)
                 .await
             {
-                log_fatal(format!(
-                    "Error appending node {} to ancestors::execute {:?}",
-                    self.id, e
-                ));
+                error!("Error appending node {} to ancestors::execute {:?}", self.id, e);
             }
         }
     }
@@ -206,17 +203,17 @@ impl Node {
                     let insert = self_branched.insert().execute(data.db_session()).await;
 
                     if let Err(e) = insert {
-                        log_fatal(format!(
+                        error!(
                             "Error creating branched node {} from non-branched node {}: {:?}",
                             self_branched.id, self.id, e
-                        ));
+                        );
                     }
 
                     self_branched.append_to_ancestors(data.db_session()).await;
                     self_branched.create_new_version(&data).await;
                 }
                 Err(e) => {
-                    log_error(format!("Error finding non-branched node {}: {:?}", self.id, e));
+                    error!("Error finding non-branched node {}: {:?}", self.id, e);
                 }
             }
         }
@@ -231,7 +228,7 @@ impl Node {
     pub async fn create_new_version(&self, req_data: &RequestData) {
         let _ = NodeCommit::handle_creation(&req_data.db_session(), &self, req_data.current_user_id())
             .map_err(|e| {
-                log_error(format!("Error creating new version for node {}: {:?}", self.id, e));
+                error!("Error creating new version for node {}: {:?}", self.id, e);
 
                 e
             })

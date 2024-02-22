@@ -7,11 +7,11 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendants_commit::NodeDescendantsCommit;
 use crate::models::node_tree_position_commit::NodeTreePositionCommit;
 use crate::models::traits::VersionedNodePluck;
-use crate::utils::logger::log_fatal;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Insert;
 use charybdis::types::{Double, Uuid};
 use chrono::Utc;
+use log::error;
 use scylla::CachingSession;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -164,7 +164,7 @@ impl NodeCommit {
         match res {
             Ok(_) => {}
             Err(e) => {
-                log_fatal(format!("handle_reorder: {:?}", e));
+                error!("handle_reorder: {:?}", e)
             }
         }
     }

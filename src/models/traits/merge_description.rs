@@ -25,6 +25,7 @@ enum ProseMirrorXmlTag {
     Image,
     Link,
     HardBreak,
+    Html,
 }
 
 impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
@@ -41,9 +42,10 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
             QName(b"listItem") => ProseMirrorXmlTag::ListItem,
             QName(b"blockquote") => ProseMirrorXmlTag::Blockquote,
             QName(b"codeBlock") => ProseMirrorXmlTag::CodeBlock,
-            QName(b"img") => ProseMirrorXmlTag::Image,
+            QName(b"image") => ProseMirrorXmlTag::Image,
             QName(b"link") => ProseMirrorXmlTag::Link,
             QName(b"hardBreak") => ProseMirrorXmlTag::HardBreak,
+            QName(b"html") => ProseMirrorXmlTag::Html,
             _ => panic!("Unknown tag {:?}", value),
         }
     }
@@ -181,6 +183,7 @@ impl Description {
                         html.push_str("<br/>");
                         markdown.push_str("\n");
                     }
+                    ProseMirrorXmlTag::Html => (),
                 },
                 Ok(Event::Text(e)) => {
                     current_text = e.unescape()?;
@@ -273,6 +276,7 @@ impl Description {
                         current_href = String::new();
                     }
                     ProseMirrorXmlTag::HardBreak => (),
+                    ProseMirrorXmlTag::Html => (),
                 },
                 Ok(Event::Eof) => break,
                 _ => (),
@@ -324,6 +328,55 @@ pub trait MergeDescription {
         self.assign_base64(base64);
 
         Ok(())
+    }
+}
+
+pub struct PlainDescriptionMerge {
+    pub current_base64: String,
+    pub updated_base64: String,
+
+    pub html: String,
+    pub markdown: String,
+    pub short_description: String,
+    pub base64: String,
+}
+
+impl PlainDescriptionMerge {
+    pub fn new(current_base64: String, updated_base64: String) -> Self {
+        Self {
+            current_base64,
+            updated_base64,
+            html: String::new(),
+            markdown: String::new(),
+            short_description: String::new(),
+            base64: String::new(),
+        }
+    }
+}
+
+impl MergeDescription for PlainDescriptionMerge {
+    async fn current_base64(&self, _db_session: &CachingSession) -> Result<String, NodecosmosError> {
+        Ok(self.current_base64.clone())
+    }
+
+    async fn updated_base64(&self) -> Result<String, NodecosmosError> {
+        Ok(self.updated_base64.clone())
+    }
+
+    fn assign_html(&mut self, html: String) {
+        self.html = html;
+    }
+
+    fn assign_markdown(&mut self, markdown: String) {
+        self.markdown = markdown;
+    }
+
+    fn assign_short_description(&mut self, short_description: String) {
+        self.short_description = short_description;
+    }
+
+    fn assign_base64(&mut self, base64: String) {
+        self.base64 = base64;
     }
 }
 

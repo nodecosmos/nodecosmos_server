@@ -3,9 +3,9 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::reorder_data::ReorderData;
 use crate::models::node_commit::create::{NewDescendantCommitById, NodeChange, TreePositionChange};
 use crate::models::node_commit::NodeCommit;
-use crate::utils::logger::log_fatal;
 use charybdis::types::Uuid;
 use futures::TryFutureExt;
+use log::error;
 use scylla::CachingSession;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -47,14 +47,14 @@ impl<'a> ReorderCommit<'a> {
             let mut descendant_node_commit_id_by_id = HashMap::new();
             descendant_node_commit_id_by_id.insert(new_node_commit.node_id, new_node_commit.id);
             let ext_desc_ver = self.create_descendants_commits().await.map_err(|e| {
-                log_fatal(format!("create_descendants_commits: {:?}", e));
+                error!("create_descendants_commits: {:?}", e);
                 e
             })?;
 
             descendant_node_commit_id_by_id.extend(ext_desc_ver);
 
             self.create_commits_for_removed_ancestors().await.map_err(|e| {
-                log_fatal(format!("create_commits_for_removed_ancestors: {:?}", e));
+                error!("create_commits_for_removed_ancestors: {:?}", e);
 
                 e
             })?;
@@ -62,7 +62,7 @@ impl<'a> ReorderCommit<'a> {
             self.create_commits_for_added_ancestors(descendant_node_commit_id_by_id)
                 .await
                 .map_err(|e| {
-                    log_fatal(format!("create_commits_for_removed_ancestors: {:?}", e));
+                    error!("create_commits_for_removed_ancestors: {:?}", e);
 
                     e
                 })?;
@@ -92,7 +92,7 @@ impl<'a> ReorderCommit<'a> {
         )
         .await
         .map_err(|err| {
-            log_fatal(format!("create_new_node_commit: {:?}", err));
+            error!("create_new_node_commit: {:?}", err);
             return err;
         })?;
 
@@ -122,9 +122,7 @@ impl<'a> ReorderCommit<'a> {
                     &changes,
                     false,
                 )
-                .map_err(|e| {
-                    log_fatal(format!("create_descendants_commits: {:?}", e));
-                });
+                .map_err(|e| error!("create_descendants_commits: {:?}", e));
 
                 futures.push(future);
             }
@@ -161,9 +159,7 @@ impl<'a> ReorderCommit<'a> {
                     &changes,
                     false,
                 )
-                .map_err(|e| {
-                    log_fatal(format!("create_descendants_commits: {:?}", e));
-                });
+                .map_err(|e| error!("create_descendants_commits: {:?}", e));
 
                 futures.push(f);
             }
@@ -193,9 +189,7 @@ impl<'a> ReorderCommit<'a> {
                     &changes,
                     false,
                 )
-                .map_err(|e| {
-                    log_fatal(format!("create_descendants_commits: {:?}", e));
-                });
+                .map_err(|e| error!("create_descendants_commits: {:?}", e));
 
                 futures.push(f);
             }

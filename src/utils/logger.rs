@@ -1,10 +1,5 @@
 use colored::Colorize;
 
-#[allow(unused)]
-pub fn log_info(message: String) {
-    println!("{}: {}", "Info".bright_blue(), message.blue());
-}
-
 pub fn log_success(message: String) {
     println!("{}: {}", "Success".bright_green(), message.green());
 }

@@ -8,11 +8,11 @@ use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::Node;
 use crate::models::traits::Branchable;
 use crate::models::user::User;
-use crate::utils::logger::log_fatal;
 use actix_web::web;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
+use log::error;
 use serde_json::json;
 
 pub trait Authorization {
@@ -103,7 +103,7 @@ impl Authorization for Node {
         return match &self.auth_branch {
             Some(branch) => Some(branch.owner_id),
             None => {
-                log_fatal(format!("Branched node {} has no branch!", self.id));
+                error!("Branched node {} has no branch!", self.id);
 
                 None
             }
@@ -118,7 +118,7 @@ impl Authorization for Node {
         return match &self.auth_branch {
             Some(branch) => branch.editor_ids.clone(),
             None => {
-                log_fatal(format!("Branched node {} has no branch!", self.id));
+                error!("Branched node {} has no branch!", self.id);
 
                 None
             }
@@ -232,8 +232,6 @@ impl Authorization for Comment {
 
                 Ok(())
             }
-
-            _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
         }
     }
 }

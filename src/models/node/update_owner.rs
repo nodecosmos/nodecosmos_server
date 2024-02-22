@@ -5,10 +5,10 @@ use crate::models::node::UpdateProfileNode;
 use crate::models::udts::{Profile, ProfileType};
 use crate::models::user::{FullName, User};
 use crate::services::elastic::ElasticDocument;
-use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::types::Uuid;
 use futures::StreamExt;
+use log::error;
 
 impl UpdateProfileNode {
     fn init(nodes_by_owner: &NodesByProfile, owner: Profile) -> Self {
@@ -29,7 +29,7 @@ impl UpdateProfileNode {
                 let _ = UpdateProfileNode::run(data, user.clone()).await;
             }
             Err(e) => {
-                log_error(format!("Error find_by_id: {}", e));
+                error!("UpdateProfileNode::update_owner_records::find_by_id {}", e);
             }
         }
     }
@@ -39,7 +39,7 @@ impl UpdateProfileNode {
             .execute(data.db_session())
             .await
             .map_err(|e| {
-                log_error(format!("Error finding nodes by owner: {}", e));
+                error!("UpdateProfileNode::run::find_by_owner_id {}", e);
                 e
             })?;
 
@@ -49,7 +49,7 @@ impl UpdateProfileNode {
         while let Some(node_by_owner) = nodes_by_owner.next().await {
             nodes_to_update.push(UpdateProfileNode::init(
                 &node_by_owner.map_err(|e| {
-                    log_error(format!("Error init: {}", e));
+                    error!("Error init: {}", e);
                     e
                 })?,
                 owner.clone(),
@@ -61,7 +61,7 @@ impl UpdateProfileNode {
             .chunked_insert(data.db_session(), &nodes_to_update, 100)
             .await
             .map_err(|e| {
-                log_error(format!("UpdateProfileNode: Error chunked_insert: {}", e));
+                error!("UpdateProfileNode::run::chunked_insert {}", e);
                 e
             })?;
 

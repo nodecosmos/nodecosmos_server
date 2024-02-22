@@ -8,10 +8,10 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::services::elastic::ElasticDocument;
-use crate::utils::logger::{log_error, log_fatal};
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::AsNative;
 use elasticsearch::Elasticsearch;
+use log::error;
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
@@ -19,12 +19,18 @@ impl UpdateTitleNode {
         let mut native = self.as_native();
 
         if let Err(e) = native.transform_to_branched(data.db_session()).await {
-            log_error(format!("Failed to transform node to branched: {}", e));
+            error!(
+                "UpdateTitleNode::update_title_for_ancestors::transform_to_branched {}",
+                e
+            );
             return;
         }
 
         if let Err(e) = data.resource_locker().validate_node_unlocked(&native, true).await {
-            log_fatal(format!("Failed to validate node unlocked for title update: {}", e));
+            error!(
+                "UpdateTitleNode::update_title_for_ancestors::validate_node_unlocked: {}",
+                e
+            );
             return;
         }
 
@@ -37,7 +43,10 @@ impl UpdateTitleNode {
             )
             .await
         {
-            log_fatal(format!("Failed to lock resource for title update: {}", e));
+            error!(
+                "UpdateTitleNode::update_title_for_ancestors::lock_resource_actions: {}",
+                e
+            );
             return;
         }
 
@@ -62,7 +71,7 @@ impl UpdateTitleNode {
                 .chunked_update(data.db_session(), &node_descendants, 100)
                 .await
             {
-                log_error(format!("Failed to update node_descendants: {}", e));
+                error!("UpdateTitleNode::update_title_for_ancestors:chunked_update: {}", e);
             }
         }
 
@@ -71,7 +80,10 @@ impl UpdateTitleNode {
             .unlock_resource_action(ActionTypes::Reorder(ActionObject::Node), &native.root_id.to_string())
             .await
         {
-            log_error(format!("Failed to unlock resource: {}", e));
+            error!(
+                "UpdateTitleNode::update_title_for_ancestors::unlock_resource_action {}",
+                e
+            );
         }
     }
 
@@ -94,7 +106,7 @@ impl UpdateTitleNode {
         )
         .await
         .map_err(|e| {
-            log_error(format!("Failed to create new versioned node: {}", e));
+            error!("UpdateTitleNode::create_new_version {}", e);
         });
     }
     pub async fn update_branch(&self, req_data: &RequestData) {

@@ -15,12 +15,12 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
 use crate::services::resource_locker::ResourceLocker;
-use crate::utils::logger::log_fatal;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::BaseModel;
 use charybdis::operations::{execute, Update};
 use charybdis::options::Consistency;
 use charybdis::types::{Double, Uuid};
+use log::error;
 pub use recovery::Recovery;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -78,10 +78,10 @@ impl<'a> Reorder<'a> {
                 Ok(())
             }
             Err(err) => {
-                log_fatal(format!(
+                error!(
                     "Reorder failed for tree_root node: {}\n! ERROR: {:?}",
                     self.reorder_data.tree_root.id, err
-                ));
+                );
 
                 Recovery::new(&self.reorder_data, &self.db_session, locker)
                     .recover()
@@ -148,7 +148,7 @@ impl<'a> Reorder<'a> {
             .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("remove_node_from_removed_ancestors: {:?}", err));
+                error!("remove_node_from_removed_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -178,7 +178,7 @@ impl<'a> Reorder<'a> {
             .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("delete_node_descendants_from_removed_ancestors: {:?}", err));
+                error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -207,7 +207,7 @@ impl<'a> Reorder<'a> {
             .chunked_insert(&self.db_session, &descendants_to_add, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("add_node_to_new_ancestors: {:?}", err));
+                error!("add_node_to_new_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -238,7 +238,7 @@ impl<'a> Reorder<'a> {
             .chunked_insert(&self.db_session, &descendants, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("insert_node_descendants_to_added_ancestors: {:?}", err));
+                error!("insert_node_descendants_to_added_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -273,7 +273,7 @@ impl<'a> Reorder<'a> {
             .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("pull_removed_ancestors_from_descendants: {:?}", err));
+                error!("pull_removed_ancestors_from_descendants: {:?}", err);
                 return err;
             })?;
 
@@ -313,7 +313,7 @@ impl<'a> Reorder<'a> {
             .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {
-                log_fatal(format!("push_added_ancestors_to_descendants: {:?}", err));
+                error!("push_added_ancestors_to_descendants: {:?}", err);
                 return err;
             })?;
 

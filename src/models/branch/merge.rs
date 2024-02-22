@@ -10,9 +10,9 @@ use crate::models::traits::GroupById;
 use crate::models::udts::{Conflict, ConflictStatus, TextChange};
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::file::read_file_names;
-use crate::utils::logger::{log_error, log_fatal, log_warning};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use log::{error, warn};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -132,7 +132,7 @@ impl BranchMerge {
                 Err(recovery_err) => {
                     branch_merge.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
 
-                    log_fatal(format!("Failed to recover: {}", recovery_err));
+                    error!("Mere::Failed to recover: {}", recovery_err);
                     branch_merge.serialize_and_store_to_disk();
 
                     Err(NodecosmosError::FatalMergeError(format!(
@@ -152,17 +152,17 @@ impl BranchMerge {
             let serialized = std::fs::read_to_string(file.clone()).unwrap();
             let mut branch_merge: BranchMerge = serde_json::from_str(&serialized)
                 .map_err(|err| {
-                    log_fatal(format!(
+                    error!(
                         "Error in deserializing recovery data from file {}: {}",
                         file.clone(),
                         err
-                    ));
+                    );
                 })
                 .unwrap();
             std::fs::remove_file(file.clone()).unwrap();
 
             if let Err(err) = branch_merge.recover(data).await {
-                log_fatal(format!("Error in recovery from file {}: {}", file, err));
+                error!("Error in recovery from file {}: {}", file, err);
                 branch_merge.serialize_and_store_to_disk();
                 continue;
             }
@@ -234,8 +234,8 @@ impl BranchMerge {
         let res = std::fs::write(path.clone(), serialized);
 
         match res {
-            Ok(_) => log_warning(format!("Merge Recovery data saved to file: {}", path)),
-            Err(err) => log_fatal(format!("Error in saving recovery data: {}", err)),
+            Ok(_) => warn!("Merge Recovery data saved to file: {}", path),
+            Err(err) => error!("Error in saving recovery data: {}", err),
         }
     }
 
@@ -328,10 +328,10 @@ impl BranchMerge {
                     }
                 }
                 None => {
-                    log_warning(format!(
+                    warn!(
                         "Failed to find deleted node with id {} and branch id {}",
                         deleted_node_id, deleted_node_id
-                    ));
+                    );
                 }
             }
         }
@@ -359,10 +359,10 @@ impl BranchMerge {
                     }
                 }
                 None => {
-                    log_warning(format!(
+                    warn!(
                         "Failed to find deleted node with id {} and branch id {}",
                         deleted_node_id, deleted_node_id
-                    ));
+                    );
                 }
             }
         }
@@ -390,14 +390,14 @@ impl BranchMerge {
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {
-                            log_error(format!("Failed to process with reorder: {:?}", e));
+                            error!("Failed to process with reorder: {:?}", e);
                         }
                     }
                     Err(e) => {
-                        log_error(format!(
+                        error!(
                             "Failed to find node with id {} and branch id {}: {:?}",
                             reorder_node_data.id, reorder_node_data.id, e
-                        ));
+                        )
                     }
                 }
             }
@@ -425,14 +425,14 @@ impl BranchMerge {
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {
-                            log_error(format!("Failed to process with reorder: {:?}", e));
+                            error!("Failed to process with reorder: {:?}", e);
                         }
                     }
                     Err(e) => {
-                        log_error(format!(
+                        error!(
                             "Failed to find node with id {} and branch id {}: {:?}",
                             reorder_node_data.id, reorder_node_data.id, e
-                        ));
+                        )
                     }
                 }
             }
