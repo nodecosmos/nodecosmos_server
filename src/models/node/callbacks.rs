@@ -1,5 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::node::context::Context;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
 use crate::models::traits::MergeDescription;
 use charybdis::callbacks::Callbacks;
@@ -10,7 +11,7 @@ impl Callbacks for Node {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if !self.merge_ctx {
+        if &self.ctx != &Context::Merge && &self.ctx != &Context::BranchedInit {
             self.set_defaults(db_session).await?;
             self.set_owner(data).await?;
             self.validate_root().await?;
@@ -30,7 +31,10 @@ impl Callbacks for Node {
             self_clone.add_to_elastic(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
             self_clone.preserve_ancestors_for_branch(&req_data).await;
-            self_clone.update_branch(&req_data).await;
+
+            if &self_clone.ctx != &Context::BranchedInit {
+                self_clone.update_branch(&req_data).await;
+            }
         });
 
         Ok(())
@@ -67,7 +71,7 @@ impl Callbacks for UpdateDescriptionNode {
         self.preserve_for_branch(&data).await?;
         self.sanitize_description();
 
-        if !self.recovery_ctx {
+        if &self.ctx != &Context::MergeRecovery {
             self.merge_description(&db_session).await?;
         }
 

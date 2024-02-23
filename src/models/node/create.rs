@@ -144,8 +144,6 @@ impl Node {
                     title: self.title.clone(),
                 };
 
-                println!("descendants: {:?}", node_descendant.node_id);
-
                 descendants.push(node_descendant);
             }
 

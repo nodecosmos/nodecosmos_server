@@ -2,6 +2,7 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::branch::{Branch, BranchStatus};
+use crate::models::node::context::Context;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
@@ -280,7 +281,7 @@ impl BranchMerge {
 
         if let Some(merge_nodes) = merge_nodes {
             for mut merge_node in merge_nodes {
-                merge_node.merge_ctx = true;
+                merge_node.ctx = Context::Merge;
                 merge_node.branch_id = merge_node.id;
                 merge_node.owner_id = node.owner_id;
                 merge_node.profile_type = node.profile_type.clone();
@@ -528,7 +529,7 @@ impl BranchMerge {
     async fn undo_update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_description_nodes) = &mut self.original_description_nodes {
             for original_description_node in original_description_nodes.values_mut() {
-                original_description_node.recovery_ctx = true;
+                original_description_node.ctx = Context::MergeRecovery;
 
                 original_description_node
                     .update_cb(data)

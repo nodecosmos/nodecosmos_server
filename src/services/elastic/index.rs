@@ -8,6 +8,7 @@ use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
+use log::info;
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -44,7 +45,7 @@ impl<T: ElasticIndex> BuildIndex for T {
         let response;
 
         if idx_exists(client, Self::ELASTIC_IDX_NAME).await {
-            println!(
+            info!(
                 "{} {}",
                 "Sync elastic index for".bright_green(),
                 Self::ELASTIC_IDX_NAME.bright_yellow()
@@ -57,7 +58,7 @@ impl<T: ElasticIndex> BuildIndex for T {
                 .send()
                 .await;
         } else {
-            println!(
+            info!(
                 "{} {}",
                 "Creating elastic index for".bright_green(),
                 Self::ELASTIC_IDX_NAME.bright_yellow()

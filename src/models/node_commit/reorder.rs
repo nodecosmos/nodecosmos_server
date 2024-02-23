@@ -1,6 +1,6 @@
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
-use crate::models::node::reorder::reorder_data::ReorderData;
+use crate::models::node::reorder::data::ReorderData;
 use crate::models::node_commit::create::{NewDescendantCommitById, NodeChange, TreePositionChange};
 use crate::models::node_commit::NodeCommit;
 use charybdis::types::Uuid;

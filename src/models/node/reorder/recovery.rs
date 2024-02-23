@@ -1,14 +1,13 @@
 use crate::errors::NodecosmosError;
-use crate::models::node::reorder::reorder_data::ReorderData;
+use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::services::resource_locker::ResourceLocker;
 use crate::utils::file::read_file_names;
-use crate::utils::logger::log_success;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::operations::Update;
-use log::{error, warn};
+use log::{error, info, warn};
 use scylla::CachingSession;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -75,11 +74,11 @@ impl<'a> Recovery<'a> {
 
         match res {
             Ok(_) => {
-                log_success(format!(
+                info!(
                     "Recovery finished for tree_root: {} in {:?}\n\n",
                     self.reorder_data.tree_root.id,
                     recovery_started.elapsed()
-                ));
+                );
 
                 self.resource_locker
                     .unlock_resource(&self.reorder_data.tree_root.id.to_string())

@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
     table_name = node_descendants,
     partition_keys = [root_id],
     clustering_keys = [branch_id, node_id, order_index, id],
-
     table_options = r#"
         gc_grace_seconds = 432000 AND
         compression = { 

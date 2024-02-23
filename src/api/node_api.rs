@@ -85,16 +85,18 @@ pub async fn get_node_description_base64(
 
     // we always return merged description as we want to keep branched description in sync with original
     if node.is_branched() && node.description_base64.is_some() {
-        let mut original = UpdateDescriptionNode::find_by_id_and_branch_id(node.id, node.id)
+        let original = UpdateDescriptionNode::find_by_id_and_branch_id(node.id, node.id)
             .execute(&db_session)
-            .await?;
+            .await;
 
-        original.description_base64 = node.description_base64;
-        original.merge_description(&db_session).await?;
+        if let Ok(mut original) = original {
+            original.description_base64 = node.description_base64;
+            original.merge_description(&db_session).await?;
 
-        node.description = original.description;
-        node.description_markdown = original.description_markdown;
-        node.description_base64 = original.description_base64;
+            node.description = original.description;
+            node.description_markdown = original.description_markdown;
+            node.description_base64 = original.description_base64;
+        }
     }
 
     Ok(HttpResponse::Ok().json(node))

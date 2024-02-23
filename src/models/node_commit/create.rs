@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::node::reorder::reorder_data::ReorderData;
+use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::Node;
 use crate::models::node_commit::reorder::ReorderCommit;
 use crate::models::node_commit::NodeCommit;

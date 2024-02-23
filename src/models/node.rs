@@ -1,5 +1,6 @@
 mod auth;
 pub mod callbacks;
+pub mod context;
 mod create;
 mod delete;
 pub mod reorder;
@@ -12,6 +13,7 @@ mod update_title;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
+use crate::models::node::context::Context;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
@@ -114,14 +116,47 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub merge_ctx: Boolean,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub recovery_ctx: Boolean,
+    pub ctx: Context,
 }
 
 impl Node {
+    pub async fn find_or_init_branched(
+        data: &crate::api::data::RequestData,
+        id: Uuid,
+        branch_id: Uuid,
+        consistency: Option<Consistency>,
+    ) -> Result<Self, NodecosmosError> {
+        use charybdis::operations::InsertWithCallbacks;
+
+        let pk = &(id, branch_id);
+        let mut node_q = Self::find_by_primary_key_value(pk);
+
+        if let Some(consistency) = consistency {
+            node_q = node_q.consistency(consistency);
+        }
+
+        let node = node_q.execute(data.db_session()).await;
+
+        match node {
+            Ok(node) => Ok(node),
+            Err(e) => match e {
+                charybdis::errors::CharybdisError::NotFoundError(_) => {
+                    let mut node = Self::find_by_primary_key_value(&(id, id))
+                        .execute(data.db_session())
+                        .await?;
+
+                    node.ctx = Context::BranchedInit;
+                    node.branch_id = branch_id;
+
+                    node.insert_cb(data).execute(data.db_session()).await?;
+
+                    Ok(node)
+                }
+                _ => Err(e.into()),
+            },
+        }
+    }
+
     pub async fn find_branch_nodes(
         db_session: &CachingSession,
         branch_id: Uuid,
@@ -236,13 +271,13 @@ impl Node {
         let mut original_q = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id);
         let mut branched_q =
             NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id);
+
         if let Some(consistency) = consistency {
             original_q = original_q.consistency(consistency);
             branched_q = branched_q.consistency(consistency);
         }
 
         let original = original_q.execute(db_session).await?.try_collect().await?;
-
         let branched = branched_q.execute(db_session).await?.try_collect().await?;
 
         let mut branched_ids = HashSet::with_capacity(branched.len());
@@ -328,7 +363,8 @@ partial_node!(
     branch_id,
     description,
     description_markdown,
-    cover_image_url
+    cover_image_url,
+    ctx
 );
 
 partial_node!(
@@ -337,12 +373,11 @@ partial_node!(
     branch_id,
     description,
     description_markdown,
-    description_base64
+    description_base64,
+    ctx
 );
 
-impl GetDescriptionBase64Node {
-    
-}
+impl GetDescriptionBase64Node {}
 
 partial_node!(
     GetStructureNode,
@@ -351,7 +386,8 @@ partial_node!(
     branch_id,
     parent_id,
     ancestor_ids,
-    order_index
+    order_index,
+    ctx
 );
 
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
@@ -369,7 +405,7 @@ partial_node!(
     description_markdown,
     description_base64,
     updated_at,
-    recovery_ctx
+    ctx
 );
 
 partial_node!(
@@ -397,7 +433,7 @@ macro_rules! find_branched_or_original {
                 db_session: &CachingSession,
                 id: Uuid,
                 branch_id: Uuid,
-                consistency: Option<Consistency>,
+                consistency: Option<scylla::statement::Consistency>,
             ) -> Result<Self, NodecosmosError> {
                 let pk = &(id, branch_id);
                 let mut node_q = Self::find_by_primary_key_value(pk);
@@ -406,20 +442,22 @@ macro_rules! find_branched_or_original {
                     node_q = node_q.consistency(consistency);
                 }
 
-                let node = node_q.execute(db_session).await.ok();
+                let node = node_q.execute(db_session).await;
 
                 match node {
-                    Some(node) => Ok(node),
-                    None => {
-                        let pk = &(id, id);
-                        let mut q = Self::find_by_primary_key_value(pk);
+                    Ok(node) => Ok(node),
+                    Err(e) => match e {
+                        charybdis::errors::CharybdisError::NotFoundError(_) => {
+                            let mut node = Self::find_by_primary_key_value(&(id, id))
+                                .execute(db_session)
+                                .await?;
 
-                        if let Some(consistency) = consistency {
-                            q = q.consistency(consistency);
+                            node.branch_id = branch_id;
+
+                            Ok(node)
                         }
-
-                        q.execute(db_session).await.map_err(|err| err.into())
-                    }
+                        _ => Err(e.into()),
+                    },
                 }
             }
 

@@ -1,5 +1,5 @@
+pub mod data;
 mod recovery;
-pub mod reorder_data;
 mod validator;
 
 use crate::api::data::RequestData;
@@ -7,7 +7,7 @@ use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::node::reorder::reorder_data::ReorderData;
+use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_commit::NodeCommit;
@@ -17,7 +17,7 @@ use crate::models::udts::BranchReorderData;
 use crate::services::resource_locker::ResourceLocker;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::BaseModel;
-use charybdis::operations::{execute, Update};
+use charybdis::operations::{execute, Insert, Update};
 use charybdis::options::Consistency;
 use charybdis::types::{Double, Uuid};
 use log::error;
@@ -329,7 +329,7 @@ impl Node {
             .validate_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
             .await?;
 
-        let reorder_data = ReorderData::from_params(&params, req_data.db_session()).await?;
+        let reorder_data = ReorderData::from_params(&params, req_data).await?;
         let reorder_data = Arc::new(reorder_data);
 
         let mut reorder = Reorder::new(req_data.db_session(), &reorder_data).await?;
