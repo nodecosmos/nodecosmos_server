@@ -9,55 +9,6 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[charybdis_model(
-    table_name = comments,
-    partition_keys = [object_id],
-    clustering_keys = [branch_id, id],
-)]
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct Comment {
-    #[serde(rename = "objectId")]
-    pub object_id: Uuid,
-
-    #[serde(rename = "branchId")]
-    pub branch_id: Uuid,
-
-    pub id: Uuid,
-
-    #[serde(rename = "nodeId")]
-    pub node_id: Option<Uuid>,
-
-    #[serde(rename = "objectType")]
-    pub object_type: Text,
-
-    pub content: Text,
-
-    #[serde(rename = "authorId")]
-    pub author_id: Uuid,
-
-    pub author: Option<Frozen<Profile>>,
-
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
-
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
-}
-
-impl Comment {
-    pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
-        match ObjectType::from_string(&self.object_type) {
-            ObjectType::ContributionRequest => {
-                let contribution_request = ContributionRequest::find_by_node_id_and_id(self.object_id, self.branch_id)
-                    .execute(db_session)
-                    .await?;
-                Ok(CommentObject::ContributionRequest(contribution_request))
-            }
-            _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
-        }
-    }
-}
-
 #[derive(Deserialize)]
 pub enum ObjectType {
     ContributionRequest,
@@ -87,6 +38,71 @@ pub enum CommentObject {
     ContributionRequest(ContributionRequest), // Topic(Topic)
 }
 
-partial_comment!(PkComment, object_id, branch_id, id);
+pub enum CrCommentType {
+    MainThread,
+    NodeDescription,
+}
+
+pub enum CommentType {
+    Topic,
+    ContributionRequest(),
+}
+
+#[charybdis_model(
+    table_name = comments,
+    partition_keys = [object_id],
+    clustering_keys = [branch_id, thread_id, id],
+)]
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct Comment {
+    #[serde(rename = "objectId")]
+    pub object_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
+
+    #[serde(rename = "treadId", default = "Uuid::new_v4")]
+    pub thread_id: Uuid,
+
+    pub id: Uuid,
+
+    #[serde(rename = "nodeId")]
+    pub node_id: Option<Uuid>,
+
+    #[serde(rename = "objectType")]
+    pub object_type: Text,
+
+    #[serde(rename = "commentType")]
+    pub comment_type: Text,
+
+    pub content: Text,
+
+    #[serde(rename = "authorId")]
+    pub author_id: Uuid,
+
+    pub author: Option<Frozen<Profile>>,
+
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<Timestamp>,
+
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<Timestamp>,
+}
+
+impl Comment {
+    pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
+        match ObjectType::from_string(&self.object_type) {
+            ObjectType::ContributionRequest => {
+                let contribution_request = ContributionRequest::find_by_node_id_and_id(self.object_id, self.branch_id)
+                    .execute(db_session)
+                    .await?;
+                Ok(CommentObject::ContributionRequest(contribution_request))
+            }
+            _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
+        }
+    }
+}
+
+partial_comment!(PkComment, object_id, branch_id, thread_id, id);
 
 impl_default_callbacks!(Comment);

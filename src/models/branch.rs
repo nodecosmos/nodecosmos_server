@@ -316,7 +316,7 @@ impl Branch {
     }
 }
 
-partial_branch!(AuthBranch, id, owner_id, editor_ids, is_public);
+partial_branch!(AuthBranch, id, owner_id, editor_ids, is_public, status);
 
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes);
 

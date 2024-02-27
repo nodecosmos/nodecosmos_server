@@ -67,15 +67,15 @@ impl<T: ElasticIndex> BuildIndex for T {
                 .indices()
                 .create(IndicesCreateParts::Index(Self::ELASTIC_IDX_NAME))
                 .body(json!({
-                    "settings": Self::mappings_json(),
-                    "mappings": Self::settings_json()
+                    "settings": Self::settings_json(),
+                    "mappings": Self::mappings_json()
                 }))
                 .send()
                 .await;
         }
 
         let response = response.unwrap_or_else(|e| {
-            panic!("Failed to handle node index: {:#?}", e);
+            panic!("Failed to send index request: {:#?}", e);
         });
 
         if !response.status_code().is_success() {
@@ -131,29 +131,27 @@ impl ElasticIndex for Node {
     }
 
     fn mappings_json() -> Value {
-        json!(
-            {
-                "dynamic": false,
-                "properties": {
-                    "ancestorIds": {
-                        "type": "keyword",
-                        "index": false
-                    },
-                    "rootId": { "type": "keyword", "index": false },
-                    "id": { "type": "keyword", "index": false },
-                    "title": { "type": "text", "analyzer": "english" },
-                    "shortDescription": { "type": "text", "index": false  },
-                    "description": {
-                        "type": "text",
-                        "analyzer": "english_with_html_strip",
-                    },
-                    "isRoot": { "type": "boolean" },
-                    "isPublic": { "type": "boolean" },
-                    "createdAt": { "type": "date" },
-                    "likesCount": { "type": "integer" }
-                }
+        json!({
+            "dynamic": false,
+            "properties": {
+                "ancestorIds": {
+                    "type": "keyword",
+                    "index": false
+                },
+                "rootId": { "type": "keyword", "index": false },
+                "id": { "type": "keyword", "index": false },
+                "title": { "type": "text", "analyzer": "english" },
+                "shortDescription": { "type": "text", "index": false  },
+                "description": {
+                    "type": "text",
+                    "analyzer": "english_with_html_strip",
+                },
+                "isRoot": { "type": "boolean" },
+                "isPublic": { "type": "boolean" },
+                "createdAt": { "type": "date" },
+                "likesCount": { "type": "integer" }
             }
-        )
+        })
     }
 
     fn index_id(&self) -> String {
@@ -166,30 +164,26 @@ impl ElasticIndex for User {
 
     fn settings_json() -> Value {
         json!({
-            "settings": {
-                "index": {
-                    "number_of_shards": 2,
-                    "number_of_replicas": 1
-                }
+            "index": {
+                "number_of_shards": 2,
+                "number_of_replicas": 1
             }
         })
     }
 
     fn mappings_json() -> Value {
-        json!(
-            {
-              "dynamic": false,
-                "properties": {
-                    "id": { "type": "keyword", "index": false },
-                    "email": { "type": "search_as_you_type" },
-                    "username": { "type": "search_as_you_type" },
-                    "firstName": { "type": "search_as_you_type" },
-                    "lastName": { "type": "search_as_you_type" },
-                    "bio": { "type": "text" },
-                    "createdAt": { "type": "date" },
-                }
+        json!({
+            "dynamic": false,
+            "properties": {
+                "id": { "type": "keyword", "index": false },
+                "email": { "type": "search_as_you_type" },
+                "username": { "type": "search_as_you_type" },
+                "firstName": { "type": "search_as_you_type" },
+                "lastName": { "type": "search_as_you_type" },
+                "bio": { "type": "text" },
+                "createdAt": { "type": "date" },
             }
-        )
+        })
     }
 
     fn index_id(&self) -> String {

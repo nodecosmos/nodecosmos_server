@@ -29,6 +29,53 @@ pub struct App {
 }
 
 impl App {
+    async fn create_caching_session(config: &Value) -> CachingSession {
+        let hosts = config["scylla"]["hosts"].as_array().expect("Missing hosts");
+
+        let keyspace = config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
+
+        let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
+
+        let session: Session = SessionBuilder::new()
+            .known_nodes(&known_nodes)
+            .connection_timeout(Duration::from_secs(3))
+            .use_keyspace(keyspace, false)
+            .build()
+            .await
+            .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
+
+        CachingSession::from(session, 1000)
+    }
+
+    async fn create_elastic_client(config: &Value) -> Elasticsearch {
+        let host = config["elasticsearch"]["host"].as_str().expect("Missing elastic host");
+
+        let transport = Transport::single_node(host).unwrap_or_else(|e| {
+            panic!(
+                "Unable to connect to elastic host: {}. \nError: {}",
+                config["elasticsearch"]["host"], e
+            )
+        });
+
+        Elasticsearch::new(transport)
+    }
+
+    async fn create_redis_pool(config: &Value) -> Pool {
+        let redis_url = config["redis"]["url"].as_str().expect("Missing redis url");
+
+        let cfg = Config::from_url(redis_url);
+
+        cfg.create_pool(Some(Runtime::Tokio1)).expect("Failed to create pool.")
+    }
+
+    async fn create_s3_client() -> aws_sdk_s3::Client {
+        let config = aws_config::from_env().load().await;
+
+        let client = aws_sdk_s3::Client::new(&config);
+
+        client
+    }
+
     pub async fn new() -> Self {
         dotenv::dotenv().ok();
 
@@ -38,10 +85,10 @@ impl App {
         let config = contents.parse::<Value>().expect("Unable to parse TOML");
         let s3_bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
 
-        let s3_client = create_s3_client().await;
-        let db_session = create_caching_session(&config).await;
-        let elastic_client = create_elastic_client(&config).await;
-        let redis_pool = create_redis_pool(&config).await;
+        let s3_client = Self::create_s3_client().await;
+        let db_session = Self::create_caching_session(&config).await;
+        let elastic_client = Self::create_elastic_client(&config).await;
+        let redis_pool = Self::create_redis_pool(&config).await;
         let resource_locker = ResourceLocker::new(&redis_pool);
 
         Self {
@@ -125,51 +172,4 @@ impl App {
 
         RedisActorSessionStore::new(redis_host)
     }
-}
-
-async fn create_caching_session(config: &Value) -> CachingSession {
-    let hosts = config["scylla"]["hosts"].as_array().expect("Missing hosts");
-
-    let keyspace = config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
-
-    let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
-
-    let session: Session = SessionBuilder::new()
-        .known_nodes(&known_nodes)
-        .connection_timeout(Duration::from_secs(3))
-        .use_keyspace(keyspace, false)
-        .build()
-        .await
-        .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
-
-    CachingSession::from(session, 1000)
-}
-
-async fn create_elastic_client(config: &Value) -> Elasticsearch {
-    let host = config["elasticsearch"]["host"].as_str().expect("Missing elastic host");
-
-    let transport = Transport::single_node(host).unwrap_or_else(|e| {
-        panic!(
-            "Unable to connect to elastic host: {}. \nError: {}",
-            config["elasticsearch"]["host"], e
-        )
-    });
-
-    Elasticsearch::new(transport)
-}
-
-async fn create_redis_pool(config: &Value) -> Pool {
-    let redis_url = config["redis"]["url"].as_str().expect("Missing redis url");
-
-    let cfg = Config::from_url(redis_url);
-
-    cfg.create_pool(Some(Runtime::Tokio1)).expect("Failed to create pool.")
-}
-
-async fn create_s3_client() -> aws_sdk_s3::Client {
-    let config = aws_config::from_env().load().await;
-
-    let client = aws_sdk_s3::Client::new(&config);
-
-    client
 }

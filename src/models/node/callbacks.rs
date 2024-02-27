@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::context::Context;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
-use crate::models::traits::MergeDescription;
+use crate::models::traits::{MergeDescription, SanitizeDescription};
 use charybdis::callbacks::Callbacks;
 use scylla::CachingSession;
 
@@ -69,7 +69,7 @@ impl Callbacks for UpdateDescriptionNode {
 
     async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.preserve_for_branch(&data).await?;
-        self.sanitize_description();
+        self.description.sanitize()?;
 
         if &self.ctx != &Context::MergeRecovery {
             self.merge_description(&db_session).await?;

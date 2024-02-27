@@ -2,7 +2,7 @@ use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
-use crate::models::branch::Branch;
+use crate::models::branch::{Branch, BranchStatus};
 use crate::models::comment::{Comment, CommentObject};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::Node;
@@ -20,6 +20,10 @@ pub trait Authorization {
         Ok(())
     }
 
+    fn is_frozen(&self) -> bool {
+        false
+    }
+
     fn is_public(&self) -> bool {
         false
     }
@@ -32,6 +36,10 @@ pub trait Authorization {
 
     async fn can_edit(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
         self.before_auth(data).await?;
+
+        if self.is_frozen() {
+            return Err(NodecosmosError::Forbidden("This object is frozen!".to_string()));
+        }
 
         if self.owner_id() == Some(data.current_user.id) {
             return Ok(true);
@@ -89,6 +97,25 @@ impl Authorization for Node {
         }
 
         Ok(())
+    }
+
+    fn is_frozen(&self) -> bool {
+        if self.is_branched() {
+            return match &self.auth_branch {
+                Some(branch) => {
+                    branch.status == Some(BranchStatus::Merged.to_string())
+                        || branch.status == Some(BranchStatus::RecoveryFailed.to_string())
+                        || branch.status == Some(BranchStatus::Closed.to_string())
+                }
+                None => {
+                    error!("Branched node {} has no branch!", self.id);
+
+                    false
+                }
+            };
+        }
+
+        false
     }
 
     fn is_public(&self) -> bool {

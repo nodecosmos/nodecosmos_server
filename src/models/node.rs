@@ -120,7 +120,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub async fn find_or_init_branched(
+    pub async fn find_or_insert_branched(
         data: &crate::api::data::RequestData,
         id: Uuid,
         branch_id: Uuid,

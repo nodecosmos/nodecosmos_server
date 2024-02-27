@@ -1,9 +1,9 @@
 use crate::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::traits::SanitizeDescription;
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use crate::services::elastic::ElasticDocument;
 use crate::App;
-use ammonia::clean;
 use charybdis::callbacks::Callbacks;
 use chrono::Utc;
 use scylla::CachingSession;
@@ -88,10 +88,7 @@ impl Callbacks for UpdateBioUser {
 
     async fn before_update(&mut self, _: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(Utc::now());
-
-        if let Some(bio) = &self.bio {
-            self.bio = Some(clean(bio));
-        }
+        self.bio.sanitize()?;
 
         Ok(())
     }

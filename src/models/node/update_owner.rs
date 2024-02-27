@@ -29,7 +29,7 @@ impl UpdateProfileNode {
                 let _ = UpdateProfileNode::run(data, user.clone()).await;
             }
             Err(e) => {
-                error!("UpdateProfileNode::update_owner_records::find_by_id {}", e);
+                error!("[update_owner_records::find_by_id] {}", e);
             }
         }
     }
@@ -39,7 +39,7 @@ impl UpdateProfileNode {
             .execute(data.db_session())
             .await
             .map_err(|e| {
-                error!("UpdateProfileNode::run::find_by_owner_id {}", e);
+                error!("[run::find_by_owner_id]: {}", e);
                 e
             })?;
 
@@ -49,7 +49,7 @@ impl UpdateProfileNode {
         while let Some(node_by_owner) = nodes_by_owner.next().await {
             nodes_to_update.push(UpdateProfileNode::init(
                 &node_by_owner.map_err(|e| {
-                    error!("Error init: {}", e);
+                    error!("[node_by_owner] {}", e);
                     e
                 })?,
                 owner.clone(),
@@ -61,7 +61,7 @@ impl UpdateProfileNode {
             .chunked_insert(data.db_session(), &nodes_to_update, 100)
             .await
             .map_err(|e| {
-                error!("UpdateProfileNode::run::chunked_insert {}", e);
+                error!("[run::chunked_insert] {}", e);
                 e
             })?;
 

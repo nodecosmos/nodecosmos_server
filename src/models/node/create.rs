@@ -151,7 +151,10 @@ impl Node {
                 .chunked_insert(db_session, &descendants, 100)
                 .await
             {
-                error!("Error appending node {} to ancestors::execute {:?}", self.id, e);
+                error!(
+                    "[append_to_ancestors::chunked_insert] Error for node {}: {:?}",
+                    self.id, e
+                );
             }
         }
     }

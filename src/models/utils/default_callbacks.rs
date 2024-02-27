@@ -80,13 +80,12 @@ macro_rules! sanitize_description_cb_fn {
             _session: &charybdis::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
+            use crate::models::traits::SanitizeDescription;
             use ammonia::clean;
 
             self.updated_at = Some(chrono::Utc::now());
 
-            if let Some(description) = &self.description {
-                self.description = Some(clean(description));
-            }
+            self.description.sanitize()?;
 
             Ok(())
         }
