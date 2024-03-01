@@ -81,7 +81,6 @@ macro_rules! sanitize_description_cb_fn {
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
             use crate::models::traits::SanitizeDescription;
-            use ammonia::clean;
 
             self.updated_at = Some(chrono::Utc::now());
 

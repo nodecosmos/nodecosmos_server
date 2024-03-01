@@ -51,10 +51,11 @@ impl Callbacks for Node {
         _session: &CachingSession,
         req_data: &Self::Extension,
     ) -> Result<(), NodecosmosError> {
-        let self_clone = self.clone();
+        let mut self_clone = self.clone();
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
+            self_clone.preserve_branched_if_original_exist(&req_data).await;
             self_clone.create_new_version_for_ancestors(&req_data).await;
             self_clone.update_branch_with_deletion(&req_data).await;
         });

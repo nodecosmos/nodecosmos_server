@@ -137,7 +137,9 @@ async fn main() {
             .service(
                 web::scope("comments")
                     .service(get_comments)
+                    .service(get_thread_comments)
                     .service(create_comment)
+                    .service(update_comment_content)
                     .service(delete_comment),
             )
     })

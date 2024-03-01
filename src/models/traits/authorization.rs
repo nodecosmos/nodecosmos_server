@@ -3,7 +3,8 @@ use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{Branch, BranchStatus};
-use crate::models::comment::{Comment, CommentObject};
+use crate::models::comment::Comment;
+use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::Node;
 use crate::models::traits::Branchable;
@@ -240,9 +241,9 @@ impl Authorization for User {
     }
 }
 
-impl Authorization for Comment {
+impl Authorization for CommentThread {
     fn owner_id(&self) -> Option<Uuid> {
-        Some(self.author_id)
+        self.author_id
     }
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
@@ -260,5 +261,22 @@ impl Authorization for Comment {
                 Ok(())
             }
         }
+    }
+}
+
+impl Authorization for Comment {
+    fn owner_id(&self) -> Option<Uuid> {
+        self.author_id
+    }
+
+    fn editor_ids(&self) -> Option<Set<Uuid>> {
+        None
+    }
+
+    async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        return match self.thread(data.db_session()).await? {
+            Some(thread) => thread.auth_creation(data).await,
+            None => Err(NodecosmosError::Forbidden("Comment must have a thread!".to_string())),
+        };
     }
 }

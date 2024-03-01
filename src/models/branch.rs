@@ -16,7 +16,7 @@ use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fmt::Display;
+use std::fmt;
 use std::rc::Rc;
 
 pub enum BranchStatus {
@@ -33,16 +33,16 @@ impl BranchStatus {
     }
 }
 
-impl Display for BranchStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for BranchStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BranchStatus::Open => {
-                write!(f, "OPEN")
+                write!(f, "Open")
             }
-            BranchStatus::Merged => write!(f, "MERGED"),
-            BranchStatus::Recovered => write!(f, "RECOVERED"),
-            BranchStatus::RecoveryFailed => write!(f, "RECOVERY_FAILED"),
-            BranchStatus::Closed => write!(f, "CLOSED"),
+            BranchStatus::Merged => write!(f, "Merged"),
+            BranchStatus::Recovered => write!(f, "Recovered"),
+            BranchStatus::RecoveryFailed => write!(f, "RecoveryFailed"),
+            BranchStatus::Closed => write!(f, "Closed"),
         }
     }
 }

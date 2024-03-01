@@ -14,7 +14,7 @@ use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::fmt::Display;
+use std::fmt;
 use std::rc::Rc;
 
 pub enum ContributionRequestStatus {
@@ -30,15 +30,15 @@ impl ContributionRequestStatus {
     }
 }
 
-impl Display for ContributionRequestStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ContributionRequestStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ContributionRequestStatus::WorkInProgress => {
-                write!(f, "WORK_IN_PROGRESS")
+                write!(f, "WorkInProgress")
             }
-            ContributionRequestStatus::Published => write!(f, "PUBLISHED"),
-            ContributionRequestStatus::Merged => write!(f, "MERGED"),
-            ContributionRequestStatus::Closed => write!(f, "CLOSED"),
+            ContributionRequestStatus::Published => write!(f, "Published"),
+            ContributionRequestStatus::Merged => write!(f, "Merged"),
+            ContributionRequestStatus::Closed => write!(f, "Closed"),
         }
     }
 }

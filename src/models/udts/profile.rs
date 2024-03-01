@@ -13,8 +13,8 @@ pub enum ProfileType {
 impl fmt::Display for ProfileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ProfileType::User => write!(f, "user"),
-            ProfileType::Organization => write!(f, "organization"),
+            ProfileType::User => write!(f, "User"),
+            ProfileType::Organization => write!(f, "Organization"),
         }
     }
 }

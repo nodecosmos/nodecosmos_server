@@ -8,18 +8,18 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::operations::Update;
 use charybdis::types::{Frozen, List, Set, Text, Uuid};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::fmt;
 
 pub enum ConflictStatus {
     Pending,
     Resolved,
 }
 
-impl Display for ConflictStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ConflictStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ConflictStatus::Pending => write!(f, "PENDING"),
-            ConflictStatus::Resolved => write!(f, "RESOLVED"),
+            ConflictStatus::Pending => write!(f, "Pending"),
+            ConflictStatus::Resolved => write!(f, "Resolved"),
         }
     }
 }

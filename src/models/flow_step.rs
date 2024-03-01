@@ -15,9 +15,7 @@ use std::rc::Rc;
     table_name = flow_steps,
     partition_keys = [node_id],
     clustering_keys = [workflow_id, flow_id, flow_index, id],
-    local_secondary_indexes = [
-        ([node_id], [id])
-    ]
+    local_secondary_indexes = [id]
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct FlowStep {

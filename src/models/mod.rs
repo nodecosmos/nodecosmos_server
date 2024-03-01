@@ -1,6 +1,7 @@
 pub mod attachment;
 pub mod branch;
 pub mod comment;
+pub mod comment_thread;
 pub mod contribution_request;
 pub mod description_commit;
 pub mod flow;

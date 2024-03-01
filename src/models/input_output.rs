@@ -21,10 +21,7 @@ use serde::{Deserialize, Serialize};
     table_name = input_outputs,
     partition_keys = [root_node_id],
     clustering_keys = [node_id, workflow_id, id],
-    local_secondary_indexes = [
-        ([root_node_id], [id]),
-        ([root_node_id], [original_id]),
-    ]
+    local_secondary_indexes = [id, original_id]
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Io {
