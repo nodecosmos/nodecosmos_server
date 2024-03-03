@@ -33,9 +33,7 @@ paping---
 
 * ### Clients (ATM `App.rs` but to be moved to `clients/`)
   They represent data structures that are alive during program runtime. They are usually related in one way or another
-  to
-  external services sessions: e.g. ScyllaDb, Redis, ElasticSearch, etc. But we can also use them for internal services.
-  E.g. mailer, logger, etc.
+  to external services sessions: e.g. ScyllaDb, Redis, ElasticSearch, etc.
 * ### Actions (`api/`)
   They represent entry point of the request. They are responsible for parsing request or triggering
   model or model-segment specific logic and returning the response.
@@ -52,8 +50,9 @@ paping---
 * ### Models
   They represent data structures that are used to model core application data and implement the business logic. If
   business logic is reusable, it should utilize traits (`models/traits`). And accordingly the traits should be
-  implemented by the segment. E.g. In case same model has multiple s3 related fields `cover_image`, `profile_image` we
-  can have a separate trait for `partial_<model_name>` and implement `S3` trait in it.
+  implemented by model or the segment. E.g. In case same model has multiple s3 related
+  fields `cover_image`, `profile_image` we can have a separate trait for `partial_<model_name>` and implement `S3` trait
+  in it.
    ```rust
    #[charybdis_model(
      table_name = users,

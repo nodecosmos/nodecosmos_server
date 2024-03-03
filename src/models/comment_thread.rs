@@ -69,6 +69,15 @@ impl fmt::Display for ThreadType {
     }
 }
 
+/// **objectId** corresponds to the following:
+/// * **`ContributionRequest['id']`** for ContributionRequest related comments  
+/// * **`Topic['id']`**  for Topic related comments
+///
+/// **thread_node_id** if provided corresponds to Node of the following
+/// * `ContributionRequestThreadType::NodeAddition`,
+/// * `ContributionRequestThreadType::NodeDeletion`,
+/// * `ContributionRequestThreadType::NodeDescription`
+///
 #[charybdis_model(
     table_name = comment_threads,
     partition_keys = [object_id],
@@ -79,6 +88,7 @@ pub struct CommentThread {
     #[serde(rename = "objectId")]
     pub object_id: Uuid,
 
+    #[serde(rename = "id", default)]
     pub id: Uuid,
 
     #[serde(rename = "authorId")]
@@ -87,11 +97,14 @@ pub struct CommentThread {
     #[serde(rename = "objectType")]
     pub object_type: Text,
 
+    #[serde(rename = "objectNodeId")]
+    pub object_node_id: Option<Uuid>,
+
     #[serde(rename = "threadType")]
     pub thread_type: Text,
 
-    #[serde(rename = "nodeId")]
-    pub node_id: Option<Uuid>,
+    #[serde(rename = "threadNodeId")]
+    pub thread_node_id: Option<Uuid>,
 
     #[serde(rename = "lineNumber")]
     pub line_number: Option<Int>,
@@ -104,7 +117,7 @@ impl CommentThread {
     pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
         match ObjectType::from_string(&self.object_type) {
             ObjectType::ContributionRequest => {
-                return match self.node_id {
+                return match self.object_node_id {
                     Some(node_id) => {
                         let contribution_request = ContributionRequest::find_by_node_id_and_id(node_id, self.object_id)
                             .execute(db_session)
@@ -125,6 +138,7 @@ impl Callbacks for CommentThread {
 
     async fn before_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.author_id = Some(data.current_user_id());
+        self.id = Uuid::new_v4();
 
         Ok(())
     }

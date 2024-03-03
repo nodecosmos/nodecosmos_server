@@ -49,7 +49,7 @@ pub struct CreateCommentPayload {
 }
 
 #[post("")]
-pub async fn create_comment(data: web::Data<RequestData>, payload: web::Json<CreateCommentPayload>) -> Response {
+pub async fn create_comment(data: RequestData, payload: web::Json<CreateCommentPayload>) -> Response {
     let payload = payload.into_inner();
     let mut comment = payload.comment;
 

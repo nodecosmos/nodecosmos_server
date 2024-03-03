@@ -1,4 +1,3 @@
-mod authorization;
 mod callbacks;
 pub mod diagram;
 

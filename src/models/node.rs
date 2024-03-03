@@ -171,13 +171,6 @@ impl Node {
         Ok(res)
     }
 
-    pub async fn init_auth_branch(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
-        self.auth_branch = Some(branch);
-
-        Ok(())
-    }
-
     pub async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
         if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
             if self.is_branched() {

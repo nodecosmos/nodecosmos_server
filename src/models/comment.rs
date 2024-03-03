@@ -28,7 +28,7 @@ pub struct Comment {
     #[serde(rename = "threadId", default)]
     pub thread_id: Uuid,
 
-    #[serde(rename = "id")]
+    #[serde(rename = "id", default)]
     pub id: Uuid,
 
     pub content: Text,

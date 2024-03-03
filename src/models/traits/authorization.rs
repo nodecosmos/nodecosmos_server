@@ -2,22 +2,27 @@ use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
-use crate::models::branch::{Branch, BranchStatus};
+use crate::models::branch::{AuthBranch, Branch, BranchStatus};
 use crate::models::comment::Comment;
 use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
-use crate::models::node::Node;
+use crate::models::node::{AuthNode, Node};
 use crate::models::traits::Branchable;
 use crate::models::user::User;
+use crate::models::workflow::Workflow;
 use actix_web::web;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
 use log::error;
+use scylla::CachingSession;
 use serde_json::json;
 
 pub trait Authorization {
-    async fn before_auth(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_view_auth(&mut self, _db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        Ok(())
+    }
+    async fn before_update_auth(&mut self, _db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Ok(())
     }
 
@@ -36,8 +41,6 @@ pub trait Authorization {
     async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError>;
 
     async fn can_edit(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
-        self.before_auth(data).await?;
-
         if self.is_frozen() {
             return Err(NodecosmosError::Forbidden("This object is frozen!".to_string()));
         }
@@ -55,6 +58,8 @@ pub trait Authorization {
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.before_update_auth(data.db_session()).await?;
+
         if !self.can_edit(data).await? {
             return Err(NodecosmosError::Unauthorized(json!({
                 "error": "Unauthorized!",
@@ -66,6 +71,8 @@ pub trait Authorization {
     }
 
     async fn auth_view(&mut self, app: &web::Data<App>, current_user: OptCurrentUser) -> Result<(), NodecosmosError> {
+        self.before_view_auth(&app.db_session).await?;
+
         if self.is_public() {
             return Ok(());
         }
@@ -90,11 +97,20 @@ pub trait Authorization {
 /// If the node is a main branch, then the authorization is done by node.
 /// Otherwise, the authorization is done by branch.
 impl Authorization for Node {
-    async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update_auth(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if self.is_original() {
-            *self = self.find_by_primary_key().execute(data.db_session()).await?;
+            if self.owner_id.is_some() {
+                return Ok(());
+            }
+
+            let auth_node = AuthNode::find_by_id_and_branch_id(self.id, self.id)
+                .execute(db_session)
+                .await?;
+            self.owner_id = auth_node.owner_id;
+            self.editor_ids = auth_node.editor_ids;
         } else {
-            self.init_auth_branch(data.db_session()).await?;
+            let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
+            self.auth_branch = Some(branch);
         }
 
         Ok(())
@@ -171,6 +187,48 @@ impl Authorization for Node {
     }
 }
 
+impl Authorization for Workflow {
+    async fn before_update_auth(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.init_node(db_session).await?;
+
+        Ok(())
+    }
+
+    fn is_public(&self) -> bool {
+        if let Some(node) = &self.node {
+            return node.is_public;
+        }
+
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
+
+        false
+    }
+
+    fn owner_id(&self) -> Option<Uuid> {
+        if let Some(node) = &self.node {
+            return node.owner_id;
+        }
+
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
+
+        None
+    }
+
+    fn editor_ids(&self) -> Option<Set<Uuid>> {
+        if let Some(node) = &self.node {
+            return node.editor_ids.clone();
+        }
+
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
+
+        None
+    }
+
+    async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
+        self.auth_update(_data).await
+    }
+}
+
 impl Authorization for Branch {
     fn is_public(&self) -> bool {
         self.is_public
@@ -190,8 +248,14 @@ impl Authorization for Branch {
 }
 
 impl Authorization for ContributionRequest {
-    async fn before_auth(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.branch(data.db_session()).await?;
+    async fn before_view_auth(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.branch(db_session).await?;
+
+        Ok(())
+    }
+
+    async fn before_update_auth(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.branch(db_session).await?;
 
         Ok(())
     }
