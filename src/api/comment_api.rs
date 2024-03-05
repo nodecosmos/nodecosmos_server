@@ -1,9 +1,9 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::comment::{Comment, PkComment, UpdateContentComment};
+use crate::models::comment::{Comment, DeleteComment, PkComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
 use crate::models::traits::Authorization;
-use actix_web::{get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{Delete, DeleteWithCallbacks, Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
@@ -72,10 +72,7 @@ pub async fn create_comment(data: RequestData, payload: web::Json<CreateCommentP
 }
 
 #[put("/content")]
-pub async fn update_comment_content(
-    data: web::Data<RequestData>,
-    mut comment: web::Json<UpdateContentComment>,
-) -> Response {
+pub async fn update_comment_content(data: RequestData, mut comment: web::Json<UpdateContentComment>) -> Response {
     comment.as_native().auth_update(&data).await?;
 
     comment.update_cb(&None).execute(data.db_session()).await?;
@@ -83,11 +80,11 @@ pub async fn update_comment_content(
     Ok(HttpResponse::Ok().json(comment))
 }
 
-#[get("/{objectId}/{treadId}/{id}")]
-pub async fn delete_comment(data: web::Data<RequestData>, comment: web::Path<PkComment>) -> Response {
+#[delete("/{objectId}/{threadId}/{id}")]
+pub async fn delete_comment(data: RequestData, mut comment: web::Path<DeleteComment>) -> Response {
     comment.as_native().auth_update(&data).await?;
 
-    comment.delete().execute(data.db_session()).await?;
+    comment.delete_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }

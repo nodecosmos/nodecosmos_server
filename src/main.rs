@@ -2,10 +2,10 @@
 
 mod api;
 mod app;
+mod clients;
 mod constants;
 mod errors;
 mod models;
-mod services;
 mod utils;
 
 use crate::models::node::Node;

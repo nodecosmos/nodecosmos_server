@@ -1,6 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::{IndexNode, Node};
-use crate::services::elastic::ElasticIndex;
+use crate::models::traits::ElasticIndex;
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde::Deserialize;
 use serde_json::{json, Value};

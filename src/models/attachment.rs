@@ -4,13 +4,14 @@ use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
 use crate::errors::NodecosmosError;
 use crate::models::attachment::image::Image;
+use crate::models::traits::s3::S3;
 use crate::models::utils::impl_default_callbacks;
-use crate::services::aws::s3::upload_s3_object;
 use actix_multipart::Multipart;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
 use futures::StreamExt;
+use log::error;
 use serde::{Deserialize, Serialize};
 
 const MAX_IMAGE_WIDTH: u32 = 852;
@@ -45,16 +46,6 @@ pub struct Attachment {
 }
 
 impl Attachment {
-    pub fn build_s3_filename(object_id: String) -> String {
-        let timestamp = chrono::Utc::now().timestamp();
-
-        format!("{}-{}.jpeg", object_id, timestamp)
-    }
-
-    pub fn build_s3_url(bucket: String, key: String) -> String {
-        format!("https://{}.s3.amazonaws.com/{}", bucket, key)
-    }
-
     pub async fn create_image(
         params: &ImageAttachmentParams,
         data: &RequestData,
@@ -77,17 +68,16 @@ impl Attachment {
             image.resize_image(width, height);
             let compressed = image.compressed()?;
 
-            let key = Attachment::build_s3_filename(params.object_id.to_string());
-            let url = Attachment::build_s3_url(data.s3_bucket().clone(), key.clone());
-
-            upload_s3_object(data.s3_client(), data.s3_bucket(), compressed, &key).await?;
-
             let mut attachment = Attachment::new();
             attachment.node_id = params.node_id;
             attachment.object_id = params.object_id;
-            attachment.key = key;
-            attachment.url = Some(url);
             attachment.user_id = Some(data.current_user.id);
+
+            // assign s3 key before url generation & upload
+            attachment.key = attachment.build_s3_key();
+            attachment.url = Some(attachment.s3_url(data));
+
+            attachment.upload_s3_object(data, compressed).await?;
 
             attachment.insert_cb(&None).execute(data.db_session()).await?;
 

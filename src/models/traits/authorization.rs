@@ -70,6 +70,10 @@ pub trait Authorization {
         Ok(())
     }
 
+    async fn auth_deletion(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.auth_update(data).await
+    }
+
     async fn auth_view(&mut self, app: &web::Data<App>, current_user: OptCurrentUser) -> Result<(), NodecosmosError> {
         self.before_view_auth(&app.db_session).await?;
 
@@ -329,6 +333,14 @@ impl Authorization for CommentThread {
 }
 
 impl Authorization for Comment {
+    async fn before_update_auth(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        if self.author_id.is_none() {
+            *self = self.find_by_primary_key().execute(db_session).await?;
+        }
+
+        Ok(())
+    }
+
     fn owner_id(&self) -> Option<Uuid> {
         self.author_id
     }

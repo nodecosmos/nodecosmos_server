@@ -2,30 +2,14 @@ use crate::models::node::{
     Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateProfileNode, UpdateTitleNode,
 };
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
-use crate::services::elastic::utils::idx_exists;
 use charybdis::model::{AsNative, BaseModel, Model};
 use charybdis::types::Uuid;
 use colored::Colorize;
-use elasticsearch::indices::{IndicesCreateParts, IndicesPutMappingParts};
+use elasticsearch::indices::{IndicesCreateParts, IndicesExistsParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
 use log::info;
 use serde::Serialize;
 use serde_json::{json, Value};
-
-pub struct ElasticIndexBuilder<'a> {
-    client: &'a Elasticsearch,
-}
-
-impl<'a> ElasticIndexBuilder<'a> {
-    pub fn new(client: &'a Elasticsearch) -> Self {
-        Self { client }
-    }
-
-    pub async fn build(&self) {
-        Node::build_index(&self.client).await;
-        User::build_index(&self.client).await;
-    }
-}
 
 pub trait ElasticIndex {
     const ELASTIC_IDX_NAME: &'static str;
@@ -34,6 +18,19 @@ pub trait ElasticIndex {
     fn mappings_json() -> Value;
 
     fn index_id(&self) -> String;
+
+    async fn idx_exists(client: &Elasticsearch) -> bool {
+        let response = client
+            .indices()
+            .exists(IndicesExistsParts::Index(&[Self::ELASTIC_IDX_NAME]))
+            .send()
+            .await
+            .unwrap();
+
+        let status = response.status_code().clone();
+
+        status.is_success()
+    }
 }
 
 pub trait BuildIndex: ElasticIndex {
@@ -44,7 +41,7 @@ impl<T: ElasticIndex> BuildIndex for T {
     async fn build_index(client: &Elasticsearch) {
         let response;
 
-        if idx_exists(client, Self::ELASTIC_IDX_NAME).await {
+        if T::idx_exists(client).await {
             info!(
                 "{} {}",
                 "Sync elastic index for".bright_green(),

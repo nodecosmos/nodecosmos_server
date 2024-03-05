@@ -117,7 +117,7 @@ pub async fn get_original_node_description_base64(
 pub async fn create_node(mut node: web::Json<Node>, data: RequestData) -> Response {
     node.auth_creation(&data).await?;
 
-    data.resource_locker().validate_node_unlocked(&node, true).await?;
+    data.resource_locker().validate_node_root_unlocked(&node, true).await?;
 
     node.insert_cb(&data).execute(data.db_session()).await?;
 
@@ -131,7 +131,7 @@ pub async fn update_node_title(mut node: web::Json<UpdateTitleNode>, data: Reque
     native_node.auth_update(&data).await?;
 
     data.resource_locker()
-        .validate_node_unlocked(&native_node, true)
+        .validate_node_root_unlocked(&native_node, true)
         .await?;
 
     node.update_cb(&data).execute(data.db_session()).await?;
@@ -158,7 +158,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
     node.auth_update(&data).await?;
 
-    data.resource_locker().validate_node_unlocked(&node, true).await?;
+    data.resource_locker().validate_node_root_unlocked(&node, true).await?;
 
     node.delete_cb(&data).execute(data.db_session()).await?;
 

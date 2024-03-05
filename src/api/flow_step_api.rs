@@ -19,21 +19,13 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
 
     let res = flow_step.insert_cb(&None).execute(data.db_session()).await;
 
+    data.resource_locker()
+        .unlock_resource(&flow_step.flow_id.to_string())
+        .await?;
+
     match res {
-        Ok(_) => {
-            data.resource_locker()
-                .unlock_resource(&flow_step.flow_id.to_string())
-                .await?;
-
-            Ok(HttpResponse::Ok().json(flow_step))
-        }
-        Err(err) => {
-            data.resource_locker()
-                .unlock_resource(&flow_step.flow_id.to_string())
-                .await?;
-
-            Err(err)
-        }
+        Ok(_) => Ok(HttpResponse::Ok().json(flow_step)),
+        Err(err) => Err(err),
     }
 }
 
@@ -87,6 +79,7 @@ pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>)
     data.resource_locker()
         .validate_resource_unlocked(&flow_step.flow_id.to_string())
         .await?;
+
     data.resource_locker()
         .lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL)
         .await?;

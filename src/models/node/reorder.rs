@@ -4,6 +4,7 @@ mod validator;
 
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
+use crate::clients::resource_locker::ResourceLocker;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -14,7 +15,6 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
-use crate::services::resource_locker::ResourceLocker;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::BaseModel;
 use charybdis::operations::{execute, Insert, Update};
@@ -323,10 +323,13 @@ impl<'a> Reorder<'a> {
 
 impl Node {
     pub async fn reorder(&self, req_data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        req_data.resource_locker().validate_node_unlocked(&self, false).await?;
         req_data
             .resource_locker()
-            .validate_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
+            .validate_node_root_unlocked(&self, false)
+            .await?;
+        req_data
+            .resource_locker()
+            .validate_node_root_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
             .await?;
 
         let reorder_data = ReorderData::from_params(&params, req_data).await?;

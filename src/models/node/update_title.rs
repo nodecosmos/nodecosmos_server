@@ -7,7 +7,7 @@ use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
-use crate::services::elastic::ElasticDocument;
+use crate::models::traits::ElasticDocument;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::model::AsNative;
 use elasticsearch::Elasticsearch;
@@ -26,9 +26,9 @@ impl UpdateTitleNode {
             return;
         }
 
-        if let Err(e) = data.resource_locker().validate_node_unlocked(&native, true).await {
+        if let Err(e) = data.resource_locker().validate_node_root_unlocked(&native, true).await {
             error!(
-                "UpdateTitleNode::update_title_for_ancestors::validate_node_unlocked: {}",
+                "UpdateTitleNode::update_title_for_ancestors::validate_node_root_unlocked: {}",
                 e
             );
             return;

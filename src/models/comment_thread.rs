@@ -1,9 +1,12 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::comment::{find_first_pk_comment, Comment, PkComment};
 use crate::models::contribution_request::ContributionRequest;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Int, Text, Uuid};
+use charybdis::operations::Delete;
+use charybdis::types::{Int, Text, Timestamp, Uuid};
+use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -111,6 +114,12 @@ pub struct CommentThread {
 
     #[serde(rename = "lineContent")]
     pub line_content: Option<Text>,
+
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
+
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 }
 
 impl CommentThread {
@@ -130,6 +139,21 @@ impl CommentThread {
             _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
         }
     }
+
+    pub async fn delete_if_no_comments(&self, db_session: &CachingSession) {
+        let comment_res = find_first_pk_comment!("object_id = ? AND thread_id = ?", (&self.object_id, &self.id))
+            .execute(db_session)
+            .await
+            .ok();
+
+        if comment_res.is_none() {
+            let res = self.delete().execute(db_session).await;
+
+            if let Err(e) = res {
+                error!("Error while deleting thread: {}", e);
+            }
+        }
+    }
 }
 
 impl Callbacks for CommentThread {
@@ -137,8 +161,12 @@ impl Callbacks for CommentThread {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        let now = chrono::Utc::now();
+
         self.author_id = Some(data.current_user_id());
         self.id = Uuid::new_v4();
+        self.created_at = now;
+        self.updated_at = now;
 
         Ok(())
     }

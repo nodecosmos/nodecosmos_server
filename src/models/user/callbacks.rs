@@ -1,8 +1,8 @@
 use crate::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::traits::ElasticDocument;
 use crate::models::traits::SanitizeDescription;
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
-use crate::services::elastic::ElasticDocument;
 use crate::App;
 use charybdis::callbacks::Callbacks;
 use chrono::Utc;
@@ -62,7 +62,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
                 req_data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::models::node::UpdateProfileNode;
-                use crate::services::elastic::{ElasticDocument, ElasticIndex};
+                use crate::models::traits::{ElasticDocument, ElasticIndex};
 
                 self.update_elastic_document(req_data.elastic_client()).await;
 

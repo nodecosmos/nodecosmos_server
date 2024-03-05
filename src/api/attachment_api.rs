@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::attachment::Attachment;
 use crate::models::node::AuthNode;
-use crate::services::aws::s3::get_s3_presigned_url;
+use crate::models::traits::s3::S3;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
 use charybdis::operations::InsertWithCallbacks;
@@ -40,7 +40,7 @@ pub struct AttachmentParams {
 pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
     AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
 
-    let url = get_s3_presigned_url(&data.app, &params.filename).await?;
+    let url = Attachment::get_presigned_url(&data, &params.filename).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "url": url,
@@ -54,9 +54,7 @@ pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: Reque
 pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
     AuthNode::auth_update(&data, attachment.node_id, attachment.node_id).await?;
 
-    let url = Attachment::build_s3_url(data.s3_bucket().clone(), attachment.key.clone());
-
-    attachment.url = Some(url);
+    attachment.url = Some(attachment.s3_url(&data));
     attachment.user_id = Some(data.current_user_id());
 
     attachment.insert_cb(&None).execute(data.db_session()).await?;

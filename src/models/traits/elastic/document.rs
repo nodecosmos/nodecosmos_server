@@ -1,4 +1,4 @@
-use crate::services::elastic::ElasticIndex;
+use crate::models::traits::ElasticIndex;
 use charybdis::model::{AsNative, Model};
 use charybdis::types::Uuid;
 use colored::Colorize;

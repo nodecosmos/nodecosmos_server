@@ -1,8 +1,8 @@
 use crate::api::current_user::get_current_user;
 use crate::app::App;
+use crate::clients::resource_locker::ResourceLocker;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
-use crate::services::resource_locker::ResourceLocker;
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};

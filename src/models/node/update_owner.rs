@@ -4,7 +4,7 @@ use crate::models::materialized_views::nodes_by_owner::NodesByProfile;
 use crate::models::node::UpdateProfileNode;
 use crate::models::udts::{Profile, ProfileType};
 use crate::models::user::{FullName, User};
-use crate::services::elastic::ElasticDocument;
+use crate::models::traits::ElasticDocument;
 use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::types::Uuid;
 use futures::StreamExt;

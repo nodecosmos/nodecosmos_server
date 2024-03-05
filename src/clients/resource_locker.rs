@@ -194,7 +194,7 @@ impl ResourceLocker {
         Ok(())
     }
 
-    pub async fn validate_node_unlocked(&self, node: &Node, retry: bool) -> Result<(), NodecosmosError> {
+    pub async fn validate_node_root_unlocked(&self, node: &Node, retry: bool) -> Result<(), NodecosmosError> {
         if self.is_resource_locked(&node.root_id.to_string()).await? {
             if retry {
                 tokio::time::sleep(tokio::time::Duration::from_millis(Self::RETRY_LOCK_TIMEOUT)).await;
@@ -211,7 +211,7 @@ impl ResourceLocker {
         Ok(())
     }
 
-    pub async fn validate_action_unlocked(
+    pub async fn validate_node_root_action_unlocked(
         &self,
         node: &Node,
         action_type: ActionTypes,
