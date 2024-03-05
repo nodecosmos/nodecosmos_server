@@ -9,7 +9,6 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
 
 #[charybdis_model(
     table_name = flow_steps,

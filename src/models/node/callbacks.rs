@@ -149,7 +149,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 req_data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
-                use crate::models::traits::{ElasticDocument, ElasticIndex};
+                use crate::models::traits::ElasticDocument;
 
                 if self.id != self.branch_id {
                     return Ok(());

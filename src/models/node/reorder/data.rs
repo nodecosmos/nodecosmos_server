@@ -8,7 +8,6 @@ use crate::utils::cloned_ref::ClonedRef;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
-use log::info;
 use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};

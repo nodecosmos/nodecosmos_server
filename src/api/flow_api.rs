@@ -4,7 +4,6 @@ use crate::models::flow::{DescriptionFlow, Flow, UpdateTitleFlow};
 use crate::models::node::AuthNode;
 use crate::models::user::CurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::model::BaseModel;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
 

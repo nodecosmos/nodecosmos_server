@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
 use ammonia::clean;
-use charybdis::types::SmallInt;
 
 pub trait SanitizeDescription {
     fn sanitize(&mut self) -> Result<(), NodecosmosError>;

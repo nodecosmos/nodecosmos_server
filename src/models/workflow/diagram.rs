@@ -4,7 +4,6 @@ use crate::models::workflow::Workflow;
 use charybdis::types::Uuid;
 use futures::TryStreamExt;
 use scylla::CachingSession;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

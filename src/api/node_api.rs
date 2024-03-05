@@ -10,12 +10,10 @@ use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::options::Consistency;
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
-use std::time::Duration;
 
 #[get("")]
 pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Query<NodeSearchQuery>) -> Response {

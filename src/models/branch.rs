@@ -11,13 +11,11 @@ use crate::models::traits::{NodeId, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, Update};
+use charybdis::operations::Find;
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::fmt;
-use std::rc::Rc;
 
 pub enum BranchStatus {
     Open,

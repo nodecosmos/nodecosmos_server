@@ -1,8 +1,6 @@
 use crate::models::branch::Branch;
 use charybdis::batch::CharybdisModelBatch;
-use charybdis::model::Model;
 use charybdis::types::Uuid;
-use charybdis::SerializeRow;
 use log::error;
 
 pub fn append_statement_or_log_fatal(

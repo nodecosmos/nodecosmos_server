@@ -62,7 +62,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
                 req_data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::models::node::UpdateProfileNode;
-                use crate::models::traits::{ElasticDocument, ElasticIndex};
+                use crate::models::traits::ElasticDocument;
 
                 self.update_elastic_document(req_data.elastic_client()).await;
 

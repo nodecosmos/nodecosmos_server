@@ -1,5 +1,5 @@
 use charybdis::macros::charybdis_udt_model;
-use charybdis::types::{Double, Int, Uuid};
+use charybdis::types::{Double, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default, PartialEq)]

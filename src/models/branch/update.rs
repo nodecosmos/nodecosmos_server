@@ -20,6 +20,7 @@ use scylla::{CachingSession, QueryResult};
 pub enum BranchUpdate {
     CreateNode(Uuid),
     DeleteNode(Uuid),
+    UndoDeleteNode(Uuid),
     RestoreNode(Uuid),
     EditNodeTitle(Uuid),
     EditNodeDescription(Uuid),
@@ -92,6 +93,15 @@ impl Branch {
                 }
 
                 res = batch.execute(session).await;
+            }
+            BranchUpdate::UndoDeleteNode(id) => {
+                res = UpdateDeletedNodesBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .pull_deleted_nodes(&vec![id])
+                .execute(session)
+                .await;
             }
             BranchUpdate::RestoreNode(id) => {
                 let mut batch = CharybdisModelBatch::new();

@@ -1,5 +1,5 @@
 use crate::models::traits::ElasticIndex;
-use charybdis::model::{AsNative, Model};
+use charybdis::model::Model;
 use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::http::response::Response;

@@ -1,13 +1,10 @@
-use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::like::Like;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{AuthNode, GetDescriptionBase64Node, Node, UpdateDescriptionNode, UpdateTitleNode};
-use charybdis::operations::Find;
+use crate::models::node::{GetDescriptionBase64Node, Node, UpdateDescriptionNode, UpdateTitleNode};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 

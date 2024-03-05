@@ -8,7 +8,6 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
 use futures::StreamExt;
-use log::error;
 use serde::{Deserialize, Serialize};
 
 const MAX_IMAGE_WIDTH: u32 = 852;

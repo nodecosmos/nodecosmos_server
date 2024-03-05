@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
-use charybdis::batch::{CharybdisModelBatch, ModelBatch};
+use charybdis::batch::ModelBatch;
 use charybdis::operations::New;
 use charybdis::types::Uuid;
 use scylla::CachingSession;

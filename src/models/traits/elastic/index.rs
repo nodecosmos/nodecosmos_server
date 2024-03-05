@@ -2,13 +2,10 @@ use crate::models::node::{
     Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateProfileNode, UpdateTitleNode,
 };
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
-use charybdis::model::{AsNative, BaseModel, Model};
-use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesExistsParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
 use log::info;
-use serde::Serialize;
 use serde_json::{json, Value};
 
 pub trait ElasticIndex {

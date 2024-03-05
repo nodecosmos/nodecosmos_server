@@ -5,7 +5,7 @@ use crate::models::comment_thread::CommentThread;
 use crate::models::traits::Authorization;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{Delete, DeleteWithCallbacks, Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;

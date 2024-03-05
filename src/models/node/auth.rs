@@ -1,13 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::node::{AuthNode, Node};
+use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
 use crate::models::traits::Branchable;
 use charybdis::model::AsNative;
-use charybdis::operations::Find;
-use charybdis::types::{Set, Uuid};
-use log::error;
-use serde_json::json;
+use charybdis::types::Uuid;
 
 /// We use auth node so we query only fields that are needed for authorization.
 impl AuthNode {

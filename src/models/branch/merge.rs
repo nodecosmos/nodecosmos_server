@@ -1,5 +1,5 @@
 use crate::api::data::RequestData;
-use crate::api::types::{ActionObject, ActionTypes};
+use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{Branch, BranchStatus};
 use crate::models::node::context::Context;
@@ -8,7 +8,7 @@ use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
 use crate::models::traits::GroupById;
-use crate::models::udts::{Conflict, ConflictStatus, TextChange};
+use crate::models::udts::TextChange;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::file::read_file_names;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
@@ -16,11 +16,8 @@ use charybdis::types::Uuid;
 use log::{error, warn};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::create_dir_all;
-use std::future::Future;
-use std::hash::Hash;
 
 const RECOVERY_DATA_DIR: &str = "tmp/merge-recovery";
 const RECOVER_FILE_PREFIX: &str = "merge_recovery_data";

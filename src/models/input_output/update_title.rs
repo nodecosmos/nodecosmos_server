@@ -1,6 +1,6 @@
 use crate::errors::NodecosmosError;
-use crate::models::input_output::{Io, UpdateDescriptionIo, UpdateTitleIo};
-use charybdis::batch::{CharybdisModelBatch, ModelBatch};
+use crate::models::input_output::UpdateTitleIo;
+use charybdis::batch::ModelBatch;
 use scylla::CachingSession;
 
 impl UpdateTitleIo {

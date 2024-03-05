@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::node::UpdateLikesCountNode;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{execute, Find, UpdateWithCallbacks};
+use charybdis::operations::{Find, UpdateWithCallbacks};
 use charybdis::types::{Counter, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};

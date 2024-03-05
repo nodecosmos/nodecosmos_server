@@ -5,7 +5,7 @@ use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::utils::file::read_file_names;
-use charybdis::batch::{CharybdisModelBatch, ModelBatch};
+use charybdis::batch::ModelBatch;
 use charybdis::operations::Update;
 use log::{error, info, warn};
 use scylla::CachingSession;

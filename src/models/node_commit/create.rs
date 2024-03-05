@@ -7,14 +7,13 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendants_commit::NodeDescendantsCommit;
 use crate::models::node_tree_position_commit::NodeTreePositionCommit;
 use crate::models::traits::VersionedNodePluck;
-use charybdis::batch::{CharybdisModelBatch, ModelBatch};
+use charybdis::batch::ModelBatch;
 use charybdis::operations::Insert;
 use charybdis::types::{Double, Uuid};
 use chrono::Utc;
 use log::error;
 use scylla::CachingSession;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 pub struct TreePositionChange {
     pub parent_id: Option<Uuid>,

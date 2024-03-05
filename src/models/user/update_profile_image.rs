@@ -6,7 +6,6 @@ use crate::models::utils::Image;
 use actix_multipart::Multipart;
 use charybdis::operations::UpdateWithCallbacks;
 use futures::StreamExt;
-use log::error;
 
 const IMG_WIDTH: u32 = 296;
 const IMG_HEIGHT: u32 = 296;

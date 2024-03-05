@@ -1,7 +1,6 @@
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use charybdis::errors::CharybdisError;
-use colored::Colorize;
 use log::error;
 use serde_json::json;
 use std::error::Error;

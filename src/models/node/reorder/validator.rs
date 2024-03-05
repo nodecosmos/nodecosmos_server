@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::data::ReorderData;
-use log::error;
 
 const TREE_DESCENDANTS_LIMIT: usize = 150000;
 const REORDER_DESCENDANTS_LIMIT: usize = 15000;

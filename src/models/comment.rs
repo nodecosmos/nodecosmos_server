@@ -1,21 +1,12 @@
 pub mod callbacks;
 
-use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::comment_thread::CommentThread;
-use crate::models::contribution_request::ContributionRequest;
-use crate::models::node::context::Context;
 use crate::models::udts::Profile;
-use crate::models::utils::{impl_default_callbacks, updated_at_cb_fn};
-use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::model::AsNative;
-use charybdis::operations::Find;
-use charybdis::types::{Frozen, Int, SmallInt, Text, Timestamp, Uuid};
-use log::{error, warn};
+use charybdis::types::{Frozen, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[charybdis_model(
     table_name = comments,

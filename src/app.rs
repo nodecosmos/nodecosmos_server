@@ -12,12 +12,11 @@ use actix_session::storage::RedisActorSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{cookie, http, web};
-use deadpool_redis::{Config, Pool, Runtime};
-use elasticsearch::http::transport::Transport;
+use deadpool_redis::Pool;
 use elasticsearch::Elasticsearch;
-use scylla::{CachingSession, Session, SessionBuilder};
+use scylla::CachingSession;
 use std::sync::Arc;
-use std::{env, fs, time::Duration};
+use std::{env, fs};
 use toml::Value;
 
 #[derive(Clone)]

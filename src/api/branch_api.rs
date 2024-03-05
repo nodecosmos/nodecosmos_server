@@ -4,9 +4,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::traits::Authorization;
 use actix_web::{put, web, HttpResponse};
-use charybdis::operations::Find;
 use charybdis::types::Uuid;
-use scylla::CachingSession;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -29,6 +27,23 @@ pub async fn restore_node(data: RequestData, params: web::Json<RestoreNodeParams
         data.db_session(),
         params.branch_id,
         BranchUpdate::RestoreNode(params.node_id),
+    )
+    .await;
+
+    Ok(HttpResponse::Ok().json(branch))
+}
+
+#[put("/undo_delete_node")]
+pub async fn undo_delete_node(data: RequestData, params: web::Json<RestoreNodeParams>) -> Response {
+    let params = params.into_inner();
+    let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
+
+    branch.auth_update(&data).await?;
+
+    Branch::update(
+        data.db_session(),
+        params.branch_id,
+        BranchUpdate::UndoDeleteNode(params.node_id),
     )
     .await;
 

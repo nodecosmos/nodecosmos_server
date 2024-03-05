@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 mod api;
 mod app;
 mod clients;
@@ -8,15 +6,10 @@ mod errors;
 mod models;
 mod utils;
 
-use crate::models::node::Node;
 use actix_web::middleware::Logger;
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
 use app::App;
-use std::sync::Arc;
-use uuid::uuid;
-use yrs::updates::decoder::Decode;
-use yrs::{Doc, GetString, ReadTxn, Transact, Update};
 
 #[tokio::main]
 async fn main() {
@@ -24,15 +17,11 @@ async fn main() {
     let port = app.port();
 
     app.init().await;
-    let app_web_data = web::Data::new(app);
 
     // web data
+    let app_web_data = web::Data::new(app);
     let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
-    let elastic_client_web_data = web::Data::from(app_web_data.elastic_client.clone());
-    let s3_client_web_data = web::Data::from(app_web_data.s3_client.clone());
-    let redis_pool_web_data = web::Data::from(app_web_data.redis_pool.clone());
-    let resource_locker_web_data = web::Data::from(app_web_data.resource_locker.clone());
-    let desc_ws_conn_pool = web::Data::new(DescriptionWsConnectionPool::default());
+    let description_ws_pool_web_data = web::Data::new(DescriptionWsPool::default());
 
     HttpServer::new(move || {
         ActixWebApp::new()
@@ -41,11 +30,7 @@ async fn main() {
             .wrap(app_web_data.session_middleware())
             .app_data(app_web_data.clone())
             .app_data(db_session_web_data.clone())
-            .app_data(elastic_client_web_data.clone())
-            .app_data(redis_pool_web_data.clone())
-            .app_data(resource_locker_web_data.clone())
-            .app_data(s3_client_web_data.clone())
-            .app_data(desc_ws_conn_pool.clone())
+            .app_data(description_ws_pool_web_data.clone())
             .service(web::scope("/ws").service(description_ws))
             .service(
                 web::scope("/users")
@@ -133,7 +118,7 @@ async fn main() {
                     .service(get_presigned_url)
                     .service(create_attachment),
             )
-            .service(web::scope("branches").service(restore_node))
+            .service(web::scope("branches").service(restore_node).service(undo_delete_node))
             .service(
                 web::scope("comments")
                     .service(get_comments)

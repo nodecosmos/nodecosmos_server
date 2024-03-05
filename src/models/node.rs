@@ -18,7 +18,6 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::utils::defaults::default_to_0;
-use crate::utils::defaults::default_to_false;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
@@ -27,7 +26,6 @@ use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::path::Ancestors;
 
 #[charybdis_model(
     table_name = nodes,

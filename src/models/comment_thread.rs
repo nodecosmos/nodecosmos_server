@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::comment::{find_first_pk_comment, Comment, PkComment};
+use crate::models::comment::{find_first_pk_comment, PkComment};
 use crate::models::contribution_request::ContributionRequest;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;

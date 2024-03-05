@@ -8,7 +8,6 @@ use futures::TryFutureExt;
 use log::error;
 use scylla::CachingSession;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ReorderCommit<'a> {

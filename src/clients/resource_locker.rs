@@ -1,7 +1,7 @@
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
-use deadpool_redis::redis::{AsyncCommands, Connection};
+use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::{redis, Pool};
 
 const LOCK_NAMESPACE: &str = "LOCK";

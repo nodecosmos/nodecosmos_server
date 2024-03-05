@@ -6,7 +6,6 @@ use actix::prelude::*;
 use actix_web::{get, web, HttpRequest};
 use actix_web_actors::ws;
 use actix_web_actors::ws::WsResponseBuilder;
-use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use dashmap::DashMap;
 use serde::Deserialize;
@@ -15,14 +14,14 @@ use std::sync::Arc;
 type RoomId = Uuid;
 
 #[derive(Default)]
-pub struct DescriptionWsConnectionPool {
+pub struct DescriptionWsPool {
     pub connections: DashMap<RoomId, Vec<Addr<DescriptionWsConnection>>>,
 }
 
 #[derive(Clone)]
 pub struct DescriptionWsConnection {
     pub room_id: Uuid,
-    pub pool: Arc<DescriptionWsConnectionPool>,
+    pub pool: Arc<DescriptionWsPool>,
 }
 
 impl Actor for DescriptionWsConnection {
@@ -106,7 +105,7 @@ pub async fn description_ws(
     req: HttpRequest,
     stream: web::Payload,
     params: web::Path<PathParams>,
-    node_ws_desc_conn_pool: web::Data<DescriptionWsConnectionPool>,
+    node_ws_desc_conn_pool: web::Data<DescriptionWsPool>,
     data: RequestData,
 ) -> Response {
     let mut node = Node {
