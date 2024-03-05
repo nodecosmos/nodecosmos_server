@@ -12,7 +12,6 @@ macro_rules! impl_default_callbacks {
     };
 }
 
-#[allow(unused_imports)]
 pub(crate) use impl_default_callbacks;
 
 macro_rules! created_at_cb_fn {

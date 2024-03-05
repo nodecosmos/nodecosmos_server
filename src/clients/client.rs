@@ -11,6 +11,7 @@ use toml::Value;
 pub trait Client<'a> {
     type Cfg;
 
+    #[allow(opaque_hidden_inferred_bound)]
     async fn init_client(config: Self::Cfg) -> Self;
 }
 

@@ -10,10 +10,43 @@ pub struct Image {
 }
 
 impl Image {
+    async fn read_image_buffer(field: &mut actix_multipart::Field) -> Result<Vec<u8>, NodecosmosError> {
+        let mut buffer: Vec<u8> = Vec::new();
+        while let Some(chunk) = field.next().await {
+            let data = chunk.map_err(|e| {
+                NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e))
+            })?;
+            buffer.extend_from_slice(&data);
+        }
+        Ok(buffer)
+    }
+
+    fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
+        let image_format = image::guess_format(buffer)
+            .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e)))?;
+
+        if image_format != image::ImageFormat::Png && image_format != image::ImageFormat::Jpeg {
+            return Err(NodecosmosError::UnsupportedMediaType);
+        }
+
+        Ok(image_format)
+    }
+
+    fn decode_image(format: image::ImageFormat, buffer: Vec<u8>) -> Result<image::DynamicImage, NodecosmosError> {
+        if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg {
+            return Err(NodecosmosError::UnsupportedMediaType);
+        }
+
+        let img = image::load_from_memory(&buffer)
+            .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to decode image: {:?}", e)))?;
+
+        Ok(img)
+    }
+
     pub async fn from_field(field: &mut actix_multipart::Field) -> Result<Self, NodecosmosError> {
-        let buffer = read_image_buffer(field).await?;
-        let format = read_image_format(&buffer)?;
-        let image = decode_image(format, buffer)?;
+        let buffer = Self::read_image_buffer(field).await?;
+        let format = Self::read_image_format(&buffer)?;
+        let image = Self::decode_image(format, buffer)?;
         let width = image.width();
         let height = image.height();
 
@@ -66,36 +99,4 @@ impl Image {
 
         Ok(compressed)
     }
-}
-
-async fn read_image_buffer(field: &mut actix_multipart::Field) -> Result<Vec<u8>, NodecosmosError> {
-    let mut buffer: Vec<u8> = Vec::new();
-    while let Some(chunk) = field.next().await {
-        let data = chunk
-            .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to read multipart field: {:?}", e)))?;
-        buffer.extend_from_slice(&data);
-    }
-    Ok(buffer)
-}
-
-fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
-    let image_format = image::guess_format(buffer)
-        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e)))?;
-
-    if image_format != image::ImageFormat::Png && image_format != image::ImageFormat::Jpeg {
-        return Err(NodecosmosError::UnsupportedMediaType);
-    }
-
-    Ok(image_format)
-}
-
-fn decode_image(format: image::ImageFormat, buffer: Vec<u8>) -> Result<image::DynamicImage, NodecosmosError> {
-    if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg {
-        return Err(NodecosmosError::UnsupportedMediaType);
-    }
-
-    let img = image::load_from_memory(&buffer)
-        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to decode image: {:?}", e)))?;
-
-    Ok(img)
 }

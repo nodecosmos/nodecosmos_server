@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::attachment::image::Image;
 use crate::models::traits::s3::S3;
 use crate::models::user::UpdateProfileImageUser;
+use crate::models::utils::Image;
 use actix_multipart::Multipart;
 use charybdis::operations::UpdateWithCallbacks;
 use futures::StreamExt;

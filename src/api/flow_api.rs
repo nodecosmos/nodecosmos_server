@@ -23,8 +23,6 @@ pub async fn get_flow_description(
     _current_user: CurrentUser,
     flow: web::Path<DescriptionFlow>,
 ) -> Response {
-    println!("{:?}", flow.primary_key_values());
-
     let flow = flow.find_by_primary_key().execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(flow))

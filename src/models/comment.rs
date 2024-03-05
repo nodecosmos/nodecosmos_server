@@ -1,9 +1,10 @@
+pub mod callbacks;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::node::context::Context;
-use crate::models::traits::SanitizeDescription;
 use crate::models::udts::Profile;
 use crate::models::utils::{impl_default_callbacks, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
@@ -69,83 +70,8 @@ impl Comment {
     }
 }
 
-impl Callbacks for Comment {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-        let thread = self.thread(&data.db_session()).await?;
-
-        match thread {
-            Some(thread) => {
-                let object_id = thread.object_id;
-                let thread_id = thread.id;
-
-                self.object_id = object_id;
-                self.thread_id = thread_id;
-            }
-            None => {
-                error!("Thread not initialized");
-                return Err(NodecosmosError::NotFound("Thread not initialized".to_string()));
-            }
-        }
-
-        self.id = Uuid::new_v4();
-        self.author_id = Some(data.current_user_id());
-        self.author = Some(Profile::init_from_current_user(&data.current_user));
-        self.content.sanitize()?;
-        self.created_at = now;
-        self.updated_at = now;
-
-        Ok(())
-    }
-}
-
 partial_comment!(PkComment, object_id, thread_id, id);
 
 partial_comment!(UpdateContentComment, object_id, thread_id, id, content, updated_at);
 
-impl Callbacks for UpdateContentComment {
-    type Extension = Option<()>;
-    type Error = NodecosmosError;
-
-    async fn before_update(
-        &mut self,
-        _session: &CachingSession,
-        _ext: &Self::Extension,
-    ) -> Result<(), NodecosmosError> {
-        self.updated_at = chrono::Utc::now();
-
-        self.content.sanitize()?;
-
-        Ok(())
-    }
-}
-
 partial_comment!(DeleteComment, object_id, thread_id, id);
-
-impl Callbacks for DeleteComment {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn after_delete(&mut self, _session: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
-        let self_clone = self.clone();
-        let req_data = req_data.clone();
-
-        tokio::spawn(async move {
-            let thread = CommentThread::find_by_object_id_and_id(self_clone.object_id, self_clone.thread_id)
-                .execute(req_data.db_session())
-                .await;
-
-            match thread {
-                Ok(thread) => {
-                    thread.delete_if_no_comments(req_data.db_session()).await;
-                }
-                Err(e) => error!("Error while deleting comment: {}", e),
-            }
-        });
-
-        Ok(())
-    }
-}
