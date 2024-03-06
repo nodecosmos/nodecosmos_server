@@ -1,4 +1,6 @@
 use crate::api::data::RequestData;
+use crate::api::types::{ActionObject, ActionTypes};
+use crate::clients::sse_pool::ModelEvent;
 use crate::errors::NodecosmosError;
 use crate::models::comment::{Comment, DeleteComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
@@ -26,7 +28,7 @@ impl Callbacks for Comment {
                 self.thread_id = thread_id;
             }
             None => {
-                error!("Thread not initialized");
+                error!("[before_insert] Thread not initialized");
                 return Err(NodecosmosError::NotFound("Thread not initialized".to_string()));
             }
         }
@@ -37,6 +39,29 @@ impl Callbacks for Comment {
         self.content.sanitize()?;
         self.created_at = now;
         self.updated_at = now;
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        let thread = self.thread(&data.db_session()).await?;
+
+        match thread {
+            Some(thread) => {
+                let node_id = &thread.object_node_id.map_or(thread.object_id, |id| id);
+
+                let res = ModelEvent::new(&node_id, ActionTypes::Create(ActionObject::Comment), self)
+                    .send(data)
+                    .await;
+
+                if let Err(e) = res {
+                    error!("Error sending message to room {}: {}", node_id, e);
+                }
+            }
+            None => {
+                error!("[after_insert] Thread not initialized");
+            }
+        }
 
         Ok(())
     }

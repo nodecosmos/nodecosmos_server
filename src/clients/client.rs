@@ -1,4 +1,6 @@
+use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
+use crate::clients::sse_pool::SsePool;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
@@ -7,7 +9,7 @@ use std::time::Duration;
 use toml::Value;
 
 /// Client's should be alive during application runtime. It's usually related to external services like db clients,
-/// redis clients, elastic clients, etc.
+/// redis, elastic, etc.
 pub trait Client<'a> {
     type Cfg;
 
@@ -79,11 +81,26 @@ impl<'a> Client<'a> for aws_sdk_s3::Client {
     }
 }
 
-// TODO: it makes more sense to move this to models/traits as it's only non-external client
 impl<'a> Client<'a> for ResourceLocker {
     type Cfg = &'a Pool;
 
     async fn init_client(pool: &'a Pool) -> Self {
         ResourceLocker::new(pool)
+    }
+}
+
+impl<'a> Client<'a> for DescriptionWsPool {
+    type Cfg = ();
+
+    async fn init_client(_config: ()) -> Self {
+        DescriptionWsPool::default()
+    }
+}
+
+impl<'a> Client<'a> for SsePool {
+    type Cfg = ();
+
+    async fn init_client(_config: ()) -> Self {
+        SsePool::new()
     }
 }

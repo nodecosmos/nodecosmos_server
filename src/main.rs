@@ -21,7 +21,6 @@ async fn main() {
     // web data
     let app_web_data = web::Data::new(app);
     let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
-    let description_ws_pool_web_data = web::Data::new(DescriptionWsPool::default());
 
     HttpServer::new(move || {
         ActixWebApp::new()
@@ -30,7 +29,6 @@ async fn main() {
             .wrap(app_web_data.session_middleware())
             .app_data(app_web_data.clone())
             .app_data(db_session_web_data.clone())
-            .app_data(description_ws_pool_web_data.clone())
             .service(web::scope("/ws").service(description_ws))
             .service(
                 web::scope("/users")
@@ -59,7 +57,8 @@ async fn main() {
                     .service(get_node_description_base64)
                     .service(reorder_nodes)
                     .service(upload_cover_image)
-                    .service(delete_cover_image),
+                    .service(delete_cover_image)
+                    .service(listen_node_events),
             )
             .service(
                 web::scope("/likes")

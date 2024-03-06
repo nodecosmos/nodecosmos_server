@@ -50,6 +50,10 @@ impl Node {
 
     // we preserve branched as it may be used for comments
     pub async fn preserve_branched_if_original_exist(&mut self, request_data: &RequestData) {
+        if self.is_original() {
+            return;
+        };
+
         let original_res = Self::find_by_id_and_branch_id(self.id, self.id)
             .execute(request_data.db_session())
             .await;

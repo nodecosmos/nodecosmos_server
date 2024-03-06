@@ -1,5 +1,6 @@
 use crate::api::data::RequestData;
-use crate::api::types::Response;
+use crate::api::types::{ActionObject, ActionTypes, Response};
+use crate::clients::sse_pool::ModelEvent;
 use crate::models::comment::{Comment, DeleteComment, PkComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
 use crate::models::traits::Authorization;

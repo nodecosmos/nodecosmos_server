@@ -1,10 +1,12 @@
 use actix_web::http::StatusCode;
+use actix_web::web::Bytes;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use charybdis::errors::CharybdisError;
 use log::error;
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
+use tokio::sync::broadcast::error::SendError;
 
 #[derive(Debug)]
 pub enum RedisError {
@@ -57,6 +59,7 @@ pub enum NodecosmosError {
     FatalMergeError(String),
     InternalServerError(String),
     QuickXmlError(quick_xml::Error),
+    BroadcastError(SendError<Bytes>),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -86,6 +89,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
             NodecosmosError::QuickXmlError(e) => write!(f, "QuickXmlError Error: {}", e),
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
+            NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: \n{}", e),
         }
     }
 }
@@ -110,12 +114,7 @@ impl Error for NodecosmosError {
 impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            NodecosmosError::Unauthorized(_) => HttpResponse::Unauthorized().json({
-                json!({
-                    "status": 401,
-                    "message": "Unauthorized"
-                })
-            }),
+            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
             NodecosmosError::ValidationError((field, message)) => HttpResponse::BadRequest().json(json!({
                 "status": 403,
                 "message": {field: message}

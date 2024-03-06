@@ -44,7 +44,7 @@ pub struct Like {
     pub updated_at: Option<Timestamp>,
 
     #[serde(skip)]
-    #[charybdis(ignore)]
+    #[charybdis_model(ignore)]
     pub like_count: Option<i64>,
 }
 

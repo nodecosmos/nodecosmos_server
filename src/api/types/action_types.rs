@@ -30,6 +30,7 @@ pub enum ActionObject {
     Flow,
     FlowStep,
     Io,
+    Comment,
 }
 
 impl Display for ActionObject {
@@ -40,6 +41,7 @@ impl Display for ActionObject {
             ActionObject::Flow => write!(f, "FLOW"),
             ActionObject::FlowStep => write!(f, "FLOW_STEP"),
             ActionObject::Io => write!(f, "INPUT_OUTPUT"),
+            ActionObject::Comment => write!(f, "COMMENT"),
         }
     }
 }

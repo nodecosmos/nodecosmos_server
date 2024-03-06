@@ -63,15 +63,15 @@ pub struct FlowStep {
     pub updated_at: Option<Timestamp>,
 
     #[serde(skip)]
-    #[charybdis(ignore)]
+    #[charybdis_model(ignore)]
     pub workflow: Option<Workflow>,
 
     #[serde(skip)]
-    #[charybdis(ignore)]
+    #[charybdis_model(ignore)]
     pub prev_flow_step: Option<BaseFlowStep>,
 
     #[serde(skip)]
-    #[charybdis(ignore)]
+    #[charybdis_model(ignore)]
     pub next_flow_step: Option<BaseFlowStep>,
 }
 

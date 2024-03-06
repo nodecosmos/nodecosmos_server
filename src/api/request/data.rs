@@ -1,6 +1,8 @@
 use crate::api::current_user::get_current_user;
 use crate::app::App;
+use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
+use crate::clients::sse_pool::SsePool;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
 use actix_session::SessionExt;
@@ -11,6 +13,7 @@ use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
 use std::future::{ready, Ready};
+use std::sync::Arc;
 
 /// It contains the data that is required by node API endpoints and node callbacks.
 #[derive(Clone)]
@@ -38,6 +41,14 @@ impl RequestData {
 
     pub fn resource_locker(&self) -> &ResourceLocker {
         &self.app.resource_locker
+    }
+
+    pub fn description_ws_pool(&self) -> Arc<DescriptionWsPool> {
+        self.app.description_ws_pool.clone()
+    }
+
+    pub fn sse_pool(&self) -> Arc<SsePool> {
+        self.app.sse_pool.clone()
     }
 
     pub fn current_user_id(&self) -> Uuid {

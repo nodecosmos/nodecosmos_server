@@ -3,6 +3,7 @@ use crate::models::user::{CurrentUser, User};
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
+use log::error;
 use scylla::CachingSession;
 use serde_json::json;
 use std::future::{ready, Ready};
@@ -17,7 +18,7 @@ impl FromRequest for CurrentUser {
             Some(user) => ready(Ok(user)),
             None => {
                 let error_response = NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized! You must be logged in to perform this action",
+                    "error": "Unauthorized!",
                     "message": "You must be logged in to perform this action!"
                 }));
                 ready(Err(error_response))
@@ -54,9 +55,11 @@ pub fn set_current_user(client_session: &Session, user: &User) -> Result<Current
         profile_image_url: user.profile_image_url.clone(),
     };
 
-    client_session
-        .insert("current_user", &current_user)
-        .map_err(|e| NodecosmosError::ClientSessionError(format!("Could not set current user. {}", e)))?;
+    client_session.insert("current_user", &current_user).map_err(|e| {
+        error!("Could not set current user. {}", e);
+
+        NodecosmosError::ClientSessionError("Could not set current user.".to_string())
+    })?;
 
     Ok(current_user)
 }
@@ -64,7 +67,7 @@ pub fn set_current_user(client_session: &Session, user: &User) -> Result<Current
 pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
     let current_user = client_session
         .get::<CurrentUser>("current_user")
-        .map_err(|e| NodecosmosError::ClientSessionError(format!("Could not get current user. {}", e)));
+        .map_err(|e| error!("Could not get current user. {}", e));
 
     match current_user {
         Ok(Some(user)) => {
@@ -90,7 +93,7 @@ pub async fn refresh_current_user(
             set_current_user(&client_session, &user)
         }
         None => Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized! You must be logged in to perform this action",
+            "error": "Unauthorized!",
             "message": "You must be logged in to perform this action!"
         }))),
     }

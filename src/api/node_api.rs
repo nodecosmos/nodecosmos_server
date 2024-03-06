@@ -11,13 +11,13 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
+use tokio_stream::wrappers::BroadcastStream;
 
 #[get("")]
-pub async fn get_nodes(elastic_client: web::Data<Elasticsearch>, query: web::Query<NodeSearchQuery>) -> Response {
-    let nodes = NodeSearch::new(&elastic_client, &query).index().await?;
+pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) -> Response {
+    let nodes = NodeSearch::new(&app.elastic_client, &query).index().await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 
@@ -196,4 +196,13 @@ async fn delete_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
     node.delete_cover_image(&data).await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+#[get("/{id}/events/listen")]
+pub async fn listen_node_events(id: web::Path<Uuid>, data: RequestData) -> Response {
+    let sender = data.sse_pool().get_or_create_room(id.into_inner());
+    let receiver = sender.subscribe();
+    let stream = BroadcastStream::new(receiver);
+
+    Ok(HttpResponse::Ok().content_type("text/event-stream").streaming(stream))
 }

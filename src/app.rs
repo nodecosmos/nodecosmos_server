@@ -1,6 +1,8 @@
 use crate::api::data::RequestData;
 use crate::clients::client::Client;
+use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
+use crate::clients::sse_pool::SsePool;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::node::reorder::Recovery;
 use crate::models::node::Node;
@@ -25,9 +27,11 @@ pub struct App {
     pub db_session: Arc<CachingSession>,
     pub elastic_client: Arc<Elasticsearch>,
     pub redis_pool: Arc<Pool>,
-    pub resource_locker: Arc<ResourceLocker>,
     pub s3_bucket: String,
     pub s3_client: Arc<aws_sdk_s3::Client>,
+    pub resource_locker: Arc<ResourceLocker>,
+    pub description_ws_pool: Arc<DescriptionWsPool>,
+    pub sse_pool: Arc<SsePool>,
 }
 
 impl App {
@@ -44,16 +48,22 @@ impl App {
         let db_session = CachingSession::init_client(&config).await;
         let elastic_client = Elasticsearch::init_client(&config).await;
         let redis_pool = Pool::init_client(&config).await;
+
+        // app data
         let resource_locker = ResourceLocker::init_client(&redis_pool).await;
+        let description_ws_pool = Arc::new(DescriptionWsPool::init_client(()).await);
+        let sse_pool = Arc::new(SsePool::init_client(()).await);
 
         Self {
             config,
             db_session: Arc::new(db_session),
             elastic_client: Arc::new(elastic_client),
-            resource_locker: Arc::new(resource_locker),
             redis_pool: Arc::new(redis_pool),
             s3_bucket,
             s3_client: Arc::new(s3_client),
+            resource_locker: Arc::new(resource_locker),
+            description_ws_pool,
+            sse_pool,
         }
     }
 
@@ -112,7 +122,7 @@ impl App {
 
         SessionMiddleware::builder(redis_actor_session_store, secret_key)
             .session_lifecycle(ttl)
-            .cookie_secure(false)
+            .cookie_secure(self.config["ssl"].as_bool().expect("Missing ssl"))
             .build()
     }
 
