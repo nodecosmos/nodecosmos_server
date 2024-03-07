@@ -30,7 +30,7 @@ impl UpdateCoverImageNode {
             }
 
             // assign s3 key before url generation & upload
-            self.cover_image_filename = Some(self.build_s3_key());
+            self.cover_image_filename = Some(self.build_s3_key("cover", "jpg"));
             self.cover_image_url = Some(self.s3_url(data));
 
             self.upload_s3_object(data, compressed).await?;

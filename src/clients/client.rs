@@ -1,6 +1,7 @@
 use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_pool::SsePool;
+use crate::clients::sse_broadcast::SseBroadcast;
+use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
@@ -73,7 +74,7 @@ impl<'a> Client<'a> for aws_sdk_s3::Client {
     type Cfg = ();
 
     async fn init_client(_config: ()) -> Self {
-        let config = aws_config::from_env().load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
 
         let client = aws_sdk_s3::Client::new(&config);
 
@@ -97,10 +98,10 @@ impl<'a> Client<'a> for DescriptionWsPool {
     }
 }
 
-impl<'a> Client<'a> for SsePool {
+impl<'a> Client<'a> for SseBroadcast {
     type Cfg = ();
 
     async fn init_client(_config: ()) -> Self {
-        SsePool::new()
+        SseBroadcast::new()
     }
 }

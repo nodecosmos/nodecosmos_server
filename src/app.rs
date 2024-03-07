@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::clients::client::Client;
 use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_pool::SsePool;
+use crate::clients::sse_broadcast::SseBroadcast;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::node::reorder::Recovery;
 use crate::models::node::Node;
@@ -31,7 +31,7 @@ pub struct App {
     pub s3_client: Arc<aws_sdk_s3::Client>,
     pub resource_locker: Arc<ResourceLocker>,
     pub description_ws_pool: Arc<DescriptionWsPool>,
-    pub sse_pool: Arc<SsePool>,
+    pub sse_pool: Arc<SseBroadcast>,
 }
 
 impl App {
@@ -52,7 +52,7 @@ impl App {
         // app data
         let resource_locker = ResourceLocker::init_client(&redis_pool).await;
         let description_ws_pool = Arc::new(DescriptionWsPool::init_client(()).await);
-        let sse_pool = Arc::new(SsePool::init_client(()).await);
+        let sse_pool = Arc::new(SseBroadcast::init_client(()).await);
 
         Self {
             config,

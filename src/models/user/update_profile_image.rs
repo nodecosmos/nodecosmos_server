@@ -30,7 +30,7 @@ impl UpdateProfileImageUser {
             }
 
             // assign s3 key before url generation & upload
-            self.profile_image_filename = Some(self.build_s3_key());
+            self.profile_image_filename = Some(self.build_s3_key("profile", "jpg"));
             self.profile_image_url = Some(self.s3_url(data));
 
             self.upload_s3_object(data, compressed).await?;

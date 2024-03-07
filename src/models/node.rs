@@ -104,15 +104,15 @@ pub struct Node {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub parent: Option<BaseNode>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub auth_branch: Option<AuthBranch>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub ctx: Context,
 }

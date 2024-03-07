@@ -88,12 +88,14 @@ pub async fn get_node_description_base64(
             .await;
 
         if let Ok(mut original) = original {
-            original.description_base64 = node.description_base64;
-            original.merge_description(&db_session).await?;
+            if node.description != original.description {
+                original.description_base64 = node.description_base64;
+                original.merge_description(&db_session).await?;
 
-            node.description = original.description;
-            node.description_markdown = original.description_markdown;
-            node.description_base64 = original.description_base64;
+                node.description = original.description;
+                node.description_markdown = original.description_markdown;
+                node.description_base64 = original.description_base64;
+            }
         }
     }
 

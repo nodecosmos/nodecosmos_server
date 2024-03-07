@@ -69,15 +69,15 @@ pub struct Io {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub flow_step: Option<FlowStep>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub workflow: Option<Workflow>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub node: Option<Node>,
 }

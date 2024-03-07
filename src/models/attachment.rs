@@ -70,7 +70,7 @@ impl Attachment {
             attachment.user_id = Some(data.current_user.id);
 
             // assign s3 key before url generation & upload
-            attachment.key = attachment.build_s3_key();
+            attachment.key = attachment.build_s3_key("attachment", "jpg");
             attachment.url = Some(attachment.s3_url(data));
 
             attachment.upload_s3_object(data, compressed).await?;

@@ -2,7 +2,7 @@ use crate::api::current_user::get_current_user;
 use crate::app::App;
 use crate::clients::description_ws_pool::DescriptionWsPool;
 use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_pool::SsePool;
+use crate::clients::sse_broadcast::SseBroadcast;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
 use actix_session::SessionExt;
@@ -47,7 +47,7 @@ impl RequestData {
         self.app.description_ws_pool.clone()
     }
 
-    pub fn sse_pool(&self) -> Arc<SsePool> {
+    pub fn sse_pool(&self) -> Arc<SseBroadcast> {
         self.app.sse_pool.clone()
     }
 

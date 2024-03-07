@@ -11,13 +11,13 @@ use log::error;
 use serde::Serialize;
 use tokio::sync::broadcast;
 
-pub struct SsePool {
+pub struct SseBroadcast {
     node_senders: DashMap<Uuid, broadcast::Sender<Bytes>>,
 }
 
-impl SsePool {
+impl SseBroadcast {
     pub fn new() -> Self {
-        SsePool {
+        SseBroadcast {
             node_senders: DashMap::new(),
         }
     }
@@ -34,7 +34,6 @@ impl SsePool {
         Ok(())
     }
 
-    // Get or create a room's broadcast channel
     pub fn get_or_create_room(&self, node_id: Uuid) -> broadcast::Sender<Bytes> {
         let sender = self
             .node_senders

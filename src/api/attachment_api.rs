@@ -40,7 +40,7 @@ pub struct AttachmentParams {
 pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
     AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
 
-    let url = Attachment::get_presigned_url(&data, &params.filename).await?;
+    let url = Attachment::get_presigned_url(&data, &params.object_id, &params.filename).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "url": url,
@@ -54,7 +54,6 @@ pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: Reque
 pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
     AuthNode::auth_update(&data, attachment.node_id, attachment.node_id).await?;
 
-    attachment.url = Some(attachment.s3_url(&data));
     attachment.user_id = Some(data.current_user_id());
 
     attachment.insert_cb(&None).execute(data.db_session()).await?;

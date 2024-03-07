@@ -1,5 +1,5 @@
 use crate::errors::NodecosmosError;
-use ammonia::clean;
+use ammonia::{clean, Builder};
 
 pub trait SanitizeDescription {
     fn sanitize(&mut self) -> Result<(), NodecosmosError>;
@@ -14,7 +14,14 @@ impl SanitizeDescription for Option<String> {
                 ));
             }
 
-            *self = Some(clean(description));
+            let mut sanitizer = Builder::default();
+            sanitizer
+                .add_tag_attributes("img", &["resizable"])
+                .add_tag_attributes("code", &["spellcheck"]);
+
+            let sanitized = sanitizer.clean(description);
+
+            *self = Some(sanitized.to_string());
         }
 
         Ok(())

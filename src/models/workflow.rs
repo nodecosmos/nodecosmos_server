@@ -61,11 +61,11 @@ pub struct Workflow {
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub diagram: Option<WorkflowDiagram>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub node: Option<Node>,
 }

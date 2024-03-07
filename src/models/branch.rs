@@ -164,35 +164,35 @@ pub struct Branch {
     pub title_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub node: Option<Node>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _created_nodes: Option<Vec<Node>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _restored_nodes: Option<Vec<Node>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _deleted_nodes: Option<Vec<Node>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _original_title_nodes: Option<Vec<UpdateTitleNode>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _edited_title_nodes: Option<Vec<UpdateTitleNode>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _original_description_nodes: Option<Vec<UpdateDescriptionNode>>,
 
     #[serde(skip)]
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     pub _edited_description_nodes: Option<Vec<UpdateDescriptionNode>>,
 }
 

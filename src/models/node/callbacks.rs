@@ -70,12 +70,12 @@ impl Callbacks for UpdateDescriptionNode {
 
     async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.preserve_for_branch(&data).await?;
-        self.description.sanitize()?;
 
         if &self.ctx != &Context::MergeRecovery {
             self.merge_description(&db_session).await?;
         }
 
+        self.description.sanitize()?;
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())

@@ -78,11 +78,11 @@ pub struct ContributionRequest {
 
     pub owner: Option<Frozen<Profile>>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub branch: Rc<RefCell<Option<Branch>>>,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub node: Option<Node>,
 }

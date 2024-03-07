@@ -38,7 +38,7 @@ pub struct Comment {
     #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
-    #[charybdis_model(ignore)]
+    #[charybdis(ignore)]
     #[serde(skip)]
     pub thread: Option<CommentThread>,
 }

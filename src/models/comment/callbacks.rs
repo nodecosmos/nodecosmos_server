@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::clients::sse_pool::ModelEvent;
+use crate::clients::sse_broadcast::ModelEvent;
 use crate::errors::NodecosmosError;
 use crate::models::comment::{Comment, DeleteComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
