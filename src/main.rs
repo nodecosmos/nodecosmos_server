@@ -1,9 +1,9 @@
 mod api;
 mod app;
-mod clients;
 mod constants;
 mod errors;
 mod models;
+mod resources;
 mod utils;
 
 use actix_web::middleware::Logger;

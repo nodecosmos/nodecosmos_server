@@ -1,4 +1,4 @@
-use crate::api::current_user::{get_current_user, refresh_current_user, set_current_user};
+use crate::api::current_user::{refresh_current_user, set_current_user, OptCurrentUser};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
@@ -52,12 +52,10 @@ pub async fn login(
 }
 
 #[get("/session/sync")]
-pub async fn sync(client_session: Session) -> Response {
-    let current_user = get_current_user(&client_session);
-
-    match current_user {
+pub async fn sync(current_user: OptCurrentUser) -> Response {
+    match current_user.0 {
         Some(current_user) => Ok(HttpResponse::Ok().json(current_user)),
-        None => Ok(HttpResponse::Ok().json(json!({"success": false}))),
+        None => Ok(HttpResponse::Ok().finish()),
     }
 }
 

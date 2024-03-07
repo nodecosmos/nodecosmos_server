@@ -1,11 +1,11 @@
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::clients::sse_broadcast::ModelEvent;
 use crate::errors::NodecosmosError;
 use crate::models::comment::{Comment, DeleteComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
 use crate::models::traits::SanitizeDescription;
 use crate::models::udts::Profile;
+use crate::resources::sse_broadcast::ModelEvent;
 use charybdis::callbacks::Callbacks;
 use charybdis::types::Uuid;
 use log::error;

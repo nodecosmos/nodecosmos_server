@@ -4,7 +4,6 @@ mod validator;
 
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
-use crate::clients::resource_locker::ResourceLocker;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -15,6 +14,7 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
+use crate::resources::resource_locker::ResourceLocker;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{execute, Update};
 use charybdis::options::Consistency;

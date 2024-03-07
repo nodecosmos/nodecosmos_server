@@ -1,10 +1,10 @@
 use crate::api::current_user::get_current_user;
 use crate::app::App;
-use crate::clients::description_ws_pool::DescriptionWsPool;
-use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_broadcast::SseBroadcast;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
@@ -23,6 +23,10 @@ pub struct RequestData {
 }
 
 impl RequestData {
+    pub fn new(app: web::Data<App>, current_user: CurrentUser) -> Self {
+        Self { app, current_user }
+    }
+
     pub fn db_session(&self) -> &CachingSession {
         &self.app.db_session
     }
@@ -47,18 +51,12 @@ impl RequestData {
         self.app.description_ws_pool.clone()
     }
 
-    pub fn sse_pool(&self) -> Arc<SseBroadcast> {
-        self.app.sse_pool.clone()
+    pub fn sse_broadcast(&self) -> Arc<SseBroadcast> {
+        self.app.sse_broadcast.clone()
     }
 
     pub fn current_user_id(&self) -> Uuid {
         self.current_user.id
-    }
-}
-
-impl RequestData {
-    pub fn new(app: web::Data<App>, current_user: CurrentUser) -> Self {
-        Self { app, current_user }
     }
 }
 

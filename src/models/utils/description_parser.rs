@@ -54,12 +54,12 @@ pub struct DescriptionXmlParser<'a> {
     pub short_description: String,
     reader: Reader<&'a [u8]>,
     heading_level: String,
-    current_href: String,
     ordered_list_counter: u32,
     paragraph_active: bool,
     ordered_list_active: bool,
     bullet_list_active: bool,
     blockquote_active: bool,
+    code_block_active: bool,
     current_text: Cow<'a, str>,
 }
 
@@ -78,12 +78,12 @@ impl<'a> DescriptionXmlParser<'a> {
             short_description: String::new(),
             reader,
             heading_level: String::new(),
-            current_href: String::new(),
             ordered_list_counter: 1,
             paragraph_active: false,
             ordered_list_active: false,
             bullet_list_active: false,
             blockquote_active: false,
+            code_block_active: false,
             current_text: Cow::Borrowed(""),
         }
     }
@@ -221,8 +221,11 @@ impl<'a> DescriptionXmlParser<'a> {
     }
 
     fn open_code_block(&mut self) {
-        self.html.push_str("<pre>");
+        self.html
+            .push_str("<pre spellcheck=\"false\" class=\"language-markup\"><code data-code-block-language=\"markup\">");
         self.markdown.push_str("```markup\n");
+
+        self.code_block_active = true;
     }
 
     fn open_image(&mut self, event: &quick_xml::events::BytesStart) {
@@ -258,9 +261,11 @@ impl<'a> DescriptionXmlParser<'a> {
                     .map(|a| a.decode_and_unescape_value(&self.reader).unwrap())
             })
             .unwrap_or_default();
-        self.html.push_str(&format!("<a href=\"{}\" target = _blank>", href));
-        self.markdown.push_str("[");
-        self.current_href = href.to_string();
+
+        let link = &format!("<a href=\"{}\">", href);
+
+        self.html.push_str(link);
+        self.markdown.push_str(link);
     }
 
     fn open_hard_break(&mut self) {
@@ -311,6 +316,7 @@ impl<'a> DescriptionXmlParser<'a> {
         }
 
         self.current_text = Cow::Borrowed("");
+
         self.paragraph_active = false;
     }
 
@@ -342,6 +348,7 @@ impl<'a> DescriptionXmlParser<'a> {
     fn close_bullet_list(&mut self) {
         self.html.push_str("</ul>");
         self.markdown.push_str("\n");
+
         self.bullet_list_active = false;
     }
 
@@ -354,14 +361,17 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_blockquote(&mut self) {
         self.html.push_str("</blockquote>");
-        self.blockquote_active = false;
         self.markdown.push_str("\n");
+
+        self.blockquote_active = false;
     }
 
     fn close_code_block(&mut self) {
-        self.html.push_str("</pre>");
+        self.html.push_str("</code></pre>");
         self.markdown.push_str("\n```");
         self.markdown.push_str("\n\n");
+
+        self.code_block_active = false;
     }
 
     fn close_image(&mut self) {
@@ -370,7 +380,6 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_link(&mut self) {
         self.html.push_str("</a>");
-        self.markdown.push_str(&format!("]({})", self.current_href));
-        self.current_href = String::new();
+        self.markdown.push_str("</a>");
     }
 }

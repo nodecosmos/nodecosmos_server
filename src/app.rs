@@ -1,13 +1,13 @@
 use crate::api::data::RequestData;
-use crate::clients::client::Client;
-use crate::clients::description_ws_pool::DescriptionWsPool;
-use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_broadcast::SseBroadcast;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::node::reorder::Recovery;
 use crate::models::node::Node;
 use crate::models::traits::BuildIndex;
 use crate::models::user::User;
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource::Resource;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
 use actix_session::storage::RedisActorSessionStore;
@@ -31,7 +31,7 @@ pub struct App {
     pub s3_client: Arc<aws_sdk_s3::Client>,
     pub resource_locker: Arc<ResourceLocker>,
     pub description_ws_pool: Arc<DescriptionWsPool>,
-    pub sse_pool: Arc<SseBroadcast>,
+    pub sse_broadcast: Arc<SseBroadcast>,
 }
 
 impl App {
@@ -44,15 +44,15 @@ impl App {
         let config = contents.parse::<Value>().expect("Unable to parse TOML");
         let s3_bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
 
-        let s3_client = aws_sdk_s3::Client::init_client(()).await;
-        let db_session = CachingSession::init_client(&config).await;
-        let elastic_client = Elasticsearch::init_client(&config).await;
-        let redis_pool = Pool::init_client(&config).await;
+        let s3_client = aws_sdk_s3::Client::init_resource(()).await;
+        let db_session = CachingSession::init_resource(&config).await;
+        let elastic_client = Elasticsearch::init_resource(&config).await;
+        let redis_pool = Pool::init_resource(&config).await;
 
         // app data
-        let resource_locker = ResourceLocker::init_client(&redis_pool).await;
-        let description_ws_pool = Arc::new(DescriptionWsPool::init_client(()).await);
-        let sse_pool = Arc::new(SseBroadcast::init_client(()).await);
+        let resource_locker = ResourceLocker::init_resource(&redis_pool).await;
+        let description_ws_pool = Arc::new(DescriptionWsPool::init_resource(()).await);
+        let sse_broadcast = Arc::new(SseBroadcast::init_resource(()).await);
 
         Self {
             config,
@@ -63,7 +63,7 @@ impl App {
             s3_client: Arc::new(s3_client),
             resource_locker: Arc::new(resource_locker),
             description_ws_pool,
-            sse_pool,
+            sse_broadcast,
         }
     }
 

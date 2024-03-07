@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::clients::description_ws_pool::DescriptionWsConnection;
 use crate::models::node::Node;
 use crate::models::traits::Authorization;
+use crate::resources::description_ws_pool::DescriptionWsConnection;
 use actix_web::{get, web, HttpRequest};
 use actix_web_actors::ws::WsResponseBuilder;
 use charybdis::types::Uuid;

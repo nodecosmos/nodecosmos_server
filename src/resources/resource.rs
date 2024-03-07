@@ -1,6 +1,6 @@
-use crate::clients::description_ws_pool::DescriptionWsPool;
-use crate::clients::resource_locker::ResourceLocker;
-use crate::clients::sse_broadcast::SseBroadcast;
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
@@ -9,19 +9,19 @@ use scylla::{CachingSession, Session, SessionBuilder};
 use std::time::Duration;
 use toml::Value;
 
-/// Client's should be alive during application runtime. It's usually related to external services like db clients,
+/// Resource's should be alive during application runtime. It's usually related to external services like db clients,
 /// redis, elastic, etc.
-pub trait Client<'a> {
+pub trait Resource<'a> {
     type Cfg;
 
     #[allow(opaque_hidden_inferred_bound)]
-    async fn init_client(config: Self::Cfg) -> Self;
+    async fn init_resource(config: Self::Cfg) -> Self;
 }
 
-impl<'a> Client<'a> for CachingSession {
+impl<'a> Resource<'a> for CachingSession {
     type Cfg = &'a Value;
 
-    async fn init_client(config: Self::Cfg) -> Self {
+    async fn init_resource(config: Self::Cfg) -> Self {
         let hosts = config["scylla"]["hosts"].as_array().expect("Missing hosts");
 
         let keyspace = config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
@@ -40,10 +40,10 @@ impl<'a> Client<'a> for CachingSession {
     }
 }
 
-impl<'a> Client<'a> for Elasticsearch {
+impl<'a> Resource<'a> for Elasticsearch {
     type Cfg = &'a Value;
 
-    async fn init_client(config: Self::Cfg) -> Self {
+    async fn init_resource(config: Self::Cfg) -> Self {
         let host = config["elasticsearch"]["host"].as_str().expect("Missing elastic host");
 
         let transport = Transport::single_node(host).unwrap_or_else(|e| {
@@ -57,10 +57,10 @@ impl<'a> Client<'a> for Elasticsearch {
     }
 }
 
-impl<'a> Client<'a> for Pool {
+impl<'a> Resource<'a> for Pool {
     type Cfg = &'a Value;
 
-    async fn init_client(config: Self::Cfg) -> Self {
+    async fn init_resource(config: Self::Cfg) -> Self {
         let redis_url = config["redis"]["url"].as_str().expect("Missing redis url");
 
         let cfg = deadpool_redis::Config::from_url(redis_url);
@@ -70,10 +70,10 @@ impl<'a> Client<'a> for Pool {
     }
 }
 
-impl<'a> Client<'a> for aws_sdk_s3::Client {
+impl<'a> Resource<'a> for aws_sdk_s3::Client {
     type Cfg = ();
 
-    async fn init_client(_config: ()) -> Self {
+    async fn init_resource(_config: ()) -> Self {
         let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
 
         let client = aws_sdk_s3::Client::new(&config);
@@ -82,26 +82,40 @@ impl<'a> Client<'a> for aws_sdk_s3::Client {
     }
 }
 
-impl<'a> Client<'a> for ResourceLocker {
+impl<'a> Resource<'a> for ammonia::Builder<'a> {
+    type Cfg = ();
+
+    async fn init_resource(_cfg: ()) -> Self {
+        let mut sanitizer = ammonia::Builder::default();
+        sanitizer
+            .add_tag_attributes("img", &["resizable"])
+            .add_tag_attributes("pre", &["spellcheck"])
+            .add_tag_attributes("code", &["spellcheck", "data-code-block-language", "spellcheck"]);
+
+        sanitizer
+    }
+}
+
+impl<'a> Resource<'a> for ResourceLocker {
     type Cfg = &'a Pool;
 
-    async fn init_client(pool: &'a Pool) -> Self {
+    async fn init_resource(pool: &'a Pool) -> Self {
         ResourceLocker::new(pool)
     }
 }
 
-impl<'a> Client<'a> for DescriptionWsPool {
+impl<'a> Resource<'a> for DescriptionWsPool {
     type Cfg = ();
 
-    async fn init_client(_config: ()) -> Self {
+    async fn init_resource(_config: ()) -> Self {
         DescriptionWsPool::default()
     }
 }
 
-impl<'a> Client<'a> for SseBroadcast {
+impl<'a> Resource<'a> for SseBroadcast {
     type Cfg = ();
 
-    async fn init_client(_config: ()) -> Self {
+    async fn init_resource(_config: ()) -> Self {
         SseBroadcast::new()
     }
 }

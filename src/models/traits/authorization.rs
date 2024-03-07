@@ -1,5 +1,5 @@
-use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
+use crate::api::request::current_user::OptCurrentUser;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{AuthBranch, Branch, BranchStatus};

@@ -14,10 +14,16 @@ impl SanitizeDescription for Option<String> {
                 ));
             }
 
+            // TODO: move this to resources
             let mut sanitizer = Builder::default();
+
             sanitizer
                 .add_tag_attributes("img", &["resizable"])
-                .add_tag_attributes("code", &["spellcheck"]);
+                .add_tag_attributes("pre", &["spellcheck", "class"])
+                .add_tag_attributes("code", &["spellcheck", "data-code-block-language"])
+                .set_tag_attribute_value("a", "rel", "noopener noreferrer nofollow")
+                .set_tag_attribute_value("a", "target", "_blank")
+                .link_rel(None);
 
             let sanitized = sanitizer.clean(description);
 

@@ -202,7 +202,7 @@ async fn delete_cover_image(node: web::Path<UpdateCoverImageNode>, data: Request
 
 #[get("/{id}/events/listen")]
 pub async fn listen_node_events(id: web::Path<Uuid>, data: RequestData) -> Response {
-    let sender = data.sse_pool().get_or_create_room(id.into_inner());
+    let sender = data.sse_broadcast().get_or_create_room(id.into_inner());
     let receiver = sender.subscribe();
     let stream = BroadcastStream::new(receiver);
 
