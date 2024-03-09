@@ -44,7 +44,8 @@ pub async fn get_thread_comments(db_session: web::Data<CachingSession>, pk: web:
 
 #[derive(Deserialize)]
 pub struct CreateCommentPayload {
-    pub thread: Option<CommentThread>,
+    #[serde(rename = "newThread")]
+    pub new_thread: Option<CommentThread>,
     pub comment: Comment,
 }
 
@@ -53,7 +54,7 @@ pub async fn create_comment(data: RequestData, payload: web::Json<CreateCommentP
     let payload = payload.into_inner();
     let mut comment = payload.comment;
 
-    if let Some(mut thread) = payload.thread {
+    if let Some(mut thread) = payload.new_thread {
         thread.auth_creation(&data).await?;
         thread.insert_cb(&data).execute(data.db_session()).await?;
         comment.assign_thread(thread.clone());

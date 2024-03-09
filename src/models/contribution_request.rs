@@ -61,9 +61,6 @@ pub struct ContributionRequest {
     pub title: Option<Text>,
     pub description: Option<Text>,
 
-    #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Option<Text>,
-
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
@@ -141,6 +138,5 @@ partial_contribution_request!(
     node_id,
     id,
     description,
-    description_markdown,
     updated_at
 );

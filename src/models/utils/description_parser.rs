@@ -60,7 +60,6 @@ pub struct DescriptionXmlParser<'a> {
     bullet_list_active: bool,
     blockquote_active: bool,
     code_block_active: bool,
-    current_text: Cow<'a, str>,
 }
 
 // this implementation should have method for each event
@@ -84,7 +83,6 @@ impl<'a> DescriptionXmlParser<'a> {
             bullet_list_active: false,
             blockquote_active: false,
             code_block_active: false,
-            current_text: Cow::Borrowed(""),
         }
     }
 
@@ -139,6 +137,8 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_active_paragraph(&mut self) {
         if self.paragraph_active {
+            println!("Closing active paragraph");
+
             self.html.push_str("</p>");
             self.markdown.push_str("\n\n");
             self.paragraph_active = false;
@@ -270,27 +270,27 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn open_hard_break(&mut self) {
         self.html.push_str("<br/>");
-        self.markdown.push_str("\n");
+        self.markdown.push_str("\n\n");
     }
 
     fn text(&mut self, event: BytesText<'a>) -> Result<(), NodecosmosError> {
-        self.current_text = event.unescape()?;
+        let text = event.unescape()?;
 
-        self.html.push_str(&self.current_text);
+        self.html.push_str(&text);
 
         if self.blockquote_active {
-            self.markdown.push_str(&format!("> {}", self.current_text));
+            self.markdown.push_str(&format!("> {}", text));
         } else {
-            self.markdown.push_str(&self.current_text);
+            self.markdown.push_str(&text);
         }
 
         if self.paragraph_active && self.short_description.is_empty() {
-            self.short_description = self.current_text.to_string();
+            self.short_description = text.to_string();
             self.short_description
                 .truncate(Self::SHORT_DESCRIPTION_LENGTH - Self::ELLIPSIS.len());
             self.short_description = self.short_description.trim_end().to_string();
 
-            if self.short_description.len() < self.current_text.len() {
+            if self.short_description.len() < text.len() {
                 self.short_description.push_str(Self::ELLIPSIS);
             }
         }
@@ -310,12 +310,10 @@ impl<'a> DescriptionXmlParser<'a> {
         } else if self.blockquote_active {
             self.html.push_str("</p>");
             self.markdown.push_str("\n>\n");
-        } else if self.current_text.len() > 0 {
+        } else {
             self.html.push_str("</p>");
             self.markdown.push_str("\n\n");
         }
-
-        self.current_text = Cow::Borrowed("");
 
         self.paragraph_active = false;
     }

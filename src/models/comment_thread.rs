@@ -2,6 +2,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::comment::{find_first_pk_comment, PkComment};
 use crate::models::contribution_request::ContributionRequest;
+use crate::models::udts::Profile;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
@@ -97,6 +98,9 @@ pub struct CommentThread {
     #[serde(rename = "authorId")]
     pub author_id: Option<Uuid>,
 
+    #[serde(rename = "author")]
+    pub author: Option<Profile>,
+
     #[serde(rename = "objectType")]
     pub object_type: Text,
 
@@ -164,7 +168,14 @@ impl Callbacks for CommentThread {
         let now = chrono::Utc::now();
 
         self.author_id = Some(data.current_user_id());
-        self.id = Uuid::new_v4();
+        self.author = Some(Profile::init_from_current_user(&data.current_user));
+
+        // here is safe to allow client to provide id as request is authenticated with `object_id`
+        // we provide `id` to separate main threads from others
+        if self.id.is_nil() {
+            self.id = Uuid::new_v4();
+        }
+
         self.created_at = now;
         self.updated_at = now;
 
