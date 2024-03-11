@@ -20,6 +20,7 @@ enum ProseMirrorXmlTag {
     Link,
     HardBreak,
     Html,
+    Empty,
 }
 
 impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
@@ -43,7 +44,7 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
             QName(b"link") => ProseMirrorXmlTag::Link,
             QName(b"hardBreak") => ProseMirrorXmlTag::HardBreak,
             QName(b"html") => ProseMirrorXmlTag::Html,
-            _ => panic!("Unknown tag {:?}", value),
+            _ => ProseMirrorXmlTag::Empty,
         }
     }
 }
@@ -105,6 +106,7 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Link => self.open_link(&e),
                     ProseMirrorXmlTag::HardBreak => self.open_hard_break(),
                     ProseMirrorXmlTag::Html => (),
+                    ProseMirrorXmlTag::Empty => (),
                 },
                 Ok(Event::Text(e)) => self.text(e)?,
                 Ok(Event::End(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
@@ -122,10 +124,10 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Image => self.close_image(),
                     ProseMirrorXmlTag::Link => self.close_link(),
                     ProseMirrorXmlTag::HardBreak => (),
-                    ProseMirrorXmlTag::Html => self.close_active_paragraph(),
+                    ProseMirrorXmlTag::Html => (),
+                    ProseMirrorXmlTag::Empty => (),
                 },
                 Ok(Event::Eof) => {
-                    self.close_active_paragraph();
                     break;
                 }
                 _ => (),
@@ -135,19 +137,7 @@ impl<'a> DescriptionXmlParser<'a> {
         Ok(self)
     }
 
-    fn close_active_paragraph(&mut self) {
-        if self.paragraph_active {
-            println!("Closing active paragraph");
-
-            self.html.push_str("</p>");
-            self.markdown.push_str("\n\n");
-            self.paragraph_active = false;
-        }
-    }
-
     fn open_heading(&mut self, event: &quick_xml::events::BytesStart) {
-        self.close_active_paragraph();
-
         self.heading_level = event
             .attributes()
             .find_map(|a| {
@@ -168,8 +158,6 @@ impl<'a> DescriptionXmlParser<'a> {
     }
 
     fn open_paragraph(&mut self) {
-        self.close_active_paragraph();
-
         self.html.push_str("<p>");
         self.paragraph_active = true;
     }

@@ -4,6 +4,7 @@ use crate::models::node::context::Context;
 use crate::models::node::{Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateTitleNode};
 use crate::models::traits::{MergeDescription, SanitizeDescription};
 use charybdis::callbacks::Callbacks;
+use charybdis::model::AsNative;
 use scylla::CachingSession;
 
 impl Callbacks for Node {
@@ -90,6 +91,10 @@ impl Callbacks for UpdateDescriptionNode {
         let req_data = req_data.clone();
 
         tokio::spawn(async move {
+            self_clone
+                .as_native()
+                .preserve_branched_if_original_exist(&req_data)
+                .await;
             self_clone.update_elastic_index(req_data.elastic_client()).await;
             self_clone.create_new_version(&req_data).await;
             self_clone.update_branch(&req_data).await;

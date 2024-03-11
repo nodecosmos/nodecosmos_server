@@ -12,6 +12,7 @@ use crate::models::udts::TextChange;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::file::read_file_names;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
+use charybdis::options::Consistency;
 use charybdis::types::Uuid;
 use log::{error, warn};
 use scylla::CachingSession;
@@ -125,7 +126,7 @@ impl BranchMerge {
             Err(e) => match branch_merge.recover(data).await {
                 Ok(_) => {
                     branch_merge.branch.status = Some(BranchStatus::Recovered.to_string());
-                    Err(NodecosmosError::MergeError(format!("Failed to merge: {}", e)))
+                    Err(e)
                 }
                 Err(recovery_err) => {
                     branch_merge.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
@@ -283,7 +284,16 @@ impl BranchMerge {
                 merge_node.owner_id = node.owner_id;
                 merge_node.profile_type = node.profile_type.clone();
                 merge_node.editor_ids = node.editor_ids.clone();
-                merge_node.insert_cb(data).execute(data.db_session()).await?;
+                merge_node
+                    .insert_cb(data)
+                    .consistency(Consistency::All)
+                    .execute(data.db_session())
+                    .await?;
+
+                // in case its needed for description merge
+                self.original_description_nodes
+                    .get_or_insert_with(HashMap::new)
+                    .insert(merge_node.id, UpdateDescriptionNode::from(merge_node));
             }
         }
 

@@ -42,6 +42,8 @@ impl Branch {
 
             return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
         } else if let Some(conflict) = &mut self.conflict {
+            conflict.deleted_ancestors = None;
+            conflict.deleted_edited_nodes = None;
             conflict.status = ConflictStatus::Resolved.to_string();
 
             self.update().execute(db_session).await?;

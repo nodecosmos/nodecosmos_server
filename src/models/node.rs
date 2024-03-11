@@ -19,7 +19,7 @@ use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::utils::defaults::default_to_0;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
+use charybdis::operations::{Find, New};
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::statement::Consistency;
@@ -398,6 +398,21 @@ partial_node!(
     updated_at,
     ctx
 );
+
+impl UpdateDescriptionNode {
+    pub fn from(node: Node) -> Self {
+        Self {
+            id: node.id,
+            branch_id: node.branch_id,
+            description: node.description,
+            short_description: node.short_description,
+            description_markdown: node.description_markdown,
+            description_base64: node.description_base64,
+            updated_at: node.updated_at,
+            ctx: node.ctx,
+        }
+    }
+}
 
 partial_node!(
     UpdateCoverImageNode,

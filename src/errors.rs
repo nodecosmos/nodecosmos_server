@@ -157,7 +157,7 @@ impl ResponseError for NodecosmosError {
                 }
             },
             _ => {
-                error!("Unhandled error: {}", self.to_string());
+                error!("InternalServerError: {}", self.to_string());
 
                 return HttpResponse::InternalServerError().json(json!({
                     "status": 500,
