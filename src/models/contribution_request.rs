@@ -11,9 +11,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 pub enum ContributionRequestStatus {
     WorkInProgress,
@@ -77,7 +75,7 @@ pub struct ContributionRequest {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub branch: Rc<RefCell<Option<Branch>>>,
+    pub branch: Option<Branch>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -102,16 +100,15 @@ impl ContributionRequest {
         Ok(self.node.as_mut().unwrap())
     }
 
-    pub async fn branch(&self, session: &CachingSession) -> Result<Branch, NodecosmosError> {
-        let mut branch_ref = self.branch.borrow_mut();
-        if branch_ref.is_none() {
-            *branch_ref = Some(Branch::find_by_id(self.id).execute(session).await?);
+    pub async fn branch(&mut self, session: &CachingSession) -> Result<&Branch, NodecosmosError> {
+        if self.branch.is_none() {
+            let branch = Branch::find_by_id(self.id).execute(session).await?;
+            self.branch.replace(branch);
         }
 
-        branch_ref.clone().ok_or(NodecosmosError::InternalServerError(
-            "Branch not found for contribution request".to_string(),
-        ))
+        Ok(self.branch.as_ref().unwrap())
     }
+
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.status == Some(ContributionRequestStatus::Merged.to_string()) {
             return Err(NodecosmosError::PreconditionFailed(
@@ -119,10 +116,10 @@ impl ContributionRequest {
             ));
         }
 
-        let branch = self.branch(data.db_session()).await?;
+        let branch = self.branch(data.db_session()).await?.clone();
+        let updated_branch = branch.merge(data).await?;
 
-        branch.merge(data).await?;
-
+        self.branch = Some(updated_branch);
         self.update_status(data, ContributionRequestStatus::Merged).await?;
 
         Ok(())

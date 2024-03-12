@@ -14,7 +14,7 @@ use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::workflow::DeleteWorkflow;
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::batch::ModelBatch;
-use charybdis::operations::{Delete, Insert};
+use charybdis::operations::Delete;
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use futures::{StreamExt, TryFutureExt};
@@ -45,33 +45,6 @@ impl Node {
                 BranchUpdate::DeleteNode(self.id),
             )
             .await;
-        }
-    }
-
-    // we preserve branched as it may be used for comments
-    pub async fn preserve_branched_if_original_exist(&mut self, request_data: &RequestData) {
-        if self.is_original() {
-            return;
-        };
-
-        let original_res = Self::find_by_id_and_branch_id(self.id, self.id)
-            .execute(request_data.db_session())
-            .await;
-        match original_res {
-            Ok(mut new_branched) => {
-                new_branched.branch_id = self.branch_id;
-                let res = new_branched
-                    .insert_if_not_exists()
-                    .execute(request_data.db_session())
-                    .await;
-
-                if let Err(err) = res {
-                    error!("Node::preserve_branched_if_original_exist::new_branched_res {}", err);
-                }
-            }
-            Err(err) => {
-                error!("Node::create_branched_if_original_exist::original_res {}", err);
-            }
         }
     }
 }

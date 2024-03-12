@@ -10,6 +10,7 @@ use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::batch::ModelBatch;
+use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Insert};
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
@@ -167,7 +168,7 @@ impl Node {
             for ancestor_id in self.ancestor_ids.cloned_ref() {
                 let ancestor = Node {
                     id: ancestor_id,
-                    branch_id: self.branchise_id(ancestor_id),
+                    branch_id: self.branch_id,
                     ..Default::default()
                 };
                 let future = ancestor.create_branched_if_not_exist(data);
@@ -177,44 +178,73 @@ impl Node {
 
             let futures_stream = stream::iter(futures);
 
-            let _: Vec<_> = futures_stream.buffer_unordered(MAX_PARALLEL_REQUESTS).collect().await;
+            futures_stream
+                .buffer_unordered(MAX_PARALLEL_REQUESTS)
+                .collect::<Vec<_>>()
+                .await;
         }
     }
 
     /// Create branched version of self if it doesn't exist.
     pub async fn create_branched_if_not_exist(self, data: &RequestData) {
-        let self_branched = self.find_by_primary_key().execute(data.db_session()).await.ok();
+        let self_branched_res = self.find_by_primary_key().execute(data.db_session()).await;
 
-        if self_branched.is_none() {
-            let branch_id = self.branch_id;
-            let non_branched_res = Node {
-                branch_id: self.id,
-                ..self
-            }
-            .find_by_primary_key()
-            .execute(data.db_session())
-            .await;
+        match self_branched_res {
+            Err(CharybdisError::NotFoundError(_)) => {
+                let non_branched_res = Node {
+                    branch_id: self.id,
+                    ..self
+                }
+                .find_by_primary_key()
+                .execute(data.db_session())
+                .await;
 
-            match non_branched_res {
-                Ok(mut self_branched) => {
-                    self_branched.branch_id = branch_id;
-                    let insert = self_branched.insert().execute(data.db_session()).await;
+                match non_branched_res {
+                    Ok(mut node) => {
+                        node.branch_id = self.branch_id;
+                        let insert = node.insert().execute(data.db_session()).await;
 
-                    if let Err(e) = insert {
-                        error!(
-                            "Error creating branched node {} from non-branched node {}: {:?}",
-                            self_branched.id, self.id, e
-                        );
+                        if let Err(e) = insert {
+                            error!(
+                                "Error creating branched node -> id: {} branch_id: {} from non-branched node: {:?}",
+                                node.id, self.branch_id, e
+                            );
+                        }
+
+                        node.append_to_ancestors(data.db_session()).await;
+                        node.create_new_version(&data).await;
                     }
-
-                    self_branched.append_to_ancestors(data.db_session()).await;
-                    self_branched.create_new_version(&data).await;
-                }
-                Err(e) => {
-                    error!("Error finding non-branched node {}: {:?}", self.id, e);
+                    Err(e) => {
+                        error!("Error finding non-branched node {}: {:?}", self.id, e);
+                    }
                 }
             }
+            Err(e) => {
+                error!("Unexpected error finding branched node {}: {:?}", self.id, e);
+            }
+            Ok(_) => (),
         }
+    }
+
+    pub async fn preserve_branched_if_original_exist(&mut self, request_data: &RequestData) {
+        if self.is_branched() {
+            let original_res = Self::find_by_id_and_branch_id(self.id, self.id)
+                .execute(request_data.db_session())
+                .await;
+            match original_res {
+                Ok(mut new_branched) => {
+                    new_branched.branch_id = self.branch_id;
+                    let res = new_branched.insert().execute(request_data.db_session()).await;
+
+                    if let Err(err) = res {
+                        error!("Node::preserve_branched_if_original_exist::new_branched_res {}", err);
+                    }
+                }
+                Err(err) => {
+                    error!("Node::create_branched_if_original_exist::original_res {}", err);
+                }
+            }
+        };
     }
 
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {

@@ -3,6 +3,7 @@ use charybdis::types::{Frozen, Set, Text, Uuid};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+#[derive(Eq, PartialEq)]
 pub enum ConflictStatus {
     Pending,
     Resolved,

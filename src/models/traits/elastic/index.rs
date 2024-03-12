@@ -205,12 +205,13 @@ macro_rules! impl_elastic_index {
     };
 }
 
+// node
 impl_elastic_index!(UpdateTitleNode, Node);
 impl_elastic_index!(UpdateDescriptionNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
 impl_elastic_index!(UpdateLikesCountNode, Node);
 impl_elastic_index!(UpdateProfileNode, Node);
-
+// user
 impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);
 impl_elastic_index!(UpdateBioUser, User);

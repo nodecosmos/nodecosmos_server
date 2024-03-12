@@ -32,12 +32,12 @@ pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
-    let branch = contribution_request.branch(&db_session).await?;
+    let mut contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
+    contribution_request.branch(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "contributionRequest": contribution_request,
-        "branch": branch,
+        "branch": contribution_request.branch,
     })))
 }
 
@@ -125,11 +125,15 @@ pub async fn merge_contribution_request(
     match res {
         Ok(_) => Ok(HttpResponse::Ok().json(contribution_request)),
         Err(e) => match e {
-            NodecosmosError::Conflict(e) => Ok(HttpResponse::Conflict().json(json!({
-                "status": 409,
-                "message": e,
-                "branch": contribution_request.branch(data.db_session()).await?,
-            }))),
+            NodecosmosError::Conflict(e) => {
+                let branch = contribution_request.branch(data.db_session()).await?;
+
+                Ok(HttpResponse::Conflict().json(json!({
+                    "status": 409,
+                    "message": e,
+                    "branch": branch,
+                })))
+            }
             _ => Err(e),
         },
     }

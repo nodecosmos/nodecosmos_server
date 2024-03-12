@@ -19,7 +19,7 @@ use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::utils::defaults::default_to_0;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, New};
+use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::statement::Consistency;
@@ -218,6 +218,7 @@ impl Node {
             Some(mut branch_self) => {
                 branch_self.parent = self.parent.take();
                 branch_self.auth_branch = self.auth_branch.take();
+                branch_self.ctx = self.ctx;
 
                 *self = branch_self;
             }
@@ -225,13 +226,16 @@ impl Node {
                 let parent = self.parent.take();
                 let auth_branch = self.auth_branch.take();
                 let branch_id = self.branch_id;
+                let ctx = self.ctx;
 
                 *self = Self::find_by_primary_key_value(&(self.id, self.id))
                     .execute(db_session)
                     .await?;
+
                 self.branch_id = branch_id;
                 self.parent = parent;
                 self.auth_branch = auth_branch;
+                self.ctx = ctx;
             }
         }
 
@@ -295,14 +299,25 @@ impl Node {
     }
 }
 
-partial_node!(PkNode, id, branch_id);
+partial_node!(PkNode, id, branch_id, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_and_collect_by_ids(
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
+        let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(res)
+    }
+
+    pub async fn find_by_ids_and_branch_id(
         db_session: &CachingSession,
         ids: &Vec<Uuid>,
+        branch_id: Uuid,
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
+        let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))
             .execute(db_session)
             .await?
             .try_collect()

@@ -78,13 +78,13 @@ impl BranchMerge {
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_node_titles {
-            let nodes = find_update_title_node!("branch_id IN ? AND id IN ?", (ids, ids))
+            let nodes_by_id = find_update_title_node!("branch_id IN ? AND id IN ?", (ids, ids))
                 .execute(session)
                 .await?
-                .try_collect()
+                .group_by_id()
                 .await?;
 
-            return Ok(Some(nodes.group_by_id()));
+            return Ok(Some(nodes_by_id));
         }
 
         Ok(None)
@@ -95,13 +95,13 @@ impl BranchMerge {
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateDescriptionNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_node_descriptions {
-            let nodes = find_update_description_node!("branch_id IN ? AND id IN ?", (ids, ids))
+            let nodes_by_id = find_update_description_node!("branch_id IN ? AND id IN ?", (ids, ids))
                 .execute(session)
                 .await?
-                .try_collect()
+                .group_by_id()
                 .await?;
 
-            return Ok(Some(nodes.group_by_id()));
+            return Ok(Some(nodes_by_id));
         }
 
         Ok(None)
@@ -326,9 +326,10 @@ impl BranchMerge {
 
             match deleted_node {
                 Some(mut deleted_node) => {
-                    if let Some(ancestor_ids) = deleted_node.ancestor_ids.clone() {
+                    if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
                         if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
-                            // skip deletion of node if it has an ancestor that is also deleted as it will be removed in the callback
+                            // skip deletion of node if it has an ancestor that is also deleted as
+                            // it will be removed in the callback
                             continue;
                         }
 
@@ -358,7 +359,7 @@ impl BranchMerge {
 
             match deleted_node {
                 Some(mut deleted_node) => {
-                    if let Some(ancestor_ids) = deleted_node.ancestor_ids.clone() {
+                    if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
                         if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
                             continue;
                         }
@@ -550,13 +551,13 @@ impl BranchMerge {
 }
 
 impl Branch {
-    pub async fn merge(mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn merge(mut self, data: &RequestData) -> Result<Self, NodecosmosError> {
         self.validate_no_existing_conflicts().await?;
         self.check_conflicts(data.db_session()).await?;
 
         let merge = BranchMerge::run(self, data).await?;
         merge.branch.update().execute(data.db_session()).await?;
 
-        Ok(())
+        Ok(merge.branch)
     }
 }

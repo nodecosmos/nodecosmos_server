@@ -7,7 +7,7 @@ use crate::models::node::sort::SortNodes;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, PkNode, UpdateDescriptionNode, UpdateTitleNode,
 };
-use crate::models::traits::{NodeId, Pluck};
+use crate::models::traits::{Id, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
@@ -224,7 +224,7 @@ impl Branch {
     pub async fn restored_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let (None, Some(restored_node_ids)) = (&self._restored_nodes, &self.restored_nodes) {
             let mut branched_nodes = Node::find_branch_nodes(db_session, self.id, &restored_node_ids).await?;
-            let already_restored_ids = PkNode::find_and_collect_by_ids(db_session, &branched_nodes.pluck_id())
+            let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
                 .await?
                 .pluck_id_set();
 
@@ -297,7 +297,7 @@ impl Branch {
     }
 
     /// Retain only the nodes that are not created or deleted in the branch
-    fn retain_branch_nodes<N: NodeId>(&self, nodes: Vec<N>) -> Vec<N> {
+    fn retain_branch_nodes<N: Id>(&self, nodes: Vec<N>) -> Vec<N> {
         nodes
             .into_iter()
             .filter(|node| {

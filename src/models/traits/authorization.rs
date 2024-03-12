@@ -265,21 +265,17 @@ impl Authorization for ContributionRequest {
     }
 
     fn is_public(&self) -> bool {
-        let branch = self.branch.borrow_mut().clone();
-
-        branch.map_or(false, |branch| branch.is_public)
+        self.branch.as_ref().map_or(false, |branch| branch.is_public)
     }
 
     fn owner_id(&self) -> Option<Uuid> {
-        let branch = self.branch.borrow_mut().clone();
-
-        branch.map(|branch| branch.owner_id)
+        self.branch.as_ref().map(|branch| branch.owner_id)
     }
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
-        let branch = self.branch.borrow_mut().clone();
-
-        branch.map(|branch| branch.editor_ids.clone().unwrap_or_default())
+        self.branch
+            .as_ref()
+            .map(|branch| branch.editor_ids.clone().unwrap_or_default())
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

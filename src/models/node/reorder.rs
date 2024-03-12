@@ -25,6 +25,7 @@ use scylla::CachingSession;
 use serde::Deserialize;
 use std::sync::Arc;
 
+// TODO: update to use SAGA similar to `BranchMerge` so we avoid reading whole tree for recovery
 #[derive(Deserialize)]
 pub struct ReorderParams {
     pub id: Uuid,

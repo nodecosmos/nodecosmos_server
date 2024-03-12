@@ -30,8 +30,6 @@ pub async fn restore_node(data: RequestData, params: web::Json<RestoreNodeParams
     )
     .await;
 
-    branch.check_conflicts(data.db_session()).await?;
-
     Ok(HttpResponse::Ok().json(branch))
 }
 
