@@ -226,15 +226,16 @@ impl Node {
         }
     }
 
-    pub async fn preserve_branched_if_original_exist(&mut self, request_data: &RequestData) {
+    pub async fn preserve_branched_if_original_exist(&mut self, data: &RequestData) {
         if self.is_branched() {
             let original_res = Self::find_by_id_and_branch_id(self.id, self.id)
-                .execute(request_data.db_session())
+                .execute(data.db_session())
                 .await;
             match original_res {
                 Ok(mut new_branched) => {
                     new_branched.branch_id = self.branch_id;
-                    let res = new_branched.insert().execute(request_data.db_session()).await;
+                    let res = new_branched.insert().execute(data.db_session()).await;
+                    self.append_to_ancestors(data.db_session()).await;
 
                     if let Err(err) = res {
                         error!("Node::preserve_branched_if_original_exist::new_branched_res {}", err);

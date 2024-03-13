@@ -44,61 +44,6 @@ impl<'a> BranchConflict<'a> {
         Ok(self)
     }
 
-    async fn extract_deleted_ancestors(
-        &mut self,
-        db_session: &CachingSession,
-        del_anc_node: DelAncNode<'_>,
-    ) -> Result<(), NodecosmosError> {
-        let created_node_ids = self.branch.created_nodes.cloned_ref();
-        let restored_node_ids = self.branch.restored_nodes.cloned_ref();
-        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
-        let ancestor_id = match del_anc_node {
-            DelAncNode::Node(node) => node.ancestor_ids.cloned_ref(),
-            DelAncNode::PkNode(pk_node) => pk_node.ancestor_ids.cloned_ref(),
-        };
-
-        let branch_ancestor_ids = ancestor_id
-            .iter()
-            .filter_map(|id| {
-                if created_node_ids.contains(id) || restored_node_ids.contains(id) || deleted_node_ids.contains(id) {
-                    None
-                } else {
-                    Some(*id)
-                }
-            })
-            .collect::<Vec<Uuid>>();
-
-        let original_ancestor_ids_set = PkNode::find_by_ids(&db_session, &branch_ancestor_ids)
-            .await?
-            .pluck_id_set();
-
-        let branch_node_deleted_ancestor_ids = branch_ancestor_ids
-            .iter()
-            .filter_map(|id| {
-                if original_ancestor_ids_set.contains(id) {
-                    None
-                } else {
-                    Some(*id)
-                }
-            })
-            .collect::<Set<Uuid>>();
-
-        if branch_node_deleted_ancestor_ids.is_empty() {
-            return Ok(());
-        }
-
-        self.deleted_ancestors = match self.deleted_ancestors.as_mut() {
-            Some(deleted_ancestors) => {
-                let mut deleted_ancestors = deleted_ancestors.clone();
-                deleted_ancestors.extend(branch_node_deleted_ancestor_ids);
-                Some(deleted_ancestors)
-            }
-            None => Some(branch_node_deleted_ancestor_ids),
-        };
-
-        Ok(())
-    }
-
     async fn extract_created_nodes_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let created_nodes = self.branch.created_nodes(db_session).await?;
 
@@ -163,6 +108,61 @@ impl<'a> BranchConflict<'a> {
         if deleted_edited_nodes.len() > 0 {
             self.deleted_edited_nodes = Some(deleted_edited_nodes);
         }
+
+        Ok(())
+    }
+
+    async fn extract_deleted_ancestors(
+        &mut self,
+        db_session: &CachingSession,
+        del_anc_node: DelAncNode<'_>,
+    ) -> Result<(), NodecosmosError> {
+        let created_node_ids = self.branch.created_nodes.cloned_ref();
+        let restored_node_ids = self.branch.restored_nodes.cloned_ref();
+        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
+        let ancestor_id = match del_anc_node {
+            DelAncNode::Node(node) => node.ancestor_ids.cloned_ref(),
+            DelAncNode::PkNode(pk_node) => pk_node.ancestor_ids.cloned_ref(),
+        };
+
+        let branch_ancestor_ids = ancestor_id
+            .iter()
+            .filter_map(|id| {
+                if created_node_ids.contains(id) || restored_node_ids.contains(id) || deleted_node_ids.contains(id) {
+                    None
+                } else {
+                    Some(*id)
+                }
+            })
+            .collect::<Vec<Uuid>>();
+
+        let original_ancestor_ids_set = PkNode::find_by_ids(&db_session, &branch_ancestor_ids)
+            .await?
+            .pluck_id_set();
+
+        let branch_node_deleted_ancestor_ids = branch_ancestor_ids
+            .iter()
+            .filter_map(|id| {
+                if original_ancestor_ids_set.contains(id) {
+                    None
+                } else {
+                    Some(*id)
+                }
+            })
+            .collect::<Set<Uuid>>();
+
+        if branch_node_deleted_ancestor_ids.is_empty() {
+            return Ok(());
+        }
+
+        self.deleted_ancestors = match self.deleted_ancestors.as_mut() {
+            Some(deleted_ancestors) => {
+                let mut deleted_ancestors = deleted_ancestors.clone();
+                deleted_ancestors.extend(branch_node_deleted_ancestor_ids);
+                Some(deleted_ancestors)
+            }
+            None => Some(branch_node_deleted_ancestor_ids),
+        };
 
         Ok(())
     }

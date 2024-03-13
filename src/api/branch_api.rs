@@ -8,7 +8,7 @@ use charybdis::types::Uuid;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct RestoreNodeParams {
+pub struct BranchNodeParams {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
@@ -17,7 +17,7 @@ pub struct RestoreNodeParams {
 }
 
 #[put("/restore_node")]
-pub async fn restore_node(data: RequestData, params: web::Json<RestoreNodeParams>) -> Response {
+pub async fn restore_node(data: RequestData, params: web::Json<BranchNodeParams>) -> Response {
     let params = params.into_inner();
     let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
 
@@ -30,11 +30,13 @@ pub async fn restore_node(data: RequestData, params: web::Json<RestoreNodeParams
     )
     .await;
 
+    branch.reload(data.db_session()).await?;
+
     Ok(HttpResponse::Ok().json(branch))
 }
 
 #[put("/undo_delete_node")]
-pub async fn undo_delete_node(data: RequestData, params: web::Json<RestoreNodeParams>) -> Response {
+pub async fn undo_delete_node(data: RequestData, params: web::Json<BranchNodeParams>) -> Response {
     let params = params.into_inner();
     let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
 
@@ -46,6 +48,8 @@ pub async fn undo_delete_node(data: RequestData, params: web::Json<RestoreNodePa
         BranchUpdate::UndoDeleteNode(params.node_id),
     )
     .await;
+
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }

@@ -197,6 +197,12 @@ pub struct Branch {
 }
 
 impl Branch {
+    pub async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        *self = Branch::find_by_id(self.id).execute(db_session).await?;
+
+        Ok(())
+    }
+
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if self.node.is_none() {
             let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
