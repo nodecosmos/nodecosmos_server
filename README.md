@@ -29,25 +29,25 @@ paping---
 - [ ] ElasticSearch
 - [ ] Redis
 
-## CASM - Clients-Actions(API)-Segmentation-Models
+## Resources-Actions-Segmentation-Models
 
-* ### Clients (ATM `App.rs` but to be moved to `clients/`)
-  They represent data structures that are alive during program runtime. They are usually related in one way or another
-  to external services sessions: e.g. ScyllaDb, Redis, ElasticSearch, etc.
+* ### Resources (`resources/`)
+  They represent data structures that are alive during program runtime. They are usually related to external services
+  sessions: e.g. `ScyllaDb`, `Redis`, `ElasticSearch`, etc. But it can also be app specific e.g.
+  `SseBroadcast`, `Locker`, `DescriptionWsPool`, etc.
 * ### Actions (`api/`)
   They represent entry point of the request. They are responsible for parsing request or triggering
   model or model-segment specific logic and returning the response.
   E.g. `update_node_description`, `update_user_profile_image`, etc.
 * ### Segmentation
   This is the process of dividing models into segments required by action. In Charybdis we can make use
-  of `partial<models>` that returns same things as base model but for subset of model fields. Each segment is
+  of `partial<model>` that returns same things as base model but for subset of model fields. Each segment is
   responsible for a specific task. E.g. `UpdateDescriptionNode`, `UpdateProfileImageUser`. One benefit of segmentation
-  is
-  to reduce need for full model read before update. Instead we can read only data required for authorization and
+  is to reduce need for full model read before update. Instead we can read only data required for authorization and
   update this fields without reading model beforehand. Another benefit of segmentation is that we can have same traits
   implemented for same model but for different segments. E.g. `S3` trait for `UpdateProfileImageUser`
   and `UpdateCoverImageUser`.
-* ### Models
+* ### Models (`models/`)
   They represent data structures that are used to model core application data and implement the business logic. If
   business logic is reusable, it should utilize traits (`models/traits`). And accordingly the traits should be
   implemented by model or the segment. E.g. In case same model has multiple s3 related
