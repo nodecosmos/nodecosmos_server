@@ -77,12 +77,12 @@ impl FromRequest for RequestData {
 
                 match app {
                     Some(app) => {
-                        let req_data = RequestData {
+                        let data = RequestData {
                             app: web::Data::clone(app),
                             current_user,
                         };
 
-                        ready(Ok(req_data))
+                        ready(Ok(data))
                     }
                     None => {
                         let err = NodecosmosError::InternalServerError("Could not get app data".to_string());

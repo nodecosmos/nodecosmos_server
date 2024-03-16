@@ -1,6 +1,7 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::node::Node;
+use crate::models::traits::node::FindBranched;
 use crate::models::traits::Authorization;
 use crate::resources::description_ws_pool::DescriptionWsConnection;
 use actix_web::{get, web, HttpRequest};
@@ -31,7 +32,7 @@ pub async fn description_ws(
         branch_id: params.branch_id,
         ..Default::default()
     };
-    node.transform_to_branched(data.db_session()).await?;
+    node.find_branched(data.db_session()).await?;
 
     node.auth_update(&data).await?;
 

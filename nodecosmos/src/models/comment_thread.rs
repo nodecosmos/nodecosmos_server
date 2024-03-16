@@ -41,6 +41,7 @@ pub enum CommentObject {
     ContributionRequest(ContributionRequest), // Topic(Topic)
 }
 
+#[allow(unused)]
 pub enum ContributionRequestThreadType {
     MainThread,
     NodeAddition,
@@ -48,6 +49,7 @@ pub enum ContributionRequestThreadType {
     NodeDescription,
 }
 
+#[allow(unused)]
 pub enum ThreadType {
     Topic,
     ContributionRequest(ContributionRequestThreadType),

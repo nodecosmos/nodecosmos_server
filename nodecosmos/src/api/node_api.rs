@@ -5,7 +5,7 @@ use crate::app::App;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
-use crate::models::traits::node::Descendants;
+use crate::models::traits::node::{Descendants, FindBranched};
 use crate::models::traits::{Authorization, Branchable, MergeDescription};
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
@@ -124,9 +124,9 @@ pub async fn get_original_node_description_base64(
 pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
     let mut node = node.into_inner();
 
-    node.auth_creation(&data).await?;
-
     data.resource_locker().validate_root_unlocked(&node, true).await?;
+
+    node.auth_creation(&data).await?;
 
     node.insert_cb(&data).execute(data.db_session()).await?;
 
@@ -164,7 +164,7 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
 
-    node.transform_to_branched(data.db_session()).await?;
+    node.find_branched(data.db_session()).await?;
 
     node.auth_update(&data).await?;
 

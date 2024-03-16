@@ -1,5 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::{GetDescriptionBase64Node, UpdateDescriptionNode};
+use crate::models::traits::node::FindBranched;
 use crate::models::utils::DescriptionXmlParser;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;

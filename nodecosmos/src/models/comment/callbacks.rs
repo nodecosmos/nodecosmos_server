@@ -45,18 +45,18 @@ impl Callbacks for DeleteComment {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn after_delete(&mut self, _session: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
-        let req_data = req_data.clone();
+        let data = data.clone();
 
         tokio::spawn(async move {
             let thread = CommentThread::find_by_object_id_and_id(self_clone.object_id, self_clone.thread_id)
-                .execute(req_data.db_session())
+                .execute(data.db_session())
                 .await;
 
             match thread {
                 Ok(thread) => {
-                    thread.delete_if_no_comments(req_data.db_session()).await;
+                    thread.delete_if_no_comments(data.db_session()).await;
                 }
                 Err(e) => error!("Error while deleting comment: {}", e),
             }

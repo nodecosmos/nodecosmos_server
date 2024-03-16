@@ -1,3 +1,4 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
     Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepOutputsByNodeBranch,
@@ -15,8 +16,9 @@ use charybdis::errors::CharybdisError;
 use charybdis::operations::{Find, Update};
 use charybdis::types::{Map, Set, Uuid};
 use log::error;
-use scylla::{CachingSession, QueryResult};
+use scylla::QueryResult;
 
+#[allow(unused)]
 pub enum BranchUpdate {
     CreateNode(Uuid),
     DeleteNode(Uuid),
@@ -45,39 +47,26 @@ pub enum BranchUpdate {
 }
 
 impl Branch {
-    async fn check_branch_conflicts(branch_id: Uuid, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch = Branch::find_by_id(branch_id).execute(session).await;
+    async fn check_branch_conflicts(branch_id: Uuid, data: &RequestData) {
+        let data = data.clone();
 
-        return match branch {
-            Ok(mut branch) => {
-                let res = branch.check_conflicts(session).await;
+        tokio::spawn(async move {
+            let branch = Branch::find_by_id(branch_id).execute(data.db_session()).await;
 
-                if let Err(err) = res {
-                    return match err {
-                        NodecosmosError::Conflict(_) => Ok(()),
-                        err => {
-                            error!("Failed to check_conflicts: {}", err);
+            return match branch {
+                Ok(mut branch) => {
+                    let res = branch.check_conflicts(data.db_session()).await;
 
-                            Err(err)
-                        }
-                    };
+                    if let Err(err) = res {
+                        error!("Failed to check_conflicts: {}", err);
+                    }
                 }
-
-                Ok(())
-            }
-            Err(err) => {
-                error!("Failed to find branch: {}", err);
-
-                Err(err.into())
-            }
-        };
+                Err(err) => error!("Failed to find branch: {}", err),
+            };
+        });
     }
 
-    pub async fn update(
-        session: &CachingSession,
-        branch_id: Uuid,
-        update: BranchUpdate,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
 
         match update {
@@ -87,7 +76,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_nodes(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteNode(id) => {
@@ -112,7 +101,7 @@ impl Branch {
                     params,
                 )?;
 
-                res = batch.execute(session).await;
+                res = batch.execute(data.db_session()).await;
             }
             BranchUpdate::UndoDeleteNode(id) => {
                 res = UpdateDeletedNodesBranch {
@@ -120,7 +109,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_nodes(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::RestoreNode(id) => {
@@ -139,7 +128,7 @@ impl Branch {
                     params.clone(),
                 )?;
 
-                res = batch.execute(session).await;
+                res = batch.execute(data.db_session()).await;
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedNodeTitlesBranch {
@@ -147,7 +136,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_node_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditNodeDescription(id) => {
@@ -156,11 +145,13 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_node_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
-                let branch = UpdateReorderedNodes::find_by_id(branch_id).execute(session).await;
+                let branch = UpdateReorderedNodes::find_by_id(branch_id)
+                    .execute(data.db_session())
+                    .await;
                 match branch {
                     Ok(mut branch) => {
                         // filter out existing reorder nodes with same id
@@ -174,7 +165,7 @@ impl Branch {
                         new_reorder_nodes.push(reorder_data);
                         branch.reordered_nodes = Some(new_reorder_nodes);
 
-                        res = branch.update().execute(session).await;
+                        res = branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::ReorderNode] Failed to find branch: {}", err);
@@ -188,7 +179,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_workflows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteWorkflow(id) => {
@@ -197,7 +188,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_workflows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditWorkflowTitle(id) => {
@@ -206,7 +197,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_workflow_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateFlow(id) => {
@@ -215,7 +206,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
@@ -224,7 +215,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_flows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditFlowTitle(id) => {
@@ -233,7 +224,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_flow_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditFlowDescription(id) => {
@@ -242,7 +233,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_flow_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateIO(id) => {
@@ -251,7 +242,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_ios(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteIO(id) => {
@@ -260,7 +251,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_ios(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditIOTitle(id) => {
@@ -269,7 +260,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_io_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditIODescription(id) => {
@@ -278,7 +269,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_io_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateFlowStep(id) => {
@@ -287,7 +278,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flow_steps(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
@@ -296,7 +287,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_flow_steps(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::AppendFlowStepInput(node_id, io_id) => {
@@ -305,7 +296,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -317,7 +308,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::AppendFlowStepInput] Failed to find branch: {}", err);
@@ -331,7 +322,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -343,7 +334,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::RemoveFlowStepInput] Failed to find branch: {}", err);
@@ -357,7 +348,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -369,7 +360,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::AppendFlowStepOutput] Failed to find branch: {}", err);
@@ -383,7 +374,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -395,7 +386,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .insert(io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::RemoveFlowStepOutput] Failed to find branch: {}", err);
@@ -409,16 +400,13 @@ impl Branch {
             error!("Failed to update branch: {}", err)
         }
 
-        Self::check_branch_conflicts(branch_id, session).await?;
+        Self::check_branch_conflicts(branch_id, data).await;
 
         Ok(())
     }
 
-    pub async fn undo_update(
-        session: &CachingSession,
-        branch_id: Uuid,
-        update: BranchUpdate,
-    ) -> Result<(), NodecosmosError> {
+    #[allow(unused)]
+    pub async fn undo_update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
 
         match update {
@@ -428,7 +416,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_created_nodes(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteNode(id) => {
@@ -437,7 +425,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_nodes(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::UndoDeleteNode(id) => {
@@ -446,7 +434,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_nodes(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::RestoreNode(id) => {
@@ -465,7 +453,7 @@ impl Branch {
                     params.clone(),
                 )?;
 
-                res = batch.execute(session).await;
+                res = batch.execute(data.db_session()).await;
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedNodeTitlesBranch {
@@ -473,7 +461,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_node_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditNodeDescription(id) => {
@@ -482,11 +470,13 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_node_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
-                let branch = UpdateReorderedNodes::find_by_id(branch_id).execute(session).await;
+                let branch = UpdateReorderedNodes::find_by_id(branch_id)
+                    .execute(data.db_session())
+                    .await;
                 match branch {
                     Ok(mut branch) => {
                         // filter out existing reorder nodes with same id
@@ -499,7 +489,7 @@ impl Branch {
 
                         branch.reordered_nodes = Some(new_reorder_nodes);
 
-                        res = branch.update().execute(session).await;
+                        res = branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::ReorderNode] Failed to find branch: {}", err);
@@ -513,7 +503,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_created_workflows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteWorkflow(id) => {
@@ -522,7 +512,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_workflows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditWorkflowTitle(id) => {
@@ -531,7 +521,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_workflow_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateFlow(id) => {
@@ -540,7 +530,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_created_flows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
@@ -549,7 +539,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_flows(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditFlowTitle(id) => {
@@ -558,7 +548,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_flow_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditFlowDescription(id) => {
@@ -567,7 +557,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_flow_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateIO(id) => {
@@ -576,7 +566,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_created_ios(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteIO(id) => {
@@ -585,7 +575,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_ios(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditIOTitle(id) => {
@@ -594,7 +584,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_io_titles(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditIODescription(id) => {
@@ -603,7 +593,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_edited_io_descriptions(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreateFlowStep(id) => {
@@ -612,7 +602,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_created_flow_steps(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
@@ -621,7 +611,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_flow_steps(&vec![id])
-                .execute(session)
+                .execute(data.db_session())
                 .await;
             }
             BranchUpdate::AppendFlowStepInput(node_id, io_id) => {
@@ -630,7 +620,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -642,7 +632,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .remove(&io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::AppendFlowStepInput] Failed to find branch: {}", err);
@@ -656,7 +646,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -668,7 +658,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .remove(&io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::RemoveFlowStepInput] Failed to find branch: {}", err);
@@ -682,7 +672,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -694,7 +684,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .remove(&io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::AppendFlowStepOutput] Failed to find branch: {}", err);
@@ -708,7 +698,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .find_by_primary_key()
-                .execute(session)
+                .execute(data.db_session())
                 .await;
 
                 match branch {
@@ -720,7 +710,7 @@ impl Branch {
                             .or_insert_with(Set::default)
                             .remove(&io_id);
 
-                        res = fs_branch.update().execute(session).await;
+                        res = fs_branch.update().execute(data.db_session()).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::RemoveFlowStepOutput] Failed to find branch: {}", err);
@@ -734,7 +724,7 @@ impl Branch {
             error!("Failed to undo update branch: {}", err)
         }
 
-        Self::check_branch_conflicts(branch_id, session).await?;
+        Self::check_branch_conflicts(branch_id, data).await;
 
         Ok(())
     }

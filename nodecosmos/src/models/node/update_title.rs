@@ -79,6 +79,14 @@ impl UpdateTitleNode {
         Ok(())
     }
 
+    pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            Branch::update(&data, self.branch_id, BranchUpdate::EditNodeTitle(self.id)).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
             self.update_elastic_document(elastic_client).await;
@@ -100,15 +108,5 @@ impl UpdateTitleNode {
         .map_err(|e| {
             error!("UpdateTitleNode::create_new_version {}", e);
         });
-    }
-    pub async fn update_branch(&self, req_data: &RequestData) {
-        if self.is_branched() {
-            Branch::update(
-                &req_data.db_session(),
-                self.branch_id,
-                BranchUpdate::EditNodeTitle(self.id),
-            )
-            .await;
-        }
     }
 }

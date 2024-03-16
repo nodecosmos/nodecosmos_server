@@ -15,35 +15,29 @@ impl Callbacks for Like {
         Ok(())
     }
 
-    async fn after_insert(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let mut self_clone = self.clone();
-        let app = req_data.app.clone();
-        let req_data = req_data.clone();
+        let app = data.app.clone();
+        let data = data.clone();
 
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone
-                .update_model_like_count(session, &req_data, true)
-                .await
-                .unwrap();
+            self_clone.update_model_like_count(session, &data, true).await.unwrap();
         });
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, _: &CachingSession, req_data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let mut self_clone = self.clone();
-        let app = req_data.app.clone();
-        let req_data = req_data.clone();
+        let app = data.app.clone();
+        let data = data.clone();
 
         tokio::spawn(async move {
             let session = &app.db_session;
 
-            self_clone
-                .update_model_like_count(session, &req_data, false)
-                .await
-                .unwrap();
+            self_clone.update_model_like_count(session, &data, false).await.unwrap();
         });
 
         Ok(())

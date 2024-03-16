@@ -23,14 +23,9 @@ pub async fn restore_node(data: RequestData, params: web::Json<BranchNodeParams>
 
     branch.auth_update(&data).await?;
 
-    Branch::update(
-        data.db_session(),
-        params.branch_id,
-        BranchUpdate::RestoreNode(params.node_id),
-    )
-    .await;
+    Branch::update(&data, params.branch_id, BranchUpdate::RestoreNode(params.node_id)).await?;
 
-    branch.reload(data.db_session()).await?;
+    let _ = branch.check_conflicts(data.db_session()).await;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -42,14 +37,9 @@ pub async fn undo_delete_node(data: RequestData, params: web::Json<BranchNodePar
 
     branch.auth_update(&data).await?;
 
-    Branch::update(
-        data.db_session(),
-        params.branch_id,
-        BranchUpdate::UndoDeleteNode(params.node_id),
-    )
-    .await;
+    Branch::update(&data, params.branch_id, BranchUpdate::UndoDeleteNode(params.node_id)).await?;
 
-    branch.reload(data.db_session()).await?;
+    let _ = branch.check_conflicts(data.db_session()).await;
 
     Ok(HttpResponse::Ok().json(branch))
 }

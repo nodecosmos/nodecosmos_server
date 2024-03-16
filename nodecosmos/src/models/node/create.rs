@@ -128,10 +128,6 @@ impl Node {
         Ok(())
     }
 
-    pub async fn test(&self) -> Result<(), NodecosmosError> {
-        Ok(())
-    }
-
     pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
@@ -313,8 +309,8 @@ impl Node {
         }
     }
 
-    pub async fn create_new_version(&self, req_data: &RequestData) {
-        let _ = NodeCommit::handle_creation(&req_data.db_session(), &self, req_data.current_user_id())
+    pub async fn create_new_version(&self, data: &RequestData) {
+        let _ = NodeCommit::handle_creation(&data.db_session(), &self, data.current_user_id())
             .map_err(|e| {
                 error!("Error creating new version for node {}: {:?}", self.id, e);
 
@@ -323,27 +319,18 @@ impl Node {
             .await;
     }
 
-    pub async fn update_branch_with_creation(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::update(
-                &req_data.db_session(),
-                self.branch_id,
-                BranchUpdate::CreateNode(self.id),
-            )
-            .await?;
+            Branch::update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
         }
 
         Ok(())
     }
 
-    pub async fn undo_update_branch_with_creation(&self, request_data: &RequestData) -> Result<(), NodecosmosError> {
+    #[allow(unused)]
+    pub async fn undo_update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::undo_update(
-                &request_data.db_session(),
-                self.branch_id,
-                BranchUpdate::CreateNode(self.id),
-            )
-            .await?;
+            Branch::undo_update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
         }
 
         Ok(())

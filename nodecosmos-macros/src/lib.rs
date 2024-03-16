@@ -101,6 +101,40 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::authorization::AuthorizationFields for #name {
+            fn is_public(&self) -> bool {
+                use crate::models::traits::authorization::AuthorizationFields;
+
+                if self.is_original() {
+                    return self.is_public;
+                }
+
+                return match &self.auth_branch {
+                    Some(branch) => branch.is_public,
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        false
+                    }
+                };
+            }
+
+            fn is_frozen(&self) -> bool {
+                use crate::models::traits::authorization::AuthorizationFields;
+
+                if self.is_branched() {
+                    return match &self.auth_branch {
+                        Some(branch) => branch.is_frozen(),
+                        None => {
+                            log::error!("Branched node {} has no branch!", self.id);
+
+                            false
+                        }
+                    };
+                }
+
+                false
+            }
+
             fn owner_id(&self) -> Option<Uuid> {
                 if self.is_original() {
                     return self.owner_id;

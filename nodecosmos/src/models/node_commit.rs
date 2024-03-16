@@ -136,6 +136,7 @@ impl NodeCommit {
         return Ok(commits);
     }
 
+    #[allow(unused)]
     pub async fn prev_commit(&self, session: &CachingSession) -> Result<Option<Self>, CharybdisError> {
         if let (Some(prev_commit_id), Some(prev_commit_branch_id)) = (self.prev_commit_id, self.prev_commit_branch_id) {
             let res = find_first_node_commit!(
@@ -188,6 +189,7 @@ impl NodeCommit {
         Ok(vec![])
     }
 
+    #[allow(unused)]
     pub async fn latest_descendant_commits(&self, session: &CachingSession) -> Result<Vec<Self>, NodecosmosError> {
         let vd = self.node_descendants_commit(session).await?;
 

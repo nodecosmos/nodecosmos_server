@@ -198,12 +198,6 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        *self = Branch::find_by_id(self.id).execute(db_session).await?;
-
-        Ok(())
-    }
-
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if self.node.is_none() {
             let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
@@ -218,7 +212,7 @@ impl Branch {
 
     pub async fn created_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let (None, Some(created_node_ids)) = (&self._created_nodes, &self.created_nodes) {
-            let mut created_nodes = Node::find_branch_nodes(db_session, self.id, &created_node_ids).await?;
+            let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, self.id).await?;
 
             created_nodes.sort_by_depth();
 
@@ -230,7 +224,7 @@ impl Branch {
 
     pub async fn restored_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let (None, Some(restored_node_ids)) = (&self._restored_nodes, &self.restored_nodes) {
-            let mut branched_nodes = Node::find_branch_nodes(db_session, self.id, &restored_node_ids).await?;
+            let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, self.id).await?;
             let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
                 .await?
                 .pluck_id_set();

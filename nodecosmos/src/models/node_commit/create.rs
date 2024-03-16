@@ -25,6 +25,7 @@ pub struct TreePositionChange {
 type RemovedIds = Vec<Uuid>;
 pub(crate) type NewDescendantCommitById = HashMap<Uuid, Uuid>;
 
+#[allow(unused)]
 pub enum NodeChange {
     Title(String),
     Description(Uuid),
@@ -146,19 +147,18 @@ impl NodeCommit {
         Ok(new_node_commit)
     }
 
-    pub async fn handle_deletion(request_data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        let mut node_commit = NodeCommit::find_latest(request_data.db_session(), &node.id, &node.branch_id).await?;
+    pub async fn handle_deletion(data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
+        let mut node_commit = NodeCommit::find_latest(data.db_session(), &node.id, &node.branch_id).await?;
 
         node_commit
-            .create_ancestors_commits_for_deleted_node(request_data.db_session())
+            .create_ancestors_commits_for_deleted_node(data.db_session())
             .await?;
 
         Ok(())
     }
 
-    pub async fn handle_reorder(request_data: &RequestData, reorder_data: &ReorderData) {
-        let reorder_commit =
-            ReorderCommit::from_reorder_data(request_data.db_session(), request_data.current_user_id(), &reorder_data);
+    pub async fn handle_reorder(data: &RequestData, reorder_data: &ReorderData) {
+        let reorder_commit = ReorderCommit::from_reorder_data(data.db_session(), data.current_user_id(), &reorder_data);
         let res = reorder_commit.create().await;
         match res {
             Ok(_) => {}

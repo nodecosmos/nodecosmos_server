@@ -69,8 +69,8 @@ impl<'a, M: BaseModel + Serialize> ModelEvent<'a, M> {
         Ok(msg)
     }
 
-    pub async fn send(&self, request_data: &RequestData) -> Result<(), NodecosmosError> {
-        let sse_broadcast = request_data.sse_broadcast();
+    pub async fn send(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let sse_broadcast = data.sse_broadcast();
         let msg = self.to_sse()?;
 
         sse_broadcast.send_message(self.node_id, msg).await

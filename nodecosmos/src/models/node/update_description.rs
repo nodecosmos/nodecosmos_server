@@ -1,4 +1,5 @@
 use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::description_commit::DescriptionCommit;
@@ -18,12 +19,12 @@ impl UpdateDescriptionNode {
         }
     }
 
-    pub async fn create_new_version(&self, req_data: &RequestData) {
+    pub async fn create_new_version(&self, data: &RequestData) {
         let description_version = DescriptionCommit::new(self.description_base64.clone());
 
         let _ = description_version
             .insert()
-            .execute(req_data.db_session())
+            .execute(data.db_session())
             .await
             .map_err(|e| {
                 error!("[create_new_version::insert] {}", e);
@@ -33,10 +34,10 @@ impl UpdateDescriptionNode {
         let changes = vec![NodeChange::Description(description_version.id)];
 
         let _ = NodeCommit::handle_change(
-            req_data.db_session(),
+            data.db_session(),
             self.id,
             self.branch_id,
-            req_data.current_user_id(),
+            data.current_user_id(),
             &changes,
             true,
         )
@@ -47,14 +48,11 @@ impl UpdateDescriptionNode {
         });
     }
 
-    pub async fn update_branch(&self, req_data: &RequestData) {
+    pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::update(
-                &req_data.db_session(),
-                self.branch_id,
-                BranchUpdate::EditNodeDescription(self.id),
-            )
-            .await;
+            Branch::update(&data, self.branch_id, BranchUpdate::EditNodeDescription(self.id)).await?;
         }
+
+        Ok(())
     }
 }

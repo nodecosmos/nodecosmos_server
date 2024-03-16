@@ -7,11 +7,8 @@ use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::options::Consistency;
-use futures::future::LocalBoxFuture;
 use log::error;
 use scylla::CachingSession;
-
-const NONE: Option<LocalBoxFuture<Result<(), NodecosmosError>>> = None;
 
 impl Callbacks for Node {
     type Extension = RequestData;
@@ -26,13 +23,21 @@ impl Callbacks for Node {
         }
 
         self.preserve_ancestors_for_branch(data).await?;
-        self.append_to_ancestors(session).await?;
-        self.update_branch_with_creation(data).await?;
+
+        if let Err(e) = self.append_to_ancestors(session).await {
+            self.remove_from_ancestors(session).await?;
+            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+        }
+
+        if let Err(e) = self.update_branch_with_creation(data).await {
+            self.remove_from_ancestors(session).await?;
+            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+        }
 
         Ok(())
     }
 
-    async fn after_insert(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
         let data = data.clone();
 
@@ -44,14 +49,14 @@ impl Callbacks for Node {
         Ok(())
     }
 
-    async fn before_delete(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.delete_related_data(data).await?;
         self.preserve_ancestors_for_branch(data).await?;
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.update_branch_with_deletion(data).await?;
 
         let mut self_clone = self.clone();
@@ -103,17 +108,18 @@ impl Callbacks for UpdateDescriptionNode {
             }
         }
 
+        self.update_branch(&data).await?;
+
         Ok(())
     }
 
-    async fn after_update(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
         let data = data.clone();
 
         tokio::spawn(async move {
             self_clone.update_elastic_index(data.elastic_client()).await;
             self_clone.create_new_version(&data).await;
-            self_clone.update_branch(&data).await;
         });
 
         Ok(())
@@ -124,17 +130,18 @@ impl Callbacks for UpdateTitleNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             self.as_native().create_branched_if_not_exist(data).await?;
         }
 
+        self.update_branch(&data).await?;
         self.updated_at = Some(chrono::Utc::now());
 
         Ok(())
     }
 
-    async fn after_update(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.update_title_for_ancestors(data).await?;
 
         let self_clone = self.clone();
@@ -143,7 +150,6 @@ impl Callbacks for UpdateTitleNode {
         tokio::spawn(async move {
             self_clone.update_elastic_index(data.elastic_client()).await;
             self_clone.create_new_version(&data).await;
-            self_clone.update_branch(&data).await;
         });
 
         Ok(())
@@ -158,8 +164,8 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
 
             async fn before_update(
                 &mut self,
-                session: &CachingSession,
-                data: &Self::Extension,
+                _session: &CachingSession,
+                _data: &Self::Extension,
             ) -> Result<(), NodecosmosError> {
                 self.updated_at = Some(chrono::Utc::now());
 
@@ -168,7 +174,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
 
             async fn after_update(
                 &mut self,
-                session: &CachingSession,
+                _session: &CachingSession,
                 data: &Self::Extension,
             ) -> Result<(), NodecosmosError> {
                 use crate::models::traits::ElasticDocument;

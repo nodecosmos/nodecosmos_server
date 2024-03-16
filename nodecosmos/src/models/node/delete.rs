@@ -24,12 +24,12 @@ use scylla::CachingSession;
 use std::collections::HashMap;
 
 impl Node {
-    pub async fn delete_related_data(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
-        NodeDelete::new(self, &req_data).run().await
+    pub async fn delete_related_data(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        NodeDelete::new(self, &data).run().await
     }
 
-    pub async fn create_new_version_for_ancestors(&self, req_data: &RequestData) {
-        let _ = NodeCommit::handle_deletion(req_data, &self)
+    pub async fn create_new_version_for_ancestors(&self, data: &RequestData) {
+        let _ = NodeCommit::handle_deletion(data, &self)
             .map_err(|e| {
                 error!("Node::create_new_version_for_ancestors:: id {}: {:?}", self.id, e);
 
@@ -38,14 +38,9 @@ impl Node {
             .await;
     }
 
-    pub async fn update_branch_with_deletion(&self, req_data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::update(
-                &req_data.db_session(),
-                self.branch_id,
-                BranchUpdate::DeleteNode(self.id),
-            )
-            .await?;
+            Branch::update(&data, self.branch_id, BranchUpdate::DeleteNode(self.id)).await?;
         }
 
         Ok(())
@@ -66,10 +61,10 @@ pub struct NodeDelete<'a> {
 }
 
 impl<'a> NodeDelete<'a> {
-    pub fn new(node: &'a Node, req_data: &'a RequestData) -> NodeDelete<'a> {
+    pub fn new(node: &'a Node, data: &'a RequestData) -> NodeDelete<'a> {
         Self {
-            db_session: &req_data.app.db_session,
-            elastic_client: &req_data.app.elastic_client,
+            db_session: &data.app.db_session,
+            elastic_client: &data.app.elastic_client,
             node,
             node_ids_to_delete: vec![node.id],
             children_by_parent_id: ChildrenByParentId::new(),

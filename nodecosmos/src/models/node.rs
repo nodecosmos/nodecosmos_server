@@ -46,13 +46,13 @@ pub struct Node {
     #[serde(rename = "versionId")]
     pub version_id: Option<Uuid>,
 
-    #[serde(rename = "isPublic")]
+    #[serde(rename = "isPublic", default)]
     pub is_public: Boolean,
 
     #[serde(rename = "isRoot")]
     pub is_root: Boolean,
 
-    #[serde(rename = "order")]
+    #[serde(rename = "order", default)]
     pub order_index: Double,
 
     pub title: Text,
@@ -151,52 +151,18 @@ impl Node {
         };
     }
 
-    pub async fn find_branch_nodes(
+    pub async fn find_by_ids_and_branch_id(
         db_session: &CachingSession,
-        branch_id: Uuid,
         ids: &Set<Uuid>,
+        branch_id: Uuid,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
+        let res = find_node!("id = IN ? AND branch_id = ?", (ids, branch_id))
             .execute(db_session)
             .await?
             .try_collect()
             .await?;
 
         Ok(res)
-    }
-
-    pub async fn transform_to_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branch_self = Self::find_by_primary_key_value(&(self.id, self.branch_id))
-            .execute(db_session)
-            .await
-            .ok();
-
-        match branch_self {
-            Some(mut branch_self) => {
-                branch_self.parent = self.parent.take();
-                branch_self.auth_branch = self.auth_branch.take();
-                branch_self.ctx = self.ctx;
-
-                *self = branch_self;
-            }
-            None => {
-                let parent = self.parent.take();
-                let auth_branch = self.auth_branch.take();
-                let branch_id = self.branch_id;
-                let ctx = self.ctx;
-
-                *self = Self::find_by_primary_key_value(&(self.id, self.id))
-                    .execute(db_session)
-                    .await?;
-
-                self.branch_id = branch_id;
-                self.parent = parent;
-                self.auth_branch = auth_branch;
-                self.ctx = ctx;
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -275,6 +241,7 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     description,
     description_markdown,
     cover_image_url,
@@ -290,6 +257,7 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     description,
     description_markdown,
     description_base64,
@@ -306,12 +274,13 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     parent_id,
     ancestor_ids,
     order_index,
     parent,
-    ctx,
-    auth_branch
+    auth_branch,
+    ctx
 );
 
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
@@ -325,6 +294,7 @@ partial_node!(
     order_index,
     owner_id,
     editor_ids,
+    is_public,
     ancestor_ids,
     title,
     updated_at,
@@ -341,6 +311,7 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     description,
     short_description,
     description_markdown,
@@ -364,6 +335,7 @@ impl UpdateDescriptionNode {
             updated_at: node.updated_at,
             owner_id: node.owner_id,
             editor_ids: node.editor_ids,
+            is_public: node.is_public,
             auth_branch: node.auth_branch,
             parent_id: node.parent_id,
             parent: node.parent,
@@ -378,6 +350,7 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     cover_image_filename,
     cover_image_url,
     updated_at,
@@ -394,74 +367,10 @@ partial_node!(
     branch_id,
     owner_id,
     editor_ids,
+    is_public,
     parent_id,
     parent,
     auth_branch
 );
 
 partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
-
-macro_rules! find_branched_or_original {
-    ($struct_name:ident) => {
-        impl $struct_name {
-            #[allow(unused)]
-            pub async fn find_branched_or_original(
-                db_session: &CachingSession,
-                id: Uuid,
-                branch_id: Uuid,
-                consistency: Option<scylla::statement::Consistency>,
-            ) -> Result<Self, NodecosmosError> {
-                let pk = &(id, branch_id);
-                let mut node_q = Self::maybe_find_by_primary_key_value(pk);
-
-                if let Some(consistency) = consistency {
-                    node_q = node_q.consistency(consistency);
-                }
-
-                let node = node_q.execute(db_session).await?;
-
-                return match node {
-                    Some(node) => Ok(node),
-                    None => {
-                        let mut node = Self::find_by_primary_key_value(&(id, id))
-                            .execute(db_session)
-                            .await?;
-                        node.branch_id = branch_id;
-
-                        Ok(node)
-                    }
-                };
-            }
-
-            #[allow(unused)]
-            pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-                let branch_self = Self::maybe_find_by_primary_key_value(&(self.id, self.branch_id))
-                    .execute(db_session)
-                    .await?;
-
-                match branch_self {
-                    Some(branch_self) => {
-                        *self = branch_self;
-                    }
-                    None => {
-                        let branch_id = self.branch_id;
-
-                        *self = Self::find_by_primary_key_value(&(self.id, self.id))
-                            .execute(db_session)
-                            .await?;
-                        self.branch_id = branch_id;
-                    }
-                }
-
-                Ok(())
-            }
-        }
-    };
-}
-
-find_branched_or_original!(Node);
-find_branched_or_original!(GetStructureNode);
-find_branched_or_original!(GetDescriptionNode);
-find_branched_or_original!(GetDescriptionBase64Node);
-find_branched_or_original!(UpdateTitleNode);
-find_branched_or_original!(UpdateDescriptionNode);

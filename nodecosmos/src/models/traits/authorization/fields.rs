@@ -1,4 +1,4 @@
-use crate::models::branch::{Branch, BranchStatus};
+use crate::models::branch::{AuthBranch, Branch, BranchStatus};
 use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
@@ -23,6 +23,26 @@ pub trait AuthorizationFields {
 }
 
 impl AuthorizationFields for Branch {
+    fn owner_id(&self) -> Option<Uuid> {
+        Some(self.owner_id)
+    }
+
+    fn editor_ids(&self) -> Option<Set<Uuid>> {
+        self.editor_ids.clone()
+    }
+
+    fn is_frozen(&self) -> bool {
+        self.status == Some(BranchStatus::Merged.to_string())
+            || self.status == Some(BranchStatus::RecoveryFailed.to_string())
+            || self.status == Some(BranchStatus::Closed.to_string())
+    }
+
+    fn is_public(&self) -> bool {
+        self.is_public
+    }
+}
+
+impl AuthorizationFields for AuthBranch {
     fn owner_id(&self) -> Option<Uuid> {
         Some(self.owner_id)
     }

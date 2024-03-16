@@ -59,18 +59,18 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
             async fn after_update(
                 &mut self,
                 _session: &charybdis::CachingSession,
-                req_data: &Self::Extension,
+                data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::models::node::UpdateOwnerNode;
                 use crate::models::traits::ElasticDocument;
 
-                self.update_elastic_document(req_data.elastic_client()).await;
+                self.update_elastic_document(data.elastic_client()).await;
 
                 let user_id = self.id.clone();
-                let req_data = req_data.clone();
+                let data = data.clone();
 
                 tokio::spawn(async move {
-                    UpdateOwnerNode::update_owner_records(&req_data, user_id).await;
+                    UpdateOwnerNode::update_owner_records(&data, user_id).await;
                 });
 
                 Ok(())

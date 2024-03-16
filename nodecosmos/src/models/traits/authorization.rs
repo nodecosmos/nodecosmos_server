@@ -67,9 +67,9 @@ pub trait Authorization: AuthorizationFields {
 
         return match current_user.0 {
             Some(current_user) => {
-                let req_data = RequestData::new(app.clone(), current_user);
+                let data = RequestData::new(app.clone(), current_user);
 
-                self.auth_update(&req_data).await?;
+                self.auth_update(&data).await?;
 
                 Ok(())
             }

@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::node::{Descendants, Parent};
+use crate::models::traits::node::{Descendants, FindBranched, Parent};
 use crate::models::traits::{Branchable, Pluck};
 use crate::utils::cloned_ref::ClonedRef;
 use charybdis::operations::Find;
@@ -28,6 +28,9 @@ pub struct ReorderData {
 
     pub removed_ancestor_ids: Vec<Uuid>,
     pub added_ancestor_ids: Vec<Uuid>,
+
+    pub new_upper_sibling_id: Option<Uuid>,
+    pub new_lower_sibling_id: Option<Uuid>,
 
     pub new_upper_sibling: Option<GetStructureNode>,
     pub new_lower_sibling: Option<GetStructureNode>,
@@ -178,13 +181,13 @@ impl ReorderData {
             .collect()
     }
 
-    pub async fn from_params(params: &ReorderParams, req_data: &RequestData) -> Result<Self, NodecosmosError> {
-        let node = Node::find_or_insert_branched(req_data, params.id, params.branch_id, Some(Consistency::All)).await?;
-        let descendants = Self::find_descendants(req_data.db_session(), params, &node).await?;
+    pub async fn from_params(params: &ReorderParams, data: &RequestData) -> Result<Self, NodecosmosError> {
+        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, Some(Consistency::All)).await?;
+        let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 
         let old_parent_id = node.parent_id;
-        let new_parent = Self::find_new_parent(req_data.db_session(), params).await?;
+        let new_parent = Self::find_new_parent(data.db_session(), params).await?;
 
         let old_ancestor_ids = node.ancestor_ids.cloned_ref();
         let new_ancestor_ids = Self::build_new_ancestor_ids(&new_parent);
@@ -193,9 +196,9 @@ impl ReorderData {
         let added_ancestor_ids = Self::extract_added_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
 
         let new_upper_sibling =
-            Self::init_sibling(req_data.db_session(), params.new_upper_sibling_id, params.branch_id).await?;
+            Self::init_sibling(data.db_session(), params.new_upper_sibling_id, params.branch_id).await?;
         let new_lower_sibling =
-            Self::init_sibling(req_data.db_session(), params.new_lower_sibling_id, params.branch_id).await?;
+            Self::init_sibling(data.db_session(), params.new_lower_sibling_id, params.branch_id).await?;
 
         let old_order_index = node.order_index;
         let new_order_index = match params.new_order_index {
@@ -204,8 +207,8 @@ impl ReorderData {
         };
 
         // used for recovery in case of failure mid-reorder
-        let tree_root = Self::find_tree_root(req_data.db_session(), &node).await?;
-        let tree_descendants = Self::find_tree_descendants(req_data.db_session(), &tree_root, params).await?;
+        let tree_root = Self::find_tree_root(data.db_session(), &node).await?;
+        let tree_descendants = Self::find_tree_descendants(data.db_session(), &tree_root, params).await?;
 
         let data = ReorderData {
             node,
@@ -221,6 +224,9 @@ impl ReorderData {
 
             removed_ancestor_ids,
             added_ancestor_ids,
+
+            new_upper_sibling_id: params.new_upper_sibling_id,
+            new_lower_sibling_id: params.new_lower_sibling_id,
 
             new_upper_sibling,
             new_lower_sibling,

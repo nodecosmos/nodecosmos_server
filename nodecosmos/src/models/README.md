@@ -9,7 +9,7 @@
   avoid blocking the main thread.
 * In `<models>/<partial_model>` we define logic for partial model that's not related to 'read` methods.
 * In `traits/` directory we define and implement traits for models
-* in `traits/<model>.rs` we define model's traits that are implemented by model and it's partial models
+* in `traits/<model>` we define model's traits that are implemented by model and it's partial models
 * in `nodecosmos-macros` we define derives for models
 
 ### Exceptions
