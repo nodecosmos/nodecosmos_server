@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::contribution_request::ContributionRequest;
 use crate::models::like::Like;
 use crate::models::node::reorder::data::ReorderData;
 use charybdis::types::Uuid;
@@ -36,16 +35,6 @@ pub trait Branchable {
         let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
 
         Ok(branch)
-    }
-}
-
-impl Branchable for ContributionRequest {
-    fn id(&self) -> Uuid {
-        self.id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.id
     }
 }
 

@@ -14,13 +14,13 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
     data.resource_locker()
-        .lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL)
+        .lock_resource(flow_step.flow_id, flow_step.flow_id, LOCKER_TTL)
         .await?;
 
     let res = flow_step.insert_cb(&None).execute(data.db_session()).await;
 
     data.resource_locker()
-        .unlock_resource(&flow_step.flow_id.to_string())
+        .unlock_resource(flow_step.flow_id, flow_step.flow_id)
         .await?;
 
     match res {
@@ -77,17 +77,13 @@ pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>)
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.node_id).await?;
 
     data.resource_locker()
-        .validate_resource_unlocked(&flow_step.flow_id.to_string())
-        .await?;
-
-    data.resource_locker()
-        .lock_resource(&flow_step.flow_id.to_string(), LOCKER_TTL)
+        .lock_resource(flow_step.flow_id, flow_step.flow_id, LOCKER_TTL)
         .await?;
 
     flow_step.delete_cb(&None).execute(data.db_session()).await?;
 
     data.resource_locker()
-        .unlock_resource(&flow_step.flow_id.to_string())
+        .unlock_resource(flow_step.flow_id, flow_step.flow_id)
         .await?;
 
     Ok(HttpResponse::Ok().json(flow_step))

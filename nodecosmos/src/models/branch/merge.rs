@@ -7,7 +7,7 @@ use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
-use crate::models::traits::GroupById;
+use crate::models::traits::{Branchable, GroupById};
 use crate::models::udts::TextChange;
 use crate::utils::cloned_ref::ClonedRef;
 use crate::utils::file::read_file_names;
@@ -231,11 +231,13 @@ impl BranchMerge {
     }
 
     async fn unlock_resource(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let root_id = self.branch.node(data.db_session()).await?.root_id;
+        let node = self.branch.node(data.db_session()).await?;
 
-        data.resource_locker().unlock_resource(&root_id.to_string()).await?;
         data.resource_locker()
-            .unlock_resource_action(ActionTypes::Merge, &root_id.to_string())
+            .unlock_resource(node.root_id, node.branchise_id(node.root_id))
+            .await?;
+        data.resource_locker()
+            .unlock_resource_action(ActionTypes::Merge, node.root_id, node.branchise_id(node.root_id))
             .await?;
 
         Ok(())

@@ -26,6 +26,8 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
+/// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all partial models
+/// if they have `auth_branch` field.
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
@@ -156,7 +158,7 @@ impl Node {
         ids: &Set<Uuid>,
         branch_id: Uuid,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        let res = find_node!("id = IN ? AND branch_id = ?", (ids, branch_id))
+        let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
             .execute(db_session)
             .await?
             .try_collect()

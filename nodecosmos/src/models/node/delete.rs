@@ -95,6 +95,7 @@ impl<'a> NodeDelete<'a> {
 
             self.delete_elastic_data().await;
         }
+
         Ok(())
     }
 

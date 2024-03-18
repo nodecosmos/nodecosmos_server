@@ -117,16 +117,6 @@ impl AuthorizationFields for Comment {
 }
 
 impl AuthorizationFields for Workflow {
-    fn is_public(&self) -> bool {
-        if let Some(node) = &self.node {
-            return node.is_public;
-        }
-
-        error!("Workflow {} is missing node {}", self.id, self.node_id);
-
-        false
-    }
-
     fn owner_id(&self) -> Option<Uuid> {
         if let Some(node) = &self.node {
             return node.owner_id;
@@ -145,5 +135,15 @@ impl AuthorizationFields for Workflow {
         error!("Workflow {} is missing node {}", self.id, self.node_id);
 
         None
+    }
+
+    fn is_public(&self) -> bool {
+        if let Some(node) = &self.node {
+            return node.is_public;
+        }
+
+        error!("Workflow {} is missing node {}", self.id, self.node_id);
+
+        false
     }
 }

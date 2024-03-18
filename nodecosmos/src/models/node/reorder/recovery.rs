@@ -81,7 +81,7 @@ impl<'a> Recovery<'a> {
                 );
 
                 self.resource_locker
-                    .unlock_resource(&self.reorder_data.tree_root.id.to_string())
+                    .unlock_resource(self.reorder_data.tree_root.id, self.reorder_data.tree_root.branch_id)
                     .await?;
             }
             Err(err) => {

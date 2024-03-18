@@ -201,8 +201,12 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
 
                 if self.is_branched() {
                     self.auth_update(data).await?;
-                } else if let Some(parent) = self.parent(data.db_session()).await? {
-                    parent.auth_update(data).await?;
+                } else if let Some(parent_id) = self.parent_id {
+                    let mut auth_parent_node = crate::models::node::AuthNode::find_by_id_and_branch_id(parent_id, parent_id)
+                        .execute(data.db_session())
+                        .await?;
+
+                    auth_parent_node.auth_update(data).await?;
                 }
 
                 Ok(())

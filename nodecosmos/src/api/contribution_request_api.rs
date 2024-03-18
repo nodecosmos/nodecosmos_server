@@ -1,10 +1,12 @@
 use crate::api::data::RequestData;
-use crate::api::types::Response;
+use crate::api::types::{ActionTypes, Response};
 use crate::errors::NodecosmosError;
+use crate::models::branch::Branch;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
 use crate::models::traits::Authorization;
+use crate::resources::resource_locker::ResourceLocker;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{Delete, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
@@ -32,12 +34,12 @@ pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let mut contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
-    contribution_request.branch(&db_session).await?;
+    let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
+    let branch = Branch::find_by_id(contribution_request.id).execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "contributionRequest": contribution_request,
-        "branch": contribution_request.branch,
+        "branch": branch,
     })))
 }
 
@@ -116,14 +118,51 @@ pub async fn merge_contribution_request(
         .find_by_primary_key()
         .execute(data.db_session())
         .await?;
+    let branch_id = contribution_request.id;
     let node = contribution_request.node(data.db_session()).await?;
+    let root_id = node.root_id;
 
     node.auth_update(&data).await?;
 
+    // first lock the complete resource to avoid all types of race conditions
+    data.resource_locker()
+        .lock_resource(root_id, root_id, ResourceLocker::ONE_HOUR)
+        .await?;
+
+    // check if merge is allowed in the root
+    if let Err(e) = data
+        .resource_locker()
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, root_id)
+        .await
+    {
+        // unlock complete resource as merge is not allowed
+        data.resource_locker().unlock_resource(root_id, root_id).await?;
+
+        // return reorder not allowed error
+        return Err(e);
+    }
+
+    // check if merge is allowed in the branch
+    if let Err(e) = data
+        .resource_locker()
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, branch_id)
+        .await
+    {
+        // unlock complete resource as merge is not allowed
+        data.resource_locker().unlock_resource(root_id, root_id).await?;
+
+        // return reorder not allowed error
+        return Err(e);
+    }
+
+    // execute merge
     let res = contribution_request.merge(&data).await;
 
+    // unlock complete resource
+    data.resource_locker().unlock_resource(root_id, root_id).await?;
+
     match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(contribution_request)),
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => match e {
             NodecosmosError::Conflict(e) => {
                 let branch = contribution_request.branch(data.db_session()).await?;

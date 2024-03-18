@@ -52,6 +52,7 @@ impl Callbacks for Node {
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.delete_related_data(data).await?;
         self.preserve_ancestors_for_branch(data).await?;
+        self.preserve_descendants_for_branch(data).await?;
 
         Ok(())
     }

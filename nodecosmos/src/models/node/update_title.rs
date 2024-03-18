@@ -1,9 +1,7 @@
 use crate::api::data::RequestData;
-use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::node::context::Context;
 use crate::models::node::UpdateTitleNode;
 use crate::models::node_commit::create::NodeChange;
 use crate::models::node_commit::NodeCommit;
@@ -11,36 +9,12 @@ use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::traits::ElasticDocument;
 use charybdis::batch::ModelBatch;
-use charybdis::model::AsNative;
 use elasticsearch::Elasticsearch;
 use log::error;
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
     pub async fn update_title_for_ancestors(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        // lock resource unless it's a merge as it's already locked
-        if self.ctx != Context::Merge {
-            data.resource_locker()
-                .validate_root_unlocked(&self.as_native(), true)
-                .await
-                .map_err(|e| {
-                    error!("::validate_root_unlocked: {}", e);
-                    e
-                })?;
-
-            data.resource_locker()
-                .lock_resource_actions(
-                    &self.as_native().root_id.to_string(),
-                    vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
-                    1000,
-                )
-                .await
-                .map_err(|e| {
-                    error!("::lock_resource_actions: {}", e);
-                    e
-                })?;
-        }
-
         if let Some(ancestor_ids) = self.ancestor_ids.clone() {
             let mut node_descendants = Vec::with_capacity(ancestor_ids.len());
 
@@ -64,16 +38,6 @@ impl UpdateTitleNode {
             {
                 error!(":chunked_update: {}", e);
             }
-        }
-
-        if self.ctx != Context::Merge {
-            data.resource_locker()
-                .unlock_resource_action(ActionTypes::Reorder(ActionObject::Node), &self.root_id.to_string())
-                .await
-                .map_err(|e| {
-                    error!("::unlock_resource_action: {}", e);
-                    e
-                })?;
         }
 
         Ok(())

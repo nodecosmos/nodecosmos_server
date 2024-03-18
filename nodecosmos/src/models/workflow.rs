@@ -92,7 +92,6 @@ impl Workflow {
         Ok(self.diagram.as_mut().unwrap())
     }
 
-    #[allow(unused)]
     pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         // TODO: introduce branch_id to workflow
         let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
@@ -101,15 +100,6 @@ impl Workflow {
         self.node = Some(node);
 
         Ok(())
-    }
-
-    #[allow(unused)]
-    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
-        if self.node.is_none() {
-            self.init_node(session).await?;
-        }
-
-        Ok(self.node.as_mut().unwrap())
     }
 
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {

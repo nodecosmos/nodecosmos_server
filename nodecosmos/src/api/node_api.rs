@@ -1,12 +1,13 @@
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
-use crate::api::types::Response;
+use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
 use crate::models::traits::node::{Descendants, FindBranched};
 use crate::models::traits::{Authorization, Branchable, MergeDescription};
+use crate::resources::resource_locker::ResourceLocker;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
@@ -124,11 +125,26 @@ pub async fn get_original_node_description_base64(
 pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
     let mut node = node.into_inner();
 
-    data.resource_locker().validate_root_unlocked(&node, true).await?;
-
     node.auth_creation(&data).await?;
 
+    data.resource_locker()
+        .lock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            ResourceLocker::TWO_SECONDS,
+        )
+        .await?;
+
     node.insert_cb(&data).execute(data.db_session()).await?;
+
+    data.resource_locker()
+        .unlock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+        )
+        .await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -138,15 +154,31 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
     let mut node = node.into_inner();
     let updated_title = node.title.clone();
 
-    node.find_branched(data.db_session()).await?;
-
     node.auth_update(&data).await?;
+
+    // prevent reorder as we need to update `NodeDescendant` title for ancestors
+    data.resource_locker()
+        .lock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            ResourceLocker::TWO_SECONDS,
+        )
+        .await?;
+
+    node.find_branched(data.db_session()).await?;
 
     node.title = updated_title;
 
-    data.resource_locker().validate_root_unlocked(&node, true).await?;
-
     node.update_cb(&data).execute(data.db_session()).await?;
+
+    data.resource_locker()
+        .unlock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+        )
+        .await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -164,24 +196,73 @@ pub async fn update_node_description(mut node: web::Json<UpdateDescriptionNode>,
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
 
-    node.find_branched(data.db_session()).await?;
-
     node.auth_update(&data).await?;
 
-    data.resource_locker().validate_root_unlocked(&node, true).await?;
+    data.resource_locker()
+        .lock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            ResourceLocker::ONE_HOUR,
+        )
+        .await?;
+
+    node.find_branched(data.db_session()).await?;
 
     node.delete_cb(&data).execute(data.db_session()).await?;
+
+    data.resource_locker()
+        .unlock_resource_actions(
+            node.root_id,
+            node.branchise_id(node.root_id),
+            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+        )
+        .await?;
 
     Ok(HttpResponse::Ok().json(node))
 }
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_branched_or_original(data.db_session(), params.id, params.branch_id, None).await?;
+    let mut node = Node {
+        id: params.id,
+        branch_id: params.branch_id,
+        ..Default::default()
+    };
 
     node.auth_update(&data).await?;
 
+    // first lock the complete resource to avoid all types of race conditions
+    data.resource_locker()
+        .lock_resource(node.root_id, node.branchise_id(node.root_id), ResourceLocker::ONE_HOUR)
+        .await?;
+
+    // validate that reorder is allowed
+    if let Err(e) = data
+        .resource_locker()
+        .validate_resource_action_unlocked(
+            ActionTypes::Reorder(ActionObject::Node),
+            node.root_id,
+            node.branchise_id(node.root_id),
+        )
+        .await
+    {
+        // unlock complete resource as reorder is not allowed
+        data.resource_locker()
+            .unlock_resource(node.root_id, node.branchise_id(node.root_id))
+            .await?;
+
+        // return reorder not allowed error
+        return Err(e);
+    }
+
+    // execute reorder
     node.reorder(&data, params.into_inner()).await?;
+
+    // unlock complete resource
+    data.resource_locker()
+        .unlock_resource(node.root_id, node.branchise_id(node.root_id))
+        .await?;
 
     Ok(HttpResponse::Ok().finish())
 }

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 #[allow(unused)]
+#[derive(Clone, Copy)]
 pub enum ActionTypes {
     Create(ActionObject),
     Read(ActionObject),
@@ -24,6 +25,7 @@ impl Display for ActionTypes {
 }
 
 #[allow(unused)]
+#[derive(Clone, Copy)]
 pub enum ActionObject {
     Node,
     Workflow,

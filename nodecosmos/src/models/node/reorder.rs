@@ -3,7 +3,6 @@ mod recovery;
 mod validator;
 
 use crate::api::data::RequestData;
-use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -14,7 +13,6 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
-use crate::resources::resource_locker::ResourceLocker;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{execute, Update};
 use charybdis::options::Consistency;
@@ -53,8 +51,6 @@ pub struct Reorder<'a> {
     pub reorder_data: &'a ReorderData,
 }
 
-const RESOURCE_LOCKER_TTL: usize = 1000 * 60 * 60; // 1 hour
-
 impl<'a> Reorder<'a> {
     pub async fn new(request_data: &'a RequestData, data: &'a ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
         Ok(Self {
@@ -64,35 +60,29 @@ impl<'a> Reorder<'a> {
         })
     }
 
-    pub async fn run(&mut self, locker: &ResourceLocker) -> Result<(), NodecosmosError> {
+    pub async fn run(&mut self) -> Result<(), NodecosmosError> {
         ReorderValidator::new(&self.reorder_data).validate()?;
-
-        locker
-            .lock_resource(&self.reorder_data.tree_root.id.to_string(), RESOURCE_LOCKER_TTL)
-            .await?;
 
         let res = self.execute_reorder().await;
 
-        return match res {
-            Ok(_) => {
-                locker
-                    .unlock_resource(&self.reorder_data.tree_root.id.to_string())
-                    .await?;
-                Ok(())
-            }
-            Err(err) => {
-                error!(
-                    "Reorder failed for tree_root node: {}\n! ERROR: {:?}",
-                    self.reorder_data.tree_root.id, err
-                );
+        if let Err(err) = res {
+            error!(
+                "Reorder failed for tree_root node: {}\n! ERROR: {:?}",
+                self.reorder_data.tree_root.id, err
+            );
 
-                Recovery::new(&self.reorder_data, &self.db_session, locker)
-                    .recover()
-                    .await?;
+            Recovery::new(
+                &self.reorder_data,
+                &self.db_session,
+                self.request_data.resource_locker(),
+            )
+            .recover()
+            .await?;
 
-                return Err(err);
-            }
-        };
+            return Err(err);
+        }
+
+        Ok(())
     }
 
     async fn execute_reorder(&mut self) -> Result<(), NodecosmosError> {
@@ -348,17 +338,12 @@ impl<'a> Reorder<'a> {
 
 impl Node {
     pub async fn reorder(&self, data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        data.resource_locker().validate_root_unlocked(self, false).await?;
-        data.resource_locker()
-            .validate_node_root_action_unlocked(&self, ActionTypes::Reorder(ActionObject::Node), true)
-            .await?;
-
         let reorder_data = ReorderData::from_params(&params, data).await?;
         let reorder_data = Arc::new(reorder_data);
 
         let mut reorder = Reorder::new(data, &reorder_data).await?;
 
-        reorder.run(data.resource_locker()).await?;
+        reorder.run().await?;
 
         let data = data.clone();
 

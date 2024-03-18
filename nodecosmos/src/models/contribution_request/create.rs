@@ -2,7 +2,6 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
-use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use charybdis::operations::Insert;
 use charybdis::types::Uuid;
@@ -34,7 +33,7 @@ impl ContributionRequest {
         let is_public = self.node(data.db_session()).await?.is_public;
 
         let branch = Branch {
-            id: self.branch_id(),
+            id: self.id, //
             title: self.title.clone(),
             description: self.description.clone(),
             owner_id: self.owner_id,

@@ -237,6 +237,49 @@ impl Node {
         Ok(())
     }
 
+    pub async fn preserve_descendants_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            let mut descendants =
+                NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+                    .execute(data.db_session())
+                    .await?;
+
+            let mut futures = vec![];
+
+            while let Some(descendant) = descendants.next().await {
+                let descendant = descendant?;
+                let descendant_node = Node {
+                    id: descendant.id,
+                    branch_id: self.branch_id,
+                    ..Default::default()
+                };
+                let future = descendant_node.create_branched_if_not_exist(&data);
+
+                futures.push(future);
+            }
+
+            let futures_stream = stream::iter(futures);
+
+            for future in futures_stream
+                .buffer_unordered(MAX_PARALLEL_REQUESTS)
+                .collect::<Vec<Result<(), NodecosmosError>>>()
+                .await
+                .into_iter()
+            {
+                if let Err(e) = future {
+                    error!(
+                        "[preserve_descendants_for_branch] Error preserving descendants for branch: {:?}",
+                        e
+                    );
+
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Create branched version of self if it doesn't exist.
     pub async fn create_branched_if_not_exist(self, data: &RequestData) -> Result<(), NodecosmosError> {
         let self_branched_res = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
