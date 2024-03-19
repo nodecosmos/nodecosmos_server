@@ -237,10 +237,48 @@ impl Node {
         Ok(())
     }
 
+    pub async fn create_branched_if_not_exist(self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let self_branched_res = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
+
+        if self_branched_res.is_none() {
+            let non_branched_res = Node::find_by_id_and_branch_id(self.id, self.id)
+                .execute(data.db_session())
+                .await;
+
+            match non_branched_res {
+                Ok(mut node) => {
+                    node.branch_id = self.branch_id;
+                    let insert = node
+                        .insert()
+                        .consistency(Consistency::All)
+                        .execute(data.db_session())
+                        .await;
+
+                    if let Err(e) = insert {
+                        error!(
+                            "Error creating branched node -> id: {} branch_id: {} from non-branched node: {:?}",
+                            node.id, self.branch_id, e
+                        );
+                    }
+
+                    node.append_to_ancestors(data.db_session()).await?;
+                    node.create_new_version(&data).await;
+                }
+                Err(e) => {
+                    error!("Error finding non-branched node {}: {:?}", self.id, e);
+
+                    return Err(NodecosmosError::from(e));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn preserve_descendants_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut descendants =
-                NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+                NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
                     .execute(data.db_session())
                     .await?;
 
@@ -280,66 +318,29 @@ impl Node {
         Ok(())
     }
 
-    /// Create branched version of self if it doesn't exist.
-    pub async fn create_branched_if_not_exist(self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let self_branched_res = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
-
-        if self_branched_res.is_none() {
-            let non_branched_res = Node::find_by_id_and_branch_id(self.id, self.id)
-                .execute(data.db_session())
-                .await;
-
-            match non_branched_res {
-                Ok(mut node) => {
-                    node.branch_id = self.branch_id;
-                    let insert = node
-                        .insert()
-                        .consistency(Consistency::All)
-                        .execute(data.db_session())
-                        .await;
-
-                    if let Err(e) = insert {
-                        error!(
-                            "Error creating branched node -> id: {} branch_id: {} from non-branched node: {:?}",
-                            node.id, self.branch_id, e
-                        );
-                    }
-
-                    node.append_to_ancestors(data.db_session()).await?;
-                    node.create_new_version(&data).await;
-                }
-                Err(e) => {
-                    error!("Error finding non-branched node {}: {:?}", self.id, e);
-
-                    return Err(NodecosmosError::from(e));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn preserve_branched_if_original_exist(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    // used to preserve deleted node for branch
+    pub async fn create_branched_if_original_exist(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            let original_res = Self::find_by_id_and_branch_id(self.id, self.id)
-                .execute(data.db_session())
-                .await;
-            match original_res {
-                Ok(mut new_branched) => {
-                    new_branched.branch_id = self.branch_id;
-                    let res = new_branched.insert().execute(data.db_session()).await;
+            let original_node = Node {
+                id: self.id,
+                branch_id: self.id,
+                ..Default::default()
+            }
+            .maybe_find_by_primary_key()
+            .execute(data.db_session())
+            .await?;
 
-                    if let Err(err) = res {
-                        error!("Node::preserve_branched_if_original_exist::new_branched_res {}", err);
+            if let Some(mut new_branched) = original_node {
+                new_branched.branch_id = self.branch_id;
+                let res = new_branched.insert().execute(data.db_session()).await;
 
-                        return Err(NodecosmosError::from(err));
-                    }
+                if let Err(err) = res {
+                    error!("Node::preserve_branched_if_original_exist::new_branched_res {}", err);
 
-                    self.append_to_ancestors(data.db_session()).await?;
+                    return Err(NodecosmosError::from(err));
                 }
-                Err(err) => {
-                    error!("Node::create_branched_if_original_exist::original_res {}", err);
-                }
+
+                self.append_to_ancestors(data.db_session()).await?;
             }
         };
 

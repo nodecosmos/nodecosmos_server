@@ -25,7 +25,11 @@ use std::collections::HashMap;
 
 impl Node {
     pub async fn delete_related_data(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        NodeDelete::new(self, &data).run().await
+        if self.is_original() {
+            NodeDelete::new(self, &data).run().await?;
+        }
+
+        Ok(())
     }
 
     pub async fn create_new_version_for_ancestors(&self, data: &RequestData) {
@@ -72,29 +76,27 @@ impl<'a> NodeDelete<'a> {
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        if self.node.is_original() {
-            self.populate_delete_data().await.map_err(|err| {
-                error!("populate_delete_data: {}", err);
-                return err;
-            })?;
+        self.populate_delete_data().await.map_err(|err| {
+            error!("populate_delete_data: {}", err);
+            return err;
+        })?;
 
-            self.delete_related_data().await.map_err(|err| {
-                error!("delete_related_data: {}", err);
-                return err;
-            })?;
+        self.delete_related_data().await.map_err(|err| {
+            error!("delete_related_data: {}", err);
+            return err;
+        })?;
 
-            self.delete_counter_data().await.map_err(|err| {
-                error!("delete_counter_data: {}", err);
-                return err;
-            })?;
+        self.delete_counter_data().await.map_err(|err| {
+            error!("delete_counter_data: {}", err);
+            return err;
+        })?;
 
-            self.delete_descendants().await.map_err(|err| {
-                error!("delete_descendants: {}", err);
-                return err;
-            })?;
+        self.delete_descendants().await.map_err(|err| {
+            error!("delete_descendants: {}", err);
+            return err;
+        })?;
 
-            self.delete_elastic_data().await;
-        }
+        self.delete_elastic_data().await;
 
         Ok(())
     }

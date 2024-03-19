@@ -53,23 +53,18 @@ impl Callbacks for Node {
         self.delete_related_data(data).await?;
         self.preserve_ancestors_for_branch(data).await?;
         self.preserve_descendants_for_branch(data).await?;
+        self.update_branch_with_deletion(data).await?;
 
         Ok(())
     }
 
     async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        self.update_branch_with_deletion(data).await?;
+        self.create_branched_if_original_exist(&data).await?;
 
-        let mut self_clone = self.clone();
+        let self_clone = self.clone();
         let data = data.clone();
 
         tokio::spawn(async move {
-            let _ = self_clone
-                .preserve_branched_if_original_exist(&data)
-                .await
-                .map_err(|e| {
-                    error!("[after_delete] Unexpected error preserving branched node: {}", e);
-                });
             self_clone.create_new_version_for_ancestors(&data).await;
         });
 
