@@ -3,23 +3,32 @@ mod create;
 mod delete;
 mod update;
 
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
+use crate::models::traits::Branchable;
 use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
+use futures::StreamExt;
+use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[charybdis_model(
     table_name = flow_steps,
-    partition_keys = [node_id],
+    partition_keys = [node_id, branch_id],
     clustering_keys = [workflow_id, flow_id, flow_index, id],
     local_secondary_indexes = [id]
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(BranchableNodeId, Serialize, Deserialize, Default, Clone)]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
 
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
@@ -76,12 +85,58 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    pub async fn find_by_node_id_and_id(
+    pub async fn branched(session: &CachingSession, params: &WorkflowParams) -> Result<Vec<FlowStep>, NodecosmosError> {
+        let mut flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
+            .execute(session)
+            .await?;
+
+        if params.is_original() {
+            Ok(flow_steps.try_collect().await?)
+        } else {
+            let mut flow_steps_map: HashMap<Uuid, FlowStep> = HashMap::new();
+
+            while let Some(flow_step) = flow_steps.next().await {
+                let flow_step = flow_step?;
+                match flow_steps_map.get(&flow_step.id) {
+                    Some(existing_flow_step) => {
+                        if existing_flow_step.branch_id == existing_flow_step.node_id {
+                            flow_steps_map.insert(flow_step.id, flow_step);
+                        }
+                    }
+                    None => {
+                        flow_steps_map.insert(flow_step.id, flow_step);
+                    }
+                }
+            }
+
+            Ok(flow_steps_map.into_values().collect())
+        }
+    }
+
+    pub async fn find_by_flow(
         session: &CachingSession,
         node_id: Uuid,
+        branch_id: Uuid,
+        workflow_id: Uuid,
+        flow_id: Uuid,
+    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
+        let res = find_flow_step!(
+            "node_id = ? AND branch_id = ? AND workflow_id = ? AND flow_id = ?",
+            (node_id, branch_id, workflow_id, flow_id)
+        )
+        .execute(session)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn find_by_node_id_and_branch_id_and_id(
+        session: &CachingSession,
+        node_id: Uuid,
+        branch_id: Uuid,
         id: Uuid,
     ) -> Result<FlowStep, NodecosmosError> {
-        let fs = find_first_flow_step!("node_id = ? AND id = ?", (node_id, id))
+        let fs = find_first_flow_step!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
             .execute(session)
             .await?;
 
@@ -93,7 +148,10 @@ impl FlowStep {
         session: &CachingSession,
     ) -> Result<&mut Option<Workflow>, NodecosmosError> {
         if self.workflow.is_none() {
-            let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
+            let workflow =
+                Workflow::find_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, self.workflow_id)
+                    .execute(session)
+                    .await?;
             self.workflow = Some(workflow);
         }
 
@@ -103,7 +161,13 @@ impl FlowStep {
     pub async fn prev_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(prev_flow_step_id) = self.prev_flow_step_id {
             if self.prev_flow_step.is_none() {
-                let res = BaseFlowStep::find_by_node_id_and_id(session, self.node_id, prev_flow_step_id).await?;
+                let res = BaseFlowStep::find_by_node_id_and_branch_id_and_id(
+                    session,
+                    self.node_id,
+                    self.branch_id,
+                    prev_flow_step_id,
+                )
+                .await?;
                 self.prev_flow_step = Some(res);
             }
         }
@@ -114,7 +178,13 @@ impl FlowStep {
     pub async fn next_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(next_flow_step_id) = self.next_flow_step_id {
             if self.next_flow_step.is_none() {
-                let res = BaseFlowStep::find_by_node_id_and_id(session, self.node_id, next_flow_step_id).await?;
+                let res = BaseFlowStep::find_by_node_id_and_branch_id_and_id(
+                    session,
+                    self.node_id,
+                    self.branch_id,
+                    next_flow_step_id,
+                )
+                .await?;
                 self.next_flow_step = Some(res);
             }
         }
@@ -126,6 +196,7 @@ impl FlowStep {
 partial_flow_step!(
     BaseFlowStep,
     node_id,
+    branch_id,
     workflow_id,
     flow_id,
     flow_index,
@@ -143,12 +214,13 @@ partial_flow_step!(
 );
 
 impl BaseFlowStep {
-    pub async fn find_by_node_id_and_id(
+    pub async fn find_by_node_id_and_branch_id_and_id(
         session: &CachingSession,
         node_id: Uuid,
+        branch_id: Uuid,
         id: Uuid,
     ) -> Result<BaseFlowStep, NodecosmosError> {
-        let fs = find_first_base_flow_step!("node_id = ? AND id = ?", (node_id, id))
+        let fs = find_first_base_flow_step!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
             .execute(session)
             .await?;
 
@@ -159,6 +231,7 @@ impl BaseFlowStep {
 partial_flow_step!(
     UpdateInputIdsFlowStep,
     node_id,
+    branch_id,
     workflow_id,
     flow_id,
     flow_index,
@@ -170,6 +243,7 @@ partial_flow_step!(
 partial_flow_step!(
     UpdateOutputIdsFlowStep,
     node_id,
+    branch_id,
     workflow_id,
     flow_id,
     flow_index,
@@ -181,6 +255,7 @@ partial_flow_step!(
 partial_flow_step!(
     UpdateNodeIdsFlowStep,
     node_id,
+    branch_id,
     workflow_id,
     flow_id,
     flow_index,
@@ -192,6 +267,7 @@ partial_flow_step!(
 partial_flow_step!(
     UpdateDescriptionFlowStep,
     node_id,
+    branch_id,
     workflow_id,
     flow_id,
     flow_index,
@@ -201,4 +277,4 @@ partial_flow_step!(
     updated_at
 );
 
-partial_flow_step!(DeleteFlowStep, node_id, workflow_id, flow_id, flow_index, id);
+partial_flow_step!(DeleteFlowStep, node_id, branch_id, workflow_id, flow_id, flow_index, id);

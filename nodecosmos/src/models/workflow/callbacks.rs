@@ -16,18 +16,16 @@ impl Callbacks for Workflow {
     updated_at_cb_fn!();
 
     async fn after_delete(&mut self, session: &CachingSession, _ext: &Self::Extension) -> Result<(), NodecosmosError> {
-        DeleteFlowStep::delete_by_node_id_and_workflow_id(self.node_id, self.id)
-            .execute(session)
-            .await?;
-        DeleteFlow::delete_by_node_id_and_workflow_id(self.node_id, self.id)
+        DeleteFlowStep::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
             .execute(session)
             .await?;
 
-        DeleteIo::delete_by_root_node_id_and_node_id(self.root_node_id, self.node_id)
+        DeleteFlow::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
             .execute(session)
             .await?;
 
-        DeleteIo::delete_by_root_node_id_and_node_id(self.root_node_id, self.node_id)
+        // NOTE: if we allow multiple workflows per node, we need to delete only the io that belongs to this workflow
+        DeleteIo::delete_by_root_node_id_and_node_id_and_branch_id(self.root_node_id, self.node_id, self.branch_id)
             .execute(session)
             .await?;
 

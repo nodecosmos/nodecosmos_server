@@ -3,39 +3,35 @@ pub mod diagram;
 
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
-use crate::models::node::Node;
 use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
+use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 /// Workflow model
 ///
-/// Currently we only support one workflow per node,
-/// in future we will support multiple workflows per node.
+/// Currently we only support one workflow per node.
 ///
-/// Single workflow can have multiple flows.
-/// Flow represents isolated process within workflow.
-/// Single flow can have many flow steps.
-/// Flow step contains inputs, nodes and outputs.
-///
-/// In that sense Workflow is a collection of flows.
-///
-/// In future we will allow multiple workflows per node.
-/// Reasoning is that we want to allow users to describe multiple processes.
-
+/// Single `Workflow` can have multiple `Flows`.
+/// `Flow` represents isolated process within `Workflow`.
+/// Single `Flow` can have many `FlowSteps`.
+/// `FlowSteps` contains inputs, nodes and outputs.
 #[charybdis_model(
     table_name = workflows,
     partition_keys = [node_id],
-    clustering_keys = [id],
+    clustering_keys = [branch_id, id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(BranchableNodeId, Serialize, Deserialize, Default, Clone)]
 pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -64,25 +60,9 @@ pub struct Workflow {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub diagram: Option<WorkflowDiagram>,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub node: Option<Node>,
 }
 
 impl Workflow {
-    pub async fn by_node_id_and_id(
-        session: &CachingSession,
-        node_id: Uuid,
-        id: Uuid,
-    ) -> Result<Workflow, NodecosmosError> {
-        let workflow = find_first_workflow!("node_id = ? AND id = ?", (node_id, id))
-            .execute(session)
-            .await?;
-
-        Ok(workflow)
-    }
-
     pub async fn diagram(&mut self, session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
         if self.diagram.is_none() {
             let diagram = WorkflowDiagram::build(session, self).await?;
@@ -92,18 +72,8 @@ impl Workflow {
         Ok(self.diagram.as_mut().unwrap())
     }
 
-    pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        // TODO: introduce branch_id to workflow
-        let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
-            .execute(session)
-            .await?;
-        self.node = Some(node);
-
-        Ok(())
-    }
-
     pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
-        let flows = Flow::find_by_node_id_and_workflow_id(self.node_id, self.id)
+        let flows = Flow::find_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
             .execute(session)
             .await?;
 
@@ -111,9 +81,16 @@ impl Workflow {
     }
 }
 
-partial_workflow!(UpdateInitialInputsWorkflow, node_id, id, initial_input_ids, updated_at);
+partial_workflow!(
+    UpdateInitialInputsWorkflow,
+    node_id,
+    branch_id,
+    id,
+    initial_input_ids,
+    updated_at
+);
 
 // used by node deletion
-partial_workflow!(DeleteWorkflow, node_id, id);
+partial_workflow!(DeleteWorkflow, node_id, branch_id, id);
 
-partial_workflow!(UpdateWorkflowTitle, node_id, id, title, updated_at);
+partial_workflow!(UpdateWorkflowTitle, node_id, branch_id, id, title, updated_at);

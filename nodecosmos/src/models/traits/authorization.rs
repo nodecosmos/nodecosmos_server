@@ -10,7 +10,6 @@ use crate::models::comment::Comment;
 use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::user::User;
-use crate::models::workflow::Workflow;
 use actix_web::web;
 use charybdis::operations::Find;
 use scylla::CachingSession;
@@ -78,18 +77,6 @@ pub trait Authorization: AuthorizationFields {
                 "message": "You must be logged in to perform this action!"
             }))),
         };
-    }
-}
-
-impl Authorization for Workflow {
-    async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        self.init_node(db_session).await?;
-
-        Ok(())
-    }
-
-    async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
-        self.auth_update(_data).await
     }
 }
 

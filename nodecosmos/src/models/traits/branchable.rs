@@ -1,3 +1,4 @@
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::like::Like;
@@ -51,6 +52,16 @@ impl Branchable for Like {
 impl Branchable for ReorderData {
     fn id(&self) -> Uuid {
         self.node.id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.branch_id
+    }
+}
+
+impl Branchable for WorkflowParams {
+    fn id(&self) -> Uuid {
+        self.node_id
     }
 
     fn branch_id(&self) -> Uuid {

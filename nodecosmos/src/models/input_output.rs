@@ -4,32 +4,40 @@ mod delete;
 mod update_description;
 mod update_title;
 
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
+use crate::models::traits::Branchable;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use crate::utils::deserializer::required;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
+use futures::StreamExt;
+use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// we group input outputs by root node id
 /// so they are accessible to all workflows within a same root node
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_node_id],
-    clustering_keys = [node_id, workflow_id, id],
+    clustering_keys = [node_id, branch_id, workflow_id, id],
     local_secondary_indexes = [id, original_id]
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(BranchableNodeId, Serialize, Deserialize, Default)]
 pub struct Io {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
 
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
+
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
 
     #[serde(rename = "workflowId")]
     pub workflow_id: Uuid,
@@ -83,13 +91,46 @@ pub struct Io {
 }
 
 impl Io {
+    pub async fn branched(
+        session: &CachingSession,
+        root_node_id: Uuid,
+        params: &WorkflowParams,
+    ) -> Result<Vec<Io>, NodecosmosError> {
+        let mut ios = Self::find_by_root_node_id(root_node_id).execute(session).await?;
+
+        if params.is_original() {
+            return Ok(ios.try_collect().await?);
+        } else {
+            let mut ios_map: HashMap<Uuid, Self> = HashMap::new();
+
+            while let Some(io) = ios.next().await {
+                let io = io?;
+                match ios_map.get(&io.id) {
+                    Some(existing_io) => {
+                        if existing_io.branch_id == existing_io.node_id {
+                            ios_map.insert(io.id, io);
+                        }
+                    }
+                    None => {
+                        ios_map.insert(io.id, io);
+                    }
+                }
+            }
+
+            Ok(ios_map.into_values().collect())
+        }
+    }
+
     pub async fn workflow(&mut self, session: &CachingSession) -> Result<&mut Option<Workflow>, NodecosmosError> {
         if self.workflow.is_none() {
             if let Some(flow_step) = &mut self.flow_step {
                 let workflow = flow_step.workflow(session).await?;
                 self.workflow = workflow.clone();
             } else {
-                let workflow = Workflow::by_node_id_and_id(session, self.node_id, self.workflow_id).await?;
+                let workflow =
+                    Workflow::find_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, self.workflow_id)
+                        .execute(session)
+                        .await?;
                 self.workflow = Some(workflow);
             }
         }
@@ -112,7 +153,9 @@ impl Io {
     pub async fn flow_step(&mut self, session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {
         if let Some(flow_step_id) = self.flow_step_id {
             if self.flow_step.is_none() {
-                let flow_step = FlowStep::find_by_node_id_and_id(session, self.node_id, flow_step_id).await?;
+                let flow_step =
+                    FlowStep::find_by_node_id_and_branch_id_and_id(session, self.node_id, self.branch_id, flow_step_id)
+                        .await?;
                 self.flow_step = Some(flow_step);
             }
         }
@@ -136,6 +179,7 @@ partial_io!(
     GetDescriptionIo,
     root_node_id,
     node_id,
+    branch_id,
     workflow_id,
     id,
     description,
@@ -146,6 +190,7 @@ partial_io!(
     UpdateDescriptionIo,
     root_node_id,
     node_id,
+    branch_id,
     workflow_id,
     id,
     original_id,
@@ -174,6 +219,7 @@ partial_io!(
     UpdateTitleIo,
     root_node_id,
     node_id,
+    branch_id,
     workflow_id,
     id,
     original_id,
@@ -197,6 +243,14 @@ impl UpdateTitleIo {
     }
 }
 
-partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, workflow_id, id);
+partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, branch_id, workflow_id, id);
 
-partial_io!(DeleteIo, root_node_id, node_id, workflow_id, id, flow_step_id);
+partial_io!(
+    DeleteIo,
+    root_node_id,
+    node_id,
+    branch_id,
+    workflow_id,
+    id,
+    flow_step_id
+);

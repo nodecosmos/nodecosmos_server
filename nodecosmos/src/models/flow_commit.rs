@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = flow_commits,
     partition_keys = [id],
-    clustering_keys = [],
+    clustering_keys = [branch_id],
     table_options = r#"
         compression = { 
             'sstable_compression': 'DeflateCompressor',
@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct FlowCommit {
     pub flow_id: Uuid,
     pub id: Uuid,
+    pub branch_id: Uuid,
     pub title: Text,
     pub description_commit: Option<Uuid>,
     pub flow_step_ids: Frozen<List<Uuid>>,

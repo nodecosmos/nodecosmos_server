@@ -3,9 +3,7 @@ use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
 use crate::models::user::User;
-use crate::models::workflow::Workflow;
 use charybdis::types::{Set, Uuid};
-use log::error;
 
 /// AuthorizationFields for nodes is implemented with the `NodeAuthorization` derive macro.
 pub trait AuthorizationFields {
@@ -113,37 +111,5 @@ impl AuthorizationFields for Comment {
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
         None
-    }
-}
-
-impl AuthorizationFields for Workflow {
-    fn owner_id(&self) -> Option<Uuid> {
-        if let Some(node) = &self.node {
-            return node.owner_id;
-        }
-
-        error!("Workflow {} is missing node {}", self.id, self.node_id);
-
-        None
-    }
-
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        if let Some(node) = &self.node {
-            return node.editor_ids.clone();
-        }
-
-        error!("Workflow {} is missing node {}", self.id, self.node_id);
-
-        None
-    }
-
-    fn is_public(&self) -> bool {
-        if let Some(node) = &self.node {
-            return node.is_public;
-        }
-
-        error!("Workflow {} is missing node {}", self.id, self.node_id);
-
-        false
     }
 }

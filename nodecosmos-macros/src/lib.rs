@@ -24,6 +24,27 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Branchable Derive that uses node_id as id
+#[proc_macro_derive(BranchableNodeId)]
+pub fn branchable_node_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let expanded = quote! {
+        impl crate::models::traits::Branchable for #name {
+            fn id(&self) -> Uuid {
+                self.node_id
+            }
+
+            fn branch_id(&self) -> Uuid {
+                self.branch_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 /// Note: all derives implemented bellow `charybdis_model` will be automatically implemented for all partial models.
 /// So by implementing `NodeAuthorization` derive for `Node` model, it will be automatically implemented for
 /// `UpdateTitleNode`, `UpdateDescriptionNode`, etc.
