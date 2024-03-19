@@ -9,14 +9,14 @@ use scylla::CachingSession;
 
 #[post("")]
 pub async fn create_flow(data: RequestData, mut flow: web::Json<Flow>) -> Response {
-    AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
+    AuthNode::auth_update(&data, flow.node_id, flow.branch_id).await?;
 
     flow.insert_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
 
-#[get("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}/description")]
+#[get("/{nodeId}/{branchId}/{workflowId}/{verticalIndex}/{startIndex}/{id}/description")]
 pub async fn get_flow_description(
     db_session: web::Data<CachingSession>,
     _current_user: CurrentUser,
@@ -29,7 +29,7 @@ pub async fn get_flow_description(
 
 #[put("/title")]
 pub async fn update_flow_title(data: RequestData, mut flow: web::Json<UpdateTitleFlow>) -> Response {
-    AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
+    AuthNode::auth_update(&data, flow.node_id, flow.branch_id).await?;
 
     flow.update_cb(&None).execute(data.db_session()).await?;
 
@@ -38,16 +38,16 @@ pub async fn update_flow_title(data: RequestData, mut flow: web::Json<UpdateTitl
 
 #[put("/description")]
 pub async fn update_flow_description(data: RequestData, mut flow: web::Json<DescriptionFlow>) -> Response {
-    AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
+    AuthNode::auth_update(&data, flow.node_id, flow.branch_id).await?;
 
     flow.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow))
 }
 
-#[delete("/{nodeId}/{workflowId}/{verticalIndex}/{startIndex}/{id}")]
+#[delete("/{nodeId}/{branchId}/{workflowId}/{verticalIndex}/{startIndex}/{id}")]
 pub async fn delete_flow(data: RequestData, mut flow: web::Path<Flow>) -> Response {
-    AuthNode::auth_update(&data, flow.node_id, flow.node_id).await?;
+    AuthNode::auth_update(&data, flow.node_id, flow.branch_id).await?;
 
     flow.delete_cb(&None).execute(data.db_session()).await?;
 

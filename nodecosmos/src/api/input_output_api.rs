@@ -17,7 +17,7 @@ pub async fn create_io(data: RequestData, mut input_output: web::Json<Io>) -> Re
     Ok(HttpResponse::Ok().json(input_output))
 }
 
-#[get("/{rootNodeId}/{nodeId}/{workflowId}/{id}/description")]
+#[get("/{rootNodeId}/{nodeId}/{branchId}/{workflowId}/{id}/description")]
 pub async fn get_io_description(data: RequestData, input_output: web::Path<GetDescriptionIo>) -> Response {
     let input_output = input_output.find_by_primary_key().execute(data.db_session()).await?;
 
@@ -26,7 +26,7 @@ pub async fn get_io_description(data: RequestData, input_output: web::Path<GetDe
 
 #[put("/title")]
 pub async fn update_io_title(data: RequestData, mut input_output: web::Json<UpdateTitleIo>) -> Response {
-    AuthNode::auth_update(&data, input_output.node_id, input_output.node_id).await?;
+    AuthNode::auth_update(&data, input_output.node_id, input_output.branch_id).await?;
 
     input_output.update_cb(&None).execute(data.db_session()).await?;
 
@@ -35,18 +35,18 @@ pub async fn update_io_title(data: RequestData, mut input_output: web::Json<Upda
 
 #[put("/description")]
 pub async fn update_io_description(data: RequestData, mut input_output: web::Json<UpdateDescriptionIo>) -> Response {
-    AuthNode::auth_update(&data, input_output.node_id, input_output.node_id).await?;
+    AuthNode::auth_update(&data, input_output.node_id, input_output.branch_id).await?;
 
     input_output.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(input_output))
 }
 
-#[delete("/{rootNodeId}/{nodeId}/{workflowId}/{id}")]
+#[delete("/{rootNodeId}/{nodeId}/{branchId}/{workflowId}/{id}")]
 pub async fn delete_io(data: RequestData, input_output: web::Path<DeleteIo>) -> Response {
     let mut input_output = input_output.find_by_primary_key().execute(data.db_session()).await?;
 
-    AuthNode::auth_update(&data, input_output.node_id, input_output.node_id).await?;
+    AuthNode::auth_update(&data, input_output.node_id, input_output.branch_id).await?;
 
     input_output.delete_cb(&None).execute(data.db_session()).await?;
 
