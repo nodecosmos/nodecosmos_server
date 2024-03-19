@@ -8,7 +8,8 @@ impl UpdateDescriptionIo {
     /// while allowing IO to have it's own properties and value.
     pub async fn update_ios_desc_by_org_id(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let ios = UpdateDescriptionIo::ios_by_original_id(session, self.root_node_id, original_id).await?;
+            let ios = UpdateDescriptionIo::ios_by_original_id(session, self.root_node_id, self.branch_id, original_id)
+                .await?;
             let mut batch_ios = Vec::with_capacity(ios.len());
 
             for mut io in ios {

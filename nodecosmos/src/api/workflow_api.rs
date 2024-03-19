@@ -4,9 +4,10 @@ use crate::models::flow::BaseFlow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
 use crate::models::node::AuthNode;
+use crate::models::traits::Branchable;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -48,11 +49,12 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Pa
 pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow>) -> Response {
     AuthNode::auth_update(&data, workflow.node_id, workflow.branch_id).await?;
 
-    let input_outputs = Io::find_by_partition_key_value(&(workflow.root_node_id,))
-        .execute(data.db_session())
-        .await?
-        .try_collect()
-        .await?;
+    let input_outputs =
+        Io::find_by_root_node_id_and_branch_id(workflow.root_node_id, workflow.branchise_id(workflow.root_node_id))
+            .execute(data.db_session())
+            .await?
+            .try_collect()
+            .await?;
 
     let existing_workflow = Workflow::maybe_find_first_by_node_id(workflow.node_id)
         .consistency(Consistency::All)

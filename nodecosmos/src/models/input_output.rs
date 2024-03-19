@@ -15,20 +15,19 @@ use crate::utils::deserializer::required;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// we group input outputs by root node id
-/// so they are accessible to all workflows within a same root node
+/// Ios are grouped by `root_node_id`, so they are accessible to all workflows within a same root node.
+/// Original Ios are the ones where `branch_id` == `root_node_id`.
 #[charybdis_model(
     table_name = input_outputs,
-    partition_keys = [root_node_id],
-    clustering_keys = [node_id, branch_id, workflow_id, id],
+    partition_keys = [root_node_id, branch_id],
+    clustering_keys = [node_id, workflow_id, id],
     local_secondary_indexes = [id, original_id]
 )]
-#[derive(BranchableNodeId, Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Io {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
@@ -96,11 +95,14 @@ impl Io {
         root_node_id: Uuid,
         params: &WorkflowParams,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let mut ios = Self::find_by_root_node_id(root_node_id).execute(session).await?;
-
         if params.is_original() {
-            return Ok(ios.try_collect().await?);
+            return Ok(Self::find_by_root_node_id_and_branch_id(root_node_id, root_node_id)
+                .execute(session)
+                .await?
+                .try_collect()
+                .await?);
         } else {
+            let mut ios = Self::find_by_root_node_id(root_node_id).execute(session).await?;
             let mut ios_map: HashMap<Uuid, Self> = HashMap::new();
 
             while let Some(io) = ios.next().await {
@@ -203,13 +205,17 @@ impl UpdateDescriptionIo {
     pub async fn ios_by_original_id(
         session: &CachingSession,
         root_node_id: Uuid,
+        branch_id: Uuid,
         original_id: Uuid,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_description_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
-            .execute(session)
-            .await?
-            .try_collect()
-            .await?;
+        let ios = find_update_description_io!(
+            "root_node_id = ? AND branch_id = ? AND original_id = ?",
+            (root_node_id, branch_id, original_id)
+        )
+        .execute(session)
+        .await?
+        .try_collect()
+        .await?;
 
         Ok(ios)
     }
@@ -231,13 +237,17 @@ impl UpdateTitleIo {
     pub async fn ios_by_original_id(
         session: &CachingSession,
         root_node_id: Uuid,
+        branch_id: Uuid,
         original_id: Uuid,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_title_io!("root_node_id = ? AND original_id = ?", (root_node_id, original_id))
-            .execute(session)
-            .await?
-            .try_collect()
-            .await?;
+        let ios = find_update_title_io!(
+            "root_node_id = ? AND branch_id = ? AND original_id = ?",
+            (root_node_id, branch_id, original_id)
+        )
+        .execute(session)
+        .await?
+        .try_collect()
+        .await?;
 
         Ok(ios)
     }
