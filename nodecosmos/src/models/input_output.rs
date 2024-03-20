@@ -17,7 +17,7 @@ use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Ios are grouped by `root_node_id`, so they are accessible to all workflows within a same root node.
 /// Original Ios are the ones where `branch_id` == `root_node_id`.
@@ -95,31 +95,33 @@ impl Io {
         root_node_id: Uuid,
         params: &WorkflowParams,
     ) -> Result<Vec<Io>, NodecosmosError> {
+        let mut ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.branch_id)
+            .execute(session)
+            .await?;
+
         if params.is_original() {
-            return Ok(Self::find_by_root_node_id_and_branch_id(root_node_id, root_node_id)
-                .execute(session)
-                .await?
-                .try_collect()
-                .await?);
+            Ok(ios.try_collect().await?)
         } else {
-            let mut ios = Self::find_by_root_node_id(root_node_id).execute(session).await?;
-            let mut ios_map: HashMap<Uuid, Self> = HashMap::new();
+            let mut original_ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.node_id)
+                .execute(session)
+                .await?;
+            let mut branched_ios_set = HashSet::new();
+            let mut branch_ios = vec![];
 
             while let Some(io) = ios.next().await {
                 let io = io?;
-                match ios_map.get(&io.id) {
-                    Some(existing_io) => {
-                        if existing_io.branch_id == existing_io.node_id {
-                            ios_map.insert(io.id, io);
-                        }
-                    }
-                    None => {
-                        ios_map.insert(io.id, io);
-                    }
+                branched_ios_set.insert(io.id);
+                branch_ios.push(io);
+            }
+
+            while let Some(io) = original_ios.next().await {
+                let io = io?;
+                if !branched_ios_set.contains(&io.id) {
+                    branch_ios.push(io);
                 }
             }
 
-            Ok(ios_map.into_values().collect())
+            Ok(branch_ios)
         }
     }
 

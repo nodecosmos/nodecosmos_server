@@ -14,7 +14,7 @@ use futures::StreamExt;
 use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[charybdis_model(
     table_name = flow_steps,
@@ -93,23 +93,32 @@ impl FlowStep {
         if params.is_original() {
             Ok(flow_steps.try_collect().await?)
         } else {
-            let mut flow_steps_map: HashMap<Uuid, FlowStep> = HashMap::new();
+            let mut original_flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.node_id)
+                .execute(session)
+                .await?;
+            let mut branched_flow_steps_set = HashSet::new();
+            let mut branch_flow_steps = vec![];
 
             while let Some(flow_step) = flow_steps.next().await {
                 let flow_step = flow_step?;
-                match flow_steps_map.get(&flow_step.id) {
-                    Some(existing_flow_step) => {
-                        if existing_flow_step.branch_id == existing_flow_step.node_id {
-                            flow_steps_map.insert(flow_step.id, flow_step);
-                        }
-                    }
-                    None => {
-                        flow_steps_map.insert(flow_step.id, flow_step);
-                    }
+                branched_flow_steps_set.insert(flow_step.id);
+                branch_flow_steps.push(flow_step);
+            }
+
+            while let Some(flow_step) = original_flow_steps.next().await {
+                let flow_step = flow_step?;
+                if !branched_flow_steps_set.contains(&flow_step.id) {
+                    branch_flow_steps.push(flow_step);
                 }
             }
 
-            Ok(flow_steps_map.into_values().collect())
+            branch_flow_steps.sort_by(|a, b| {
+                a.flow_index
+                    .partial_cmp(&b.flow_index)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            Ok(branch_flow_steps)
         }
     }
 

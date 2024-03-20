@@ -11,12 +11,12 @@ use futures::StreamExt;
 use nodecosmos_macros::BranchableNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[charybdis_model(
     table_name = flows,
-    partition_keys = [node_id],
-    clustering_keys = [branch_id, workflow_id, vertical_index, start_index, id],
+    partition_keys = [node_id, branch_id],
+    clustering_keys = [workflow_id, vertical_index, start_index, id],
 )]
 #[derive(BranchableNodeId, Serialize, Deserialize, Default, Debug)]
 pub struct Flow {
@@ -90,23 +90,32 @@ impl BaseFlow {
         if params.is_original() {
             Ok(flows.try_collect().await?)
         } else {
-            let mut flow_map: HashMap<Uuid, BaseFlow> = HashMap::new();
+            let mut original_flows = BaseFlow::find_by_node_id_and_branch_id(params.node_id, params.node_id)
+                .execute(session)
+                .await?;
+            let mut branched_flows_set = HashSet::new();
+            let mut branch_flows = vec![];
 
             while let Some(flow) = flows.next().await {
                 let flow = flow?;
-                match flow_map.get(&flow.id) {
-                    Some(existing_flow) => {
-                        if existing_flow.branch_id == existing_flow.node_id {
-                            flow_map.insert(flow.id, flow);
-                        }
-                    }
-                    None => {
-                        flow_map.insert(flow.id, flow);
-                    }
+                branched_flows_set.insert(flow.id);
+                branch_flows.push(flow);
+            }
+
+            while let Some(flow) = original_flows.next().await {
+                let flow = flow?;
+                if !branched_flows_set.contains(&flow.id) {
+                    branch_flows.push(flow);
                 }
             }
 
-            Ok(flow_map.into_values().collect())
+            branch_flows.sort_by(|a, b| {
+                a.vertical_index
+                    .partial_cmp(&b.vertical_index)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            Ok(branch_flows)
         }
     }
 }
