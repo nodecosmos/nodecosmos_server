@@ -9,7 +9,8 @@ use scylla::{CachingSession, Session, SessionBuilder};
 use std::time::Duration;
 use toml::Value;
 
-/// Resource's should be alive during application runtime. It's usually related to external services like db clients,
+/// Resource's should be alive during application runtime.
+/// It's usually related to external services like db clients,
 /// redis, elastic, etc.
 pub trait Resource<'a> {
     type Cfg;

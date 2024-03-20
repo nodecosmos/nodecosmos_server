@@ -167,9 +167,12 @@ impl Io {
 
     pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(original_id) = self.original_id {
-            let original_io = find_first_io!("root_node_id = ? AND id = ?", (self.root_node_id, original_id))
-                .execute(session)
-                .await?;
+            let original_io = find_first_io!(
+                "root_node_id = ? AND branch_id = ? AND id = ?",
+                (self.root_node_id, self.branch_id, original_id)
+            )
+            .execute(session)
+            .await?;
             Ok(Some(original_io))
         } else {
             Ok(None)

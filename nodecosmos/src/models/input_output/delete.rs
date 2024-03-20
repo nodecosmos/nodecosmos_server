@@ -2,7 +2,6 @@ use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
 use charybdis::batch::ModelBatch;
-use charybdis::operations::New;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
@@ -16,13 +15,16 @@ impl Io {
         let mut batch = Self::delete_batch();
 
         for output_id in ids.iter() {
-            let mut output = Io::new();
-
-            output.root_node_id = workflow.root_node_id;
-            output.node_id = workflow.node_id;
-            output.workflow_id = workflow.id;
-            output.flow_step_id = flow_step_id;
-            output.id = *output_id;
+            let mut output = Io {
+                root_node_id: workflow.root_node_id,
+                branch_id: workflow.branch_id,
+                node_id: workflow.node_id,
+                workflow_id: workflow.id,
+                id: *output_id,
+                workflow: Some(workflow.clone()),
+                flow_step_id,
+                ..Default::default()
+            };
 
             batch.append_delete(&output)?;
 

@@ -1,8 +1,10 @@
 mod callbacks;
 pub mod diagram;
 
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
+use crate::models::traits::Branchable;
 use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
@@ -63,6 +65,31 @@ pub struct Workflow {
 }
 
 impl Workflow {
+    pub async fn branched(session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
+        if params.is_original() {
+            let workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
+                .execute(session)
+                .await?;
+
+            Ok(workflow)
+        } else {
+            let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
+                .execute(session)
+                .await?;
+
+            if let Some(workflow) = maybe_branched {
+                Ok(workflow)
+            } else {
+                let mut workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
+                    .execute(session)
+                    .await?;
+                workflow.branch_id = params.branch_id;
+
+                Ok(workflow)
+            }
+        }
+    }
+
     pub async fn diagram(&mut self, session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
         if self.diagram.is_none() {
             let diagram = WorkflowDiagram::build(session, self).await?;

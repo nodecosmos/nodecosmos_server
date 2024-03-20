@@ -2,7 +2,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
 use charybdis::model::AsNative;
-use charybdis::operations::{New, UpdateWithCallbacks};
+use charybdis::operations::UpdateWithCallbacks;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
@@ -85,13 +85,17 @@ impl FlowStep {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
             for id in output_ids {
-                let mut output = Io::new();
-                output.root_node_id = workflow.root_node_id;
-                output.node_id = workflow.node_id;
-                output.workflow_id = workflow.id;
-                output.id = id;
-                output.workflow = Some(workflow.clone());
-                output.flow_step_id = Some(flow_step_id);
+                let mut output = Io {
+                    root_node_id: workflow.root_node_id,
+                    branch_id: workflow.branch_id,
+                    node_id: workflow.node_id,
+                    workflow_id: workflow.id,
+                    id,
+                    workflow: Some(workflow.clone()),
+                    flow_step_id: Some(flow_step_id),
+
+                    ..Default::default()
+                };
 
                 output.pull_from_next_workflow_step(session).await?;
             }
