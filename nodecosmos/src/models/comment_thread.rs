@@ -129,13 +129,13 @@ pub struct CommentThread {
 }
 
 impl CommentThread {
-    pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
+    pub async fn object(&self, session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
         match ObjectType::from_string(&self.object_type) {
             ObjectType::ContributionRequest => {
                 return match self.object_node_id {
                     Some(node_id) => {
                         let contribution_request = ContributionRequest::find_by_node_id_and_id(node_id, self.object_id)
-                            .execute(db_session)
+                            .execute(session)
                             .await?;
                         Ok(CommentObject::ContributionRequest(contribution_request))
                     }
@@ -146,14 +146,14 @@ impl CommentThread {
         }
     }
 
-    pub async fn delete_if_no_comments(&self, db_session: &CachingSession) {
+    pub async fn delete_if_no_comments(&self, session: &CachingSession) {
         let comment_res = find_first_pk_comment!("object_id = ? AND thread_id = ?", (&self.object_id, &self.id))
-            .execute(db_session)
+            .execute(session)
             .await
             .ok();
 
         if comment_res.is_none() {
-            let res = self.delete().execute(db_session).await;
+            let res = self.delete().execute(session).await;
 
             if let Err(e) = res {
                 error!("Error while deleting thread: {}", e);

@@ -1,7 +1,8 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use charybdis::model::AsNative;
-use charybdis::operations::UpdateWithCallbacks;
+use charybdis::operations::{Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
@@ -12,6 +13,46 @@ impl FlowStep {
         self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
+    }
+
+    pub async fn create_branched_if_not_exist(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let maybe_branched = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
+
+        if maybe_branched.is_none() {
+            let mut flow_step = self.find_by_primary_key().execute(data.db_session()).await?;
+            flow_step.branch_id = self.branch_id;
+
+            flow_step.insert_cb(data).execute(data.db_session()).await?;
+
+            return Ok(());
+        }
+
+        Ok(())
+    }
+
+    pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut maybe_original = FlowStep {
+            node_id: self.node_id,
+            branch_id: self.branch_id,
+            workflow_id: self.workflow_id,
+            flow_id: self.flow_id,
+            flow_index: self.flow_index,
+            id: self.id,
+            ..Default::default()
+        }
+        .maybe_find_by_primary_key()
+        .execute(data.db_session())
+        .await?;
+
+        if let Some(maybe_original) = maybe_original.as_mut() {
+            maybe_original.branch_id = self.branch_id;
+
+            maybe_original.insert().execute(data.db_session()).await?;
+
+            return Ok(());
+        }
+
+        Ok(())
     }
 
     pub async fn validate_conflicts(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -98,35 +139,35 @@ impl FlowStep {
     }
 
     // syncs the prev and next flow steps when a new flow step is created
-    pub async fn sync_surrounding_fs_on_creation(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let mut prev_flow_step = self.prev_flow_step(session).await?;
-        let mut next_flow_step = self.next_flow_step(session).await?;
+    pub async fn sync_surrounding_fs_on_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut prev_flow_step = self.prev_flow_step(data.db_session()).await?;
+        let mut next_flow_step = self.next_flow_step(data.db_session()).await?;
 
         match (prev_flow_step.as_mut(), next_flow_step.as_mut()) {
             (Some(prev_fs), Some(next_fs)) => {
                 let mut prev_fs = prev_fs.as_native();
                 let mut next_fs = next_fs.as_native();
 
-                prev_fs.pull_outputs_from_next_flow_step(session).await?;
+                prev_fs.pull_outputs_from_next_flow_step(data).await?;
                 prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(&None).execute(session).await?;
+                prev_fs.update_cb(data).execute(data.db_session()).await?;
 
                 next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(&None).execute(session).await?;
-                next_fs.remove_inputs(session).await?;
+                next_fs.update_cb(data).execute(data.db_session()).await?;
+                next_fs.remove_inputs(data).await?;
             }
             (Some(prev_fs), None) => {
                 let mut prev_fs = prev_fs.as_native();
 
                 prev_fs.next_flow_step_id = Some(self.id);
-                prev_fs.update_cb(&None).execute(session).await?;
+                prev_fs.update_cb(data).execute(data.db_session()).await?;
             }
             (None, Some(next_fs)) => {
                 let mut next_fs = next_fs.as_native();
 
                 next_fs.prev_flow_step_id = Some(self.id);
-                next_fs.update_cb(&None).execute(session).await?;
-                next_fs.remove_inputs(session).await?;
+                next_fs.update_cb(data).execute(data.db_session()).await?;
+                next_fs.remove_inputs(data).await?;
             }
             _ => {}
         }

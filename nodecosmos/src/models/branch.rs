@@ -108,6 +108,12 @@ pub struct Branch {
     #[serde(default, rename = "deletedWorkflows")]
     pub deleted_workflows: Option<Set<Uuid>>,
 
+    #[serde(default, rename = "createdWorkflowInitialInputs")]
+    pub created_workflow_initial_inputs: Option<Set<Uuid>>,
+
+    #[serde(default, rename = "deletedWorkflowInitialInputs")]
+    pub deleted_workflow_initial_inputs: Option<Set<Uuid>>,
+
     #[serde(default, rename = "editedWorkflowTitles")]
     pub edited_workflow_titles: Option<Set<Uuid>>,
 
@@ -144,17 +150,24 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowSteps")]
     pub deleted_flow_steps: Option<Set<Uuid>>,
 
+    #[serde(default, rename = "createdFlowStepNodes")]
+    pub created_flow_step_nodes: Option<Set<Uuid>>,
+
+    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
     #[serde(default, rename = "createdFlowStepInputsByNode")]
-    pub created_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub created_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
+    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
     #[serde(default, rename = "deletedFlowStepInputsByNode")]
-    pub deleted_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub deleted_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
+    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
     #[serde(default, rename = "createdFlowStepOutputsByNode")]
-    pub created_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub created_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
+    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
-    pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
     pub conflict: Option<Frozen<Conflict>>,
 
@@ -198,10 +211,10 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
+    pub async fn node(&mut self, session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if self.node.is_none() {
             let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
-                .execute(db_session)
+                .execute(session)
                 .await?;
 
             self.node = Some(node);
@@ -210,9 +223,9 @@ impl Branch {
         Ok(self.node.as_ref().unwrap())
     }
 
-    pub async fn created_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
+    pub async fn created_nodes(&mut self, session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let (None, Some(created_node_ids)) = (&self._created_nodes, &self.created_nodes) {
-            let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, self.id).await?;
+            let mut created_nodes = Node::find_by_ids_and_branch_id(session, &created_node_ids, self.id).await?;
 
             created_nodes.sort_by_depth();
 
@@ -222,10 +235,10 @@ impl Branch {
         Ok(self._created_nodes.clone())
     }
 
-    pub async fn restored_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
+    pub async fn restored_nodes(&mut self, session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let (None, Some(restored_node_ids)) = (&self._restored_nodes, &self.restored_nodes) {
-            let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, self.id).await?;
-            let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
+            let mut branched_nodes = Node::find_by_ids_and_branch_id(session, &restored_node_ids, self.id).await?;
+            let already_restored_ids = PkNode::find_by_ids(session, &branched_nodes.pluck_id())
                 .await?
                 .pluck_id_set();
 
@@ -241,11 +254,11 @@ impl Branch {
 
     pub async fn edited_title_nodes(
         &mut self,
-        db_session: &CachingSession,
+        session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
         if let (None, Some(edited_node_titles)) = (&self._edited_title_nodes, &self.edited_node_titles) {
             let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (self.id, edited_node_titles))
-                .execute(db_session)
+                .execute(session)
                 .await?
                 .try_collect()
                 .await?;
@@ -266,13 +279,13 @@ impl Branch {
 
     pub async fn edited_description_nodes(
         &mut self,
-        db_session: &CachingSession,
+        session: &CachingSession,
     ) -> Result<Option<Vec<UpdateDescriptionNode>>, NodecosmosError> {
         if let (None, Some(edited_node_descriptions)) =
             (&self._edited_description_nodes, &self.edited_node_descriptions)
         {
             let nodes = find_update_description_node!("branch_id = ? AND id IN ?", (self.id, edited_node_descriptions))
-                .execute(db_session)
+                .execute(session)
                 .await?
                 .try_collect()
                 .await?;
@@ -338,6 +351,18 @@ partial_branch!(UpdateCreatedWorkflowsBranch, id, created_workflows);
 
 partial_branch!(UpdateDeletedWorkflowsBranch, id, deleted_workflows);
 
+partial_branch!(
+    UpdateCreatedWorkflowInitialInputsBranch,
+    id,
+    created_workflow_initial_inputs
+);
+
+partial_branch!(
+    UpdateDeletedWorkflowInitialInputsBranch,
+    id,
+    deleted_workflow_initial_inputs
+);
+
 partial_branch!(UpdateEditedWorkflowTitlesBranch, id, edited_workflow_titles);
 
 partial_branch!(UpdateCreatedFlowsBranch, id, created_flows);
@@ -359,6 +384,8 @@ partial_branch!(UpdateEditedIODescriptionsBranch, id, edited_io_descriptions);
 partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 
 partial_branch!(UpdateDeletedFlowStepsBranch, id, deleted_flow_steps);
+
+partial_branch!(UpdateCreatedFlowStepNodesBranch, id, created_flow_step_nodes);
 
 partial_branch!(
     UpdateCreatedFlowStepInputsByNodeBranch,

@@ -49,11 +49,11 @@ impl Comment {
         self.thread = Some(thread);
     }
 
-    pub async fn thread(&mut self, db_session: &CachingSession) -> Result<Option<&mut CommentThread>, NodecosmosError> {
+    pub async fn thread(&mut self, session: &CachingSession) -> Result<Option<&mut CommentThread>, NodecosmosError> {
         if self.thread.is_none() {
             self.thread = Some(
                 CommentThread::find_by_object_id_and_id(self.object_id, self.thread_id)
-                    .execute(db_session)
+                    .execute(session)
                     .await?,
             );
         }

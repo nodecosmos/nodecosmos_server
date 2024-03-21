@@ -11,11 +11,11 @@ const PAGE_SIZE: i16 = 10;
 pub struct NodeSearchQuery {
     q: Option<String>,
 
-    #[serde(default = "default_to_0")]
+    #[serde(default = "default_to_opt_0")]
     page: i16,
 }
 
-pub fn default_to_0() -> i16 {
+pub fn default_to_opt_0() -> i16 {
     0
 }
 

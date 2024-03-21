@@ -11,7 +11,7 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::Branchable for #name {
-            fn id(&self) -> Uuid {
+            fn original_id(&self) -> Uuid {
                 self.id
             }
 
@@ -32,7 +32,7 @@ pub fn branchable_node_id_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::Branchable for #name {
-            fn id(&self) -> Uuid {
+            fn original_id(&self) -> Uuid {
                 self.node_id
             }
 

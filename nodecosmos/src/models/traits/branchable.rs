@@ -1,6 +1,7 @@
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
+use crate::models::input_output::{Io, UpdateTitleIo};
 use crate::models::like::Like;
 use crate::models::node::reorder::data::ReorderData;
 use charybdis::types::Uuid;
@@ -12,16 +13,16 @@ use scylla::CachingSession;
 ///
 /// `nodecosmos-macros` provides a derive macro for this trait.
 pub trait Branchable {
-    fn id(&self) -> Uuid;
+    fn original_id(&self) -> Uuid;
 
     fn branch_id(&self) -> Uuid;
 
     fn is_original(&self) -> bool {
-        self.branch_id() == self.id()
+        self.branch_id() == self.original_id()
     }
 
     fn is_branched(&self) -> bool {
-        self.branch_id() != self.id()
+        self.branch_id() != self.original_id()
     }
 
     fn branchise_id(&self, id: Uuid) -> Uuid {
@@ -32,15 +33,15 @@ pub trait Branchable {
         }
     }
 
-    async fn branch(&self, db_session: &CachingSession) -> Result<Branch, NodecosmosError> {
-        let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
+    async fn branch(&self, session: &CachingSession) -> Result<Branch, NodecosmosError> {
+        let branch = Branch::find_by_id(self.branch_id()).execute(session).await?;
 
         Ok(branch)
     }
 }
 
 impl Branchable for Like {
-    fn id(&self) -> Uuid {
+    fn original_id(&self) -> Uuid {
         self.object_id
     }
 
@@ -50,7 +51,7 @@ impl Branchable for Like {
 }
 
 impl Branchable for ReorderData {
-    fn id(&self) -> Uuid {
+    fn original_id(&self) -> Uuid {
         self.node.id
     }
 
@@ -60,8 +61,28 @@ impl Branchable for ReorderData {
 }
 
 impl Branchable for WorkflowParams {
-    fn id(&self) -> Uuid {
+    fn original_id(&self) -> Uuid {
         self.node_id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.branch_id
+    }
+}
+
+impl Branchable for Io {
+    fn original_id(&self) -> Uuid {
+        self.root_node_id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.branch_id
+    }
+}
+
+impl Branchable for UpdateTitleIo {
+    fn original_id(&self) -> Uuid {
+        self.root_node_id
     }
 
     fn branch_id(&self) -> Uuid {

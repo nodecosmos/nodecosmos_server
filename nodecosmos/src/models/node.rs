@@ -16,7 +16,7 @@ use crate::models::branch::AuthBranch;
 use crate::models::node::context::Context;
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
-use crate::utils::defaults::default_to_0;
+use crate::models::utils::defaults::default_to_opt_0;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
@@ -90,7 +90,7 @@ pub struct Node {
 
     pub owner: Option<Frozen<Profile>>,
 
-    #[serde(rename = "likesCount", default = "default_to_0")]
+    #[serde(rename = "likesCount", default = "default_to_opt_0")]
     pub like_count: Option<BigInt>,
 
     #[serde(rename = "coverImageKey")]
@@ -154,12 +154,12 @@ impl Node {
     }
 
     pub async fn find_by_ids_and_branch_id(
-        db_session: &CachingSession,
+        session: &CachingSession,
         ids: &Set<Uuid>,
         branch_id: Uuid,
     ) -> Result<Vec<Node>, NodecosmosError> {
         let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(db_session)
+            .execute(session)
             .await?
             .try_collect()
             .await?;
@@ -171,9 +171,9 @@ impl Node {
 partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_by_ids(db_session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
+    pub async fn find_by_ids(session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
+            .execute(session)
             .await?
             .try_collect()
             .await?;
@@ -182,12 +182,12 @@ impl PkNode {
     }
 
     pub async fn find_by_ids_and_branch_id(
-        db_session: &CachingSession,
+        session: &CachingSession,
         ids: &Vec<Uuid>,
         branch_id: Uuid,
     ) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(db_session)
+            .execute(session)
             .await?
             .try_collect()
             .await?;

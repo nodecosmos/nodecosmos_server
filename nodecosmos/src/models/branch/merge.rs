@@ -7,10 +7,10 @@ use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{
     find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
 };
+use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::{Branchable, GroupById};
 use crate::models::udts::TextChange;
-use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::file::read_file_names;
+use crate::models::utils::file::read_file_names;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::Uuid;

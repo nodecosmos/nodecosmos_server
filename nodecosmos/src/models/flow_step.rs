@@ -2,12 +2,16 @@ mod callbacks;
 mod create;
 mod delete;
 mod update;
+mod update_input_ids;
+mod update_node_ids;
+mod update_output_ids;
 
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::traits::Branchable;
 use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Frozen, List, Map, Text, Timestamp, Uuid};
 use futures::StreamExt;
@@ -199,6 +203,18 @@ impl FlowStep {
         }
 
         Ok(self.next_flow_step.clone())
+    }
+
+    pub async fn maybe_find_original(&mut self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
+        let original = Self {
+            branch_id: self.original_id(),
+            ..self.clone()
+        }
+        .maybe_find_by_primary_key()
+        .execute(session)
+        .await?;
+
+        Ok(original)
     }
 }
 

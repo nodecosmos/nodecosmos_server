@@ -6,7 +6,7 @@ use charybdis::types::Uuid;
 use futures::StreamExt;
 use std::collections::HashMap;
 
-pub trait GroupById<T: Model> {
+pub trait GroupById<T: Model + Id> {
     async fn group_by_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError>;
 }
 

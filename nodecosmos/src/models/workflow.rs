@@ -1,5 +1,7 @@
 mod callbacks;
+pub mod create;
 pub mod diagram;
+mod update_initial_inputs;
 
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;

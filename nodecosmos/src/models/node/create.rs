@@ -6,10 +6,10 @@ use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::node::Parent;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
-use crate::utils::cloned_ref::ClonedRef;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert};
 use charybdis::options::Consistency;
@@ -128,7 +128,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn append_to_ancestors(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
 
@@ -146,10 +146,7 @@ impl Node {
                 descendants.push(node_descendant);
             }
 
-            if let Err(e) = NodeDescendant::batch()
-                .chunked_insert(db_session, &descendants, 100)
-                .await
-            {
+            if let Err(e) = NodeDescendant::batch().chunked_insert(session, &descendants, 100).await {
                 error!(
                     "[append_to_ancestors::chunked_insert] Error for node {}: {:?}",
                     self.id, e
@@ -162,7 +159,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn remove_from_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn remove_from_ancestors(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
 
@@ -180,10 +177,7 @@ impl Node {
                 descendants.push(node_descendant);
             }
 
-            if let Err(e) = NodeDescendant::batch()
-                .chunked_delete(db_session, &descendants, 100)
-                .await
-            {
+            if let Err(e) = NodeDescendant::batch().chunked_delete(session, &descendants, 100).await {
                 error!(
                     "[remove_from_ancestors::chunked_delete] Error for node {}: {:?}",
                     self.id, e

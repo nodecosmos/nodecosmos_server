@@ -21,13 +21,13 @@ pub struct WorkflowParams {
 }
 
 #[get("/{node_id}/{branch_id}")]
-pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
+pub async fn get_workflow(session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
     let params = params.into_inner();
 
-    let workflow = Workflow::branched(&db_session, &params).await?;
-    let flows = BaseFlow::branched(&db_session, &params).await?;
-    let flow_steps = FlowStep::branched(&db_session, &params).await?;
-    let input_outputs = Io::branched(&db_session, workflow.root_node_id, &params).await?;
+    let workflow = Workflow::branched(&session, &params).await?;
+    let flows = BaseFlow::branched(&session, &params).await?;
+    let flow_steps = FlowStep::branched(&session, &params).await?;
+    let input_outputs = Io::branched(&session, workflow.root_node_id, &params).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
@@ -64,7 +64,7 @@ pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow
         })));
     }
 
-    workflow.insert_cb(&None).execute(data.db_session()).await?;
+    workflow.insert_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
@@ -79,7 +79,7 @@ pub async fn update_initial_inputs(
 ) -> Response {
     AuthNode::auth_update(&data, workflow.node_id, workflow.branch_id).await?;
 
-    workflow.update_cb(&None).execute(data.db_session()).await?;
+    workflow.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
@@ -88,7 +88,7 @@ pub async fn update_initial_inputs(
 pub async fn update_workflow_title(data: RequestData, mut workflow: web::Json<UpdateWorkflowTitle>) -> Response {
     AuthNode::auth_update(&data, workflow.node_id, workflow.branch_id).await?;
 
-    workflow.update_cb(&None).execute(data.db_session()).await?;
+    workflow.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }
@@ -109,7 +109,7 @@ pub async fn delete_workflow(data: RequestData, params: web::Path<DeleteWfParams
             .execute(data.db_session())
             .await?;
 
-    workflow.delete_cb(&None).execute(data.db_session()).await?;
+    workflow.delete_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }

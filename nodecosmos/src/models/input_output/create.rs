@@ -1,10 +1,36 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
+use charybdis::operations::{Find, Insert};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
 
 impl Io {
+    pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut maybe_original = Io {
+            root_node_id: self.root_node_id,
+            branch_id: self.root_node_id,
+            node_id: self.node_id,
+            workflow_id: self.workflow_id,
+            id: self.id,
+            ..Default::default()
+        }
+        .maybe_find_by_primary_key()
+        .execute(data.db_session())
+        .await?;
+
+        if let Some(maybe_original) = maybe_original.as_mut() {
+            maybe_original.branch_id = self.branch_id;
+
+            maybe_original.insert().execute(data.db_session()).await?;
+
+            return Ok(());
+        }
+
+        Ok(())
+    }
+
     pub async fn validate_root_node_id(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         let node = self.node(session).await?;
         let root_node_id = node.root_id;

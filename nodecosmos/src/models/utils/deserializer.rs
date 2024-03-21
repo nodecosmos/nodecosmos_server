@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::fmt;
 
 /// Allow optional fields to be None, but require them to be provided within JSON
+#[allow(unused)]
 pub fn required<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,

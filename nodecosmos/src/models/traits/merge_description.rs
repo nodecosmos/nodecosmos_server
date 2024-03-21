@@ -11,7 +11,7 @@ use yrs::{Doc, GetString, Transact, Update};
 pub trait MergeDescription {
     const DESCRIPTION_ROOT: &'static str = "prosemirror";
 
-    async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError>;
+    async fn current_base64(&self, session: &CachingSession) -> Result<String, NodecosmosError>;
     async fn updated_base64(&self) -> Result<String, NodecosmosError>;
 
     fn assign_html(&mut self, html: String);
@@ -19,8 +19,8 @@ pub trait MergeDescription {
     fn assign_short_description(&mut self, short_description: String);
     fn assign_base64(&mut self, short_description: String);
 
-    async fn merge_description(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let current_base64 = self.current_base64(db_session).await?;
+    async fn merge_description(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let current_base64 = self.current_base64(session).await?;
         let updated_base64 = self.updated_base64().await?;
         let current_buf = STANDARD.decode(current_base64)?;
         let update_buf = STANDARD.decode(updated_base64)?;
@@ -48,8 +48,8 @@ pub trait MergeDescription {
         Ok(())
     }
 
-    async fn undo_merge_description(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let current_base64 = self.current_base64(db_session).await?;
+    async fn undo_merge_description(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        let current_base64 = self.current_base64(session).await?;
         let current_buf = STANDARD.decode(current_base64)?;
         let current = Update::decode_v2(&current_buf)?;
         let doc = Doc::new();
@@ -76,9 +76,8 @@ pub trait MergeDescription {
 
 /// In future it can be used for description of other models like IO, Flow, Flow Step, etc.
 impl MergeDescription for UpdateDescriptionNode {
-    async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError> {
-        let node =
-            GetDescriptionBase64Node::find_branched_or_original(db_session, self.id, self.branch_id, None).await?;
+    async fn current_base64(&self, session: &CachingSession) -> Result<String, NodecosmosError> {
+        let node = GetDescriptionBase64Node::find_branched_or_original(session, self.id, self.branch_id, None).await?;
 
         Ok(node.description_base64.unwrap_or(
             self.description_base64

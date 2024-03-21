@@ -4,7 +4,6 @@ mod constants;
 mod errors;
 mod models;
 mod resources;
-mod utils;
 
 use actix_web::middleware::Logger;
 use actix_web::{web, App as ActixWebApp, HttpServer};
@@ -78,9 +77,7 @@ async fn main() {
             .service(
                 web::scope("/flows")
                     .service(create_flow)
-                    .service(get_flow_description)
                     .service(update_flow_title)
-                    .service(update_flow_description)
                     .service(delete_flow),
             )
             .service(
@@ -89,15 +86,12 @@ async fn main() {
                     .service(update_flow_step_nodes)
                     .service(update_flow_step_inputs)
                     .service(update_flow_step_outputs)
-                    .service(update_flow_step_description)
                     .service(delete_flow_step),
             )
             .service(
                 web::scope("input_outputs")
                     .service(create_io)
-                    .service(get_io_description)
                     .service(update_io_title)
-                    .service(update_io_description)
                     .service(delete_io),
             )
             .service(

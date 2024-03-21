@@ -1,3 +1,4 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
 use crate::models::workflow::Workflow;
@@ -7,7 +8,7 @@ use scylla::CachingSession;
 
 impl Io {
     pub async fn delete_by_ids(
-        session: &CachingSession,
+        data: &RequestData,
         ids: Vec<Uuid>,
         workflow: &Workflow,
         flow_step_id: Option<Uuid>,
@@ -28,10 +29,10 @@ impl Io {
 
             batch.append_delete(&output)?;
 
-            output.pull_from_next_workflow_step(session).await?;
+            output.pull_from_next_workflow_step(data).await?;
         }
 
-        batch.execute(session).await?;
+        batch.execute(data.db_session()).await?;
 
         Ok(())
     }
@@ -51,26 +52,26 @@ impl Io {
         Ok(())
     }
 
-    pub async fn pull_form_flow_step_outputs(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn pull_form_flow_step_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let id = self.id;
-        let flow_step = self.flow_step(session).await?;
+        let flow_step = self.flow_step(data.db_session()).await?;
 
         if let Some(flow_step) = &mut flow_step.as_mut() {
-            flow_step.pull_output_id(session, id).await?;
+            flow_step.pull_output_id(data, id).await?;
         }
 
         Ok(())
     }
 
     // remove output as input from next workflow step
-    pub async fn pull_from_next_workflow_step(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn pull_from_next_workflow_step(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let current_step_wf_index;
         let flow_step_id = self.flow_step_id;
         let id = self.id;
-        let workflow = self.workflow(session).await?;
+        let workflow = self.workflow(data.db_session()).await?;
 
         if let Some(workflow) = workflow.as_mut() {
-            let diagram = workflow.diagram(session).await?;
+            let diagram = workflow.diagram(data.db_session()).await?;
 
             // get current workflow index of flow step
             if let Some(flow_step_id) = flow_step_id {
@@ -92,7 +93,7 @@ impl Io {
             if let Some(mut next_flow_steps) = next_flow_steps {
                 for flow_step in next_flow_steps.iter_mut() {
                     let mut flow_step = flow_step.lock()?;
-                    flow_step.pull_input_id(session, id).await?;
+                    flow_step.pull_input_id(data, id).await?;
                 }
             }
         }

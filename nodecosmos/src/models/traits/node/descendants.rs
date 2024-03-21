@@ -9,13 +9,13 @@ use std::collections::HashSet;
 pub trait Descendants {
     async fn descendants(
         &self,
-        db_session: &CachingSession,
+        session: &CachingSession,
         consistency: Option<Consistency>,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError>;
 
     async fn branch_descendants(
         &self,
-        db_session: &CachingSession,
+        session: &CachingSession,
         consistency: Option<Consistency>,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError>;
 }
@@ -25,7 +25,7 @@ macro_rules! impl_descendants {
         impl Descendants for $ty {
             async fn descendants(
                 &self,
-                db_session: &CachingSession,
+                session: &CachingSession,
                 consistency: Option<Consistency>,
             ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
                 let mut q =
@@ -35,14 +35,14 @@ macro_rules! impl_descendants {
                     q = q.consistency(consistency)
                 }
 
-                let descendants = q.execute(db_session).await?;
+                let descendants = q.execute(session).await?;
 
                 Ok(descendants)
             }
 
             async fn branch_descendants(
                 &self,
-                db_session: &CachingSession,
+                session: &CachingSession,
                 consistency: Option<Consistency>,
             ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
                 let mut original_q =
@@ -55,8 +55,8 @@ macro_rules! impl_descendants {
                     branched_q = branched_q.consistency(consistency);
                 }
 
-                let original = original_q.execute(db_session).await?.try_collect().await?;
-                let branched = branched_q.execute(db_session).await?.try_collect().await?;
+                let original = original_q.execute(session).await?.try_collect().await?;
+                let branched = branched_q.execute(session).await?.try_collect().await?;
 
                 let mut branched_ids = HashSet::with_capacity(branched.len());
                 let mut descendants = Vec::with_capacity(original.len() + branched.len());

@@ -1,7 +1,6 @@
 mod callbacks;
 mod create;
 mod delete;
-mod update_description;
 mod update_title;
 
 use crate::api::WorkflowParams;
@@ -11,7 +10,6 @@ use crate::models::node::Node;
 use crate::models::traits::Branchable;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
-use crate::utils::deserializer::required;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use futures::StreamExt;
@@ -44,7 +42,7 @@ pub struct Io {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "originalId", deserialize_with = "required")]
+    #[serde(rename = "originalId")]
     pub original_id: Option<Uuid>,
 
     /// outputted by flow step
@@ -192,39 +190,6 @@ partial_io!(
     description,
     description_markdown
 );
-
-partial_io!(
-    UpdateDescriptionIo,
-    root_node_id,
-    node_id,
-    branch_id,
-    workflow_id,
-    id,
-    original_id,
-    description,
-    description_markdown,
-    updated_at
-);
-
-impl UpdateDescriptionIo {
-    pub async fn ios_by_original_id(
-        session: &CachingSession,
-        root_node_id: Uuid,
-        branch_id: Uuid,
-        original_id: Uuid,
-    ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_description_io!(
-            "root_node_id = ? AND branch_id = ? AND original_id = ?",
-            (root_node_id, branch_id, original_id)
-        )
-        .execute(session)
-        .await?
-        .try_collect()
-        .await?;
-
-        Ok(ios)
-    }
-}
 
 partial_io!(
     UpdateTitleIo,

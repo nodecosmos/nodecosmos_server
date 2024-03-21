@@ -3,7 +3,7 @@ pub mod update_profile_image;
 
 pub use super::udts::Address;
 use crate::errors::NodecosmosError;
-use crate::utils::defaults::default_to_false;
+use crate::models::utils::defaults::default_to_false;
 use bcrypt::{hash, verify};
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Text, Timestamp, Uuid};

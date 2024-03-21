@@ -59,12 +59,12 @@ pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode
 
 #[get("/{id}/{branchId}/description")]
 pub async fn get_node_description(
-    db_session: web::Data<CachingSession>,
+    session: web::Data<CachingSession>,
     mut node: web::Path<GetDescriptionNode>,
     app: web::Data<App>,
     opt_cu: OptCurrentUser,
 ) -> Response {
-    node.find_branched(&db_session).await?;
+    node.find_branched(&session).await?;
 
     node.auth_view(&app, opt_cu).await?;
 

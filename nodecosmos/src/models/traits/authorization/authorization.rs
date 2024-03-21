@@ -15,7 +15,7 @@ use serde_json::json;
 
 /// Authorization for nodes is implemented with the `NodeAuthorization` derive macro.
 pub trait Authorization: AuthorizationFields {
-    async fn init_auth_info(&mut self, _db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn init_auth_info(&mut self, _session: &CachingSession) -> Result<(), NodecosmosError> {
         Ok(())
     }
 
@@ -85,8 +85,8 @@ impl Authorization for Branch {
 }
 
 impl Authorization for ContributionRequest {
-    async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        self.branch(db_session).await?;
+    async fn init_auth_info(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.branch(session).await?;
 
         Ok(())
     }
@@ -126,9 +126,9 @@ impl Authorization for CommentThread {
 }
 
 impl Authorization for Comment {
-    async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn init_auth_info(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
         if self.author_id.is_none() {
-            *self = self.find_by_primary_key().execute(db_session).await?;
+            *self = self.find_by_primary_key().execute(session).await?;
         }
 
         Ok(())

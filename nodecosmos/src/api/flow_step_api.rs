@@ -1,8 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::flow_step::{
-    FlowStep, UpdateDescriptionFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
-};
+use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::node::AuthNode;
 use actix_web::{delete, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -17,7 +15,7 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
         .lock_resource(flow_step.flow_id, flow_step.branch_id, LOCKER_TTL)
         .await?;
 
-    let res = flow_step.insert_cb(&None).execute(data.db_session()).await;
+    let res = flow_step.insert_cb(&data).execute(data.db_session()).await;
 
     data.resource_locker()
         .unlock_resource(flow_step.flow_id, flow_step.branch_id)
@@ -33,7 +31,7 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
 pub async fn update_flow_step_nodes(data: RequestData, mut flow_step: web::Json<UpdateNodeIdsFlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 
-    flow_step.update_cb(&None).execute(data.db_session()).await?;
+    flow_step.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -45,7 +43,7 @@ pub async fn update_flow_step_outputs(
 ) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 
-    flow_step.update_cb(&None).execute(data.db_session()).await?;
+    flow_step.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -54,19 +52,7 @@ pub async fn update_flow_step_outputs(
 pub async fn update_flow_step_inputs(data: RequestData, mut flow_step: web::Json<UpdateInputIdsFlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 
-    flow_step.update_cb(&None).execute(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(flow_step))
-}
-
-#[put("/description")]
-pub async fn update_flow_step_description(
-    data: RequestData,
-    mut flow_step: web::Json<UpdateDescriptionFlowStep>,
-) -> Response {
-    AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
-
-    flow_step.update_cb(&None).execute(data.db_session()).await?;
+    flow_step.update_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(flow_step))
 }
@@ -80,7 +66,7 @@ pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>)
         .lock_resource(flow_step.flow_id, flow_step.branch_id, LOCKER_TTL)
         .await?;
 
-    flow_step.delete_cb(&None).execute(data.db_session()).await?;
+    flow_step.delete_cb(&data).execute(data.db_session()).await?;
 
     data.resource_locker()
         .unlock_resource(flow_step.flow_id, flow_step.branch_id)

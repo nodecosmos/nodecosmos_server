@@ -10,20 +10,20 @@ use scylla::CachingSession;
 
 pub trait FindBranched: Model {
     async fn find_branched_or_original(
-        db_session: &CachingSession,
+        session: &CachingSession,
         id: Uuid,
         branch_id: Uuid,
         consistency: Option<Consistency>,
     ) -> Result<Self, NodecosmosError>;
 
-    async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError>;
+    async fn find_branched(&mut self, session: &CachingSession) -> Result<(), NodecosmosError>;
 }
 
 macro_rules! impl_find_branched_or_original {
     ($struct_name:ident) => {
         impl FindBranched for $struct_name {
             async fn find_branched_or_original(
-                db_session: &CachingSession,
+                session: &CachingSession,
                 id: Uuid,
                 branch_id: Uuid,
                 consistency: Option<Consistency>,
@@ -35,13 +35,13 @@ macro_rules! impl_find_branched_or_original {
                     node_q = node_q.consistency(consistency);
                 }
 
-                let node = node_q.execute(db_session).await?;
+                let node = node_q.execute(session).await?;
 
                 return match node {
                     Some(node) => Ok(node),
                     None => {
                         let mut node = Self::find_by_primary_key_value(&(id, id))
-                            .execute(db_session)
+                            .execute(session)
                             .await?;
                         node.branch_id = branch_id;
 
@@ -50,9 +50,9 @@ macro_rules! impl_find_branched_or_original {
                 };
             }
 
-            async fn find_branched(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+            async fn find_branched(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
                 let branch_self = Self::maybe_find_by_primary_key_value(&(self.id, self.branch_id))
-                    .execute(db_session)
+                    .execute(session)
                     .await?;
 
                 match branch_self {
@@ -70,7 +70,7 @@ macro_rules! impl_find_branched_or_original {
                         let ctx = self.ctx;
 
                         *self = Self::find_by_primary_key_value(&(self.id, self.id))
-                            .execute(db_session)
+                            .execute(session)
                             .await?;
 
                         self.branch_id = branch_id;

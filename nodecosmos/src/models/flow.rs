@@ -1,9 +1,11 @@
-mod callbacks;
+pub mod callbacks;
+pub mod create;
 
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::Branchable;
+use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
@@ -17,8 +19,9 @@ use std::collections::HashSet;
     table_name = flows,
     partition_keys = [node_id, branch_id],
     clustering_keys = [workflow_id, vertical_index, start_index, id],
+    local_secondary_indexes = [id]
 )]
-#[derive(BranchableNodeId, Serialize, Deserialize, Default, Debug)]
+#[derive(BranchableNodeId, Serialize, Deserialize, Default)]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -54,9 +57,26 @@ pub struct Flow {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub workflow: Option<Workflow>,
 }
 
 impl Flow {
+    pub async fn find_by_node_id_and_branch_id_and_id(
+        session: &CachingSession,
+        node_id: Uuid,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<Flow, NodecosmosError> {
+        let flow = find_first_flow!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
+            .execute(session)
+            .await?;
+
+        Ok(flow)
+    }
+
     pub async fn flow_steps(
         &self,
         session: &CachingSession,
@@ -64,6 +84,20 @@ impl Flow {
         let res = FlowStep::find_by_flow(session, self.node_id, self.branch_id, self.workflow_id, self.id).await?;
 
         Ok(res)
+    }
+
+    pub async fn workflow(&mut self, session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
+        if self.workflow.is_none() {
+            let params = WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            };
+
+            let workflow = Workflow::branched(session, &params).await?;
+            self.workflow = Some(workflow);
+        }
+
+        Ok(self.workflow.as_mut().unwrap())
     }
 }
 

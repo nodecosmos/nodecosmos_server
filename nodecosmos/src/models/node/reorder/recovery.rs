@@ -3,8 +3,8 @@ use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
+use crate::models::utils::file::read_file_names;
 use crate::resources::resource_locker::ResourceLocker;
-use crate::utils::file::read_file_names;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Update;
 use log::{error, info, warn};
@@ -41,7 +41,7 @@ impl<'a> Recovery<'a> {
 
     // Recovers Tree from recovery data stored on disk.
     // This may be needed in case of connection loss during reorder.
-    pub async fn recover_from_stored_data(db_session: &CachingSession, resource_locker: &ResourceLocker) {
+    pub async fn recover_from_stored_data(session: &CachingSession, resource_locker: &ResourceLocker) {
         create_dir_all(RECOVERY_DATA_DIR).unwrap();
         let files = read_file_names(RECOVERY_DATA_DIR, RECOVER_FILE_PREFIX).await;
 
@@ -58,7 +58,7 @@ impl<'a> Recovery<'a> {
                 .unwrap();
             std::fs::remove_file(file.clone()).unwrap();
 
-            let mut recovery = Recovery::new(&recovery_data, db_session, resource_locker);
+            let mut recovery = Recovery::new(&recovery_data, session, resource_locker);
             let _ = recovery
                 .recover()
                 .await
