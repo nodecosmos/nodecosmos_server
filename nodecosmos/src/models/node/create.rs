@@ -10,8 +10,9 @@ use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::node::Parent;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
+use crate::models::workflow::Workflow;
 use charybdis::batch::ModelBatch;
-use charybdis::operations::{Find, Insert};
+use charybdis::operations::{Find, Insert, InsertWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::{Set, Uuid};
 use chrono::Utc;
@@ -361,6 +362,24 @@ impl Node {
                 e
             })
             .await;
+    }
+
+    pub async fn create_workflow(&self, data: &RequestData) {
+        let _ = Workflow {
+            root_node_id: self.root_id,
+            node_id: self.id,
+            branch_id: self.branch_id,
+            title: Some(format!("{} Workflow", self.title)),
+            ..Default::default()
+        }
+        .insert_cb(data)
+        .execute(data.db_session())
+        .map_err(|e| {
+            error!("Error creating new workflow for node {}: {:?}", self.id, e);
+
+            e
+        })
+        .await;
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {

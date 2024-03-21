@@ -11,8 +11,10 @@ use crate::models::traits::Branchable;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::Insert;
 use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
 use futures::StreamExt;
+use nodecosmos_macros::BranchableByRootNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -25,7 +27,7 @@ use std::collections::HashSet;
     clustering_keys = [node_id, workflow_id, id],
     local_secondary_indexes = [id, original_id]
 )]
-#[derive(Serialize, Deserialize, Default)]
+#[derive(BranchableByRootNodeId, Serialize, Deserialize, Default)]
 pub struct Io {
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
@@ -129,10 +131,13 @@ impl Io {
                 let workflow = flow_step.workflow(db_session).await?;
                 self.workflow = workflow.clone();
             } else {
-                let workflow =
-                    Workflow::find_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, self.workflow_id)
-                        .execute(db_session)
-                        .await?;
+                let params = WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                };
+
+                let workflow = Workflow::branched(db_session, &params).await?;
+
                 self.workflow = Some(workflow);
             }
         }
@@ -155,13 +160,10 @@ impl Io {
     pub async fn flow_step(&mut self, db_session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {
         if let Some(flow_step_id) = self.flow_step_id {
             if self.flow_step.is_none() {
-                let flow_step = FlowStep::find_by_node_id_and_branch_id_and_id(
-                    db_session,
-                    self.node_id,
-                    self.branch_id,
-                    flow_step_id,
-                )
-                .await?;
+                let flow_step =
+                    FlowStep::find_first_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, flow_step_id)
+                        .execute(db_session)
+                        .await?;
                 self.flow_step = Some(flow_step);
             }
         }
@@ -170,16 +172,45 @@ impl Io {
     }
 
     pub async fn original_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
-        if let Some(original_id) = self.original_id {
-            let original_io = find_first_io!(
-                "root_node_id = ? AND branch_id = ? AND id = ?",
-                (self.root_node_id, self.branch_id, original_id)
+        return if self.is_original() {
+            let res =
+                Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, self.id)
+                    .execute(db_session)
+                    .await?;
+
+            Ok(res)
+        } else {
+            self.original_branched_io(db_session).await
+        };
+    }
+
+    pub async fn original_branched_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        let maybe_branched =
+            Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, self.id)
+                .execute(db_session)
+                .await?;
+
+        if let Some(branched) = maybe_branched {
+            Ok(Some(branched))
+        } else {
+            let original = Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(
+                self.root_node_id,
+                self.original_id(),
+                self.id,
             )
             .execute(db_session)
             .await?;
-            Ok(Some(original_io))
-        } else {
-            Ok(None)
+
+            match original {
+                Some(mut original) => {
+                    original.branch_id = self.branch_id;
+
+                    original.insert().execute(db_session).await?;
+
+                    Ok(Some(original))
+                }
+                None => Ok(None),
+            }
         }
     }
 }

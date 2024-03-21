@@ -44,6 +44,7 @@ impl Callbacks for Node {
         tokio::spawn(async move {
             self_clone.add_to_elastic(data.elastic_client()).await;
             self_clone.create_new_version(&data).await;
+            self_clone.create_workflow(&data).await;
         });
 
         Ok(())

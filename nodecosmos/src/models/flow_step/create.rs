@@ -1,6 +1,7 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
+use crate::models::traits::Branchable;
 use charybdis::model::AsNative;
 use charybdis::operations::{Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
@@ -19,7 +20,14 @@ impl FlowStep {
         let maybe_branched = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
 
         if maybe_branched.is_none() {
-            let mut flow_step = self.find_by_primary_key().execute(data.db_session()).await?;
+            let mut flow_step = Self {
+                branch_id: self.original_id(),
+                ..self.clone()
+            }
+            .find_by_primary_key()
+            .execute(data.db_session())
+            .await?;
+
             flow_step.branch_id = self.branch_id;
 
             flow_step.insert_cb(data).execute(data.db_session()).await?;

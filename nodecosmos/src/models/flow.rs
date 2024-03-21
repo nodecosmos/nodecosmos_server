@@ -10,7 +10,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::BranchableNodeId;
+use nodecosmos_macros::BranchableByNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -21,7 +21,7 @@ use std::collections::HashSet;
     clustering_keys = [workflow_id, vertical_index, start_index, id],
     local_secondary_indexes = [id]
 )]
-#[derive(BranchableNodeId, Serialize, Deserialize, Default)]
+#[derive(BranchableByNodeId, Serialize, Deserialize, Default, Clone)]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -64,19 +64,6 @@ pub struct Flow {
 }
 
 impl Flow {
-    pub async fn find_by_node_id_and_branch_id_and_id(
-        db_session: &CachingSession,
-        node_id: Uuid,
-        branch_id: Uuid,
-        id: Uuid,
-    ) -> Result<Flow, NodecosmosError> {
-        let flow = find_first_flow!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
-            .execute(db_session)
-            .await?;
-
-        Ok(flow)
-    }
-
     pub async fn flow_steps(
         &self,
         db_session: &CachingSession,
@@ -94,6 +81,7 @@ impl Flow {
             };
 
             let workflow = Workflow::branched(db_session, &params).await?;
+
             self.workflow = Some(workflow);
         }
 

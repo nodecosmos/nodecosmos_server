@@ -22,10 +22,16 @@ impl Callbacks for FlowStep {
         self.sync_surrounding_fs_on_creation(data).await?;
 
         if self.is_branched() {
-            let flow =
-                Flow::find_by_node_id_and_branch_id_and_id(db_session, self.node_id, self.branch_id, self.flow_id)
-                    .await?;
+            let mut flow = Flow {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+                workflow_id: self.workflow_id,
+                ..Default::default()
+            };
             flow.create_branched_if_not_exist(data).await?;
+
+            let workflow = flow.workflow(db_session).await?;
+            workflow.create_branched_if_not_exist(data).await?;
 
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }

@@ -2,7 +2,7 @@ use actix_web::http::StatusCode;
 use actix_web::web::Bytes;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use charybdis::errors::CharybdisError;
-use log::error;
+use log::{error, warn};
 use serde_json::json;
 use std::error::Error;
 use std::fmt;
@@ -66,8 +66,8 @@ impl fmt::Display for NodecosmosError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
-            NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: \n{}", e),
-            NodecosmosError::ResourceAlreadyLocked(e) => write!(f, "ResourceAlreadyLocked Error: \n{}", e),
+            NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: {}", e),
+            NodecosmosError::ResourceAlreadyLocked(e) => write!(f, "ResourceAlreadyLocked Error: {}", e),
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
@@ -76,11 +76,11 @@ impl fmt::Display for NodecosmosError {
             }
             NodecosmosError::NotFound(e) => write!(f, "Not Found: {}", e),
             NodecosmosError::PreconditionFailed(e) => write!(f, "Precondition Failed: {}", e),
-            NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: \n{}", e),
-            NodecosmosError::ClientSessionError(e) => write!(f, "Session Error: {}", e),
-            NodecosmosError::SerdeError(e) => write!(f, "Serde Error: \n{}", e),
-            NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: \n{}", e),
-            NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: \n{}", e),
+            NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: {}", e),
+            NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
+            NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
+            NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
+            NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: {}", e),
             NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
             NodecosmosError::DecodeError(e) => write!(f, "Decode Error: {}", e),
@@ -88,8 +88,8 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::MergeError(e) => write!(f, "Merge Error: {}", e),
             NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
             NodecosmosError::QuickXmlError(e) => write!(f, "QuickXmlError Error: {}", e),
-            NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
-            NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: \n{}", e),
+            NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: {}", e),
+            NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: {}", e),
         }
     }
 }
@@ -141,27 +141,37 @@ impl ResponseError for NodecosmosError {
                     "message": "Unsupported Media Type"
                 })
             }),
-            NodecosmosError::ResourceLocked(e) => HttpResponseBuilder::new(StatusCode::LOCKED).json({
-                json!({
-                    "status": 423,
-                    "message": e
+            NodecosmosError::ResourceLocked(e) => {
+                warn!("{}", self.to_string());
+
+                HttpResponseBuilder::new(StatusCode::LOCKED).json({
+                    json!({
+                        "status": 423,
+                        "message": e
+                    })
                 })
-            }),
+            }
             NodecosmosError::CharybdisError(e) => match e {
-                CharybdisError::NotFoundError(e) => HttpResponse::NotFound().json(json!({
-                    "status": 404,
-                    "message": e.to_string()
-                })),
+                CharybdisError::NotFoundError(_e) => {
+                    warn!("{}", self.to_string());
+
+                    HttpResponse::NotFound().json(json!({
+                        "status": 404,
+                        "message": "Not Found"
+                    }))
+                }
                 _ => {
+                    error!("CharybdisError: {:?}", self);
+
                     NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string())).error_response()
                 }
             },
             _ => {
-                error!("InternalServerError: {}", self.to_string());
+                error!("InternalServerError: {:?}", self);
 
                 return HttpResponse::InternalServerError().json(json!({
                     "status": 500,
-                    "message": self.to_string()
+                    "message": "Internal Server Error"
                 }));
             }
         }

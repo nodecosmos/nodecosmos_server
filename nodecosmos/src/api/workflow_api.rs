@@ -10,11 +10,12 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::Uuid;
+use nodecosmos_macros::BranchableByNodeId;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, BranchableByNodeId)]
 pub struct WorkflowParams {
     pub node_id: Uuid,
     pub branch_id: Uuid,
@@ -41,21 +42,17 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Pa
 pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow>) -> Response {
     AuthNode::auth_update(&data, workflow.node_id, workflow.branch_id).await?;
 
-    let input_outputs =
-        Io::find_by_root_node_id_and_branch_id(workflow.root_node_id, workflow.branchise_id(workflow.root_node_id))
+    let existing_workflow =
+        Workflow::maybe_find_first_by_node_id_and_branch_id(workflow.node_id, workflow.original_id())
+            .consistency(Consistency::All)
             .execute(data.db_session())
-            .await?
-            .try_collect()
             .await?;
-
-    let existing_workflow = Workflow::maybe_find_first_by_node_id(workflow.node_id)
-        .consistency(Consistency::All)
-        .execute(data.db_session())
-        .await?;
 
     // ATM we only allow one workflow per node
     // match first existing workflow
     if let Some(existing_workflow) = existing_workflow {
+        let input_outputs = existing_workflow.input_outputs(data.db_session()).await?;
+
         return Ok(HttpResponse::Conflict().json(json!({
             "status": 409,
             "message": "Workflow already exists",
@@ -65,6 +62,8 @@ pub async fn create_workflow(data: RequestData, mut workflow: web::Json<Workflow
     }
 
     workflow.insert_cb(&data).execute(data.db_session()).await?;
+
+    let input_outputs = workflow.input_outputs(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,

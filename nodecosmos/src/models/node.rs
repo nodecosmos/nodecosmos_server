@@ -11,6 +11,7 @@ mod update_description;
 mod update_owner;
 mod update_title;
 
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::context::Context;
@@ -20,6 +21,7 @@ use crate::models::utils::defaults::default_to_opt_0;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use futures::TryFutureExt;
 use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent, RootId};
 use scylla::statement::Consistency;
 use scylla::CachingSession;
@@ -120,7 +122,7 @@ pub struct Node {
 
 impl Node {
     pub async fn find_or_insert_branched(
-        data: &crate::api::data::RequestData,
+        data: &RequestData,
         id: Uuid,
         branch_id: Uuid,
         consistency: Option<Consistency>,
@@ -146,7 +148,10 @@ impl Node {
                 node.ctx = Context::BranchedInit;
                 node.branch_id = branch_id;
 
-                node.insert_cb(data).execute(data.db_session()).await?;
+                node.insert_cb(data)
+                    .execute(data.db_session())
+                    .map_err(|err| NodecosmosError::from(err))
+                    .await?;
 
                 Ok(node)
             }

@@ -6,12 +6,13 @@ mod update_initial_inputs;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
+use crate::models::input_output::Io;
 use crate::models::traits::Branchable;
 use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
-use nodecosmos_macros::BranchableNodeId;
+use nodecosmos_macros::BranchableByNodeId;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +30,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [branch_id, id],
     global_secondary_indexes = []
 )]
-#[derive(BranchableNodeId, Serialize, Deserialize, Default, Clone)]
+#[derive(BranchableByNodeId, Serialize, Deserialize, Default, Clone)]
 pub struct Workflow {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -69,27 +70,55 @@ pub struct Workflow {
 impl Workflow {
     pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
         if params.is_original() {
-            let workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
+            let original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
                 .execute(db_session)
                 .await?;
 
-            Ok(workflow)
+            Ok(original)
         } else {
             let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
                 .execute(db_session)
                 .await?;
 
+            let mut branched;
+
             if let Some(workflow) = maybe_branched {
-                Ok(workflow)
+                branched = workflow;
             } else {
                 let mut workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
                     .execute(db_session)
                     .await?;
                 workflow.branch_id = params.branch_id;
-
-                Ok(workflow)
+                branched = workflow;
             }
+
+            let original_initial_inputs_wf =
+                GetInitialInputsWorkflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
+                    .execute(db_session)
+                    .await?
+                    .initial_input_ids
+                    .unwrap_or_default();
+
+            let mut initial_input_ids = branched.initial_input_ids.unwrap_or_default();
+
+            initial_input_ids.extend(original_initial_inputs_wf);
+
+            branched.initial_input_ids = Some(initial_input_ids);
+
+            Ok(branched)
         }
+    }
+
+    pub async fn input_outputs(&self, db_session: &CachingSession) -> Result<Vec<Io>, NodecosmosError> {
+        Io::branched(
+            db_session,
+            self.root_node_id,
+            &WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            },
+        )
+        .await
     }
 
     pub async fn diagram(&mut self, db_session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
@@ -118,6 +147,8 @@ partial_workflow!(
     initial_input_ids,
     updated_at
 );
+
+partial_workflow!(GetInitialInputsWorkflow, node_id, branch_id, id, initial_input_ids);
 
 // used by node deletion
 partial_workflow!(DeleteWorkflow, node_id, branch_id, id);

@@ -4,10 +4,10 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::traits::Branchable;
-use crate::models::utils::updated_at_cb_fn;
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::Delete;
+use charybdis::types::Uuid;
 use futures::TryStreamExt;
 use scylla::CachingSession;
 
@@ -18,7 +18,7 @@ impl Callbacks for Flow {
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
-        self.id = charybdis::types::Uuid::new_v4();
+        self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
 
@@ -33,8 +33,6 @@ impl Callbacks for Flow {
 
         Ok(())
     }
-
-    updated_at_cb_fn!();
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let mut flow_steps = self.flow_steps(db_session).await?;

@@ -25,8 +25,8 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
 }
 
 /// Branchable Derive that uses node_id as id
-#[proc_macro_derive(BranchableNodeId)]
-pub fn branchable_node_id_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(BranchableByNodeId)]
+pub fn branchable_by_node_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
@@ -34,6 +34,27 @@ pub fn branchable_node_id_derive(input: TokenStream) -> TokenStream {
         impl crate::models::traits::Branchable for #name {
             fn original_id(&self) -> Uuid {
                 self.node_id
+            }
+
+            fn branch_id(&self) -> Uuid {
+                self.branch_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+/// Branchable Derive that uses node_id as id
+#[proc_macro_derive(BranchableByRootNodeId)]
+pub fn branchable_by_root_node_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let expanded = quote! {
+        impl crate::models::traits::Branchable for #name {
+            fn original_id(&self) -> Uuid {
+                self.root_node_id
             }
 
             fn branch_id(&self) -> Uuid {

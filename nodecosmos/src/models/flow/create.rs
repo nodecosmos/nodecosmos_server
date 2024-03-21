@@ -1,17 +1,25 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
-use charybdis::operations::{Find, Insert, InsertWithCallbacks};
+use crate::models::traits::Branchable;
+use charybdis::operations::{Find, Insert};
 
 impl Flow {
     pub async fn create_branched_if_not_exist(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         let maybe_branched = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
 
         if maybe_branched.is_none() {
-            let mut flow = self.find_by_primary_key().execute(data.db_session()).await?;
+            let mut flow = Self {
+                branch_id: self.original_id(),
+                ..self.clone()
+            }
+            .find_by_primary_key()
+            .execute(data.db_session())
+            .await?;
+
             flow.branch_id = self.branch_id;
 
-            flow.insert_cb(data).execute(data.db_session()).await?;
+            flow.insert().execute(data.db_session()).await?;
 
             return Ok(());
         }
