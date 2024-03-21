@@ -31,9 +31,9 @@ impl<'a> BranchConflict<'a> {
         }
     }
 
-    pub async fn run(&mut self, session: &CachingSession) -> Result<&Self, NodecosmosError> {
-        self.extract_created_nodes_conflicts(session).await?;
-        self.extract_edited_description_nodes_conflicts(session).await?;
+    pub async fn run(&mut self, db_session: &CachingSession) -> Result<&Self, NodecosmosError> {
+        self.extract_created_nodes_conflicts(db_session).await?;
+        self.extract_edited_description_nodes_conflicts(db_session).await?;
 
         if self.deleted_ancestors.is_some() || self.deleted_edited_nodes.is_some() {
             self.status = ConflictStatus::Pending;
@@ -44,12 +44,12 @@ impl<'a> BranchConflict<'a> {
         Ok(self)
     }
 
-    async fn extract_created_nodes_conflicts(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let created_nodes = self.branch.created_nodes(session).await?;
+    async fn extract_created_nodes_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let created_nodes = self.branch.created_nodes(db_session).await?;
 
         if let Some(created_nodes) = created_nodes {
             for created_node in created_nodes {
-                self.extract_deleted_ancestors(session, DelAncNode::Node(&created_node))
+                self.extract_deleted_ancestors(db_session, DelAncNode::Node(&created_node))
                     .await?;
             }
         }
@@ -59,7 +59,7 @@ impl<'a> BranchConflict<'a> {
 
     async fn extract_edited_description_nodes_conflicts(
         &mut self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
         let created_node_ids = self.branch.created_nodes.cloned_ref();
         let restored_node_ids = self.branch.restored_nodes.cloned_ref();
@@ -80,14 +80,14 @@ impl<'a> BranchConflict<'a> {
 
             // check ancestors of edited description nodes
             let desc_branched_nodes =
-                PkNode::find_by_ids_and_branch_id(&session, &edit_description_node_ids, self.branch.id).await?;
+                PkNode::find_by_ids_and_branch_id(&db_session, &edit_description_node_ids, self.branch.id).await?;
 
             for node in &desc_branched_nodes {
-                self.extract_deleted_ancestors(session, DelAncNode::PkNode(&node))
+                self.extract_deleted_ancestors(db_session, DelAncNode::PkNode(&node))
                     .await?;
             }
 
-            let original_nodes_ids = PkNode::find_by_ids(&session, &edit_description_node_ids)
+            let original_nodes_ids = PkNode::find_by_ids(&db_session, &edit_description_node_ids)
                 .await?
                 .pluck_id_set();
 
@@ -114,7 +114,7 @@ impl<'a> BranchConflict<'a> {
 
     async fn extract_deleted_ancestors(
         &mut self,
-        session: &CachingSession,
+        db_session: &CachingSession,
         del_anc_node: DelAncNode<'_>,
     ) -> Result<(), NodecosmosError> {
         let created_node_ids = self.branch.created_nodes.cloned_ref();
@@ -136,7 +136,7 @@ impl<'a> BranchConflict<'a> {
             })
             .collect::<Vec<Uuid>>();
 
-        let original_ancestor_ids_set = PkNode::find_by_ids(&session, &branch_ancestor_ids)
+        let original_ancestor_ids_set = PkNode::find_by_ids(&db_session, &branch_ancestor_ids)
             .await?
             .pluck_id_set();
 
@@ -179,9 +179,9 @@ impl Branch {
         Ok(())
     }
 
-    pub async fn check_conflicts(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn check_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut branch_conflict = BranchConflict::new(self);
-        branch_conflict.run(session).await?;
+        branch_conflict.run(db_session).await?;
 
         if branch_conflict.status == ConflictStatus::Pending {
             self.conflict = Some(Conflict {
@@ -189,7 +189,7 @@ impl Branch {
                 deleted_ancestors: branch_conflict.deleted_ancestors,
                 deleted_edited_nodes: branch_conflict.deleted_edited_nodes,
             });
-            self.update().execute(session).await?;
+            self.update().execute(db_session).await?;
 
             return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
         } else if let Some(conflict) = &mut self.conflict {
@@ -197,7 +197,7 @@ impl Branch {
             conflict.deleted_edited_nodes = None;
             conflict.status = ConflictStatus::Resolved.to_string();
 
-            self.update().execute(session).await?;
+            self.update().execute(db_session).await?;
         }
 
         Ok(())

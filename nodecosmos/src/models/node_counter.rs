@@ -76,9 +76,9 @@ impl Likeable for NodeCounter {
         Ok(lc)
     }
 
-    async fn like_count(session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
+    async fn like_count(db_session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
         let res = Self::find_by_primary_key_value(&(id, branch_id))
-            .execute(session)
+            .execute(db_session)
             .await
             .ok();
 

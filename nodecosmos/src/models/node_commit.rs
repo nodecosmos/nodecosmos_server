@@ -82,12 +82,12 @@ impl NodeCommit {
     }
 
     pub async fn init_from_latest(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         user_id: Uuid,
     ) -> Result<Self, NodecosmosError> {
-        let mut commit = NodeCommit::find_latest(session, &node_id, &branch_id).await?;
+        let mut commit = NodeCommit::find_latest(db_session, &node_id, &branch_id).await?;
 
         commit.id = Uuid::new_v4();
         commit.created_at = Utc::now();
@@ -99,19 +99,23 @@ impl NodeCommit {
         Ok(commit)
     }
 
-    async fn find_latest(session: &CachingSession, node_id: &Uuid, branch_id: &Uuid) -> Result<Self, CharybdisError> {
+    async fn find_latest(
+        db_session: &CachingSession,
+        node_id: &Uuid,
+        branch_id: &Uuid,
+    ) -> Result<Self, CharybdisError> {
         let res = find_first_node_commit!(
             "node_id = ? AND branch_id in ? LIMIT 1",
             (node_id, vec![branch_id, node_id])
         )
-        .execute(session)
+        .execute(db_session)
         .await?;
 
         Ok(res)
     }
 
     async fn latest_by_node_ids(
-        session: &CachingSession,
+        db_session: &CachingSession,
         branch_id: &Uuid,
         ids: &Vec<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
@@ -122,7 +126,7 @@ impl NodeCommit {
             let mut futures = vec![];
 
             for ancestor_id in ids_chunk {
-                let future = NodeCommit::find_latest(session, ancestor_id, branch_id);
+                let future = NodeCommit::find_latest(db_session, ancestor_id, branch_id);
                 futures.push(future);
             }
 
@@ -137,13 +141,13 @@ impl NodeCommit {
     }
 
     #[allow(unused)]
-    pub async fn prev_commit(&self, session: &CachingSession) -> Result<Option<Self>, CharybdisError> {
+    pub async fn prev_commit(&self, db_session: &CachingSession) -> Result<Option<Self>, CharybdisError> {
         if let (Some(prev_commit_id), Some(prev_commit_branch_id)) = (self.prev_commit_id, self.prev_commit_branch_id) {
             let res = find_first_node_commit!(
                 "node_id = ? AND branch_id = ? AND created_at =< ? AND id = ? LIMIT 1",
                 (self.node_id, prev_commit_branch_id, self.created_at, prev_commit_id)
             )
-            .execute(session)
+            .execute(db_session)
             .await?;
 
             return Ok(Some(res));
@@ -154,10 +158,10 @@ impl NodeCommit {
 
     pub async fn tree_position_commit(
         &mut self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<NodeTreePositionCommit, NodecosmosError> {
         let res = NodeTreePositionCommit::find_by_id(self.node_tree_position_commit_id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         Ok(res)
@@ -165,11 +169,11 @@ impl NodeCommit {
 
     pub async fn node_descendants_commit(
         &self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<Option<NodeDescendantsCommit>, NodecosmosError> {
         if let Some(node_descendants_commit_id) = self.node_descendants_commit_id {
             let res = NodeDescendantsCommit::find_by_id(node_descendants_commit_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
 
             return Ok(Some(res));
@@ -178,25 +182,25 @@ impl NodeCommit {
         Ok(None)
     }
 
-    pub async fn latest_ancestor_commits(&mut self, session: &CachingSession) -> Result<Vec<Self>, NodecosmosError> {
-        let vtp = self.tree_position_commit(session).await?;
+    pub async fn latest_ancestor_commits(&mut self, db_session: &CachingSession) -> Result<Vec<Self>, NodecosmosError> {
+        let vtp = self.tree_position_commit(db_session).await?;
 
         if let Some(ancestor_ids) = &vtp.ancestor_ids {
             let ancestor_ids = ancestor_ids.iter().cloned().collect();
-            return Self::latest_by_node_ids(session, &self.branch_id, &ancestor_ids).await;
+            return Self::latest_by_node_ids(db_session, &self.branch_id, &ancestor_ids).await;
         }
 
         Ok(vec![])
     }
 
     #[allow(unused)]
-    pub async fn latest_descendant_commits(&self, session: &CachingSession) -> Result<Vec<Self>, NodecosmosError> {
-        let vd = self.node_descendants_commit(session).await?;
+    pub async fn latest_descendant_commits(&self, db_session: &CachingSession) -> Result<Vec<Self>, NodecosmosError> {
+        let vd = self.node_descendants_commit(db_session).await?;
 
         if let Some(vd) = vd {
             let descendant_ids = vd.descendant_node_commit_id_by_id.keys().cloned().collect();
 
-            return Self::latest_by_node_ids(session, &self.branch_id, &descendant_ids).await;
+            return Self::latest_by_node_ids(db_session, &self.branch_id, &descendant_ids).await;
         }
 
         Ok(vec![])

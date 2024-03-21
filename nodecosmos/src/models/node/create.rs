@@ -54,10 +54,10 @@ impl Node {
         Ok(())
     }
 
-    pub async fn set_defaults(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn set_defaults(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
 
-        if let Some(parent) = self.parent(session).await? {
+        if let Some(parent) = self.parent(db_session).await? {
             let editor_ids = parent.editor_ids.clone().unwrap_or(Set::new());
             let root_id = parent.root_id;
             let is_public = parent.is_public;
@@ -128,7 +128,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn append_to_ancestors(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
 
@@ -146,7 +146,10 @@ impl Node {
                 descendants.push(node_descendant);
             }
 
-            if let Err(e) = NodeDescendant::batch().chunked_insert(session, &descendants, 100).await {
+            if let Err(e) = NodeDescendant::batch()
+                .chunked_insert(db_session, &descendants, 100)
+                .await
+            {
                 error!(
                     "[append_to_ancestors::chunked_insert] Error for node {}: {:?}",
                     self.id, e
@@ -159,7 +162,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn remove_from_ancestors(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn remove_from_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
 
@@ -177,7 +180,10 @@ impl Node {
                 descendants.push(node_descendant);
             }
 
-            if let Err(e) = NodeDescendant::batch().chunked_delete(session, &descendants, 100).await {
+            if let Err(e) = NodeDescendant::batch()
+                .chunked_delete(db_session, &descendants, 100)
+                .await
+            {
                 error!(
                     "[remove_from_ancestors::chunked_delete] Error for node {}: {:?}",
                     self.id, e

@@ -29,7 +29,7 @@ impl<'a> Resource<'a> for CachingSession {
 
         let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
 
-        let session: Session = SessionBuilder::new()
+        let db_session: Session = SessionBuilder::new()
             .known_nodes(&known_nodes)
             .connection_timeout(Duration::from_secs(3))
             .use_keyspace(keyspace, false)
@@ -37,7 +37,7 @@ impl<'a> Resource<'a> for CachingSession {
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
 
-        CachingSession::from(session, 1000)
+        CachingSession::from(db_session, 1000)
     }
 }
 

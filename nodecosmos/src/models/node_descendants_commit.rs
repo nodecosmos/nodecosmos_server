@@ -33,11 +33,11 @@ impl NodeDescendantsCommit {
         }
     }
 
-    pub async fn find_by_ids(session: &CachingSession, ids: Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: Vec<Uuid>) -> Result<Vec<Self>, NodecosmosError> {
         let mut res = vec![];
 
         let mut commits = find_node_descendants_commit!("id IN ?", (ids,))
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         while let Some(commit) = commits.next().await {
@@ -48,10 +48,10 @@ impl NodeDescendantsCommit {
     }
 
     pub async fn find_grouped_by_node_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         ids: Vec<Uuid>,
     ) -> Result<HashMap<Uuid, Self>, NodecosmosError> {
-        let commits = Self::find_by_ids(session, ids).await?;
+        let commits = Self::find_by_ids(db_session, ids).await?;
         let mut res = HashMap::new();
 
         for commit in commits {

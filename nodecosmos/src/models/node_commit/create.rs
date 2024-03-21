@@ -35,9 +35,13 @@ pub enum NodeChange {
 }
 
 impl NodeCommit {
-    pub async fn handle_creation(session: &CachingSession, node: &Node, user_id: Uuid) -> Result<(), NodecosmosError> {
+    pub async fn handle_creation(
+        db_session: &CachingSession,
+        node: &Node,
+        user_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         let tree_position_commit = NodeTreePositionCommit::from_node(node);
-        tree_position_commit.insert().execute(session).await?;
+        tree_position_commit.insert().execute(db_session).await?;
 
         let now = Utc::now();
 
@@ -58,21 +62,21 @@ impl NodeCommit {
             workflow_commit_id: None,
         };
 
-        node_commit.insert().execute(session).await?;
-        node_commit.create_ancestors_commits(session).await?;
+        node_commit.insert().execute(db_session).await?;
+        node_commit.create_ancestors_commits(db_session).await?;
 
         Ok(())
     }
 
     pub async fn handle_change(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         user_id: Uuid,
         changes: &Vec<NodeChange>,
         create_ancestors_commits: bool,
     ) -> Result<NodeCommit, NodecosmosError> {
-        let mut new_node_commit = NodeCommit::init_from_latest(session, node_id, branch_id, user_id).await?;
+        let mut new_node_commit = NodeCommit::init_from_latest(db_session, node_id, branch_id, user_id).await?;
 
         for attribute in changes {
             match attribute {
@@ -86,7 +90,7 @@ impl NodeCommit {
                     new_node_commit.workflow_commit_id = Some(*workflow_commit_id);
                 }
                 NodeChange::TreePosition(tree_position_change) => {
-                    let old_vtp = new_node_commit.tree_position_commit(session).await?;
+                    let old_vtp = new_node_commit.tree_position_commit(db_session).await?;
                     let mut new_vtp = NodeTreePositionCommit::init_from(&old_vtp);
 
                     if let Some(parent_id) = tree_position_change.parent_id {
@@ -110,7 +114,7 @@ impl NodeCommit {
                     }
                 }
                 NodeChange::Descendants(removed_ids, new_descendant_node_commit_id_by_id) => {
-                    let old_ndc = new_node_commit.node_descendants_commit(session).await?;
+                    let old_ndc = new_node_commit.node_descendants_commit(db_session).await?;
                     if let Some(old_node_descendant_commit) = old_ndc {
                         let mut descendant_node_commit_id_by_id =
                             old_node_descendant_commit.descendant_node_commit_id_by_id;
@@ -131,17 +135,17 @@ impl NodeCommit {
                             descendant_node_commit_id_by_id,
                         };
 
-                        new_node_descendants_commit.insert().execute(session).await?;
+                        new_node_descendants_commit.insert().execute(db_session).await?;
                         new_node_commit.node_descendants_commit_id = Some(new_node_descendants_commit.id);
                     }
                 }
             }
         }
 
-        new_node_commit.insert().execute(session).await?;
+        new_node_commit.insert().execute(db_session).await?;
 
         if create_ancestors_commits {
-            new_node_commit.create_ancestors_commits(session).await?;
+            new_node_commit.create_ancestors_commits(db_session).await?;
         }
 
         Ok(new_node_commit)
@@ -168,10 +172,10 @@ impl NodeCommit {
         }
     }
 
-    async fn create_ancestors_commits(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let versioned_ancestors = self.latest_ancestor_commits(session).await?;
+    async fn create_ancestors_commits(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let versioned_ancestors = self.latest_ancestor_commits(db_session).await?;
         let vnd_ids = versioned_ancestors.pluck_node_descendants_commit_id();
-        let grouped_v_node_descendants = NodeDescendantsCommit::find_grouped_by_node_id(session, vnd_ids).await?;
+        let grouped_v_node_descendants = NodeDescendantsCommit::find_grouped_by_node_id(db_session, vnd_ids).await?;
         let mut new_v_node_descendants = vec![];
         let mut new_v_nodes = vec![];
 
@@ -194,11 +198,11 @@ impl NodeCommit {
         }
 
         NodeDescendantsCommit::unlogged_batch()
-            .chunked_insert(session, &new_v_node_descendants, 100)
+            .chunked_insert(db_session, &new_v_node_descendants, 100)
             .await?;
 
         NodeCommit::unlogged_batch()
-            .chunked_insert(session, &new_v_nodes, 100)
+            .chunked_insert(db_session, &new_v_nodes, 100)
             .await?;
 
         Ok(())
@@ -206,16 +210,16 @@ impl NodeCommit {
 
     async fn create_ancestors_commits_for_deleted_node(
         &mut self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
         let mut new_v_node_descendants = vec![];
         let mut new_v_nodes = vec![];
 
-        let ancestors = self.latest_ancestor_commits(session).await?;
+        let ancestors = self.latest_ancestor_commits(db_session).await?;
         let vnd_ids = ancestors.pluck_node_descendants_commit_id();
-        let grouped_v_node_descendants = NodeDescendantsCommit::find_grouped_by_node_id(session, vnd_ids).await?;
+        let grouped_v_node_descendants = NodeDescendantsCommit::find_grouped_by_node_id(db_session, vnd_ids).await?;
 
-        let node_descendant_commit = self.node_descendants_commit(session).await?;
+        let node_descendant_commit = self.node_descendants_commit(db_session).await?;
         let mut node_descendant_ids_to_remove = vec![self.node_id];
 
         if let Some(node_descendant_commit) = node_descendant_commit {
@@ -249,11 +253,11 @@ impl NodeCommit {
         }
 
         NodeDescendantsCommit::unlogged_batch()
-            .chunked_insert(session, &new_v_node_descendants, 100)
+            .chunked_insert(db_session, &new_v_node_descendants, 100)
             .await?;
 
         NodeCommit::unlogged_batch()
-            .chunked_insert(session, &new_v_nodes, 100)
+            .chunked_insert(db_session, &new_v_nodes, 100)
             .await?;
 
         Ok(())

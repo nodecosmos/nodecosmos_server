@@ -11,7 +11,7 @@ impl Callbacks for ContributionRequest {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.set_defaults(data);
         self.create_branch(data).await?;
         self.create_branch_node(data).await?;

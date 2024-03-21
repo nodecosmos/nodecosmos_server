@@ -89,19 +89,19 @@ pub struct Io {
 
 impl Io {
     pub async fn branched(
-        session: &CachingSession,
+        db_session: &CachingSession,
         root_node_id: Uuid,
         params: &WorkflowParams,
     ) -> Result<Vec<Io>, NodecosmosError> {
         let mut ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.branch_id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(ios.try_collect().await?)
         } else {
             let mut original_ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.node_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
             let mut branched_ios_set = HashSet::new();
             let mut branch_ios = vec![];
@@ -123,15 +123,15 @@ impl Io {
         }
     }
 
-    pub async fn workflow(&mut self, session: &CachingSession) -> Result<&mut Option<Workflow>, NodecosmosError> {
+    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Option<Workflow>, NodecosmosError> {
         if self.workflow.is_none() {
             if let Some(flow_step) = &mut self.flow_step {
-                let workflow = flow_step.workflow(session).await?;
+                let workflow = flow_step.workflow(db_session).await?;
                 self.workflow = workflow.clone();
             } else {
                 let workflow =
                     Workflow::find_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, self.workflow_id)
-                        .execute(session)
+                        .execute(db_session)
                         .await?;
                 self.workflow = Some(workflow);
             }
@@ -140,11 +140,11 @@ impl Io {
         Ok(&mut self.workflow)
     }
 
-    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
             // TODO: introduce branch_id to workflow
             let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
             self.node = Some(node);
         }
@@ -152,12 +152,16 @@ impl Io {
         Ok(self.node.as_mut().unwrap())
     }
 
-    pub async fn flow_step(&mut self, session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {
+    pub async fn flow_step(&mut self, db_session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {
         if let Some(flow_step_id) = self.flow_step_id {
             if self.flow_step.is_none() {
-                let flow_step =
-                    FlowStep::find_by_node_id_and_branch_id_and_id(session, self.node_id, self.branch_id, flow_step_id)
-                        .await?;
+                let flow_step = FlowStep::find_by_node_id_and_branch_id_and_id(
+                    db_session,
+                    self.node_id,
+                    self.branch_id,
+                    flow_step_id,
+                )
+                .await?;
                 self.flow_step = Some(flow_step);
             }
         }
@@ -165,13 +169,13 @@ impl Io {
         Ok(&mut self.flow_step)
     }
 
-    pub async fn original_io(&self, session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+    pub async fn original_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(original_id) = self.original_id {
             let original_io = find_first_io!(
                 "root_node_id = ? AND branch_id = ? AND id = ?",
                 (self.root_node_id, self.branch_id, original_id)
             )
-            .execute(session)
+            .execute(db_session)
             .await?;
             Ok(Some(original_io))
         } else {
@@ -205,7 +209,7 @@ partial_io!(
 
 impl UpdateTitleIo {
     pub async fn ios_by_original_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         root_node_id: Uuid,
         branch_id: Uuid,
         original_id: Uuid,
@@ -214,7 +218,7 @@ impl UpdateTitleIo {
             "root_node_id = ? AND branch_id = ? AND original_id = ?",
             (root_node_id, branch_id, original_id)
         )
-        .execute(session)
+        .execute(db_session)
         .await?
         .try_collect()
         .await?;

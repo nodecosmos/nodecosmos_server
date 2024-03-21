@@ -13,8 +13,8 @@ impl Callbacks for User {
     type Extension = Arc<App>;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.check_existing_user(session).await?;
+    async fn before_insert(&mut self, db_session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.check_existing_user(db_session).await?;
 
         self.set_defaults();
         self.set_password()?;
@@ -22,7 +22,7 @@ impl Callbacks for User {
         Ok(())
     }
 
-    async fn after_insert(&mut self, _session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
+    async fn after_insert(&mut self, _db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
         self.add_elastic_document(&app.elastic_client).await;
 
         Ok(())

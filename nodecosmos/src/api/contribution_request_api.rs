@@ -15,13 +15,13 @@ use scylla::CachingSession;
 use serde_json::json;
 
 #[get("/{node_id}")]
-pub async fn get_contribution_requests(session: web::Data<CachingSession>, node_id: web::Path<Uuid>) -> Response {
+pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, node_id: web::Path<Uuid>) -> Response {
     let mut contribution_request = BaseContributionRequest::new();
     contribution_request.node_id = node_id.into_inner();
 
     let contribution_requests: Vec<BaseContributionRequest> = contribution_request
         .find_by_partition_key()
-        .execute(&session)
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;
@@ -31,11 +31,11 @@ pub async fn get_contribution_requests(session: web::Data<CachingSession>, node_
 
 #[get("/{nodeId}/{id}")]
 pub async fn get_contribution_request(
-    session: web::Data<CachingSession>,
+    db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
 ) -> Response {
-    let contribution_request = contribution_request.find_by_primary_key().execute(&session).await?;
-    let branch = Branch::find_by_id(contribution_request.id).execute(&session).await?;
+    let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
+    let branch = Branch::find_by_id(contribution_request.id).execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "contributionRequest": contribution_request,

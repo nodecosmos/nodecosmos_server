@@ -25,7 +25,7 @@ pub struct LoginForm {
 #[post("/session/login")]
 pub async fn login(
     client_session: Session,
-    session: web::Data<CachingSession>,
+    db_session: web::Data<CachingSession>,
     login_form: web::Json<LoginForm>,
 ) -> Response {
     let mut user = User {
@@ -34,9 +34,9 @@ pub async fn login(
         ..Default::default()
     };
 
-    if let Some(user_by_username) = user.find_by_username(&session).await {
+    if let Some(user_by_username) = user.find_by_username(&db_session).await {
         user = user_by_username;
-    } else if let Some(user_by_email) = user.find_by_email(&session).await {
+    } else if let Some(user_by_email) = user.find_by_email(&db_session).await {
         user = user_by_email;
     } else {
         return Err(NodecosmosError::NotFound("Not found".to_string()));
@@ -66,15 +66,15 @@ pub async fn logout(client_session: Session) -> Response {
 }
 
 #[get("/{id}")]
-pub async fn get_user(session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let user = GetUser::find_by_id(*id).execute(&session).await?;
+pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
+    let user = GetUser::find_by_id(*id).execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(user))
 }
 
 #[get("/{username}/username")]
-pub async fn get_user_by_username(session: web::Data<CachingSession>, username: web::Path<String>) -> Response {
-    let user = GetUser::find_by_username(&session, &username).await?;
+pub async fn get_user_by_username(db_session: web::Data<CachingSession>, username: web::Path<String>) -> Response {
+    let user = GetUser::find_by_username(&db_session, &username).await?;
 
     Ok(HttpResponse::Ok().json(user))
 }

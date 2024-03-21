@@ -14,9 +14,9 @@ impl Callbacks for Node {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if &self.ctx != &Context::Merge && &self.ctx != &Context::BranchedInit {
-            self.set_defaults(session).await?;
+            self.set_defaults(db_session).await?;
             self.set_owner(data).await?;
             self.validate_root().await?;
             self.validate_owner().await?;
@@ -24,13 +24,13 @@ impl Callbacks for Node {
 
         self.preserve_ancestors_for_branch(data).await?;
 
-        if let Err(e) = self.append_to_ancestors(session).await {
-            self.remove_from_ancestors(session).await?;
+        if let Err(e) = self.append_to_ancestors(db_session).await {
+            self.remove_from_ancestors(db_session).await?;
             error!("[before_insert] Unexpected error updating branch with creation: {}", e);
         }
 
         if let Err(e) = self.update_branch_with_creation(data).await {
-            self.remove_from_ancestors(session).await?;
+            self.remove_from_ancestors(db_session).await?;
             error!("[before_insert] Unexpected error updating branch with creation: {}", e);
         }
 
@@ -76,13 +76,17 @@ impl Callbacks for UpdateDescriptionNode {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, session: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+    async fn before_update(
+        &mut self,
+        db_session: &CachingSession,
+        data: &Self::Extension,
+    ) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             self.as_native().create_branched_if_not_exist(data).await?;
         }
 
         if &self.ctx != &Context::MergeRecovery {
-            self.merge_description(session).await?;
+            self.merge_description(db_session).await?;
         }
 
         self.description.sanitize()?;
@@ -94,7 +98,7 @@ impl Callbacks for UpdateDescriptionNode {
                 .as_native()
                 .find_by_primary_key()
                 .consistency(Consistency::All)
-                .execute(session)
+                .execute(db_session)
                 .await;
             match native {
                 Ok(native) => {
@@ -160,7 +164,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
 
             async fn before_update(
                 &mut self,
-                _session: &CachingSession,
+                _db_session: &CachingSession,
                 _data: &Self::Extension,
             ) -> Result<(), NodecosmosError> {
                 self.updated_at = Some(chrono::Utc::now());
@@ -170,7 +174,7 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
 
             async fn after_update(
                 &mut self,
-                _session: &CachingSession,
+                _db_session: &CachingSession,
                 data: &Self::Extension,
             ) -> Result<(), NodecosmosError> {
                 use crate::models::traits::ElasticDocument;

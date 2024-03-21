@@ -21,14 +21,14 @@ impl Like {
         self.updated_at = Some(now);
     }
 
-    pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn validate_not_liked(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let existing_like = LikesByUser {
             user_id: self.user_id,
             object_id: self.object_id,
             branch_id: self.branch_id,
         }
         .find_by_primary_key()
-        .execute(session)
+        .execute(db_session)
         .await
         .ok();
 
@@ -44,7 +44,6 @@ impl Like {
 
     pub async fn update_model_like_count(
         &mut self,
-        _: &CachingSession,
         data: &RequestData,
         increment: bool,
     ) -> Result<(), NodecosmosError> {

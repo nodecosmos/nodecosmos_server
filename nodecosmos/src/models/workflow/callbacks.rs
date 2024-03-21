@@ -18,7 +18,7 @@ impl Callbacks for Workflow {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
         self.id = charybdis::types::Uuid::new_v4();
@@ -26,7 +26,7 @@ impl Callbacks for Workflow {
         self.updated_at = Some(now);
 
         if self.is_branched() {
-            let node = Node::find_branched_or_original(session, self.node_id, self.branch_id, None).await?;
+            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id, None).await?;
             node.create_branched_if_not_exist(data).await?;
 
             Branch::update(data, self.branch_id, BranchUpdate::CreateWorkflow(self.id)).await?;
@@ -37,7 +37,7 @@ impl Callbacks for Workflow {
 
     updated_at_cb_fn!();
 
-    async fn before_delete(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+    async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::DeleteWorkflow(self.id)).await?;
         }
@@ -45,17 +45,17 @@ impl Callbacks for Workflow {
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             self.create_branched_if_original_exists(data).await?;
         }
 
         DeleteFlowStep::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         DeleteFlow::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         // NOTE: if we allow multiple workflows per node, we need to delete only the io that belongs to this workflow
@@ -64,7 +64,7 @@ impl Callbacks for Workflow {
             self.branchise_id(self.root_node_id),
             self.node_id,
         )
-        .execute(session)
+        .execute(db_session)
         .await?;
 
         Ok(())
@@ -75,7 +75,7 @@ impl Callbacks for UpdateInitialInputsWorkflow {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
@@ -91,7 +91,7 @@ impl Callbacks for UpdateWorkflowTitle {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {

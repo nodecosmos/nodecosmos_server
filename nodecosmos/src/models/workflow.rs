@@ -67,23 +67,23 @@ pub struct Workflow {
 }
 
 impl Workflow {
-    pub async fn branched(session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
+    pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
         if params.is_original() {
             let workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
 
             Ok(workflow)
         } else {
             let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
 
             if let Some(workflow) = maybe_branched {
                 Ok(workflow)
             } else {
                 let mut workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
-                    .execute(session)
+                    .execute(db_session)
                     .await?;
                 workflow.branch_id = params.branch_id;
 
@@ -92,18 +92,18 @@ impl Workflow {
         }
     }
 
-    pub async fn diagram(&mut self, session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
+    pub async fn diagram(&mut self, db_session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
         if self.diagram.is_none() {
-            let diagram = WorkflowDiagram::build(session, self).await?;
+            let diagram = WorkflowDiagram::build(db_session, self).await?;
             self.diagram = Some(diagram);
         }
 
         Ok(self.diagram.as_mut().unwrap())
     }
 
-    pub async fn flows(&self, session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
+    pub async fn flows(&self, db_session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
         let flows = Flow::find_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         Ok(flows)

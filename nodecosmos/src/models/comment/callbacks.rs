@@ -11,13 +11,13 @@ impl Callbacks for Comment {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.set_default_values(data).await?;
 
         Ok(())
     }
 
-    async fn after_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+    async fn after_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.emmit_create_event(data).await?;
 
         Ok(())
@@ -30,7 +30,7 @@ impl Callbacks for UpdateContentComment {
 
     async fn before_update(
         &mut self,
-        _session: &CachingSession,
+        _db_session: &CachingSession,
         _ext: &Self::Extension,
     ) -> Result<(), NodecosmosError> {
         self.updated_at = chrono::Utc::now();
@@ -45,7 +45,7 @@ impl Callbacks for DeleteComment {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn after_delete(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let self_clone = self.clone();
         let data = data.clone();
 

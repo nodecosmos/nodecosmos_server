@@ -49,14 +49,14 @@ pub struct Like {
 }
 
 impl Like {
-    pub async fn like_count(&mut self, session: &CachingSession) -> Result<i64, NodecosmosError> {
+    pub async fn like_count(&mut self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
         if let Some(c) = self.like_count {
             return Ok(c);
         }
 
         match ObjectType::from_string(self.object_type.as_str()) {
             Some(ObjectType::Node) => {
-                let lc = NodeCounter::like_count(session, self.object_id, self.branch_id).await?;
+                let lc = NodeCounter::like_count(db_session, self.object_id, self.branch_id).await?;
 
                 self.like_count = Some(lc);
 

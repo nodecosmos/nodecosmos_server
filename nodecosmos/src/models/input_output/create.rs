@@ -31,8 +31,8 @@ impl Io {
         Ok(())
     }
 
-    pub async fn validate_root_node_id(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let node = self.node(session).await?;
+    pub async fn validate_root_node_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let node = self.node(db_session).await?;
         let root_node_id = node.root_id;
 
         if self.root_node_id != root_node_id {
@@ -55,8 +55,8 @@ impl Io {
 
     /// We use copy instead of reference, as in future we may add more features
     /// that will require each node within a flow step to have it's own IO.
-    pub async fn copy_vals_from_original(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let original_io = self.original_io(session).await?;
+    pub async fn copy_vals_from_original(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let original_io = self.original_io(db_session).await?;
 
         if let Some(original_io) = original_io {
             self.title = original_io.title;

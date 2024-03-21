@@ -154,12 +154,12 @@ impl Node {
     }
 
     pub async fn find_by_ids_and_branch_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         ids: &Set<Uuid>,
         branch_id: Uuid,
     ) -> Result<Vec<Node>, NodecosmosError> {
         let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(session)
+            .execute(db_session)
             .await?
             .try_collect()
             .await?;
@@ -171,9 +171,9 @@ impl Node {
 partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_by_ids(session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(session)
+            .execute(db_session)
             .await?
             .try_collect()
             .await?;
@@ -182,12 +182,12 @@ impl PkNode {
     }
 
     pub async fn find_by_ids_and_branch_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         ids: &Vec<Uuid>,
         branch_id: Uuid,
     ) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(session)
+            .execute(db_session)
             .await?
             .try_collect()
             .await?;

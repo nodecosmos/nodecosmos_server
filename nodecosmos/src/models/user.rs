@@ -59,29 +59,29 @@ pub struct User {
 }
 
 impl User {
-    pub async fn find_by_username(&self, session: &CachingSession) -> Option<User> {
+    pub async fn find_by_username(&self, db_session: &CachingSession) -> Option<User> {
         find_first_user!("username = ?", (&self.username,))
-            .execute(session)
+            .execute(db_session)
             .await
             .ok()
     }
 
-    pub async fn find_by_email(&self, session: &CachingSession) -> Option<User> {
+    pub async fn find_by_email(&self, db_session: &CachingSession) -> Option<User> {
         find_first_user!("email = ?", (&self.email,))
-            .execute(session)
+            .execute(db_session)
             .await
             .ok()
     }
 
-    pub async fn check_existing_user(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        if self.find_by_username(session).await.is_some() {
+    pub async fn check_existing_user(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        if self.find_by_username(db_session).await.is_some() {
             return Err(NodecosmosError::ValidationError((
                 "username".to_string(),
                 "is taken".to_string(),
             )));
         }
 
-        if self.find_by_email(session).await.is_some() {
+        if self.find_by_email(db_session).await.is_some() {
             return Err(NodecosmosError::ValidationError((
                 "email".to_string(),
                 "is taken".to_string(),
@@ -135,9 +135,9 @@ partial_user!(
 );
 
 impl GetUser {
-    pub async fn find_by_username(session: &CachingSession, username: &String) -> Result<GetUser, NodecosmosError> {
+    pub async fn find_by_username(db_session: &CachingSession, username: &String) -> Result<GetUser, NodecosmosError> {
         find_first_get_user!("username = ?", (username,))
-            .execute(session)
+            .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
     }

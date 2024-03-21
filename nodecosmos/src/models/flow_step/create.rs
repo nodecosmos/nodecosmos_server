@@ -55,9 +55,9 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn validate_conflicts(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let prev_flow_step = self.prev_flow_step(session).await?;
-        let next_flow_step = self.next_flow_step(session).await?;
+    pub async fn validate_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let prev_flow_step = self.prev_flow_step(db_session).await?;
+        let next_flow_step = self.next_flow_step(db_session).await?;
 
         match (prev_flow_step.as_ref(), next_flow_step.as_ref()) {
             (Some(prev_flow_step), Some(next_flow_step)) => match prev_flow_step.next_flow_step_id {
@@ -98,9 +98,9 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn calculate_index(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let prev_flow_step = self.prev_flow_step(session).await?;
-        let next_flow_step = self.next_flow_step(session).await?;
+    pub async fn calculate_index(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let prev_flow_step = self.prev_flow_step(db_session).await?;
+        let next_flow_step = self.next_flow_step(db_session).await?;
 
         if prev_flow_step.is_none() && next_flow_step.is_none() {
             self.flow_index = 0.0;

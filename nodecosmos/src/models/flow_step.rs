@@ -89,16 +89,19 @@ pub struct FlowStep {
 }
 
 impl FlowStep {
-    pub async fn branched(session: &CachingSession, params: &WorkflowParams) -> Result<Vec<FlowStep>, NodecosmosError> {
+    pub async fn branched(
+        db_session: &CachingSession,
+        params: &WorkflowParams,
+    ) -> Result<Vec<FlowStep>, NodecosmosError> {
         let mut flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(flow_steps.try_collect().await?)
         } else {
             let mut original_flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.node_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
             let mut branched_flow_steps_set = HashSet::new();
             let mut branch_flow_steps = vec![];
@@ -127,7 +130,7 @@ impl FlowStep {
     }
 
     pub async fn find_by_flow(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         workflow_id: Uuid,
@@ -137,20 +140,20 @@ impl FlowStep {
             "node_id = ? AND branch_id = ? AND workflow_id = ? AND flow_id = ?",
             (node_id, branch_id, workflow_id, flow_id)
         )
-        .execute(session)
+        .execute(db_session)
         .await?;
 
         Ok(res)
     }
 
     pub async fn find_by_node_id_and_branch_id_and_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         id: Uuid,
     ) -> Result<FlowStep, NodecosmosError> {
         let fs = find_first_flow_step!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         Ok(fs)
@@ -158,12 +161,12 @@ impl FlowStep {
 
     pub(crate) async fn workflow(
         &mut self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<&mut Option<Workflow>, NodecosmosError> {
         if self.workflow.is_none() {
             let workflow =
                 Workflow::find_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, self.workflow_id)
-                    .execute(session)
+                    .execute(db_session)
                     .await?;
             self.workflow = Some(workflow);
         }
@@ -171,11 +174,14 @@ impl FlowStep {
         Ok(&mut self.workflow)
     }
 
-    pub async fn prev_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
+    pub async fn prev_flow_step(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(prev_flow_step_id) = self.prev_flow_step_id {
             if self.prev_flow_step.is_none() {
                 let res = BaseFlowStep::find_by_node_id_and_branch_id_and_id(
-                    session,
+                    db_session,
                     self.node_id,
                     self.branch_id,
                     prev_flow_step_id,
@@ -188,11 +194,14 @@ impl FlowStep {
         Ok(self.prev_flow_step.clone())
     }
 
-    pub async fn next_flow_step(&mut self, session: &CachingSession) -> Result<Option<BaseFlowStep>, NodecosmosError> {
+    pub async fn next_flow_step(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<BaseFlowStep>, NodecosmosError> {
         if let Some(next_flow_step_id) = self.next_flow_step_id {
             if self.next_flow_step.is_none() {
                 let res = BaseFlowStep::find_by_node_id_and_branch_id_and_id(
-                    session,
+                    db_session,
                     self.node_id,
                     self.branch_id,
                     next_flow_step_id,
@@ -205,13 +214,16 @@ impl FlowStep {
         Ok(self.next_flow_step.clone())
     }
 
-    pub async fn maybe_find_original(&mut self, session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
+    pub async fn maybe_find_original(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<FlowStep>, NodecosmosError> {
         let original = Self {
             branch_id: self.original_id(),
             ..self.clone()
         }
         .maybe_find_by_primary_key()
-        .execute(session)
+        .execute(db_session)
         .await?;
 
         Ok(original)
@@ -240,13 +252,13 @@ partial_flow_step!(
 
 impl BaseFlowStep {
     pub async fn find_by_node_id_and_branch_id_and_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         id: Uuid,
     ) -> Result<BaseFlowStep, NodecosmosError> {
         let fs = find_first_base_flow_step!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         Ok(fs)

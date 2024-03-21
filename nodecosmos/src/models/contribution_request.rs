@@ -83,26 +83,26 @@ pub struct ContributionRequest {
 }
 
 impl ContributionRequest {
-    pub async fn init_node(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn init_node(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
-            .execute(session)
+            .execute(db_session)
             .await?;
         self.node = Some(node);
 
         Ok(())
     }
 
-    pub async fn node(&mut self, session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
-            self.init_node(session).await?;
+            self.init_node(db_session).await?;
         }
 
         Ok(self.node.as_mut().unwrap())
     }
 
-    pub async fn branch(&mut self, session: &CachingSession) -> Result<&Branch, NodecosmosError> {
+    pub async fn branch(&mut self, db_session: &CachingSession) -> Result<&Branch, NodecosmosError> {
         if self.branch.is_none() {
-            let branch = Branch::find_by_id(self.id).execute(session).await?;
+            let branch = Branch::find_by_id(self.id).execute(db_session).await?;
             self.branch.replace(branch);
         }
 

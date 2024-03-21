@@ -65,13 +65,13 @@ pub struct Flow {
 
 impl Flow {
     pub async fn find_by_node_id_and_branch_id_and_id(
-        session: &CachingSession,
+        db_session: &CachingSession,
         node_id: Uuid,
         branch_id: Uuid,
         id: Uuid,
     ) -> Result<Flow, NodecosmosError> {
         let flow = find_first_flow!("node_id = ? AND branch_id = ? AND id = ?", (node_id, branch_id, id))
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         Ok(flow)
@@ -79,21 +79,21 @@ impl Flow {
 
     pub async fn flow_steps(
         &self,
-        session: &CachingSession,
+        db_session: &CachingSession,
     ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        let res = FlowStep::find_by_flow(session, self.node_id, self.branch_id, self.workflow_id, self.id).await?;
+        let res = FlowStep::find_by_flow(db_session, self.node_id, self.branch_id, self.workflow_id, self.id).await?;
 
         Ok(res)
     }
 
-    pub async fn workflow(&mut self, session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
+    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
         if self.workflow.is_none() {
             let params = WorkflowParams {
                 node_id: self.node_id,
                 branch_id: self.branch_id,
             };
 
-            let workflow = Workflow::branched(session, &params).await?;
+            let workflow = Workflow::branched(db_session, &params).await?;
             self.workflow = Some(workflow);
         }
 
@@ -116,16 +116,19 @@ partial_flow!(
 
 impl BaseFlow {
     /// merges original and branched flows
-    pub async fn branched(session: &CachingSession, params: &WorkflowParams) -> Result<Vec<BaseFlow>, NodecosmosError> {
+    pub async fn branched(
+        db_session: &CachingSession,
+        params: &WorkflowParams,
+    ) -> Result<Vec<BaseFlow>, NodecosmosError> {
         let mut flows = BaseFlow::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
-            .execute(session)
+            .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(flows.try_collect().await?)
         } else {
             let mut original_flows = BaseFlow::find_by_node_id_and_branch_id(params.node_id, params.node_id)
-                .execute(session)
+                .execute(db_session)
                 .await?;
             let mut branched_flows_set = HashSet::new();
             let mut branch_flows = vec![];

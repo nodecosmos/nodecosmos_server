@@ -11,14 +11,14 @@ use serde::Deserialize;
 use serde_json::json;
 
 #[get("/{objectId}")]
-pub async fn get_comments(session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
+pub async fn get_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
     let comments = Comment::find_by_partition_key_value(&(pk.object_id,))
-        .execute(&session)
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;
     let threads = CommentThread::find_by_partition_key_value(&(pk.object_id,))
-        .execute(&session)
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;
@@ -32,9 +32,9 @@ pub async fn get_comments(session: web::Data<CachingSession>, pk: web::Path<PkCo
 }
 
 #[get("/{objectId}/{threadId}")]
-pub async fn get_thread_comments(session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
+pub async fn get_thread_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
     let comments = Comment::find_by_object_id_and_thread_id(pk.object_id, pk.thread_id)
-        .execute(&session)
+        .execute(&db_session)
         .await?
         .try_collect()
         .await?;

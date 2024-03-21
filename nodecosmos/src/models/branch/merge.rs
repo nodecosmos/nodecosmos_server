@@ -79,12 +79,12 @@ pub struct BranchMerge {
 
 impl BranchMerge {
     async fn fetch_original_title_nodes(
-        session: &CachingSession,
+        db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_node_titles {
             let nodes_by_id = find_update_title_node!("id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(session)
+                .execute(db_session)
                 .await?
                 .group_by_id()
                 .await?;
@@ -96,12 +96,12 @@ impl BranchMerge {
     }
 
     async fn fetch_original_description_nodes(
-        session: &CachingSession,
+        db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateDescriptionNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_node_descriptions {
             let nodes_by_id = find_update_description_node!("id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(session)
+                .execute(db_session)
                 .await?
                 .group_by_id()
                 .await?;

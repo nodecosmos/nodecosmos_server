@@ -33,8 +33,8 @@ pub trait Branchable {
         }
     }
 
-    async fn branch(&self, session: &CachingSession) -> Result<Branch, NodecosmosError> {
-        let branch = Branch::find_by_id(self.branch_id()).execute(session).await?;
+    async fn branch(&self, db_session: &CachingSession) -> Result<Branch, NodecosmosError> {
+        let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
 
         Ok(branch)
     }

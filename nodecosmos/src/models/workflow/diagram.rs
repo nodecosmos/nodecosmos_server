@@ -25,14 +25,14 @@ pub struct WorkflowDiagram {
 }
 
 impl WorkflowDiagram {
-    pub async fn build(session: &CachingSession, workflow: &Workflow) -> Result<WorkflowDiagram, NodecosmosError> {
-        let mut flows = workflow.flows(session).await?;
+    pub async fn build(db_session: &CachingSession, workflow: &Workflow) -> Result<WorkflowDiagram, NodecosmosError> {
+        let mut flows = workflow.flows(db_session).await?;
         let mut flow_step_by_id = HashMap::new();
         let mut flow_steps_ids_by_wf_index = HashMap::new();
         let mut workflow_index_by_id = HashMap::new();
 
         while let Some(flow) = flows.try_next().await? {
-            let mut flow_steps = flow.flow_steps(session).await?;
+            let mut flow_steps = flow.flow_steps(db_session).await?;
             let mut workflow_index = flow.start_index as u32;
 
             while let Some(flow_step) = flow_steps.try_next().await? {

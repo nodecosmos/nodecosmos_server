@@ -9,9 +9,9 @@ use scylla::CachingSession;
 use serde_json::json;
 
 #[get("/{objectId}/{branchId}")]
-pub async fn get_like_count(session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {
-    let like_count = match like.find_by_primary_key().execute(&session).await.ok() {
-        Some(mut like) => like.like_count(&session).await?,
+pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {
+    let like_count = match like.find_by_primary_key().execute(&db_session).await.ok() {
+        Some(mut like) => like.like_count(&db_session).await?,
         None => 0,
     };
 
@@ -55,13 +55,13 @@ pub async fn delete_like(data: RequestData, mut like: web::Path<Like>) -> Respon
 }
 
 #[get("/user_likes")]
-pub async fn user_likes(session: web::Data<CachingSession>, current_user: CurrentUser) -> Response {
+pub async fn user_likes(db_session: web::Data<CachingSession>, current_user: CurrentUser) -> Response {
     let user_likes = LikesByUser {
         user_id: current_user.id,
         ..Default::default()
     }
     .find_by_partition_key()
-    .execute(&session)
+    .execute(&db_session)
     .await?
     .try_collect()
     .await?;

@@ -44,29 +44,29 @@ pub struct ReorderData {
 
 impl ReorderData {
     async fn find_descendants(
-        session: &CachingSession,
+        db_session: &CachingSession,
         params: &ReorderParams,
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         return if params.is_branched() {
-            node.descendants(&session, Some(Consistency::All))
+            node.descendants(&db_session, Some(Consistency::All))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
         } else {
-            node.branch_descendants(&session, Some(Consistency::All)).await
+            node.branch_descendants(&db_session, Some(Consistency::All)).await
         };
     }
 
-    async fn find_new_parent(session: &CachingSession, params: &ReorderParams) -> Result<BaseNode, NodecosmosError> {
+    async fn find_new_parent(db_session: &CachingSession, params: &ReorderParams) -> Result<BaseNode, NodecosmosError> {
         let mut query_new_parent_node = Node {
             id: params.id,
             branch_id: params.branch_id,
             parent_id: Some(params.new_parent_id),
             ..Default::default()
         };
-        let new_parent = query_new_parent_node.branch_parent(&session).await?;
+        let new_parent = query_new_parent_node.branch_parent(&db_session).await?;
 
         match new_parent {
             Some(new_parent) => Ok(new_parent.clone()),
@@ -77,44 +77,44 @@ impl ReorderData {
         }
     }
 
-    async fn find_tree_root(session: &CachingSession, node: &Node) -> Result<GetStructureNode, NodecosmosError> {
+    async fn find_tree_root(db_session: &CachingSession, node: &Node) -> Result<GetStructureNode, NodecosmosError> {
         let tree_root = GetStructureNode {
             id: node.root_id,
             branch_id: node.branchise_id(node.root_id),
             ..Default::default()
         }
         .find_by_primary_key()
-        .execute(&session)
+        .execute(&db_session)
         .await?;
 
         Ok(tree_root)
     }
 
     async fn find_tree_descendants(
-        session: &CachingSession,
+        db_session: &CachingSession,
         tree_root: &GetStructureNode,
         params: &ReorderParams,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         if params.is_branched() {
             tree_root
-                .descendants(&session, Some(Consistency::All))
+                .descendants(&db_session, Some(Consistency::All))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
         } else {
-            tree_root.branch_descendants(&session, Some(Consistency::All)).await
+            tree_root.branch_descendants(&db_session, Some(Consistency::All)).await
         }
     }
 
     async fn init_sibling(
-        session: &CachingSession,
+        db_session: &CachingSession,
         id: Option<Uuid>,
         branch_id: Uuid,
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
         if let Some(id) = id {
             let node =
-                GetStructureNode::find_branched_or_original(&session, id, branch_id, Some(Consistency::All)).await?;
+                GetStructureNode::find_branched_or_original(&db_session, id, branch_id, Some(Consistency::All)).await?;
 
             return Ok(Some(node));
         }

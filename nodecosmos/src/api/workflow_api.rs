@@ -21,13 +21,13 @@ pub struct WorkflowParams {
 }
 
 #[get("/{node_id}/{branch_id}")]
-pub async fn get_workflow(session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
+pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
     let params = params.into_inner();
 
-    let workflow = Workflow::branched(&session, &params).await?;
-    let flows = BaseFlow::branched(&session, &params).await?;
-    let flow_steps = FlowStep::branched(&session, &params).await?;
-    let input_outputs = Io::branched(&session, workflow.root_node_id, &params).await?;
+    let workflow = Workflow::branched(&db_session, &params).await?;
+    let flows = BaseFlow::branched(&db_session, &params).await?;
+    let flow_steps = FlowStep::branched(&db_session, &params).await?;
+    let input_outputs = Io::branched(&db_session, workflow.root_node_id, &params).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,

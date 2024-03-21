@@ -37,15 +37,15 @@ impl Io {
         Ok(())
     }
 
-    pub async fn pull_from_initial_input_ids(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn pull_from_initial_input_ids(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let id = self.id;
-        let workflow = self.workflow(session).await?;
+        let workflow = self.workflow(db_session).await?;
 
         if let Some(workflow) = &mut workflow.as_mut() {
             let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
 
             if initial_input_ids.contains(&id) {
-                workflow.pull_initial_input_ids(&vec![id]).execute(session).await?;
+                workflow.pull_initial_input_ids(&vec![id]).execute(db_session).await?;
             }
         }
 
