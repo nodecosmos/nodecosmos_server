@@ -7,6 +7,7 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
+use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
@@ -25,7 +26,7 @@ use std::collections::HashSet;
     table_name = input_outputs,
     partition_keys = [root_node_id, branch_id],
     clustering_keys = [node_id, workflow_id, id],
-    local_secondary_indexes = [id, original_id]
+    local_secondary_indexes = [id, main_id]
 )]
 #[derive(BranchableByRootNodeId, Serialize, Deserialize, Default)]
 pub struct Io {
@@ -44,8 +45,8 @@ pub struct Io {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "originalId")]
-    pub original_id: Option<Uuid>,
+    #[serde(rename = "mainId")]
+    pub main_id: Option<Uuid>,
 
     /// outputted by flow step
     #[serde(rename = "flowStepId")]
@@ -59,14 +60,6 @@ pub struct Io {
     pub data_type: Option<Text>,
 
     pub value: Option<Text>,
-
-    pub description: Option<Text>,
-
-    #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Option<Text>,
-
-    #[serde(rename = "descriptionBase64")]
-    pub description_base64: Option<Text>,
 
     pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
@@ -102,7 +95,7 @@ impl Io {
         if params.is_original() {
             Ok(ios.try_collect().await?)
         } else {
-            let mut original_ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.node_id)
+            let mut original_ios = Self::find_by_root_node_id_and_branch_id(root_node_id, root_node_id)
                 .execute(db_session)
                 .await?;
             let mut branched_ios_set = HashSet::new();
@@ -115,8 +108,9 @@ impl Io {
             }
 
             while let Some(io) = original_ios.next().await {
-                let io = io?;
+                let mut io = io?;
                 if !branched_ios_set.contains(&io.id) {
+                    io.branch_id = params.branch_id;
                     branch_ios.push(io);
                 }
             }
@@ -125,11 +119,10 @@ impl Io {
         }
     }
 
-    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Option<Workflow>, NodecosmosError> {
+    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
         if self.workflow.is_none() {
             if let Some(flow_step) = &mut self.flow_step {
-                let workflow = flow_step.workflow(db_session).await?;
-                self.workflow = workflow.clone();
+                return flow_step.workflow(db_session).await;
             } else {
                 let params = WorkflowParams {
                     node_id: self.node_id,
@@ -142,15 +135,13 @@ impl Io {
             }
         }
 
-        Ok(&mut self.workflow)
+        Ok(self.workflow.as_mut().unwrap())
     }
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
             // TODO: introduce branch_id to workflow
-            let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
-                .execute(db_session)
-                .await?;
+            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id, None).await?;
             self.node = Some(node);
         }
 
@@ -171,60 +162,65 @@ impl Io {
         Ok(&mut self.flow_step)
     }
 
-    pub async fn original_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+    /// Main `Io` refers to Io from which we copy values so users don't have to redefine complete IO.
+    /// Io description for main and copied remains the same, while properties can be different.
+    pub async fn main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         return if self.is_original() {
-            let res =
-                Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, self.id)
-                    .execute(db_session)
-                    .await?;
-
-            Ok(res)
+            self.original_main_io(db_session).await
         } else {
-            self.original_branched_io(db_session).await
+            self.branched_main_io(db_session).await
         };
     }
 
-    pub async fn original_branched_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
-        let maybe_branched =
-            Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, self.id)
-                .execute(db_session)
-                .await?;
-
-        if let Some(branched) = maybe_branched {
-            Ok(Some(branched))
-        } else {
-            let original = Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(
+    async fn original_main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        if let Some(main_id) = self.main_id {
+            let res = Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(
                 self.root_node_id,
                 self.original_id(),
-                self.id,
+                main_id,
             )
             .execute(db_session)
             .await?;
 
-            match original {
-                Some(mut original) => {
-                    original.branch_id = self.branch_id;
-
-                    original.insert().execute(db_session).await?;
-
-                    Ok(Some(original))
-                }
-                None => Ok(None),
-            }
+            Ok(res)
+        } else {
+            Ok(None)
         }
     }
-}
 
-partial_io!(
-    GetDescriptionIo,
-    root_node_id,
-    node_id,
-    branch_id,
-    workflow_id,
-    id,
-    description,
-    description_markdown
-);
+    pub async fn branched_main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        if self.main_id.is_some() {
+            if let Some(branched) = self.maybe_main(db_session).await? {
+                return Ok(Some(branched));
+            }
+
+            if let Some(mut main_io) = self.original_main_io(db_session).await? {
+                main_io.branch_id = self.branch_id;
+
+                main_io.insert().execute(db_session).await?;
+
+                return Ok(Some(main_io));
+            }
+
+            return Ok(None);
+        }
+
+        Ok(None)
+    }
+
+    async fn maybe_main(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        if let Some(main_id) = self.main_id {
+            let res =
+                Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, main_id)
+                    .execute(db_session)
+                    .await?;
+
+            return Ok(res);
+        }
+
+        Ok(None)
+    }
+}
 
 partial_io!(
     UpdateTitleIo,
@@ -233,26 +229,23 @@ partial_io!(
     branch_id,
     workflow_id,
     id,
-    original_id,
+    main_id,
     title,
     updated_at
 );
 
 impl UpdateTitleIo {
-    pub async fn ios_by_original_id(
+    pub async fn ios_by_main_id(
         db_session: &CachingSession,
         root_node_id: Uuid,
         branch_id: Uuid,
-        original_id: Uuid,
+        main_id: Uuid,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_title_io!(
-            "root_node_id = ? AND branch_id = ? AND original_id = ?",
-            (root_node_id, branch_id, original_id)
-        )
-        .execute(db_session)
-        .await?
-        .try_collect()
-        .await?;
+        let ios = UpdateTitleIo::find_by_root_node_id_and_branch_id_and_main_id(root_node_id, branch_id, main_id)
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
 
         Ok(ios)
     }

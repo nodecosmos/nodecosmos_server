@@ -82,13 +82,8 @@ impl UpdateInputIdsFlowStep {
                 }
             }
 
-            let mut created_input_ids_by_fs_id_and_node_id: Option<
-                Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
-            > = None;
-
-            let mut removed_input_ids_by_fs_id_and_node_id: Option<
-                Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
-            > = None;
+            let mut created_input_ids_by_fs_id_and_node_id: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
+            let mut removed_input_ids_by_fs_id_and_node_id: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
 
             if !created_input_ids_by_node_id.is_empty() {
                 let mut value = HashMap::new();

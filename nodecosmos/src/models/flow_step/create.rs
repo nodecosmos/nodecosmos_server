@@ -1,9 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::Branchable;
 use charybdis::model::AsNative;
-use charybdis::operations::{Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 
@@ -14,28 +13,6 @@ impl FlowStep {
         self.id = Uuid::new_v4();
         self.created_at = Some(now);
         self.updated_at = Some(now);
-    }
-
-    pub async fn create_branched_if_not_exist(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let maybe_branched = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
-
-        if maybe_branched.is_none() {
-            let mut flow_step = Self {
-                branch_id: self.original_id(),
-                ..self.clone()
-            }
-            .find_by_primary_key()
-            .execute(data.db_session())
-            .await?;
-
-            flow_step.branch_id = self.branch_id;
-
-            flow_step.insert_cb(data).execute(data.db_session()).await?;
-
-            return Ok(());
-        }
-
-        Ok(())
     }
 
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {

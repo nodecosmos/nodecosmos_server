@@ -23,7 +23,7 @@ pub struct TreePositionChange {
 }
 
 type RemovedIds = Vec<Uuid>;
-pub(crate) type NewDescendantCommitById = HashMap<Uuid, Uuid>;
+pub type NewDescendantCommitById = HashMap<Uuid, Uuid>;
 
 #[allow(unused)]
 pub enum NodeChange {

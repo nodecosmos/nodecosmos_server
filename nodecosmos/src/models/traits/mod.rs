@@ -1,14 +1,16 @@
-pub(crate) mod authorization;
+pub mod authorization;
 mod aws;
 mod branchable;
 mod elastic;
 mod generics;
 mod group;
 mod id;
+mod merge;
 mod merge_description;
 pub mod node;
 mod pluck;
 mod sanitize_description;
+mod workflow;
 
 pub use authorization::*;
 pub use aws::*;
@@ -17,6 +19,8 @@ pub use elastic::*;
 pub use generics::*;
 pub use group::*;
 pub use id::*;
+pub use merge::*;
 pub use merge_description::*;
 pub use pluck::*;
 pub use sanitize_description::*;
+pub use workflow::*;

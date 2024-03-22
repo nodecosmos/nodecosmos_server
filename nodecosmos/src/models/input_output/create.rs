@@ -1,6 +1,8 @@
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
+use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -53,21 +55,40 @@ impl Io {
         self.updated_at = Some(now);
     }
 
-    /// We use copy instead of reference, as in future we may add more features
-    /// that will require each node within a flow step to have it's own IO.
-    pub async fn copy_vals_from_original(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let original_io = self.original_io(db_session).await?;
+    pub async fn copy_vals_from_main(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let main_io = self.main_io(db_session).await?;
 
-        if let Some(original_io) = original_io {
-            self.title = original_io.title;
-            self.unit = original_io.unit;
-            self.data_type = original_io.data_type;
-            self.description = original_io.description;
-            self.description_markdown = original_io.description_markdown;
-            self.original_id = original_io.original_id;
+        if let Some(main_io) = main_io {
+            self.title = main_io.title;
+            self.unit = main_io.unit;
+            self.data_type = main_io.data_type;
+            self.main_id = main_io.main_id;
         } else {
-            self.original_id = Some(self.id);
+            self.main_id = Some(self.id);
         }
+
+        Ok(())
+    }
+
+    pub async fn clone_main_ios_to_branch(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let branched = Io::branched(
+            db_session,
+            self.root_node_id,
+            &WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            },
+        )
+        .await?
+        .into_iter()
+        .filter(|io| io.main_id == self.main_id)
+        .collect();
+
+        let insert_branched_batch = Io::unlogged_batch();
+
+        insert_branched_batch
+            .chunked_insert_if_not_exist(db_session, &branched, 100)
+            .await?;
 
         Ok(())
     }

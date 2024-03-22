@@ -13,12 +13,12 @@ impl UpdateOutputIdsFlowStep {
         let maybe_original = self.as_native().maybe_find_original(data.db_session()).await?;
 
         if let Some(original) = maybe_original {
-            let original_output_ids_by_node_id: Option<HashMap<Uuid, HashSet<Uuid>>> = original
+            let original_node_outputs: Option<HashMap<Uuid, HashSet<Uuid>>> = original
                 .output_ids_by_node_id
                 .clone()
                 .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_val_to_set());
 
-            let current_output_ids_by_node_id: Option<HashMap<Uuid, HashSet<Uuid>>> = self
+            let branched_node_outputs: Option<HashMap<Uuid, HashSet<Uuid>>> = self
                 .output_ids_by_node_id
                 .clone()
                 .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_val_to_set());
@@ -26,10 +26,10 @@ impl UpdateOutputIdsFlowStep {
             let mut created_output_ids_by_node_id = HashMap::new();
             let mut removed_output_ids_by_node_id = HashMap::new();
 
-            match (original_output_ids_by_node_id, current_output_ids_by_node_id) {
-                (Some(original_output_ids_by_node_id), Some(current_output_ids_by_node_id)) => {
-                    for (node_id, original_output_ids) in &original_output_ids_by_node_id {
-                        match current_output_ids_by_node_id.get(node_id) {
+            match (original_node_outputs, branched_node_outputs) {
+                (Some(original_node_outputs), Some(branched_node_outputs)) => {
+                    for (node_id, original_output_ids) in &original_node_outputs {
+                        match branched_node_outputs.get(node_id) {
                             Some(current_output_ids) => {
                                 // Calculate created and removed outputs
                                 let created: Set<Uuid> = current_output_ids
@@ -59,21 +59,21 @@ impl UpdateOutputIdsFlowStep {
                     }
 
                     // Check for created outputs for node IDs only in the current map
-                    for (node_id, current_output_ids) in &current_output_ids_by_node_id {
-                        if !original_output_ids_by_node_id.contains_key(node_id) {
+                    for (node_id, current_output_ids) in &branched_node_outputs {
+                        if !original_node_outputs.contains_key(node_id) {
                             created_output_ids_by_node_id.insert(*node_id, current_output_ids.clone());
                         }
                     }
                 }
-                (None, Some(current_output_ids_by_node_id)) => {
+                (None, Some(branched_node_outputs)) => {
                     // All current outputs are considered created
-                    for (node_id, current_output_ids) in &current_output_ids_by_node_id {
+                    for (node_id, current_output_ids) in &branched_node_outputs {
                         created_output_ids_by_node_id.insert(*node_id, current_output_ids.clone());
                     }
                 }
-                (Some(original_output_ids_by_node_id), None) => {
+                (Some(original_node_outputs), None) => {
                     // All original outputs are considered removed
-                    for (node_id, original_output_ids) in &original_output_ids_by_node_id {
+                    for (node_id, original_output_ids) in &original_node_outputs {
                         removed_output_ids_by_node_id.insert(*node_id, original_output_ids.clone());
                     }
                 }
@@ -82,35 +82,34 @@ impl UpdateOutputIdsFlowStep {
                 }
             }
 
-            let mut created_output_ids_by_fs_id_and_node_id = None;
-
-            let mut removed_output_ids_by_fs_id_and_node_id = None;
+            let mut created_node_outputs_by_fow_step: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
+            let mut deleted_node_outputs_by_flow_step: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
 
             if !created_output_ids_by_node_id.is_empty() {
                 let mut value = HashMap::new();
                 value.insert(self.id, created_output_ids_by_node_id);
 
-                created_output_ids_by_fs_id_and_node_id = Some(value);
+                created_node_outputs_by_fow_step = Some(value);
             }
 
             if !removed_output_ids_by_node_id.is_empty() {
                 let mut value = HashMap::new();
                 value.insert(self.id, removed_output_ids_by_node_id);
 
-                removed_output_ids_by_fs_id_and_node_id = Some(value);
+                deleted_node_outputs_by_flow_step = Some(value);
             }
 
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::CreatedFlowStepInputs(created_output_ids_by_fs_id_and_node_id),
+                BranchUpdate::CreatedFlowStepInputs(created_node_outputs_by_fow_step),
             )
             .await?;
 
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::DeletedFlowStepInputs(removed_output_ids_by_fs_id_and_node_id),
+                BranchUpdate::DeletedFlowStepInputs(deleted_node_outputs_by_flow_step),
             )
             .await?;
         }

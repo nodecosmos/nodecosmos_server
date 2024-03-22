@@ -38,16 +38,14 @@ impl FlowStep {
         Ok(())
     }
 
-    pub(crate) async fn delete_fs_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn delete_fs_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let output_ids_by_node_id = self.output_ids_by_node_id.clone();
         let id = self.id;
         let workflow = self.workflow(data.db_session()).await?;
 
         if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-            if let Some(workflow) = workflow.as_ref() {
-                let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-                Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
-            }
+            let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
+            Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
         }
 
         Ok(())
@@ -78,7 +76,7 @@ impl FlowStep {
         let flow_step_id = self.id;
         let workflow = self.workflow(data.db_session()).await?;
 
-        if let (Some(output_ids_by_node_id), Some(workflow)) = (output_ids_by_node_id, workflow) {
+        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
             for id in output_ids {

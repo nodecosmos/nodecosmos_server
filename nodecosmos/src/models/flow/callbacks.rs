@@ -1,14 +1,14 @@
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::{Flow, UpdateTitleFlow};
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
-use charybdis::model::AsNative;
 use charybdis::operations::Delete;
 use charybdis::types::Uuid;
-use futures::TryStreamExt;
 use scylla::CachingSession;
 
 impl Callbacks for Flow {
@@ -23,10 +23,15 @@ impl Callbacks for Flow {
         self.updated_at = Some(now);
 
         if self.is_branched() {
-            self.workflow(db_session)
-                .await?
-                .create_branched_if_not_exist(data)
-                .await?;
+            Workflow::find_or_insert_branched(
+                db_session,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.workflow_id,
+            )
+            .await?;
 
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
         }
@@ -35,13 +40,13 @@ impl Callbacks for Flow {
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut flow_steps = self.flow_steps(db_session).await?;
-
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
         }
 
-        while let Some(mut flow_step) = flow_steps.try_next().await? {
+        let flow_steps = self.flow_steps(db_session).await?;
+
+        for mut flow_step in flow_steps {
             flow_step.pull_outputs_from_next_workflow_step(data).await?;
             flow_step.delete_fs_outputs(data).await?;
             flow_step.delete().execute(db_session).await?;
@@ -67,8 +72,15 @@ impl Callbacks for UpdateTitleFlow {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
-
+            Flow::find_or_insert_branched(
+                data.db_session(),
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.workflow_id,
+            )
+            .await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditFlowTitle(self.id)).await?;
         }
 

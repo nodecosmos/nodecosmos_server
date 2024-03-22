@@ -5,9 +5,7 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::Branchable;
-use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use nodecosmos_macros::BranchableByNodeId;
@@ -44,78 +42,25 @@ pub struct Flow {
     pub id: Uuid,
 
     pub title: Option<Text>,
-    pub description: Option<Text>,
-
-    #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Option<Text>,
-
-    #[serde(rename = "descriptionBase64")]
-    pub description_base64: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub workflow: Option<Workflow>,
 }
 
 impl Flow {
-    pub async fn flow_steps(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        let res = FlowStep::find_by_flow(db_session, self.node_id, self.branch_id, self.workflow_id, self.id).await?;
-
-        Ok(res)
-    }
-
-    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
-        if self.workflow.is_none() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
-
-            let workflow = Workflow::branched(db_session, &params).await?;
-
-            self.workflow = Some(workflow);
-        }
-
-        Ok(self.workflow.as_mut().unwrap())
-    }
-}
-
-partial_flow!(
-    BaseFlow,
-    node_id,
-    branch_id,
-    workflow_id,
-    start_index,
-    vertical_index,
-    id,
-    title,
-    created_at,
-    updated_at
-);
-
-impl BaseFlow {
     /// merges original and branched flows
-    pub async fn branched(
-        db_session: &CachingSession,
-        params: &WorkflowParams,
-    ) -> Result<Vec<BaseFlow>, NodecosmosError> {
-        let mut flows = BaseFlow::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
+    pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Vec<Self>, NodecosmosError> {
+        let mut flows = Self::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(flows.try_collect().await?)
         } else {
-            let mut original_flows = BaseFlow::find_by_node_id_and_branch_id(params.node_id, params.node_id)
+            let mut original_flows = Self::find_by_node_id_and_branch_id(params.node_id, params.node_id)
                 .execute(db_session)
                 .await?;
             let mut branched_flows_set = HashSet::new();
@@ -128,8 +73,9 @@ impl BaseFlow {
             }
 
             while let Some(flow) = original_flows.next().await {
-                let flow = flow?;
+                let mut flow = flow?;
                 if !branched_flows_set.contains(&flow.id) {
+                    flow.branch_id = params.branch_id;
                     branch_flows.push(flow);
                 }
             }
@@ -143,6 +89,21 @@ impl BaseFlow {
             Ok(branch_flows)
         }
     }
+
+    pub async fn flow_steps(&self, db_session: &CachingSession) -> Result<Vec<FlowStep>, NodecosmosError> {
+        let res = FlowStep::find_by_flow(
+            db_session,
+            &WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            },
+            self.workflow_id,
+            self.id,
+        )
+        .await?;
+
+        Ok(res)
+    }
 }
 
 partial_flow!(
@@ -154,19 +115,6 @@ partial_flow!(
     vertical_index,
     id,
     title,
-    updated_at
-);
-
-partial_flow!(
-    DescriptionFlow,
-    node_id,
-    branch_id,
-    workflow_id,
-    start_index,
-    vertical_index,
-    id,
-    description,
-    description_markdown,
     updated_at
 );
 

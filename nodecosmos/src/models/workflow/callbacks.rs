@@ -1,4 +1,5 @@
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -7,11 +8,9 @@ use crate::models::flow_step::DeleteFlowStep;
 use crate::models::input_output::DeleteIo;
 use crate::models::node::Node;
 use crate::models::traits::node::FindBranched;
-use crate::models::traits::Branchable;
-use crate::models::utils::updated_at_cb_fn;
+use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use charybdis::callbacks::Callbacks;
-use charybdis::model::AsNative;
 use scylla::CachingSession;
 
 impl Callbacks for Workflow {
@@ -34,8 +33,6 @@ impl Callbacks for Workflow {
 
         Ok(())
     }
-
-    updated_at_cb_fn!();
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         if self.is_branched() {
@@ -75,11 +72,20 @@ impl Callbacks for UpdateInitialInputsWorkflow {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
+            Workflow::find_or_insert_branched(
+                db_session,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
             self.update_branch(data).await?;
         }
 
@@ -91,11 +97,20 @@ impl Callbacks for UpdateWorkflowTitle {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
+            Workflow::find_or_insert_branched(
+                db_session,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
             Branch::update(data, self.branch_id, BranchUpdate::EditWorkflowTitle(self.id)).await?;
         }
 

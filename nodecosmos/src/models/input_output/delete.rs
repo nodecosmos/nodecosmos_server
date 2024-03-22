@@ -41,12 +41,10 @@ impl Io {
         let id = self.id;
         let workflow = self.workflow(db_session).await?;
 
-        if let Some(workflow) = &mut workflow.as_mut() {
-            let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
+        let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
 
-            if initial_input_ids.contains(&id) {
-                workflow.pull_initial_input_ids(&vec![id]).execute(db_session).await?;
-            }
+        if initial_input_ids.contains(&id) {
+            workflow.pull_initial_input_ids(&vec![id]).execute(db_session).await?;
         }
 
         Ok(())
@@ -70,31 +68,29 @@ impl Io {
         let id = self.id;
         let workflow = self.workflow(data.db_session()).await?;
 
-        if let Some(workflow) = workflow.as_mut() {
-            let diagram = workflow.diagram(data.db_session()).await?;
+        let diagram = workflow.diagram(data.db_session()).await?;
 
-            // get current workflow index of flow step
-            if let Some(flow_step_id) = flow_step_id {
-                let wf_index = diagram.workflow_index(flow_step_id);
+        // get current workflow index of flow step
+        if let Some(flow_step_id) = flow_step_id {
+            let wf_index = diagram.workflow_index(flow_step_id);
 
-                if let Some(wf_index) = wf_index {
-                    current_step_wf_index = wf_index;
-                } else {
-                    return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
-                }
+            if let Some(wf_index) = wf_index {
+                current_step_wf_index = wf_index;
             } else {
-                current_step_wf_index = 0;
+                return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
             }
+        } else {
+            current_step_wf_index = 0;
+        }
 
-            // get next flow steps within diagram
-            let next_wf_index = current_step_wf_index + 1;
-            let next_flow_steps = diagram.flow_steps_by_wf_index(next_wf_index)?;
+        // get next flow steps within diagram
+        let next_wf_index = current_step_wf_index + 1;
+        let next_flow_steps = diagram.flow_steps_by_wf_index(next_wf_index)?;
 
-            if let Some(mut next_flow_steps) = next_flow_steps {
-                for flow_step in next_flow_steps.iter_mut() {
-                    let mut flow_step = flow_step.lock()?;
-                    flow_step.pull_input_id(data, id).await?;
-                }
+        if let Some(mut next_flow_steps) = next_flow_steps {
+            for flow_step in next_flow_steps.iter_mut() {
+                let mut flow_step = flow_step.lock()?;
+                flow_step.pull_input_id(data, id).await?;
             }
         }
 

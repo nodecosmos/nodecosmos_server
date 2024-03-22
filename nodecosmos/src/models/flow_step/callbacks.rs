@@ -1,11 +1,12 @@
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
-use crate::models::traits::Branchable;
-use crate::models::utils::updated_at_cb_fn;
+use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
@@ -22,24 +23,19 @@ impl Callbacks for FlowStep {
         self.sync_surrounding_fs_on_creation(data).await?;
 
         if self.is_branched() {
-            let mut flow = Flow {
+            let params = WorkflowParams {
                 node_id: self.node_id,
                 branch_id: self.branch_id,
-                workflow_id: self.workflow_id,
-                ..Default::default()
             };
-            flow.create_branched_if_not_exist(data).await?;
 
-            let workflow = flow.workflow(db_session).await?;
-            workflow.create_branched_if_not_exist(data).await?;
+            Flow::find_or_insert_branched(db_session, &params, self.flow_id).await?;
+            Workflow::find_or_insert_branched(db_session, &params, self.workflow_id).await?;
 
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }
 
         Ok(())
     }
-
-    updated_at_cb_fn!();
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.pull_outputs_from_next_workflow_step(data).await?;
@@ -70,7 +66,16 @@ impl Callbacks for UpdateInputIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
+            FlowStep::find_or_insert_branched(
+                data.db_session(),
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
             self.update_branch(data).await?;
         }
 
@@ -86,7 +91,16 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
+            FlowStep::find_or_insert_branched(
+                data.db_session(),
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
             self.update_branch(data).await?;
         }
 
@@ -112,7 +126,16 @@ impl Callbacks for UpdateOutputIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
+            FlowStep::find_or_insert_branched(
+                data.db_session(),
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
             self.update_branch(data).await?;
         }
 

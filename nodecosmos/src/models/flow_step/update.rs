@@ -14,11 +14,9 @@ impl FlowStep {
         let workflow = self.workflow(data.db_session()).await?;
 
         if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-            if let Some(workflow) = workflow.as_ref() {
-                for (node_id, output_ids) in output_ids_by_node_id.iter() {
-                    if !cloned_node_ids.contains(node_id) {
-                        Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
-                    }
+            for (node_id, output_ids) in output_ids_by_node_id.iter() {
+                if !cloned_node_ids.contains(node_id) {
+                    Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
                 }
             }
         }

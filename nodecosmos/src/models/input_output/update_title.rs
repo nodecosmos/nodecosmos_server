@@ -1,15 +1,18 @@
 use crate::errors::NodecosmosError;
 use crate::models::input_output::UpdateTitleIo;
+use crate::models::traits::Branchable;
 use charybdis::batch::ModelBatch;
+use charybdis::model::AsNative;
 use scylla::CachingSession;
 
 impl UpdateTitleIo {
-    /// This may seem cumbersome, but end-goal with IOs is to reflect title, description and unit changes,
-    /// while allowing IO to have it's own properties and value.
-    pub async fn update_ios_titles_by_org_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(original_id) = self.original_id {
-            let ios =
-                UpdateTitleIo::ios_by_original_id(db_session, self.root_node_id, self.branch_id, original_id).await?;
+    pub async fn update_ios_titles_by_main_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        if let Some(main_id) = self.main_id {
+            if self.is_branched() {
+                self.as_native().clone_main_ios_to_branch(db_session).await?;
+            }
+
+            let ios = UpdateTitleIo::ios_by_main_id(db_session, self.root_node_id, self.branch_id, main_id).await?;
             let mut batch_ios = Vec::with_capacity(ios.len());
 
             for mut io in ios {

@@ -2,7 +2,6 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::workflow::Workflow;
 use charybdis::types::Uuid;
-use futures::TryStreamExt;
 use scylla::CachingSession;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,16 +25,15 @@ pub struct WorkflowDiagram {
 
 impl WorkflowDiagram {
     pub async fn build(db_session: &CachingSession, workflow: &Workflow) -> Result<WorkflowDiagram, NodecosmosError> {
-        let mut flows = workflow.flows(db_session).await?;
         let mut flow_step_by_id = HashMap::new();
         let mut flow_steps_ids_by_wf_index = HashMap::new();
         let mut workflow_index_by_id = HashMap::new();
 
-        while let Some(flow) = flows.try_next().await? {
-            let mut flow_steps = flow.flow_steps(db_session).await?;
+        for flow in workflow.flows(db_session).await? {
+            let flow_steps = flow.flow_steps(db_session).await?;
             let mut workflow_index = flow.start_index as u32;
 
-            while let Some(flow_step) = flow_steps.try_next().await? {
+            for flow_step in flow_steps {
                 flow_steps_ids_by_wf_index
                     .entry(workflow_index)
                     .or_insert_with(Vec::new)

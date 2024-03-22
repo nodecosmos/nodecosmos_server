@@ -10,7 +10,6 @@ use crate::models::input_output::Io;
 use crate::models::traits::Branchable;
 use crate::models::workflow::diagram::WorkflowDiagram;
 use charybdis::macros::charybdis_model;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use nodecosmos_macros::BranchableByNodeId;
 use scylla::CachingSession;
@@ -45,13 +44,6 @@ pub struct Workflow {
     pub root_node_id: Uuid,
 
     pub title: Option<Text>,
-    pub description: Option<Text>,
-
-    #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Option<Text>,
-
-    #[serde(rename = "descriptionBase64")]
-    pub description_base64: Option<Text>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<Timestamp>,
@@ -69,11 +61,11 @@ pub struct Workflow {
 
 impl Workflow {
     pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
-        if params.is_original() {
-            let original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
-                .execute(db_session)
-                .await?;
+        let original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
+            .execute(db_session)
+            .await?;
 
+        if params.is_original() {
             Ok(original)
         } else {
             let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
@@ -82,28 +74,19 @@ impl Workflow {
 
             let mut branched;
 
-            if let Some(workflow) = maybe_branched {
-                branched = workflow;
+            if let Some(mut maybe_branched) = maybe_branched {
+                // merge original initial input ids with branched initial input ids
+                if let Some(original_initial_input_ids) = original.initial_input_ids {
+                    let mut branched_initial_input_ids = maybe_branched.initial_input_ids.unwrap_or_default();
+                    branched_initial_input_ids.extend(original_initial_input_ids);
+                    maybe_branched.initial_input_ids = Some(branched_initial_input_ids);
+                }
+
+                branched = maybe_branched;
             } else {
-                let mut workflow = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
-                    .execute(db_session)
-                    .await?;
-                workflow.branch_id = params.branch_id;
-                branched = workflow;
+                branched = original;
+                branched.branch_id = params.branch_id;
             }
-
-            let original_initial_inputs_wf =
-                GetInitialInputsWorkflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
-                    .execute(db_session)
-                    .await?
-                    .initial_input_ids
-                    .unwrap_or_default();
-
-            let mut initial_input_ids = branched.initial_input_ids.unwrap_or_default();
-
-            initial_input_ids.extend(original_initial_inputs_wf);
-
-            branched.initial_input_ids = Some(initial_input_ids);
 
             Ok(branched)
         }
@@ -130,10 +113,15 @@ impl Workflow {
         Ok(self.diagram.as_mut().unwrap())
     }
 
-    pub async fn flows(&self, db_session: &CachingSession) -> Result<CharybdisModelStream<Flow>, NodecosmosError> {
-        let flows = Flow::find_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(db_session)
-            .await?;
+    pub async fn flows(&self, db_session: &CachingSession) -> Result<Vec<Flow>, NodecosmosError> {
+        let flows = Flow::branched(
+            db_session,
+            &WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            },
+        )
+        .await?;
 
         Ok(flows)
     }

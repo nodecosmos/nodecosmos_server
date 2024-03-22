@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::flow::BaseFlow;
+use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
 use crate::models::node::AuthNode;
@@ -26,7 +26,7 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Pa
     let params = params.into_inner();
 
     let workflow = Workflow::branched(&db_session, &params).await?;
-    let flows = BaseFlow::branched(&db_session, &params).await?;
+    let flows = Flow::branched(&db_session, &params).await?;
     let flow_steps = FlowStep::branched(&db_session, &params).await?;
     let input_outputs = Io::branched(&db_session, workflow.root_node_id, &params).await?;
 

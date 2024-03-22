@@ -1,9 +1,13 @@
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
+use crate::models::flow::Flow;
+use crate::models::flow_step::FlowStep;
 use crate::models::input_output::{Io, UpdateTitleIo};
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::model::AsNative;
 use scylla::CachingSession;
@@ -15,9 +19,21 @@ impl Callbacks for Io {
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.validate_root_node_id(db_session).await?;
         self.set_defaults();
-        self.copy_vals_from_original(db_session).await?;
+        self.copy_vals_from_main(db_session).await?;
 
         if self.is_branched() {
+            let params = WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            };
+
+            if let Some(flow_step_id) = self.flow_step_id {
+                let fs = FlowStep::find_or_insert_branched(db_session, &params, flow_step_id).await?;
+                Flow::find_or_insert_branched(db_session, &params, fs.flow_id).await?;
+            }
+
+            Workflow::find_or_insert_branched(db_session, &params, self.workflow_id).await?;
+
             Branch::update(data, self.branch_id, BranchUpdate::CreateIo(self.id)).await?;
         }
 
@@ -49,7 +65,7 @@ impl Callbacks for UpdateTitleIo {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
@@ -57,11 +73,7 @@ impl Callbacks for UpdateTitleIo {
             Branch::update(data, self.branch_id, BranchUpdate::EditIOTitle(self.id)).await?;
         }
 
-        Ok(())
-    }
-
-    async fn after_update(&mut self, db_session: &CachingSession, _data: &RequestData) -> Result<(), NodecosmosError> {
-        self.update_ios_titles_by_org_id(db_session).await?;
+        self.update_ios_titles_by_main_id(db_session).await?;
 
         Ok(())
     }
