@@ -150,22 +150,27 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowSteps")]
     pub deleted_flow_steps: Option<Set<Uuid>>,
 
+    /// FlowStepId -> NodeId
     #[serde(default, rename = "createdFlowStepNodes")]
-    pub created_flow_step_nodes: Option<Set<Uuid>>,
+    pub created_flow_step_nodes: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
 
-    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
+    /// FlowStepId -> NodeId
+    #[serde(default, rename = "deletedFlowStepNodes")]
+    pub deleted_flow_step_nodes: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+
+    /// FlowStepId -> NodeId -> IOId
     #[serde(default, rename = "createdFlowStepInputsByNode")]
     pub created_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
-    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
+    /// FlowStepId -> NodeId -> IOId
     #[serde(default, rename = "deletedFlowStepInputsByNode")]
     pub deleted_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
-    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
+    /// FlowStepId -> NodeId -> IOId
     #[serde(default, rename = "createdFlowStepOutputsByNode")]
     pub created_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
-    /// First Uuid is the flow_step_id, second Uuid is the node_id, third Uuid is the io_id.
+    /// FlowStepId -> NodeId -> IOId
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
@@ -386,6 +391,8 @@ partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 partial_branch!(UpdateDeletedFlowStepsBranch, id, deleted_flow_steps);
 
 partial_branch!(UpdateCreatedFlowStepNodesBranch, id, created_flow_step_nodes);
+
+partial_branch!(UpdateDeletedFlowStepNodesBranch, id, deleted_flow_step_nodes);
 
 partial_branch!(
     UpdateCreatedFlowStepInputsByNodeBranch,

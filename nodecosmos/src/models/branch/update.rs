@@ -4,12 +4,12 @@ use crate::models::branch::{
     Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
     UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
     UpdateCreatedIOsBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
-    UpdateCreatedWorkflowsBranch, UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepOutputsByNodeBranch,
-    UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch, UpdateDeletedIOsBranch, UpdateDeletedNodesBranch,
-    UpdateDeletedWorkflowInitialInputsBranch, UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch,
-    UpdateEditedFlowTitlesBranch, UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch,
-    UpdateEditedNodeDescriptionsBranch, UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch,
-    UpdateReorderedNodes, UpdateRestoredNodesBranch,
+    UpdateCreatedWorkflowsBranch, UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
+    UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
+    UpdateDeletedIOsBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
+    UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch,
+    UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
+    UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::{BranchReorderData, TextChange};
 use crate::models::utils::append_statement_or_log_fatal;
@@ -44,8 +44,8 @@ pub enum BranchUpdate {
     EditIODescription(Uuid),
     CreateFlowStep(Uuid),
     DeleteFlowStep(Uuid),
-    CreatedFlowStepNodes(Option<Set<Uuid>>),
-    DeletedFlowStepNodes(Option<Set<Uuid>>),
+    CreatedFlowStepNodes(Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepNodes(Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
     CreatedFlowStepInputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
     DeletedFlowStepInputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
     CreatedFlowStepOutputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
@@ -324,9 +324,9 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
-                res = UpdateDeletedFlowStepsBranch {
+                res = UpdateDeletedFlowStepNodesBranch {
                     id: branch_id,
-                    deleted_flow_steps: deleted_flow_step_nodes,
+                    deleted_flow_step_nodes,
                 }
                 .update()
                 .execute(data.db_session())
@@ -616,9 +616,9 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
-                res = UpdateDeletedFlowStepsBranch {
+                res = UpdateDeletedFlowStepNodesBranch {
                     id: branch_id,
-                    deleted_flow_steps: deleted_flow_step_nodes,
+                    deleted_flow_step_nodes,
                 }
                 .update()
                 .execute(data.db_session())

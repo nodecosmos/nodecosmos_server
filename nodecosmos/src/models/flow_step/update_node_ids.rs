@@ -5,7 +5,7 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateNodeIdsFlowStep;
 use crate::models::traits::set::ToHashSet;
 use charybdis::model::AsNative;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -16,18 +16,18 @@ impl UpdateNodeIdsFlowStep {
             let current_node_ids = self.node_ids.clone();
 
             let mut created_node_ids = None;
-            let mut removed_node_ids = None;
+            let mut deleted_node_ids = None;
 
             match (original_node_ids, current_node_ids) {
                 (Some(original_node_ids), Some(current_node_ids)) => {
-                    // Calculate created and removed nodes
+                    // Calculate created and deleted nodes
                     let created: HashSet<_> = current_node_ids
                         .iter()
                         .filter(|id| !original_node_ids.contains(id))
                         .cloned()
                         .collect();
 
-                    let removed: HashSet<_> = original_node_ids
+                    let deleted: HashSet<_> = original_node_ids
                         .iter()
                         .filter(|id| !current_node_ids.contains(id))
                         .cloned()
@@ -36,12 +36,12 @@ impl UpdateNodeIdsFlowStep {
                     if !created.is_empty() {
                         created_node_ids = Some(created);
                     }
-                    if !removed.is_empty() {
-                        removed_node_ids = Some(removed);
+                    if !deleted.is_empty() {
+                        deleted_node_ids = Some(deleted);
                     }
                 }
                 (Some(original_node_ids), None) => {
-                    removed_node_ids = Some(original_node_ids.to_hash_set());
+                    deleted_node_ids = Some(original_node_ids.to_hash_set());
                 }
                 (None, Some(current_node_ids)) => {
                     created_node_ids = Some(current_node_ids.to_hash_set());
@@ -49,17 +49,34 @@ impl UpdateNodeIdsFlowStep {
                 (None, None) => {}
             }
 
+            let mut created_flow_step_nodes = None;
+            let mut deleted_flow_step_nodes = None;
+
+            if let Some(created_node_ids) = created_node_ids {
+                let mut value = HashMap::new();
+                value.insert(self.id, created_node_ids);
+
+                created_flow_step_nodes = Some(value);
+            }
+
+            if let Some(deleted_node_ids) = deleted_node_ids {
+                let mut value = HashMap::new();
+                value.insert(self.id, deleted_node_ids);
+
+                deleted_flow_step_nodes = Some(value);
+            }
+
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::CreatedFlowStepNodes(created_node_ids),
+                BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes),
             )
             .await?;
 
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::DeletedFlowStepNodes(removed_node_ids),
+                BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes),
             )
             .await?;
         }
