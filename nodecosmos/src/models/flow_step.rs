@@ -17,7 +17,6 @@ use futures::StreamExt;
 use nodecosmos_macros::{BranchableByNodeId, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 #[charybdis_model(
     table_name = flow_steps,
@@ -100,6 +99,7 @@ impl FlowStep {
                 let mut original_flow_step = original_flow_step?;
                 if let Some(branched_flow_step) = branch_flow_steps.get_mut(&original_flow_step.id) {
                     branched_flow_step.merge_inputs(&original_flow_step);
+                    branched_flow_step.merge_nodes(&original_flow_step);
                     branched_flow_step.merge_outputs(&original_flow_step);
                 } else {
                     original_flow_step.branch_id = params.branch_id;
@@ -123,12 +123,12 @@ impl FlowStep {
         self.input_ids_by_node_id.merge(original.input_ids_by_node_id.clone());
     }
 
-    pub fn merge_outputs(&mut self, original: &FlowStep) {
-        self.output_ids_by_node_id.merge(original.output_ids_by_node_id.clone());
+    pub fn merge_nodes(&mut self, original: &FlowStep) {
+        self.node_ids.merge_unique(original.node_ids.clone());
     }
 
-    pub fn merge_nodes(&mut self, original: &FlowStep) {
-        self.node_ids.merge(original.node_ids.clone());
+    pub fn merge_outputs(&mut self, original: &FlowStep) {
+        self.output_ids_by_node_id.merge(original.output_ids_by_node_id.clone());
     }
 
     pub async fn find_by_flow(
