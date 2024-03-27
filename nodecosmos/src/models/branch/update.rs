@@ -3,13 +3,13 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::{
     Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
     UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
-    UpdateCreatedIOsBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
-    UpdateCreatedWorkflowsBranch, UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
+    UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch, UpdateCreatedWorkflowsBranch,
+    UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
     UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
-    UpdateDeletedIOsBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
-    UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch,
-    UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
+    UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch, UpdateDeletedWorkflowsBranch,
+    UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch, UpdateEditedNodeDescriptionsBranch,
     UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes, UpdateRestoredNodesBranch,
+    UpdatecreatedIosBranch, UpdatedeletedIosBranch, UpdateeditedIoDescriptionsBranch, UpdateeditedIoTitlesBranch,
 };
 use crate::models::udts::{BranchReorderData, TextChange};
 use crate::models::utils::append_statement_or_log_fatal;
@@ -40,8 +40,8 @@ pub enum BranchUpdate {
     EditFlowDescription(Uuid),
     CreateIo(Uuid),
     DeleteIo(Uuid),
-    EditIOTitle(Uuid),
-    EditIODescription(Uuid),
+    EditIoTitle(Uuid),
+    EditIoDescription(Uuid),
     CreateFlowStep(Uuid),
     DeleteFlowStep(Uuid),
     CreatedFlowStepNodes(Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
@@ -150,7 +150,7 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_descriptions(&vec![id])
+                .push_edited_nodes_descriptions(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
@@ -261,7 +261,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::CreateIo(id) => {
-                res = UpdateCreatedIOsBranch {
+                res = UpdatecreatedIosBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -270,7 +270,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteIo(id) => {
-                res = UpdateDeletedIOsBranch {
+                res = UpdatedeletedIosBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -278,8 +278,8 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::EditIOTitle(id) => {
-                res = UpdateEditedIOTitlesBranch {
+            BranchUpdate::EditIoTitle(id) => {
+                res = UpdateeditedIoTitlesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -287,8 +287,8 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::EditIODescription(id) => {
-                res = UpdateEditedIODescriptionsBranch {
+            BranchUpdate::EditIoDescription(id) => {
+                res = UpdateeditedIoDescriptionsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -443,7 +443,7 @@ impl Branch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .pull_edited_node_descriptions(&vec![id])
+                .pull_edited_nodes_descriptions(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
@@ -553,7 +553,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::CreateIo(id) => {
-                res = UpdateCreatedIOsBranch {
+                res = UpdatecreatedIosBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -562,7 +562,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteIo(id) => {
-                res = UpdateDeletedIOsBranch {
+                res = UpdatedeletedIosBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -570,8 +570,8 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::EditIOTitle(id) => {
-                res = UpdateEditedIOTitlesBranch {
+            BranchUpdate::EditIoTitle(id) => {
+                res = UpdateeditedIoTitlesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -579,8 +579,8 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::EditIODescription(id) => {
-                res = UpdateEditedIODescriptionsBranch {
+            BranchUpdate::EditIoDescription(id) => {
+                res = UpdateeditedIoDescriptionsBranch {
                     id: branch_id,
                     ..Default::default()
                 }

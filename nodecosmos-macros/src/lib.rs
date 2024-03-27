@@ -267,6 +267,16 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
 pub fn id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
+    let id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "id",
+            None => false,
+        };
+    });
+
+    if id.is_none() {
+        panic!("Struct must have `id` field to derive Id");
+    }
 
     let expanded = quote! {
         impl crate::models::traits::Id for #name {
@@ -283,21 +293,47 @@ pub fn id_derive(input: TokenStream) -> TokenStream {
 pub fn root_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let has_root_id = input.struct_fields().iter().any(|field| {
+    let root_id = input.struct_fields().iter().find(|field| {
         return match field.ident {
             Some(ref ident) => ident == "root_id",
             None => false,
         };
     });
 
-    if !has_root_id {
-        return TokenStream::new();
+    if root_id.is_none() {
+        panic!("Struct must have `root_id` field to derive RootId");
     }
 
     let expanded = quote! {
         impl crate::models::traits::RootId for #name {
             fn root_id(&self) -> Uuid {
                 self.root_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(ObjectId)]
+pub fn object_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let object_id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "object_id",
+            None => false,
+        };
+    });
+
+    if object_id.is_none() {
+        panic!("Struct must have `object_id` field to derive ObjectId");
+    }
+
+    let expanded = quote! {
+        impl crate::models::traits::ObjectId for #name {
+            fn object_id(&self) -> Uuid {
+                self.object_id
             }
         }
     };

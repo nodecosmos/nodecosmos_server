@@ -3,12 +3,11 @@ pub mod merge;
 pub mod update;
 
 use crate::errors::NodecosmosError;
+use crate::models::description::{find_description, Description};
 use crate::models::node::context::Context;
 use crate::models::node::sort::SortNodes;
-use crate::models::node::{
-    find_update_description_node, find_update_title_node, Node, PkNode, UpdateDescriptionNode, UpdateTitleNode,
-};
-use crate::models::traits::{Id, Pluck};
+use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
+use crate::models::traits::{Id, ObjectId, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
@@ -96,7 +95,7 @@ pub struct Branch {
     pub edited_node_titles: Option<Set<Uuid>>,
 
     #[serde(default, rename = "editedNodeDescriptions")]
-    pub edited_node_descriptions: Option<Set<Uuid>>,
+    pub edited_nodes_descriptions: Option<Set<Uuid>>,
 
     #[serde(default, rename = "reorderedNodes")]
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
@@ -131,16 +130,16 @@ pub struct Branch {
     pub edited_flow_descriptions: Option<Set<Uuid>>,
 
     // ios
-    #[serde(default, rename = "createdIOs")]
+    #[serde(default, rename = "createdIos")]
     pub created_ios: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "deletedIOs")]
+    #[serde(default, rename = "deletedIos")]
     pub deleted_ios: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedIOTitles")]
+    #[serde(default, rename = "editedIoTitles")]
     pub edited_io_titles: Option<Frozen<Set<Text>>>,
 
-    #[serde(default, rename = "editedIODescriptions")]
+    #[serde(default, rename = "editedIoDescriptions")]
     pub edited_io_descriptions: Option<Set<Uuid>>,
 
     // flow steps
@@ -208,11 +207,11 @@ pub struct Branch {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub _original_description_nodes: Option<Vec<UpdateDescriptionNode>>,
+    pub _original_nodes_descriptions: Option<Vec<Description>>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub _edited_description_nodes: Option<Vec<UpdateDescriptionNode>>,
+    pub _edited_nodes_descriptions: Option<Vec<Description>>,
 }
 
 impl Branch {
@@ -269,7 +268,7 @@ impl Branch {
                 .await?;
 
             let edited_title_nodes = self
-                .retain_branch_nodes(nodes)
+                .map_original_nodes(nodes)
                 .map(|mut edited_title_node| {
                     edited_title_node.ctx = Context::Merge;
                     edited_title_node
@@ -282,23 +281,24 @@ impl Branch {
         Ok(self._edited_title_nodes.clone())
     }
 
-    pub async fn edited_description_nodes(
+    pub async fn edited_nodes_descriptions(
         &mut self,
         db_session: &CachingSession,
-    ) -> Result<Option<Vec<UpdateDescriptionNode>>, NodecosmosError> {
-        if let (None, Some(edited_node_descriptions)) =
-            (&self._edited_description_nodes, &self.edited_node_descriptions)
+    ) -> Result<Option<&mut Vec<Description>>, NodecosmosError> {
+        if let (None, Some(edited_nodes_descriptions)) =
+            (&self._edited_nodes_descriptions, &self.edited_nodes_descriptions)
         {
-            let nodes = find_update_description_node!("branch_id = ? AND id IN ?", (self.id, edited_node_descriptions))
-                .execute(db_session)
-                .await?
-                .try_collect()
-                .await?;
+            let descriptions =
+                find_description!("branch_id = ? AND object_id IN ?", (self.id, edited_nodes_descriptions))
+                    .execute(db_session)
+                    .await?
+                    .try_collect()
+                    .await?;
 
-            self._edited_description_nodes = Some(self.retain_branch_nodes(nodes).collect());
+            self._edited_nodes_descriptions = Some(self.map_original_objects(descriptions).collect());
         }
 
-        Ok(self._edited_description_nodes.clone())
+        Ok(self._edited_nodes_descriptions.as_mut())
     }
 
     pub fn reordered_nodes_data(&self) -> Option<List<Frozen<&BranchReorderData>>> {
@@ -323,8 +323,21 @@ impl Branch {
         }
     }
 
+    fn map_original_objects<'a, O: ObjectId + 'a>(&'a self, objects: Vec<O>) -> impl Iterator<Item = O> + 'a {
+        objects.into_iter().filter(|object| {
+            !self
+                .created_nodes
+                .as_ref()
+                .map_or(false, |created_nodes| created_nodes.contains(&object.object_id()))
+                && !self
+                    .deleted_nodes
+                    .as_ref()
+                    .map_or(false, |deleted_nodes| deleted_nodes.contains(&object.object_id()))
+        })
+    }
+
     /// Retain only the nodes that are not created or deleted in the branch
-    fn retain_branch_nodes<'a, N: Id + 'a>(&'a self, nodes: Vec<N>) -> impl Iterator<Item = N> + 'a {
+    fn map_original_nodes<'a, N: Id + 'a>(&'a self, nodes: Vec<N>) -> impl Iterator<Item = N> + 'a {
         nodes.into_iter().filter(|node| {
             !self
                 .created_nodes
@@ -348,7 +361,7 @@ partial_branch!(UpdateRestoredNodesBranch, id, restored_nodes);
 
 partial_branch!(UpdateEditedNodeTitlesBranch, id, edited_node_titles);
 
-partial_branch!(UpdateEditedNodeDescriptionsBranch, id, edited_node_descriptions);
+partial_branch!(UpdateEditedNodeDescriptionsBranch, id, edited_nodes_descriptions);
 
 partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
@@ -378,13 +391,13 @@ partial_branch!(UpdateEditedFlowTitlesBranch, id, edited_flow_titles);
 
 partial_branch!(UpdateEditedFlowDescriptionsBranch, id, edited_flow_descriptions);
 
-partial_branch!(UpdateCreatedIOsBranch, id, created_ios);
+partial_branch!(UpdatecreatedIosBranch, id, created_ios);
 
-partial_branch!(UpdateDeletedIOsBranch, id, deleted_ios);
+partial_branch!(UpdatedeletedIosBranch, id, deleted_ios);
 
-partial_branch!(UpdateEditedIOTitlesBranch, id, edited_io_titles);
+partial_branch!(UpdateeditedIoTitlesBranch, id, edited_io_titles);
 
-partial_branch!(UpdateEditedIODescriptionsBranch, id, edited_io_descriptions);
+partial_branch!(UpdateeditedIoDescriptionsBranch, id, edited_io_descriptions);
 
 partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 

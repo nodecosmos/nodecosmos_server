@@ -1,4 +1,4 @@
-use crate::api::current_user::{get_current_user, OptCurrentUser};
+use crate::api::current_user::get_current_user;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
@@ -57,10 +57,6 @@ impl RequestData {
 
     pub fn current_user_id(&self) -> Uuid {
         self.current_user.id
-    }
-
-    pub fn opt_current_user(&self) -> OptCurrentUser {
-        OptCurrentUser(Some(self.current_user.clone()))
     }
 }
 

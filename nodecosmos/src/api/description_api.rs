@@ -12,7 +12,7 @@ use charybdis::operations::InsertWithCallbacks;
 use charybdis::types::Uuid;
 use serde::Deserialize;
 
-#[get("/{nodeId}/{objectId}/{branchId}")]
+#[get("/{nodeId}/{objectId}/{objectType}/{branchId}")]
 pub async fn get_description(
     app: web::Data<App>,
     opt_cu: OptCurrentUser,
@@ -25,7 +25,7 @@ pub async fn get_description(
     Ok(HttpResponse::Ok().json(description))
 }
 
-#[get("/{nodeId}/{objectId}/{branchId}/base64")]
+#[get("/{nodeId}/{objectId}/{objectType}/{branchId}/base64")]
 pub async fn get_base64_description(data: RequestData, mut description: web::Path<Description>) -> Response {
     AuthNode::auth_update(&data, description.node_id, description.branch_id).await?;
 
@@ -58,15 +58,26 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
     Ok(HttpResponse::Ok().json(description.into_inner()))
 }
 
-#[get("/{nodeId}/{objectId}/original/base64")]
+#[derive(Deserialize)]
+pub struct OriginalPathParams {
+    #[serde(rename = "nodeId")]
+    pub node_id: Uuid,
+
+    #[serde(rename = "objectId")]
+    pub object_id: Uuid,
+}
+
+#[get("/{nodeId}/{objectId}")]
 pub async fn get_original_description(
     app: web::Data<App>,
     opt_cu: OptCurrentUser,
-    mut description: web::Path<BaseDescription>,
+    params: web::Path<OriginalPathParams>,
 ) -> Response {
-    AuthNode::auth_view(&app, opt_cu, description.node_id, description.branch_id).await?;
+    AuthNode::auth_view(&app, opt_cu, params.node_id, params.node_id).await?;
 
-    let description = description.find_branched(&app.db_session).await?;
+    let description = Description::find_by_object_id_and_branch_id(params.object_id, params.object_id)
+        .execute(&app.db_session)
+        .await?;
 
     Ok(HttpResponse::Ok().json(description))
 }
@@ -75,13 +86,13 @@ pub async fn get_original_description(
 pub async fn save_description(data: RequestData, mut description: web::Json<Description>) -> Response {
     AuthNode::auth_update(&data, description.node_id, description.branch_id).await?;
 
-    description.insert_cb(&None).execute(data.db_session()).await?;
+    description.insert_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(description))
 }
 
 #[derive(Deserialize)]
-pub struct PathParams {
+pub struct WsPathParams {
     // TODO: check if we can route Load Balancer connections based on room_id params
     room_id: Uuid,
     branch_id: Uuid,
@@ -95,7 +106,7 @@ pub struct PathParams {
 pub async fn description_ws(
     req: HttpRequest,
     stream: web::Payload,
-    params: web::Path<PathParams>,
+    params: web::Path<WsPathParams>,
     data: RequestData,
 ) -> Response {
     AuthNode::auth_update(&data, params.node_id, params.branch_id).await?;

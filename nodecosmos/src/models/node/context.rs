@@ -3,6 +3,5 @@ pub enum Context {
     #[default]
     None,
     Merge,
-    MergeRecovery,
     BranchedInit,
 }

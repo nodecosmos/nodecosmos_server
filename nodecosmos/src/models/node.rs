@@ -6,7 +6,6 @@ pub mod reorder;
 pub mod search;
 pub mod sort;
 pub mod update_cover_image;
-mod update_description;
 mod update_owner;
 mod update_title;
 
@@ -14,7 +13,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::context::Context;
-use crate::models::traits::{Branchable, MergeDescription, SanitizeDescription};
+use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::models::utils::defaults::default_to_opt_0;
 use charybdis::callbacks::Callbacks;
@@ -24,7 +23,7 @@ use charybdis::operations::Find;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use futures::TryFutureExt;
 use log::error;
-use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent, RootId};
+use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -37,7 +36,7 @@ use serde::{Deserialize, Serialize};
     partition_keys = [id],
     clustering_keys = [branch_id],
 )]
-#[derive(Branchable, NodeParent, NodeAuthorization, Id, RootId, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
 pub struct Node {
     #[serde(default)]
     #[branch(original_id)]
@@ -69,17 +68,6 @@ pub struct Node {
 
     #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
-
-    pub description: Option<Text>,
-
-    #[serde(rename = "shortDescription")]
-    pub short_description: Option<Text>,
-
-    #[serde(rename = "descriptionMarkdown")]
-    pub description_markdown: Option<Text>,
-
-    #[serde(rename = "descriptionBase64")]
-    pub description_base64: Option<Text>,
 
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
@@ -142,9 +130,11 @@ impl Callbacks for Node {
             error!("[before_insert] Unexpected error updating branch with creation: {}", e);
         }
 
-        if let Err(e) = self.update_branch_with_creation(data).await {
-            self.remove_from_ancestors(db_session).await?;
-            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+        if self.ctx != Context::BranchedInit {
+            if let Err(e) = self.update_branch_with_creation(data).await {
+                self.remove_from_ancestors(db_session).await?;
+                error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+            }
         }
 
         Ok(())
@@ -268,26 +258,6 @@ impl PkNode {
 }
 
 partial_node!(
-    IndexNode,
-    id,
-    branch_id,
-    owner_id,
-    editor_ids,
-    is_root,
-    is_public,
-    short_description,
-    title,
-    like_count,
-    owner,
-    cover_image_url,
-    created_at,
-    updated_at,
-    parent_id,
-    parent,
-    auth_branch
-);
-
-partial_node!(
     BaseNode,
     root_id,
     id,
@@ -295,7 +265,6 @@ partial_node!(
     owner_id,
     editor_ids,
     is_root,
-    short_description,
     ancestor_ids,
     order_index,
     title,
@@ -306,38 +275,6 @@ partial_node!(
     created_at,
     updated_at,
     auth_branch
-);
-
-partial_node!(
-    GetDescriptionNode,
-    id,
-    branch_id,
-    owner_id,
-    editor_ids,
-    is_public,
-    description,
-    description_markdown,
-    cover_image_url,
-    parent_id,
-    parent,
-    auth_branch,
-    ctx
-);
-
-partial_node!(
-    GetDescriptionBase64Node,
-    id,
-    branch_id,
-    owner_id,
-    editor_ids,
-    is_public,
-    description,
-    description_markdown,
-    description_base64,
-    parent_id,
-    parent,
-    auth_branch,
-    ctx
 );
 
 partial_node!(
@@ -406,99 +343,6 @@ impl Callbacks for UpdateTitleNode {
     }
 }
 
-partial_node!(
-    UpdateDescriptionNode,
-    id,
-    branch_id,
-    owner_id,
-    editor_ids,
-    is_public,
-    description,
-    short_description,
-    description_markdown,
-    description_base64,
-    updated_at,
-    ctx,
-    parent_id,
-    parent,
-    auth_branch
-);
-
-impl Callbacks for UpdateDescriptionNode {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_update(
-        &mut self,
-        db_session: &CachingSession,
-        data: &Self::Extension,
-    ) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            self.as_native().create_branched_if_not_exist(data).await?;
-        }
-
-        if &self.ctx != &Context::MergeRecovery {
-            self.merge_description(db_session).await?;
-        }
-
-        self.description.sanitize()?;
-
-        self.updated_at = Some(chrono::Utc::now());
-
-        if self.is_branched() {
-            let native = self
-                .as_native()
-                .find_by_primary_key()
-                .consistency(Consistency::All)
-                .execute(db_session)
-                .await;
-            match native {
-                Ok(native) => {
-                    native.preserve_ancestors_for_branch(data).await?;
-                }
-                Err(e) => error!("[after_update] Unexpected error finding native node: {}", e),
-            }
-        }
-
-        self.update_branch(&data).await?;
-
-        Ok(())
-    }
-
-    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        let self_clone = self.clone();
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            self_clone.update_elastic_index(data.elastic_client()).await;
-            self_clone.create_new_version(&data).await;
-        });
-
-        Ok(())
-    }
-}
-
-impl UpdateDescriptionNode {
-    pub fn from(node: Node) -> Self {
-        Self {
-            id: node.id,
-            branch_id: node.branch_id,
-            description: node.description,
-            short_description: node.short_description,
-            description_markdown: node.description_markdown,
-            description_base64: node.description_base64,
-            updated_at: node.updated_at,
-            owner_id: node.owner_id,
-            editor_ids: node.editor_ids,
-            is_public: node.is_public,
-            auth_branch: node.auth_branch,
-            parent_id: node.parent_id,
-            parent: node.parent,
-            ctx: node.ctx,
-        }
-    }
-}
-
 partial_node!(PrimaryKeyNode, id, branch_id);
 
 partial_node!(
@@ -521,15 +365,9 @@ partial_node!(
     UpdateCoverImageNode,
     id,
     branch_id,
-    owner_id,
-    editor_ids,
-    is_public,
     cover_image_filename,
     cover_image_url,
-    updated_at,
-    parent_id,
-    parent,
-    auth_branch
+    updated_at
 );
 
 macro_rules! impl_node_updated_at_with_elastic_ext_cb {

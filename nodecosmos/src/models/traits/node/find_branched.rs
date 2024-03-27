@@ -1,7 +1,5 @@
 use crate::errors::NodecosmosError;
-use crate::models::node::{
-    GetDescriptionBase64Node, GetDescriptionNode, GetStructureNode, Node, UpdateDescriptionNode, UpdateTitleNode,
-};
+use crate::models::node::{GetStructureNode, Node, UpdateTitleNode};
 use charybdis::model::Model;
 use charybdis::operations::Find;
 use charybdis::options::Consistency;
@@ -88,7 +86,4 @@ macro_rules! impl_find_branched_or_original {
 
 impl_find_branched_or_original!(Node);
 impl_find_branched_or_original!(GetStructureNode);
-impl_find_branched_or_original!(GetDescriptionNode);
-impl_find_branched_or_original!(GetDescriptionBase64Node);
 impl_find_branched_or_original!(UpdateTitleNode);
-impl_find_branched_or_original!(UpdateDescriptionNode);

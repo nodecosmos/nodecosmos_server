@@ -1,11 +1,52 @@
 use crate::errors::NodecosmosError;
-use crate::models::node::{IndexNode, Node};
+use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
+use crate::models::udts::Profile;
+use charybdis::types::{BigInt, Timestamp};
 use elasticsearch::{Elasticsearch, SearchParts};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use yrs::Uuid;
 
 const PAGE_SIZE: i16 = 10;
+
+#[derive(Deserialize, Serialize)]
+pub struct IndexNode {
+    pub id: Uuid,
+
+    #[serde(rename = "rootId")]
+    pub root_id: Uuid,
+
+    #[serde(rename = "ancestorIds")]
+    pub ancestor_ids: Option<Vec<Uuid>>,
+
+    #[serde(rename = "ownerId")]
+    pub owner_id: Uuid,
+
+    pub title: String,
+
+    #[serde(rename = "shortDescription")]
+    pub short_description: Option<String>,
+
+    pub description: Option<String>,
+
+    #[serde(rename = "likesCount")]
+    pub like_count: Option<BigInt>,
+
+    #[serde(rename = "coverImageURL")]
+    pub cover_image_url: Option<String>,
+
+    #[serde(rename = "isRoot")]
+    pub is_root: bool,
+
+    #[serde(rename = "isPublic")]
+    pub is_public: bool,
+
+    #[serde(rename = "createdAt")]
+    pub created_at: Timestamp,
+
+    pub owner: Profile,
+}
 
 #[derive(Deserialize)]
 pub struct NodeSearchQuery {
@@ -60,7 +101,7 @@ impl<'a> NodeSearch<'a> {
             "query": {
                 "bool": {
                     "must": [
-                        { "term": { "isPublic": true } }
+                        { "term": { "isPublic": true } } // Only public nodes
                     ]
                 }
             },
@@ -86,7 +127,9 @@ impl<'a> NodeSearch<'a> {
         if let Some(term) = &self.node_search_query.q {
             data["query"]["bool"]["should"] = json!([
                 { "match": { "title": { "query": &term, "boost": 2 } } },
-                { "match": { "description": &term } }
+                { "match": { "description": &term } },
+                { "match": { "owner.name": &term } },
+                { "match": { "owner.username": &term } },
             ]);
             data["query"]["bool"]["minimum_should_match"] = json!(1);
             data["sort"] = json!([

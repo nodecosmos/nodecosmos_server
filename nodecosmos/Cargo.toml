@@ -40,3 +40,5 @@ uuid = "1.6.1"
 quick-xml = "0.31.0"
 log = "0.4"
 nodecosmos-macros = { path = "../nodecosmos-macros" }
+strum = "0.26"
+strum_macros = "0.26"

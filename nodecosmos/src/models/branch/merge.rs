@@ -2,13 +2,12 @@ use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{Branch, BranchStatus};
+use crate::models::description::{find_description, Description};
 use crate::models::node::context::Context;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{
-    find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
-};
+use crate::models::node::{find_update_title_node, Node, UpdateTitleNode};
 use crate::models::traits::cloned_ref::ClonedRef;
-use crate::models::traits::{Branchable, GroupById};
+use crate::models::traits::{Branchable, GroupById, GroupByObjId};
 use crate::models::udts::TextChange;
 use crate::models::utils::file::read_file_names;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
@@ -74,7 +73,7 @@ pub struct BranchMerge {
     branch: Branch,
     merge_step: MergeStep,
     original_title_nodes: Option<HashMap<Uuid, UpdateTitleNode>>,
-    original_description_nodes: Option<HashMap<Uuid, UpdateDescriptionNode>>,
+    original_nodes_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl BranchMerge {
@@ -95,15 +94,15 @@ impl BranchMerge {
         Ok(None)
     }
 
-    async fn fetch_original_description_nodes(
+    async fn fetch_original_nodes_description(
         db_session: &CachingSession,
         branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, UpdateDescriptionNode>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_node_descriptions {
-            let nodes_by_id = find_update_description_node!("id IN ? AND branch_id IN ?", (ids, ids))
+    ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
+        if let Some(ids) = &branch.edited_nodes_descriptions {
+            let nodes_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
-                .group_by_id()
+                .group_by_obj_id()
                 .await?;
 
             return Ok(Some(nodes_by_id));
@@ -118,7 +117,7 @@ impl BranchMerge {
             Err(e) => return Err(MergeError { inner: e, branch }), // Early return on error
         };
 
-        let original_description_nodes = match Self::fetch_original_description_nodes(data.db_session(), &branch).await
+        let original_nodes_descriptions = match Self::fetch_original_nodes_description(data.db_session(), &branch).await
         {
             Ok(nodes) => nodes,
             Err(e) => return Err(MergeError { inner: e, branch }), // Early return on error, no issue with moved value
@@ -128,7 +127,7 @@ impl BranchMerge {
             branch,
             merge_step: MergeStep::Start,
             original_title_nodes,
-            original_description_nodes,
+            original_nodes_descriptions,
         };
 
         match branch_merge.merge(data).await {
@@ -307,11 +306,6 @@ impl BranchMerge {
                     .consistency(Consistency::All)
                     .execute(data.db_session())
                     .await?;
-
-                // in case its needed for description merge
-                self.original_description_nodes
-                    .get_or_insert_with(HashMap::new)
-                    .insert(merge_node.id, UpdateDescriptionNode::from(merge_node));
             }
         }
 
@@ -509,55 +503,51 @@ impl BranchMerge {
     }
 
     async fn update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let edited_description_nodes = match self.branch.edited_description_nodes(data.db_session()).await? {
-            Some(nodes) => nodes,
+        let edited_node_descriptions = match self.branch.edited_nodes_descriptions(data.db_session()).await? {
+            Some(descriptions) => descriptions.clone(),
             None => return Ok(()),
         };
 
-        let original_description_nodes = match &self.original_description_nodes {
-            Some(nodes) => nodes,
-            None => {
-                return Err(NodecosmosError::MergeError(format!(
-                    "Failed to find original descriptions for edited description nodes - branch_id {}",
-                    self.branch.id
-                )))
-            }
-        };
+        let mut default = HashMap::default();
+        let original_nodes_description = self
+            .original_nodes_descriptions
+            .as_mut()
+            .unwrap_or_else(|| &mut default);
 
-        for edited_description_node in edited_description_nodes {
-            let mut original = match original_description_nodes.get(&edited_description_node.id) {
-                Some(node) => node.clone(),
-                None => {
-                    return Err(NodecosmosError::MergeError(format!(
-                        "Failed to find original description node with id {}",
-                        edited_description_node.id
-                    )))
-                }
+        for edited_node_description in edited_node_descriptions {
+            let object_id = edited_node_description.object_id;
+            let mut default_description = Description {
+                object_id,
+                branch_id: object_id,
+                ..Default::default()
             };
+
+            let original = original_nodes_description
+                .get_mut(&object_id)
+                .unwrap_or_else(|| &mut default_description);
 
             // init text change for remembrance of diff between old and new description
             let mut text_change = TextChange::new();
-            text_change.assign_old(original.description_markdown.clone());
+            text_change.assign_old(original.markdown.clone());
 
-            // description merge is handled within before_update callback
-            original.description_base64 = edited_description_node.description_base64;
-            original.update_cb(data).execute(data.db_session()).await?;
+            // description merge is handled within before_insert callback
+            original.base64 = edited_node_description.base64.clone();
+            original.insert_cb(data).execute(data.db_session()).await?;
 
             // update text change with new description
-            text_change.assign_new(original.description_markdown);
-            self.branch
-                .push_description_change_by_object(edited_description_node.id, text_change);
+            text_change.assign_new(original.markdown.clone());
+            self.branch.push_description_change_by_object(object_id, text_change);
         }
 
         Ok(())
     }
 
     async fn undo_update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_description_nodes) = &mut self.original_description_nodes {
-            for original_description_node in original_description_nodes.values_mut() {
-                original_description_node.ctx = Context::MergeRecovery;
-
-                original_description_node
+        if let Some(original_nodes_description) = &mut self.original_nodes_descriptions {
+            for original_node_description in original_nodes_description.values_mut() {
+                // description merge is handled within before_insert callback, so we use update to revert as
+                // it will not trigger merge logic
+                original_node_description
                     .update_cb(data)
                     .execute(data.db_session())
                     .await?;

@@ -1,5 +1,4 @@
 use crate::models::traits::ElasticIndex;
-use charybdis::model::Model;
 use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::http::response::Response;
@@ -29,7 +28,7 @@ impl Display for ElasticDocumentOp {
     }
 }
 
-pub trait ElasticDocument<T: Model + ElasticIndex + Serialize> {
+pub trait ElasticDocument<T: ElasticIndex + Serialize> {
     async fn bulk_update_elastic_documents(client: &Elasticsearch, models: Vec<T>);
     async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &Vec<Uuid>);
 
@@ -53,7 +52,7 @@ pub trait ElasticDocument<T: Model + ElasticIndex + Serialize> {
     async fn delete_elastic_document(&self, client: &Elasticsearch);
 }
 
-impl<T: Model + ElasticIndex + Serialize> ElasticDocument<T> for T {
+impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
     async fn bulk_update_elastic_documents(client: &Elasticsearch, models: Vec<T>) {
         let mut ops = BulkOperations::new();
 

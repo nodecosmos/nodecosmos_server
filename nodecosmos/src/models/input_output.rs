@@ -297,7 +297,7 @@ impl Callbacks for UpdateTitleIo {
 
         if self.is_branched() {
             self.as_native().create_branched_if_original_exists(data).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditIOTitle(self.id)).await?;
+            Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
         }
 
         self.update_ios_titles_by_main_id(db_session).await?;

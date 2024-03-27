@@ -10,69 +10,30 @@ use charybdis::types::{Int, Text, Timestamp, Uuid};
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ObjectType {
     ContributionRequest,
     Topic,
 }
 
-impl fmt::Display for ObjectType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ObjectType::ContributionRequest => write!(f, "ContributionRequest"),
-            ObjectType::Topic => write!(f, "Topic"),
-        }
-    }
-}
-
-impl ObjectType {
-    pub fn from_string(s: &str) -> Self {
-        match s {
-            "ContributionRequest" => ObjectType::ContributionRequest,
-            "Topic" => ObjectType::Topic,
-            _ => unimplemented!("Unknown object type"),
-        }
-    }
-}
-
-pub enum CommentObject {
-    ContributionRequest(ContributionRequest), // Topic(Topic)
-}
-
-#[allow(unused)]
+#[derive(Default, Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ContributionRequestThreadType {
+    #[default]
     MainThread,
     NodeAddition,
     NodeDeletion,
     NodeDescription,
 }
 
-#[allow(unused)]
+#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ThreadType {
     Topic,
     ContributionRequest(ContributionRequestThreadType),
 }
 
-impl fmt::Display for ThreadType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ThreadType::Topic => write!(f, "Topic"),
-            ThreadType::ContributionRequest(ContributionRequestThreadType::MainThread) => {
-                write!(f, "ContributionRequest::MainThread")
-            }
-            ThreadType::ContributionRequest(ContributionRequestThreadType::NodeAddition) => {
-                write!(f, "ContributionRequest::NodeAddition")
-            }
-            ThreadType::ContributionRequest(ContributionRequestThreadType::NodeDeletion) => {
-                write!(f, "ContributionRequest::NodeDeletion")
-            }
-            ThreadType::ContributionRequest(ContributionRequestThreadType::NodeDescription) => {
-                write!(f, "ContributionRequest::NodeDescription")
-            }
-        }
-    }
+pub enum CommentObject {
+    ContributionRequest(ContributionRequest), // Topic(Topic)
 }
 
 /// **objectId** corresponds to the following:
@@ -130,7 +91,7 @@ pub struct CommentThread {
 
 impl CommentThread {
     pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
-        match ObjectType::from_string(&self.object_type) {
+        match ObjectType::from(self.object_type.parse()?) {
             ObjectType::ContributionRequest => {
                 return match self.object_node_id {
                     Some(node_id) => {

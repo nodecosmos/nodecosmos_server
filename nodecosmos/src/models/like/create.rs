@@ -47,8 +47,8 @@ impl Like {
         data: &RequestData,
         increment: bool,
     ) -> Result<(), NodecosmosError> {
-        match ObjectType::from_string(self.object_type.as_str()) {
-            Some(ObjectType::Node) => {
+        match ObjectType::from(self.object_type.parse()?) {
+            ObjectType::Node => {
                 if increment {
                     NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
                 } else {

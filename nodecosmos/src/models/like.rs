@@ -11,10 +11,15 @@ use charybdis::types::{Text, Timestamp, Uuid};
 use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 // CQL limitation is to have counters in a separate table
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
+
+#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
+pub enum ObjectType {
+    Node,
+    Comment,
+}
 
 #[charybdis_model(
     table_name = likes,
@@ -91,8 +96,8 @@ impl Like {
             return Ok(c);
         }
 
-        match ObjectType::from_string(self.object_type.as_str()) {
-            Some(ObjectType::Node) => {
+        match ObjectType::from(self.object_type.parse()?) {
+            ObjectType::Node => {
                 let lc = NodeCounter::like_count(db_session, self.object_id, self.branch_id).await?;
 
                 self.like_count = Some(lc);
@@ -100,34 +105,6 @@ impl Like {
                 Ok(lc)
             }
             _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string()).into()),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-pub enum ObjectType {
-    Node,
-    Like,
-    Comment,
-}
-
-impl fmt::Display for ObjectType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ObjectType::Node => write!(f, "Node"),
-            ObjectType::Like => write!(f, "Like"),
-            ObjectType::Comment => write!(f, "Comment"),
-        }
-    }
-}
-
-impl ObjectType {
-    pub fn from_string(s: &str) -> Option<Self> {
-        match s {
-            "Node" => Some(ObjectType::Node),
-            "Like" => Some(ObjectType::Like),
-            "Comment" => Some(ObjectType::Comment),
-            _ => None,
         }
     }
 }

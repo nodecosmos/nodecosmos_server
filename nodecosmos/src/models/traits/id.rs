@@ -9,3 +9,8 @@ pub trait Id {
 pub trait RootId {
     fn root_id(&self) -> Uuid;
 }
+
+/// implemented by #[derive(ObjectId)]
+pub trait ObjectId {
+    fn object_id(&self) -> Uuid;
+}
