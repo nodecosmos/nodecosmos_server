@@ -1,6 +1,5 @@
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::like::Like;
 use crate::models::node::reorder::data::ReorderData;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -9,7 +8,9 @@ use scylla::CachingSession;
 /// - Original model has the same id and branch_id
 /// - Branched model has different id and branch_id
 ///
-/// `nodecosmos-macros` provides a derive macro for this trait.
+/// `nodecosmos-macros` provides a derives for this trait.
+/// `Branchable` is a derive for models that have `object_id` and `branch_id` fields.
+/// `Branchable` is a derive for models that have `node_id` and `branch_id` fields.
 pub trait Branchable {
     fn original_id(&self) -> Uuid;
 
@@ -35,16 +36,6 @@ pub trait Branchable {
         let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
 
         Ok(branch)
-    }
-}
-
-impl Branchable for Like {
-    fn original_id(&self) -> Uuid {
-        self.object_id
-    }
-
-    fn branch_id(&self) -> Uuid {
-        self.branch_id
     }
 }
 

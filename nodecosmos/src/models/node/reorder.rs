@@ -22,11 +22,11 @@ use nodecosmos_macros::Branchable;
 pub use recovery::Recovery;
 use scylla::CachingSession;
 use serde::Deserialize;
-use std::sync::Arc;
 
 // TODO: update to use SAGA similar to `BranchMerge` so we avoid reading whole tree for recovery
 #[derive(Deserialize, Branchable)]
 pub struct ReorderParams {
+    #[branch(original_id)]
     pub id: Uuid,
 
     #[serde(rename = "branchId")]
@@ -52,17 +52,15 @@ pub struct Reorder<'a> {
 }
 
 impl<'a> Reorder<'a> {
-    pub async fn new(request_data: &'a RequestData, data: &'a ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
-        Ok(Self {
+    pub fn new(request_data: &'a RequestData, data: &'a ReorderData) -> Reorder<'a> {
+        Self {
             db_session: request_data.db_session(),
             request_data,
             reorder_data: data,
-        })
+        }
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        ReorderValidator::new(&self.reorder_data).validate()?;
-
         let res = self.execute_reorder().await;
 
         if let Err(err) = res {
@@ -339,11 +337,9 @@ impl<'a> Reorder<'a> {
 impl Node {
     pub async fn reorder(&self, data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
         let reorder_data = ReorderData::from_params(&params, data).await?;
-        let reorder_data = Arc::new(reorder_data);
 
-        let mut reorder = Reorder::new(data, &reorder_data).await?;
-
-        reorder.run().await?;
+        ReorderValidator::new(&reorder_data).validate()?;
+        Reorder::new(data, &reorder_data).run().await?;
 
         let data = data.clone();
 

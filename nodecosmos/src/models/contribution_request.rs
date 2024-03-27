@@ -1,4 +1,3 @@
-mod callbacks;
 pub mod create;
 pub mod update;
 
@@ -7,6 +6,8 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::udts::Profile;
+use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb};
+use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -82,6 +83,25 @@ pub struct ContributionRequest {
     pub node: Option<Node>,
 }
 
+impl Callbacks for ContributionRequest {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.set_defaults(data);
+        self.create_branch(data).await?;
+        self.create_branch_node(data).await?;
+
+        Ok(())
+    }
+
+    async fn before_update(&mut self, _: &CachingSession, _: &Self::Extension) -> Result<(), NodecosmosError> {
+        self.updated_at = Some(chrono::Utc::now());
+
+        Ok(())
+    }
+}
+
 impl ContributionRequest {
     pub async fn init_node(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
@@ -139,6 +159,8 @@ partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title
 
 partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, title, updated_at);
 
+impl_updated_at_cb!(UpdateContributionRequestTitle);
+
 partial_contribution_request!(
     UpdateContributionRequestDescription,
     node_id,
@@ -146,3 +168,5 @@ partial_contribution_request!(
     description,
     updated_at
 );
+
+sanitize_description_cb!(UpdateContributionRequestDescription);

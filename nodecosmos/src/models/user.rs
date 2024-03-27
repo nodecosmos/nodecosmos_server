@@ -1,16 +1,20 @@
-mod callbacks;
 pub mod update_profile_image;
 
 pub use super::udts::Address;
+use crate::api::data::RequestData;
+use crate::app::App;
 use crate::errors::NodecosmosError;
+use crate::models::traits::{ElasticDocument, SanitizeDescription};
 use crate::models::utils::defaults::default_to_false;
 use bcrypt::{hash, verify};
+use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 const BCRYPT_COST: u32 = 6;
 
@@ -56,6 +60,37 @@ pub struct User {
 
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<Timestamp>,
+}
+
+impl Callbacks for User {
+    type Extension = Arc<App>;
+    type Error = NodecosmosError;
+
+    async fn before_insert(&mut self, db_session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.check_existing_user(db_session).await?;
+
+        self.set_defaults();
+        self.set_password()?;
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.add_elastic_document(&app.elastic_client).await;
+
+        Ok(())
+    }
+
+    async fn before_update(&mut self, _: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.updated_at = Some(Utc::now());
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, _: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.update_elastic_document(&app.elastic_client).await;
+
+        Ok(())
+    }
 }
 
 impl User {
@@ -119,6 +154,48 @@ impl User {
     }
 }
 
+macro_rules! impl_user_updated_at_with_elastic_ext_cb {
+    ($struct_name:ident) => {
+        impl charybdis::callbacks::Callbacks for $struct_name {
+            type Extension = crate::api::data::RequestData;
+            type Error = crate::errors::NodecosmosError;
+
+            async fn before_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                _ext: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                self.updated_at = Some(Utc::now());
+
+                Ok(())
+            }
+
+            async fn after_update(
+                &mut self,
+                _session: &charybdis::CachingSession,
+                data: &Self::Extension,
+            ) -> Result<(), crate::errors::NodecosmosError> {
+                use crate::models::node::UpdateOwnerNode;
+                use crate::models::traits::ElasticDocument;
+
+                self.update_elastic_document(data.elastic_client()).await;
+
+                let user_id = self.id.clone();
+                let data = data.clone();
+
+                tokio::spawn(async move {
+                    UpdateOwnerNode::update_owner_records(&data, user_id).await;
+                });
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
+impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
+
 partial_user!(
     GetUser,
     id,
@@ -173,6 +250,24 @@ partial_user!(
 );
 
 partial_user!(UpdateBioUser, id, username, bio, updated_at);
+
+impl Callbacks for UpdateBioUser {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = Some(Utc::now());
+        self.bio.sanitize()?;
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.update_elastic_document(data.elastic_client()).await;
+
+        Ok(())
+    }
+}
 
 pub trait FullName {
     fn full_name(&self) -> String;

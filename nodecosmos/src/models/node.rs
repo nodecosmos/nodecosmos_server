@@ -1,5 +1,4 @@
 mod auth;
-pub mod callbacks;
 pub mod context;
 mod create;
 mod delete;
@@ -15,13 +14,16 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::context::Context;
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, MergeDescription, SanitizeDescription};
 use crate::models::udts::Profile;
 use crate::models::utils::defaults::default_to_opt_0;
+use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
+use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use futures::TryFutureExt;
+use log::error;
 use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent, RootId};
 use scylla::statement::Consistency;
 use scylla::CachingSession;
@@ -35,9 +37,10 @@ use serde::{Deserialize, Serialize};
     partition_keys = [id],
     clustering_keys = [branch_id],
 )]
-#[derive(NodeParent, NodeAuthorization, Id, RootId, Branchable, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, NodeParent, NodeAuthorization, Id, RootId, Serialize, Deserialize, Default, Clone)]
 pub struct Node {
     #[serde(default)]
+    #[branch(original_id)]
     pub id: Uuid,
 
     // `self.branch_id` is equal to `self.id` for the main node's branch
@@ -118,6 +121,69 @@ pub struct Node {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub ctx: Context,
+}
+
+impl Callbacks for Node {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        if &self.ctx != &Context::Merge && &self.ctx != &Context::BranchedInit {
+            self.set_defaults(db_session).await?;
+            self.set_owner(data).await?;
+            self.validate_root().await?;
+            self.validate_owner().await?;
+        }
+
+        self.preserve_ancestors_for_branch(data).await?;
+
+        if let Err(e) = self.append_to_ancestors(db_session).await {
+            self.remove_from_ancestors(db_session).await?;
+            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+        }
+
+        if let Err(e) = self.update_branch_with_creation(data).await {
+            self.remove_from_ancestors(db_session).await?;
+            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
+        }
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        let self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.add_to_elastic(data.elastic_client()).await;
+            self_clone.create_new_version(&data).await;
+            self_clone.create_workflow(&data).await;
+        });
+
+        Ok(())
+    }
+
+    async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        self.delete_related_data(data).await?;
+        self.preserve_ancestors_for_branch(data).await?;
+        self.preserve_descendants_for_branch(data).await?;
+        self.update_branch_with_deletion(data).await?;
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        self.create_branched_if_original_exist(&data).await?;
+
+        let self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.create_new_version_for_ancestors(&data).await;
+        });
+
+        Ok(())
+    }
 }
 
 impl Node {
@@ -292,8 +358,6 @@ partial_node!(
 
 partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
 
-partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
-
 partial_node!(
     UpdateTitleNode,
     id,
@@ -312,6 +376,36 @@ partial_node!(
     auth_branch
 );
 
+impl Callbacks for UpdateTitleNode {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            self.as_native().create_branched_if_not_exist(data).await?;
+        }
+
+        self.update_branch(&data).await?;
+        self.updated_at = Some(chrono::Utc::now());
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        self.update_title_for_ancestors(data).await?;
+
+        let self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.update_elastic_index(data.elastic_client()).await;
+            self_clone.create_new_version(&data).await;
+        });
+
+        Ok(())
+    }
+}
+
 partial_node!(
     UpdateDescriptionNode,
     id,
@@ -329,6 +423,60 @@ partial_node!(
     parent,
     auth_branch
 );
+
+impl Callbacks for UpdateDescriptionNode {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(
+        &mut self,
+        db_session: &CachingSession,
+        data: &Self::Extension,
+    ) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            self.as_native().create_branched_if_not_exist(data).await?;
+        }
+
+        if &self.ctx != &Context::MergeRecovery {
+            self.merge_description(db_session).await?;
+        }
+
+        self.description.sanitize()?;
+
+        self.updated_at = Some(chrono::Utc::now());
+
+        if self.is_branched() {
+            let native = self
+                .as_native()
+                .find_by_primary_key()
+                .consistency(Consistency::All)
+                .execute(db_session)
+                .await;
+            match native {
+                Ok(native) => {
+                    native.preserve_ancestors_for_branch(data).await?;
+                }
+                Err(e) => error!("[after_update] Unexpected error finding native node: {}", e),
+            }
+        }
+
+        self.update_branch(&data).await?;
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        let self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.update_elastic_index(data.elastic_client()).await;
+            self_clone.create_new_version(&data).await;
+        });
+
+        Ok(())
+    }
+}
 
 impl UpdateDescriptionNode {
     pub fn from(node: Node) -> Self {
@@ -351,21 +499,6 @@ impl UpdateDescriptionNode {
     }
 }
 
-partial_node!(
-    UpdateCoverImageNode,
-    id,
-    branch_id,
-    owner_id,
-    editor_ids,
-    is_public,
-    cover_image_filename,
-    cover_image_url,
-    updated_at,
-    parent_id,
-    parent,
-    auth_branch
-);
-
 partial_node!(PrimaryKeyNode, id, branch_id);
 
 partial_node!(
@@ -381,3 +514,58 @@ partial_node!(
 );
 
 partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
+
+partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
+
+partial_node!(
+    UpdateCoverImageNode,
+    id,
+    branch_id,
+    owner_id,
+    editor_ids,
+    is_public,
+    cover_image_filename,
+    cover_image_url,
+    updated_at,
+    parent_id,
+    parent,
+    auth_branch
+);
+
+macro_rules! impl_node_updated_at_with_elastic_ext_cb {
+    ($struct_name:ident) => {
+        impl charybdis::callbacks::Callbacks for $struct_name {
+            type Extension = crate::api::data::RequestData;
+            type Error = crate::errors::NodecosmosError;
+
+            async fn before_update(
+                &mut self,
+                _db_session: &CachingSession,
+                _data: &Self::Extension,
+            ) -> Result<(), NodecosmosError> {
+                self.updated_at = Some(chrono::Utc::now());
+
+                Ok(())
+            }
+
+            async fn after_update(
+                &mut self,
+                _db_session: &CachingSession,
+                data: &Self::Extension,
+            ) -> Result<(), NodecosmosError> {
+                use crate::models::traits::ElasticDocument;
+
+                if self.id != self.branch_id {
+                    return Ok(());
+                }
+
+                self.update_elastic_document(data.elastic_client()).await;
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_node_updated_at_with_elastic_ext_cb!(UpdateLikesCountNode);
+impl_node_updated_at_with_elastic_ext_cb!(UpdateCoverImageNode);

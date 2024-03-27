@@ -116,7 +116,11 @@ pub async fn get_original_node_description_base64(
 
     node.auth_view(&data.app, data.opt_current_user()).await?;
 
-    let node = node.find_by_primary_key().execute(data.db_session()).await?;
+    let node = node
+        .find_by_primary_key()
+        .trace(true)
+        .execute(data.db_session())
+        .await?;
 
     Ok(HttpResponse::Ok().json(node))
 }

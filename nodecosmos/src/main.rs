@@ -28,7 +28,6 @@ async fn main() {
             .wrap(app_web_data.session_middleware())
             .app_data(app_web_data.clone())
             .app_data(db_session_web_data.clone())
-            .service(web::scope("/ws").service(description_ws))
             .service(
                 web::scope("/users")
                     .service(get_user)
@@ -120,6 +119,14 @@ async fn main() {
                     .service(update_comment_content)
                     .service(delete_comment),
             )
+            .service(
+                web::scope("descriptions")
+                    .service(get_description)
+                    .service(get_base64_description)
+                    .service(get_original_description)
+                    .service(save_description),
+            )
+            .service(web::scope("ws").service(description_ws))
     })
     .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))

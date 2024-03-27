@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 #[charybdis_udt_model(type_name = property)]
 pub struct Property {
     pub title: Text,
+
     #[serde(rename = "dataType")]
     pub data_type: Text,
+
     pub value: Text,
 }
 

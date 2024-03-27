@@ -1,12 +1,14 @@
-mod callbacks;
 mod create;
 pub mod likeable;
 
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::node_counter::NodeCounter;
+use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
+use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -20,9 +22,10 @@ use std::fmt;
     clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, Serialize, Deserialize, Default, Clone)]
 pub struct Like {
     #[serde(rename = "objectId")]
+    #[branch(original_id)]
     pub object_id: Uuid,
 
     #[serde(default, rename = "branchId")]
@@ -46,6 +49,40 @@ pub struct Like {
     #[serde(skip)]
     #[charybdis(ignore)]
     pub like_count: Option<i64>,
+}
+
+impl Callbacks for Like {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_insert(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
+        self.validate_not_liked(db_session).await?;
+        self.set_defaults();
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.update_model_like_count(&data, true).await.unwrap();
+        });
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        let mut self_clone = self.clone();
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            self_clone.update_model_like_count(&data, false).await.unwrap();
+        });
+
+        Ok(())
+    }
 }
 
 impl Like {

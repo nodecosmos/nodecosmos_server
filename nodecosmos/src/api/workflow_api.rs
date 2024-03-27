@@ -10,13 +10,14 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::Uuid;
-use nodecosmos_macros::BranchableByNodeId;
+use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
-#[derive(Deserialize, BranchableByNodeId)]
+#[derive(Deserialize, Branchable)]
 pub struct WorkflowParams {
+    #[branch(original_id)]
     pub node_id: Uuid,
     pub branch_id: Uuid,
 }

@@ -16,8 +16,8 @@ pub trait MergeDescription {
 
     fn assign_html(&mut self, html: String);
     fn assign_markdown(&mut self, markdown: String);
-    fn assign_short_description(&mut self, short_description: String);
     fn assign_base64(&mut self, short_description: String);
+    fn assign_short_description(&mut self, _short: String) {}
 
     async fn merge_description(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let current_base64 = self.current_base64(db_session).await?;
@@ -74,7 +74,6 @@ pub trait MergeDescription {
     }
 }
 
-/// In future it can be used for description of other models like IO, Flow, Flow Step, etc.
 impl MergeDescription for UpdateDescriptionNode {
     async fn current_base64(&self, db_session: &CachingSession) -> Result<String, NodecosmosError> {
         let node =
@@ -99,11 +98,11 @@ impl MergeDescription for UpdateDescriptionNode {
         self.description_markdown = Some(markdown);
     }
 
-    fn assign_short_description(&mut self, short_description: String) {
-        self.short_description = Some(short_description);
-    }
-
     fn assign_base64(&mut self, base64: String) {
         self.description_base64 = Some(base64);
+    }
+
+    fn assign_short_description(&mut self, short_description: String) {
+        self.short_description = Some(short_description);
     }
 }

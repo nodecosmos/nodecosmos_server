@@ -1,69 +1,73 @@
 mod traits;
+
+use darling::{FromDeriveInput, FromField};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, DeriveInput, Ident};
 use traits::StructFields;
 
-#[proc_macro_derive(Branchable)]
+#[derive(Clone, FromField)]
+#[darling(attributes(branch))]
+struct BranchField {
+    ident: Option<Ident>,
+
+    #[darling(default)]
+    original_id: bool,
+}
+
+#[derive(FromDeriveInput)]
+#[darling(attributes(branch))]
+struct BranchStruct {
+    ident: Ident,
+
+    data: darling::ast::Data<(), BranchField>,
+}
+
+#[proc_macro_derive(Branchable, attributes(branch))]
 pub fn branchable_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+    let ast = parse_macro_input!(input as DeriveInput);
+    let parsed_struct = match BranchStruct::from_derive_input(&ast) {
+        Ok(value) => value,
+        Err(e) => return e.write_errors().into(),
+    };
+    let struct_name = parsed_struct.ident;
 
-    let expanded = quote! {
-        impl crate::models::traits::Branchable for #name {
-            fn original_id(&self) -> Uuid {
-                self.id
-            }
+    // Example of manually parsing attributes
 
-            fn branch_id(&self) -> Uuid {
-                self.branch_id
-            }
-        }
+    // Iterate over fields to find the one with `original_id`
+    let original_id_fields = match parsed_struct.data {
+        darling::ast::Data::Struct(fields) => fields
+            .fields
+            .into_iter()
+            .filter(|field| field.original_id)
+            .collect::<Vec<BranchField>>(),
+        _ => Vec::new(),
     };
 
-    TokenStream::from(expanded)
-}
+    // Ensure there's only one `original_id`
+    if original_id_fields.len() == 1 {
+        let field_name = original_id_fields[0]
+            .ident
+            .as_ref()
+            .expect("Field without an identifier");
 
-/// Branchable Derive that uses node_id as id
-#[proc_macro_derive(BranchableByNodeId)]
-pub fn branchable_by_node_id_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+        // Generate your desired code with the unique `original_id` field
+        let expanded = quote! {
+            impl crate::models::traits::Branchable for #struct_name {
+                fn original_id(&self) -> Uuid {
+                    self.#field_name
+                }
 
-    let expanded = quote! {
-        impl crate::models::traits::Branchable for #name {
-            fn original_id(&self) -> Uuid {
-                self.node_id
+                fn branch_id(&self) -> Uuid {
+                    self.branch_id
+                }
             }
+        };
 
-            fn branch_id(&self) -> Uuid {
-                self.branch_id
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}
-
-/// Branchable Derive that uses node_id as id
-#[proc_macro_derive(BranchableByRootNodeId)]
-pub fn branchable_by_root_node_id_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-
-    let expanded = quote! {
-        impl crate::models::traits::Branchable for #name {
-            fn original_id(&self) -> Uuid {
-                self.root_node_id
-            }
-
-            fn branch_id(&self) -> Uuid {
-                self.branch_id
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        TokenStream::from(expanded)
+    } else {
+        panic!("Branch record requires single #[branch(original_id)] attribute to determine `original_id`");
+    }
 }
 
 /// Note: all derives implemented bellow `charybdis_model` will be automatically implemented for all partial models.
