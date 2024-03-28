@@ -59,7 +59,7 @@ pub async fn update_flow_step_inputs(data: RequestData, mut flow_step: web::Json
     Ok(HttpResponse::Ok().json(flow_step))
 }
 
-#[delete("{nodeId}/{branchId}/{workflowId}/{flowId}/{flowIndex}/{id}")]
+#[delete("{nodeId}/{branchId}/{flowId}/{flowIndex}/{id}")]
 pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 

@@ -23,7 +23,7 @@ pub async fn update_flow_title(data: RequestData, mut flow: web::Json<UpdateTitl
     Ok(HttpResponse::Ok().json(flow))
 }
 
-#[delete("/{nodeId}/{branchId}/{workflowId}/{verticalIndex}/{startIndex}/{id}")]
+#[delete("/{nodeId}/{branchId}/{verticalIndex}/{startIndex}/{id}")]
 pub async fn delete_flow(data: RequestData, mut flow: web::Path<Flow>) -> Response {
     AuthNode::auth_update(&data, flow.node_id, flow.branch_id).await?;
 

@@ -26,7 +26,7 @@ pub async fn update_io_title(data: RequestData, mut input_output: web::Json<Upda
     Ok(HttpResponse::Ok().json(input_output))
 }
 
-#[delete("/{rootNodeId}/{nodeId}/{branchId}/{workflowId}/{id}")]
+#[delete("/{rootNodeId}/{nodeId}/{branchId}/{id}")]
 pub async fn delete_io(data: RequestData, input_output: web::Path<Io>) -> Response {
     let mut input_output = input_output.find_by_primary_key().execute(data.db_session()).await?;
 
