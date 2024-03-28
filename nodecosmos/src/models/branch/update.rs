@@ -642,14 +642,4 @@ impl Branch {
             self.title_change_by_object = Some(map);
         }
     }
-
-    pub fn push_description_change_by_object(&mut self, id: Uuid, text_change: TextChange) {
-        if let Some(description_change_by_object) = &mut self.description_change_by_object {
-            description_change_by_object.insert(id, text_change);
-        } else {
-            let mut map = Map::new();
-            map.insert(id, text_change);
-            self.description_change_by_object = Some(map);
-        }
-    }
 }

@@ -10,7 +10,7 @@ use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
-use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
+use charybdis::types::{Double, Int, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use nodecosmos_macros::Branchable;
 use scylla::CachingSession;

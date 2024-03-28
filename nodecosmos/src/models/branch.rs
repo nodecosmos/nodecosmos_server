@@ -4,10 +4,12 @@ pub mod update;
 
 use crate::errors::NodecosmosError;
 use crate::models::description::{find_description, Description};
+use crate::models::flow::{Flow, UpdateTitleFlow};
+use crate::models::flow_step::FlowStep;
 use crate::models::node::context::Context;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::traits::{Id, ObjectId, Pluck};
+use crate::models::traits::{FindForBranchMerge, Id, ObjectId, Pluck};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
@@ -122,19 +124,6 @@ pub struct Branch {
     #[serde(default, rename = "editedDescriptionFlows")]
     pub edited_description_flows: Option<Set<Uuid>>,
 
-    // ios
-    #[serde(default, rename = "createdIos")]
-    pub created_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedIos")]
-    pub deleted_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedTitleIos")]
-    pub edited_title_ios: Option<Frozen<Set<Text>>>,
-
-    #[serde(default, rename = "editedDescriptionIos")]
-    pub edited_description_ios: Option<Set<Uuid>>,
-
     // flow steps
     #[serde(default, rename = "createdFlowSteps")]
     pub created_flow_steps: Option<Set<Uuid>>,
@@ -169,6 +158,19 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
 
+    // ios
+    #[serde(default, rename = "createdIos")]
+    pub created_ios: Option<Set<Uuid>>,
+
+    #[serde(default, rename = "deletedIos")]
+    pub deleted_ios: Option<Set<Uuid>>,
+
+    #[serde(default, rename = "editedTitleIos")]
+    pub edited_title_ios: Option<Frozen<Set<Text>>>,
+
+    #[serde(default, rename = "editedDescriptionIos")]
+    pub edited_description_ios: Option<Set<Uuid>>,
+
     pub conflict: Option<Frozen<Conflict>>,
 
     #[serde(rename = "descriptionChangeByObject")]
@@ -180,34 +182,6 @@ pub struct Branch {
     #[serde(skip)]
     #[charybdis(ignore)]
     pub node: Option<Node>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _created_nodes: Option<Vec<Node>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _restored_nodes: Option<Vec<Node>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _deleted_nodes: Option<Vec<Node>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _original_title_nodes: Option<Vec<UpdateTitleNode>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _edited_title_nodes: Option<Vec<UpdateTitleNode>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _original_nodes_descriptions: Option<Vec<Description>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub _edited_description_nodes: Option<Vec<Description>>,
 }
 
 impl Branch {
@@ -224,19 +198,19 @@ impl Branch {
     }
 
     pub async fn created_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let (None, Some(created_node_ids)) = (&self._created_nodes, &self.created_nodes) {
+        if let Some(created_node_ids) = &self.created_nodes {
             let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, self.id).await?;
 
             created_nodes.sort_by_depth();
 
-            self._created_nodes = Some(created_nodes);
+            return Ok(Some(created_nodes));
         }
 
-        Ok(self._created_nodes.clone())
+        Ok(None)
     }
 
     pub async fn restored_nodes(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let (None, Some(restored_node_ids)) = (&self._restored_nodes, &self.restored_nodes) {
+        if let Some(restored_node_ids) = &self.restored_nodes {
             let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, self.id).await?;
             let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
                 .await?
@@ -246,17 +220,17 @@ impl Branch {
 
             branched_nodes.sort_by_depth();
 
-            self._restored_nodes = Some(branched_nodes);
+            return Ok(Some(branched_nodes));
         }
 
-        Ok(self._restored_nodes.clone())
+        Ok(None)
     }
 
     pub async fn edited_title_nodes(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
-        if let (None, Some(edited_title_nodes)) = (&self._edited_title_nodes, &self.edited_title_nodes) {
+        if let Some(edited_title_nodes) = &self.edited_title_nodes {
             let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (self.id, edited_title_nodes))
                 .execute(db_session)
                 .await?
@@ -271,19 +245,17 @@ impl Branch {
                 })
                 .collect();
 
-            self._edited_title_nodes = Some(edited_title_nodes);
+            return Ok(Some(edited_title_nodes));
         }
 
-        Ok(self._edited_title_nodes.clone())
+        Ok(None)
     }
 
-    pub async fn edited_description_nodes(
+    pub async fn edited_node_descriptions(
         &mut self,
         db_session: &CachingSession,
-    ) -> Result<Option<&mut Vec<Description>>, NodecosmosError> {
-        if let (None, Some(edited_description_nodes)) =
-            (&self._edited_description_nodes, &self.edited_description_nodes)
-        {
+    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
+        if let Some(edited_description_nodes) = &self.edited_description_nodes {
             let descriptions =
                 find_description!("branch_id = ? AND object_id IN ?", (self.id, edited_description_nodes))
                     .execute(db_session)
@@ -291,10 +263,10 @@ impl Branch {
                     .try_collect()
                     .await?;
 
-            self._edited_description_nodes = Some(self.map_original_objects(descriptions).collect());
+            return Ok(Some(self.map_original_objects(descriptions).collect()));
         }
 
-        Ok(self._edited_description_nodes.as_mut())
+        Ok(None)
     }
 
     pub fn reordered_nodes_data(&self) -> Option<List<Frozen<&BranchReorderData>>> {
@@ -317,6 +289,141 @@ impl Branch {
         } else {
             None
         }
+    }
+
+    pub async fn created_flows(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Flow>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(created_flow_ids)) =
+            (&self.edited_workflow_nodes, &self.created_flows)
+        {
+            let flows = Flow::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                self.id,
+                created_flow_ids,
+            )
+            .await?;
+
+            return Ok(Some(flows));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn deleted_flows(&mut self, db_session: &CachingSession) -> Result<Option<Vec<Flow>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(deleted_flow_ids)) =
+            (&self.edited_workflow_nodes, &self.deleted_flows)
+        {
+            let flows = Flow::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                self.id,
+                deleted_flow_ids,
+            )
+            .await?;
+
+            return Ok(Some(flows));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn edited_title_flows(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<UpdateTitleFlow>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(edited_title_flows)) =
+            (&self.edited_workflow_nodes, &self.edited_title_flows)
+        {
+            let flows = UpdateTitleFlow::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                self.id,
+                edited_title_flows,
+            )
+            .await?;
+
+            return Ok(Some(flows));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn edited_flow_descriptions(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
+        if let Some(edited_description_flow_ids) = &self.edited_description_flows {
+            let descriptions = find_description!(
+                "branch_id = ? AND object_id IN ?",
+                (self.id, edited_description_flow_ids)
+            )
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+            return Ok(Some(self.map_original_objects(descriptions).collect()));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn created_flow_steps(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(created_flow_step_ids)) =
+            (&self.edited_workflow_nodes, &self.created_flow_steps)
+        {
+            let flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                self.id,
+                created_flow_step_ids,
+            )
+            .await?;
+            return Ok(Some(flow_steps));
+        }
+        Ok(None)
+    }
+
+    pub async fn deleted_flow_steps(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_ids)) =
+            (&self.edited_workflow_nodes, &self.deleted_flow_steps)
+        {
+            let flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                self.id,
+                deleted_flow_step_ids,
+            )
+            .await?;
+            return Ok(Some(flow_steps));
+        }
+        Ok(None)
+    }
+
+    pub async fn edited_flow_step_descriptions(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
+        if let Some(edited_description_flow_step_ids) = &self.edited_description_flow_steps {
+            let descriptions = find_description!(
+                "branch_id = ? AND object_id IN ?",
+                (self.id, edited_description_flow_step_ids)
+            )
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+            return Ok(Some(self.map_original_objects(descriptions).collect()));
+        }
+
+        Ok(None)
     }
 
     fn map_original_objects<'a, O: ObjectId + 'a>(&'a self, objects: Vec<O>) -> impl Iterator<Item = O> + 'a {

@@ -503,7 +503,7 @@ impl BranchMerge {
 
     async fn update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let mut description_change_by_object = self.branch.description_change_by_object.clone().unwrap_or_default();
-        let edited_node_descriptions = match self.branch.edited_description_nodes(data.db_session()).await? {
+        let edited_node_descriptions = match self.branch.edited_node_descriptions(data.db_session()).await? {
             Some(descriptions) => descriptions,
             None => return Ok(()),
         };
