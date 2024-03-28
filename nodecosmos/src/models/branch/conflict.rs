@@ -66,7 +66,7 @@ impl<'a> BranchConflict<'a> {
         let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
         let mut deleted_edited_nodes = HashSet::new();
 
-        if let Some(edit_description_node_ids) = &self.branch.edited_nodes_descriptions {
+        if let Some(edit_description_node_ids) = &self.branch.edited_description_nodes {
             let edit_description_node_ids = edit_description_node_ids
                 .iter()
                 .filter_map(|id| {

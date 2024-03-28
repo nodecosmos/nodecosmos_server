@@ -7,7 +7,6 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
-use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
@@ -21,7 +20,7 @@ use std::collections::HashSet;
 #[charybdis_model(
     table_name = flows,
     partition_keys = [node_id, branch_id],
-    clustering_keys = [workflow_id, vertical_index, start_index, id],
+    clustering_keys = [vertical_index, start_index, id],
     local_secondary_indexes = [id]
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
@@ -32,9 +31,6 @@ pub struct Flow {
 
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "workflowId")]
-    pub workflow_id: Uuid,
 
     // vertical index
     #[serde(rename = "verticalIndex")]
@@ -60,7 +56,7 @@ impl Callbacks for Flow {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
 
         self.id = Uuid::new_v4();
@@ -68,16 +64,7 @@ impl Callbacks for Flow {
         self.updated_at = Some(now);
 
         if self.is_branched() {
-            Workflow::find_or_insert_branched(
-                db_session,
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.workflow_id,
-            )
-            .await?;
-
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
         }
 
@@ -86,6 +73,7 @@ impl Callbacks for Flow {
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
         }
 
@@ -156,7 +144,6 @@ impl Flow {
                 node_id: self.node_id,
                 branch_id: self.branch_id,
             },
-            self.workflow_id,
             self.id,
         )
         .await?;
@@ -169,7 +156,6 @@ partial_flow!(
     UpdateTitleFlow,
     node_id,
     branch_id,
-    workflow_id,
     start_index,
     vertical_index,
     id,
@@ -185,13 +171,14 @@ impl Callbacks for UpdateTitleFlow {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Flow::find_or_insert_branched(
                 data.db_session(),
                 &WorkflowParams {
                     node_id: self.node_id,
                     branch_id: self.branch_id,
                 },
-                self.workflow_id,
+                self.id,
             )
             .await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditFlowTitle(self.id)).await?;
@@ -201,12 +188,4 @@ impl Callbacks for UpdateTitleFlow {
     }
 }
 
-partial_flow!(
-    DeleteFlow,
-    node_id,
-    branch_id,
-    workflow_id,
-    start_index,
-    vertical_index,
-    id
-);
+partial_flow!(DeleteFlow, node_id, branch_id, start_index, vertical_index, id);

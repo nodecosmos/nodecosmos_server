@@ -19,7 +19,6 @@ impl FlowStep {
         let mut maybe_original = FlowStep {
             node_id: self.node_id,
             branch_id: self.branch_id,
-            workflow_id: self.workflow_id,
             flow_id: self.flow_id,
             flow_index: self.flow_index,
             id: self.id,

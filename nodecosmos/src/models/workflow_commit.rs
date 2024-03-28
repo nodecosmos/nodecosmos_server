@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct WorkflowCommit {
-    pub workflow_id: Uuid,
     pub id: Uuid,
     pub branch_id: Uuid,
     pub title: Text,

@@ -81,7 +81,7 @@ impl BranchMerge {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_node_titles {
+        if let Some(ids) = &branch.edited_title_nodes {
             let nodes_by_id = find_update_title_node!("id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
@@ -98,7 +98,7 @@ impl BranchMerge {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_nodes_descriptions {
+        if let Some(ids) = &branch.edited_description_nodes {
             let nodes_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
@@ -502,8 +502,9 @@ impl BranchMerge {
     }
 
     async fn update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let edited_node_descriptions = match self.branch.edited_nodes_descriptions(data.db_session()).await? {
-            Some(descriptions) => descriptions.clone(),
+        let mut description_change_by_object = self.branch.description_change_by_object.clone().unwrap_or_default();
+        let edited_node_descriptions = match self.branch.edited_description_nodes(data.db_session()).await? {
+            Some(descriptions) => descriptions,
             None => return Ok(()),
         };
 
@@ -535,8 +536,10 @@ impl BranchMerge {
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
-            self.branch.push_description_change_by_object(object_id, text_change);
+            description_change_by_object.insert(object_id, text_change);
         }
+
+        self.branch.description_change_by_object = Some(description_change_by_object);
 
         Ok(())
     }

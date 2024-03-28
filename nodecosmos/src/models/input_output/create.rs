@@ -14,7 +14,6 @@ impl Io {
             root_node_id: self.root_node_id,
             branch_id: self.root_node_id,
             node_id: self.node_id,
-            workflow_id: self.workflow_id,
             id: self.id,
             ..Default::default()
         }

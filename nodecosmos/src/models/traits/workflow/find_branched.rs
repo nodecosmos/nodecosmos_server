@@ -2,7 +2,6 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::flow_step::{FlowStep, SiblingFlowStep};
-use crate::models::workflow::Workflow;
 use charybdis::model::Model;
 use scylla::CachingSession;
 
@@ -56,7 +55,6 @@ macro_rules! find_or_insert_branched {
     };
 }
 
-find_or_insert_branched!(Workflow);
 find_or_insert_branched!(Flow);
 find_or_insert_branched!(FlowStep);
 find_or_insert_branched!(SiblingFlowStep);

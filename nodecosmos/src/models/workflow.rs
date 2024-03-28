@@ -5,11 +5,8 @@ mod update_initial_inputs;
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
-use crate::models::flow::{DeleteFlow, Flow};
-use crate::models::flow_step::DeleteFlowStep;
-use crate::models::input_output::{DeleteIo, Io};
+use crate::models::flow::Flow;
+use crate::models::input_output::Io;
 use crate::models::node::Node;
 use crate::models::traits::node::FindBranched;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
@@ -23,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 /// Workflow model
 ///
-/// Currently we only support one workflow per node.
+/// We only support one workflow per node.
 ///
 /// Single `Workflow` can have multiple `Flows`.
 /// `Flow` represents isolated process within `Workflow`.
@@ -32,7 +29,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = workflows,
     partition_keys = [node_id],
-    clustering_keys = [branch_id, id],
+    clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
@@ -44,19 +41,10 @@ pub struct Workflow {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(default = "Uuid::new_v4")]
-    pub id: Uuid,
-
     #[serde(rename = "rootNodeId")]
     pub root_node_id: Uuid,
 
     pub title: Option<Text>,
-
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
-
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
 
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
@@ -64,6 +52,12 @@ pub struct Workflow {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub diagram: Option<WorkflowDiagram>,
+
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
+
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 }
 
 impl Callbacks for Workflow {
@@ -71,51 +65,10 @@ impl Callbacks for Workflow {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
         if self.is_branched() {
             let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id, None).await?;
             node.create_branched_if_not_exist(data).await?;
-
-            Branch::update(data, self.branch_id, BranchUpdate::CreateWorkflow(self.id)).await?;
         }
-
-        Ok(())
-    }
-
-    async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteWorkflow(self.id)).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            self.create_branched_if_original_exists(data).await?;
-        }
-
-        DeleteFlowStep::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(db_session)
-            .await?;
-
-        DeleteFlow::delete_by_node_id_and_branch_id_and_workflow_id(self.node_id, self.branch_id, self.id)
-            .execute(db_session)
-            .await?;
-
-        // NOTE: if we allow multiple workflows per node, we need to delete only the io that belongs to this workflow
-        DeleteIo::delete_by_root_node_id_and_branch_id_and_node_id(
-            self.root_node_id,
-            self.branchise_id(self.root_node_id),
-            self.node_id,
-        )
-        .execute(db_session)
-        .await?;
 
         Ok(())
     }
@@ -193,31 +146,20 @@ partial_workflow!(
     UpdateInitialInputsWorkflow,
     node_id,
     branch_id,
-    id,
     initial_input_ids,
     updated_at
 );
 
-partial_workflow!(GetInitialInputsWorkflow, node_id, branch_id, id, initial_input_ids);
+partial_workflow!(GetInitialInputsWorkflow, node_id, branch_id, initial_input_ids);
 
 impl Callbacks for UpdateInitialInputsWorkflow {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
+    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = chrono::Utc::now();
 
         if self.is_branched() {
-            Workflow::find_or_insert_branched(
-                db_session,
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.id,
-            )
-            .await?;
-
             self.update_branch(data).await?;
         }
 
@@ -226,31 +168,6 @@ impl Callbacks for UpdateInitialInputsWorkflow {
 }
 
 // used by node deletion
-partial_workflow!(DeleteWorkflow, node_id, branch_id, id);
+partial_workflow!(DeleteWorkflow, node_id, branch_id);
 
-partial_workflow!(UpdateWorkflowTitle, node_id, branch_id, id, title, updated_at);
-
-impl Callbacks for UpdateWorkflowTitle {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
-        if self.is_branched() {
-            Workflow::find_or_insert_branched(
-                db_session,
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.id,
-            )
-            .await?;
-
-            Branch::update(data, self.branch_id, BranchUpdate::EditWorkflowTitle(self.id)).await?;
-        }
-
-        Ok(())
-    }
-}
+partial_workflow!(UpdateWorkflowTitle, node_id, branch_id, title, updated_at);

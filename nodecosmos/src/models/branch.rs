@@ -91,30 +91,23 @@ pub struct Branch {
     #[serde(default, rename = "deletedNodes")]
     pub deleted_nodes: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedNodeTitles")]
-    pub edited_node_titles: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedTitleNodes")]
+    pub edited_title_nodes: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedNodeDescriptions")]
-    pub edited_nodes_descriptions: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedDescriptionNodes")]
+    pub edited_description_nodes: Option<Set<Uuid>>,
 
     #[serde(default, rename = "reorderedNodes")]
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
 
-    // workflows
-    #[serde(default, rename = "createdWorkflows")]
-    pub created_workflows: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedWorkflows")]
-    pub deleted_workflows: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedWorkflowNodes")]
+    pub edited_workflow_nodes: Option<Set<Uuid>>,
 
     #[serde(default, rename = "createdWorkflowInitialInputs")]
     pub created_workflow_initial_inputs: Option<Set<Uuid>>,
 
     #[serde(default, rename = "deletedWorkflowInitialInputs")]
     pub deleted_workflow_initial_inputs: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedWorkflowTitles")]
-    pub edited_workflow_titles: Option<Set<Uuid>>,
 
     // flows
     #[serde(default, rename = "createdFlows")]
@@ -123,11 +116,11 @@ pub struct Branch {
     #[serde(default, rename = "deletedFlows")]
     pub deleted_flows: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedFlowTitles")]
-    pub edited_flow_titles: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedTitleFlows")]
+    pub edited_title_flows: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedFlowDescriptions")]
-    pub edited_flow_descriptions: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedDescriptionFlows")]
+    pub edited_description_flows: Option<Set<Uuid>>,
 
     // ios
     #[serde(default, rename = "createdIos")]
@@ -136,11 +129,11 @@ pub struct Branch {
     #[serde(default, rename = "deletedIos")]
     pub deleted_ios: Option<Set<Uuid>>,
 
-    #[serde(default, rename = "editedIoTitles")]
-    pub edited_io_titles: Option<Frozen<Set<Text>>>,
+    #[serde(default, rename = "editedTitleIos")]
+    pub edited_title_ios: Option<Frozen<Set<Text>>>,
 
-    #[serde(default, rename = "editedIoDescriptions")]
-    pub edited_io_descriptions: Option<Set<Uuid>>,
+    #[serde(default, rename = "editedDescriptionIos")]
+    pub edited_description_ios: Option<Set<Uuid>>,
 
     // flow steps
     #[serde(default, rename = "createdFlowSteps")]
@@ -148,6 +141,9 @@ pub struct Branch {
 
     #[serde(default, rename = "deletedFlowSteps")]
     pub deleted_flow_steps: Option<Set<Uuid>>,
+
+    #[serde(default, rename = "editedDescriptionFlowSteps")]
+    pub edited_description_flow_steps: Option<Set<Uuid>>,
 
     /// FlowStepId -> NodeId
     #[serde(default, rename = "createdFlowStepNodes")]
@@ -211,7 +207,7 @@ pub struct Branch {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub _edited_nodes_descriptions: Option<Vec<Description>>,
+    pub _edited_description_nodes: Option<Vec<Description>>,
 }
 
 impl Branch {
@@ -260,8 +256,8 @@ impl Branch {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
-        if let (None, Some(edited_node_titles)) = (&self._edited_title_nodes, &self.edited_node_titles) {
-            let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (self.id, edited_node_titles))
+        if let (None, Some(edited_title_nodes)) = (&self._edited_title_nodes, &self.edited_title_nodes) {
+            let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (self.id, edited_title_nodes))
                 .execute(db_session)
                 .await?
                 .try_collect()
@@ -281,24 +277,24 @@ impl Branch {
         Ok(self._edited_title_nodes.clone())
     }
 
-    pub async fn edited_nodes_descriptions(
+    pub async fn edited_description_nodes(
         &mut self,
         db_session: &CachingSession,
     ) -> Result<Option<&mut Vec<Description>>, NodecosmosError> {
-        if let (None, Some(edited_nodes_descriptions)) =
-            (&self._edited_nodes_descriptions, &self.edited_nodes_descriptions)
+        if let (None, Some(edited_description_nodes)) =
+            (&self._edited_description_nodes, &self.edited_description_nodes)
         {
             let descriptions =
-                find_description!("branch_id = ? AND object_id IN ?", (self.id, edited_nodes_descriptions))
+                find_description!("branch_id = ? AND object_id IN ?", (self.id, edited_description_nodes))
                     .execute(db_session)
                     .await?
                     .try_collect()
                     .await?;
 
-            self._edited_nodes_descriptions = Some(self.map_original_objects(descriptions).collect());
+            self._edited_description_nodes = Some(self.map_original_objects(descriptions).collect());
         }
 
-        Ok(self._edited_nodes_descriptions.as_mut())
+        Ok(self._edited_description_nodes.as_mut())
     }
 
     pub fn reordered_nodes_data(&self) -> Option<List<Frozen<&BranchReorderData>>> {
@@ -359,15 +355,13 @@ partial_branch!(UpdateDeletedNodesBranch, id, deleted_nodes);
 
 partial_branch!(UpdateRestoredNodesBranch, id, restored_nodes);
 
-partial_branch!(UpdateEditedNodeTitlesBranch, id, edited_node_titles);
+partial_branch!(UpdateEditedTitleNodesBranch, id, edited_title_nodes);
 
-partial_branch!(UpdateEditedNodeDescriptionsBranch, id, edited_nodes_descriptions);
+partial_branch!(UpdateEditedDescriptionNodesBranch, id, edited_description_nodes);
 
 partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
-partial_branch!(UpdateCreatedWorkflowsBranch, id, created_workflows);
-
-partial_branch!(UpdateDeletedWorkflowsBranch, id, deleted_workflows);
+partial_branch!(UpdateEditedNodeWorkflowsBranch, id, edited_workflow_nodes);
 
 partial_branch!(
     UpdateCreatedWorkflowInitialInputsBranch,
@@ -381,23 +375,21 @@ partial_branch!(
     deleted_workflow_initial_inputs
 );
 
-partial_branch!(UpdateEditedWorkflowTitlesBranch, id, edited_workflow_titles);
-
 partial_branch!(UpdateCreatedFlowsBranch, id, created_flows);
 
 partial_branch!(UpdateDeletedFlowsBranch, id, deleted_flows);
 
-partial_branch!(UpdateEditedFlowTitlesBranch, id, edited_flow_titles);
+partial_branch!(UpdateEditedFlowTitleBranch, id, edited_title_flows);
 
-partial_branch!(UpdateEditedFlowDescriptionsBranch, id, edited_flow_descriptions);
+partial_branch!(UpdateEditedFlowDescriptionBranch, id, edited_description_flows);
 
-partial_branch!(UpdatecreatedIosBranch, id, created_ios);
+partial_branch!(UpdateCreatedIosBranch, id, created_ios);
 
-partial_branch!(UpdatedeletedIosBranch, id, deleted_ios);
+partial_branch!(UpdateDeletedIosBranch, id, deleted_ios);
 
-partial_branch!(UpdateeditedIoTitlesBranch, id, edited_io_titles);
+partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
 
-partial_branch!(UpdateeditedIoDescriptionsBranch, id, edited_io_descriptions);
+partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
 
 partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 

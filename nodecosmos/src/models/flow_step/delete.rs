@@ -84,7 +84,6 @@ impl FlowStep {
                     root_node_id: workflow.root_node_id,
                     branch_id: workflow.branch_id,
                     node_id: workflow.node_id,
-                    workflow_id: workflow.id,
                     id,
                     workflow: Some(workflow.clone()),
                     flow_step_id: Some(flow_step_id),

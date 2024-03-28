@@ -30,7 +30,7 @@ use std::collections::HashSet;
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_node_id, branch_id],
-    clustering_keys = [node_id, workflow_id, id],
+    clustering_keys = [node_id, id],
     local_secondary_indexes = [id, main_id]
 )]
 #[derive(Branchable, Serialize, Deserialize, Default)]
@@ -44,9 +44,6 @@ pub struct Io {
 
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "workflowId")]
-    pub workflow_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -108,8 +105,7 @@ impl Callbacks for Io {
                 Flow::find_or_insert_branched(db_session, &params, fs.flow_id).await?;
             }
 
-            Workflow::find_or_insert_branched(db_session, &params, self.workflow_id).await?;
-
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateIo(self.id)).await?;
         }
 
@@ -122,6 +118,7 @@ impl Callbacks for Io {
         self.pull_from_next_workflow_step(data).await?;
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
         }
 
@@ -281,7 +278,6 @@ partial_io!(
     root_node_id,
     node_id,
     branch_id,
-    workflow_id,
     id,
     main_id,
     title,
@@ -297,6 +293,7 @@ impl Callbacks for UpdateTitleIo {
 
         if self.is_branched() {
             self.as_native().create_branched_if_original_exists(data).await?;
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
         }
 
@@ -323,14 +320,6 @@ impl UpdateTitleIo {
     }
 }
 
-partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, branch_id, workflow_id, id);
+partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, branch_id, id);
 
-partial_io!(
-    DeleteIo,
-    root_node_id,
-    node_id,
-    branch_id,
-    workflow_id,
-    id,
-    flow_step_id
-);
+partial_io!(DeleteIo, root_node_id, node_id, branch_id, id, flow_step_id);

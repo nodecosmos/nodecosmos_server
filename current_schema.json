@@ -459,7 +459,7 @@
         "owner_id": "uuid",
         "created_workflows": "set<uuid>",
         "created_flow_step_nodes": "frozen<map<uuid, frozen<set<uuid>>>>",
-        "edited_nodes_descriptions": "set<uuid>",
+        "edited_node_descriptions": "set<uuid>",
         "is_public": "boolean",
         "restored_nodes": "set<uuid>",
         "created_flow_steps": "set<uuid>",

@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 #[charybdis_model(
     table_name = flow_steps,
     partition_keys = [node_id, branch_id],
-    clustering_keys = [workflow_id, flow_id, flow_index, id],
+    clustering_keys = [flow_id, flow_index, id],
     local_secondary_indexes = [id]
 )]
 #[derive(Branchable, Id, Serialize, Deserialize, Default, Clone)]
@@ -38,9 +38,6 @@ pub struct FlowStep {
 
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "workflowId")]
-    pub workflow_id: Uuid,
 
     #[serde(rename = "flowId")]
     pub flow_id: Uuid,
@@ -101,9 +98,8 @@ impl Callbacks for FlowStep {
                 branch_id: self.branch_id,
             };
 
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Flow::find_or_insert_branched(db_session, &params, self.flow_id).await?;
-            Workflow::find_or_insert_branched(db_session, &params, self.workflow_id).await?;
-
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }
 
@@ -116,6 +112,7 @@ impl Callbacks for FlowStep {
         self.sync_surrounding_fs_on_del(data).await?;
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
         }
 
@@ -187,19 +184,15 @@ impl FlowStep {
     pub async fn find_by_flow(
         db_session: &CachingSession,
         params: &WorkflowParams,
-        workflow_id: Uuid,
         flow_id: Uuid,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         if params.is_original() {
-            return find_flow_step!(
-                "node_id = ? AND branch_id = ? AND workflow_id = ? AND flow_id = ?",
-                (params.node_id, params.branch_id, workflow_id, flow_id)
-            )
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from);
+            return FlowStep::find_by_node_id_and_branch_id_and_flow_id(params.node_id, params.branch_id, flow_id)
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await
+                .map_err(NodecosmosError::from);
         }
 
         let flow_steps = FlowStep::branched(db_session, params)
@@ -292,7 +285,6 @@ partial_flow_step!(
     SiblingFlowStep,
     node_id,
     branch_id,
-    workflow_id,
     flow_id,
     flow_index,
     id,
@@ -311,7 +303,6 @@ partial_flow_step!(
     UpdateInputIdsFlowStep,
     node_id,
     branch_id,
-    workflow_id,
     flow_id,
     flow_index,
     id,
@@ -327,6 +318,7 @@ impl Callbacks for UpdateInputIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
                 data.db_session(),
                 &WorkflowParams {
@@ -348,7 +340,6 @@ partial_flow_step!(
     UpdateOutputIdsFlowStep,
     node_id,
     branch_id,
-    workflow_id,
     flow_id,
     flow_index,
     id,
@@ -364,6 +355,7 @@ impl Callbacks for UpdateOutputIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
                 data.db_session(),
                 &WorkflowParams {
@@ -385,7 +377,6 @@ partial_flow_step!(
     UpdateNodeIdsFlowStep,
     node_id,
     branch_id,
-    workflow_id,
     flow_id,
     flow_index,
     id,
@@ -401,6 +392,7 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         self.updated_at = Some(chrono::Utc::now());
 
         if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
                 data.db_session(),
                 &WorkflowParams {
@@ -428,4 +420,4 @@ impl Callbacks for UpdateNodeIdsFlowStep {
     }
 }
 
-partial_flow_step!(DeleteFlowStep, node_id, branch_id, workflow_id, flow_id, flow_index, id);
+partial_flow_step!(DeleteFlowStep, node_id, branch_id, flow_id, flow_index, id);

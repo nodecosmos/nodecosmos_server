@@ -6,8 +6,8 @@ use crate::models::input_output::Io;
 use crate::models::node::AuthNode;
 use crate::models::traits::Branchable;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
-use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use actix_web::{get, post, put, web, HttpResponse};
+use charybdis::operations::{InsertWithCallbacks, Update, UpdateWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::Uuid;
 use nodecosmos_macros::Branchable;
@@ -85,31 +85,10 @@ pub async fn update_initial_inputs(
 }
 
 #[put("/title")]
-pub async fn update_workflow_title(data: RequestData, mut workflow: web::Json<UpdateWorkflowTitle>) -> Response {
+pub async fn update_workflow_title(data: RequestData, workflow: web::Json<UpdateWorkflowTitle>) -> Response {
     AuthNode::auth_update(&data, workflow.node_id, workflow.branch_id).await?;
 
-    workflow.update_cb(&data).execute(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(workflow))
-}
-
-#[derive(Deserialize)]
-pub struct DeleteWfParams {
-    node_id: Uuid,
-    branch_id: Uuid,
-    workflow_id: Uuid,
-}
-
-#[delete("/{node_id}/{branch_id}/{workflow_id}")]
-pub async fn delete_workflow(data: RequestData, params: web::Path<DeleteWfParams>) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.branch_id).await?;
-
-    let mut workflow =
-        Workflow::find_by_node_id_and_branch_id_and_id(params.node_id, params.branch_id, params.workflow_id)
-            .execute(data.db_session())
-            .await?;
-
-    workflow.delete_cb(&data).execute(data.db_session()).await?;
+    workflow.update().execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(workflow))
 }

@@ -9,7 +9,6 @@ impl Workflow {
         let mut maybe_original = Workflow {
             node_id: self.node_id,
             branch_id: self.original_id(),
-            id: self.id,
             ..Default::default()
         }
         .maybe_find_by_primary_key()
