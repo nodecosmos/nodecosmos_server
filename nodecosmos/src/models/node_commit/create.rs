@@ -54,7 +54,6 @@ impl NodeCommit {
             prev_commit_branch_id: None,
             user_id: Some(user_id),
             node_title: node.title.clone(),
-            node_creator_id: node.creator_id,
             node_created_at: node.created_at,
             description_commit_id: None,
             node_tree_position_commit_id: tree_position_commit.id,

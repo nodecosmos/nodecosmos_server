@@ -44,8 +44,8 @@ impl Likeable for NodeCounter {
         let mut node = UpdateLikesCountNode {
             id,
             branch_id,
-            like_count: Some(lc),
-            updated_at: Some(chrono::Utc::now()),
+            like_count: lc as i32,
+            updated_at: chrono::Utc::now(),
         };
 
         node.update_cb(data).execute(data.db_session()).await?;
@@ -67,8 +67,8 @@ impl Likeable for NodeCounter {
         let mut node = UpdateLikesCountNode {
             id,
             branch_id,
-            like_count: Some(lc),
-            updated_at: Some(chrono::Utc::now()),
+            like_count: lc as i32,
+            updated_at: chrono::Utc::now(),
         };
 
         node.update_cb(data).execute(data.db_session()).await?;

@@ -15,12 +15,11 @@ use crate::models::branch::AuthBranch;
 use crate::models::node::context::Context;
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
-use crate::models::utils::defaults::default_to_opt_0;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
-use charybdis::types::{BigInt, Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Double, Frozen, Int, Set, Text, Timestamp, Uuid};
 use futures::TryFutureExt;
 use log::error;
 use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
@@ -49,9 +48,6 @@ pub struct Node {
     #[serde(default, rename = "rootId")]
     pub root_id: Uuid,
 
-    #[serde(rename = "versionId")]
-    pub version_id: Option<Uuid>,
-
     #[serde(rename = "isPublic", default)]
     pub is_public: Boolean,
 
@@ -72,19 +68,13 @@ pub struct Node {
     #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
 
-    #[serde(rename = "ownerType")]
-    pub profile_type: Option<Text>,
-
-    #[serde(rename = "creatorId")]
-    pub creator_id: Option<Uuid>,
+    pub owner: Option<Frozen<Profile>>,
 
     #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    pub owner: Option<Frozen<Profile>>,
-
-    #[serde(rename = "likesCount", default = "default_to_opt_0")]
-    pub like_count: Option<BigInt>,
+    #[serde(rename = "likesCount", default)]
+    pub like_count: Int,
 
     #[serde(rename = "coverImageKey")]
     pub cover_image_filename: Option<Text>,
@@ -92,11 +82,11 @@ pub struct Node {
     #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -323,7 +313,6 @@ impl Callbacks for UpdateTitleNode {
         }
 
         self.update_branch(&data).await?;
-        self.updated_at = Some(chrono::Utc::now());
 
         Ok(())
     }
@@ -375,16 +364,6 @@ macro_rules! impl_node_updated_at_with_elastic_ext_cb {
         impl charybdis::callbacks::Callbacks for $struct_name {
             type Extension = crate::api::data::RequestData;
             type Error = crate::errors::NodecosmosError;
-
-            async fn before_update(
-                &mut self,
-                _db_session: &CachingSession,
-                _data: &Self::Extension,
-            ) -> Result<(), NodecosmosError> {
-                self.updated_at = Some(chrono::Utc::now());
-
-                Ok(())
-            }
 
             async fn after_update(
                 &mut self,

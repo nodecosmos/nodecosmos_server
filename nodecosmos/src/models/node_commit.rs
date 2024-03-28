@@ -49,11 +49,8 @@ pub struct NodeCommit {
     #[serde(rename = "nodeTitle")]
     pub node_title: Text,
 
-    #[serde(rename = "nodeCreatorId")]
-    pub node_creator_id: Option<Uuid>,
-
     #[serde(rename = "nodeCreatedAt")]
-    pub node_created_at: Option<Timestamp>,
+    pub node_created_at: Timestamp,
 
     #[serde(rename = "descriptionCommitId")]
     pub description_commit_id: Option<Uuid>,

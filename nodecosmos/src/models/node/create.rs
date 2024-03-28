@@ -15,7 +15,6 @@ use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert, InsertWithCallbacks};
 use charybdis::options::Consistency;
 use charybdis::types::{Set, Uuid};
-use chrono::Utc;
 use elasticsearch::Elasticsearch;
 use futures::{stream, StreamExt, TryFutureExt};
 use log::error;
@@ -28,14 +27,12 @@ impl Node {
             let owner = Profile::init_from_current_user(current_user);
 
             self.owner_id = Some(owner.id);
-            self.profile_type = Some(owner.profile_type.clone());
 
             self.owner = Some(owner);
         } else {
             if let Some(parent) = self.parent(data.db_session()).await? {
                 if let Some(owner) = parent.owner.clone() {
                     self.owner_id = Some(owner.id);
-                    self.profile_type = Some(owner.profile_type.clone());
 
                     self.owner = Some(owner);
                 } else {
@@ -83,11 +80,6 @@ impl Node {
             self.branch_id = self.id;
         }
 
-        let now = Utc::now();
-
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
         Ok(())
     }
 
@@ -115,13 +107,6 @@ impl Node {
         if self.owner_id.is_none() || self.owner.is_none() {
             return Err(NodecosmosError::ValidationError((
                 "owner_id".to_string(),
-                "must be present".to_string(),
-            )));
-        }
-
-        if self.profile_type.is_none() {
-            return Err(NodecosmosError::ValidationError((
-                "profile_type".to_string(),
                 "must be present".to_string(),
             )));
         }

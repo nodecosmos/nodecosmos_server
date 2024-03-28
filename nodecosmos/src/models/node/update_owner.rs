@@ -17,7 +17,7 @@ impl UpdateOwnerNode {
             branch_id: nodes_by_owner.branch_id,
             owner_id: Some(nodes_by_owner.owner_id),
             owner: Some(owner),
-            updated_at: Some(chrono::Utc::now()),
+            updated_at: chrono::Utc::now(),
         }
     }
 

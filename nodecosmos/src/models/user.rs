@@ -5,7 +5,6 @@ use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
-use crate::models::utils::defaults::default_to_false;
 use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -26,7 +25,7 @@ const BCRYPT_COST: u32 = 6;
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct User {
-    #[serde(default = "Uuid::new_v4")]
+    #[serde(default)]
     pub id: Uuid,
 
     pub username: Text,
@@ -49,17 +48,17 @@ pub struct User {
     #[serde(rename = "profileImageURL")]
     pub profile_image_url: Option<Text>,
 
-    #[serde(rename = "isConfirmed", default = "default_to_false")]
+    #[serde(rename = "isConfirmed", default)]
     pub is_confirmed: Boolean,
 
-    #[serde(rename = "isBlocked", default = "default_to_false")]
+    #[serde(rename = "isBlocked", default)]
     pub is_blocked: Boolean,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 }
 
 impl Callbacks for User {
@@ -69,7 +68,8 @@ impl Callbacks for User {
     async fn before_insert(&mut self, db_session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
         self.check_existing_user(db_session).await?;
 
-        self.set_defaults();
+        self.id = Uuid::new_v4();
+
         self.set_password()?;
 
         Ok(())
@@ -78,11 +78,6 @@ impl Callbacks for User {
     async fn after_insert(&mut self, _db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
         self.add_elastic_document(&app.elastic_client).await;
 
-        Ok(())
-    }
-
-    async fn before_update(&mut self, _: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(Utc::now());
         Ok(())
     }
 
@@ -133,14 +128,6 @@ impl User {
         Ok(res)
     }
 
-    fn set_defaults(&mut self) {
-        let now = Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-    }
-
     fn set_password(&mut self) -> Result<(), NodecosmosError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
             println!("{}", "error hashing password".bright_red().bold());
@@ -165,7 +152,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
                 _session: &charybdis::CachingSession,
                 _ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
-                self.updated_at = Some(Utc::now());
+                self.updated_at = Utc::now();
 
                 Ok(())
             }
@@ -256,7 +243,6 @@ impl Callbacks for UpdateBioUser {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(Utc::now());
         self.bio.sanitize()?;
 
         Ok(())

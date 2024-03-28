@@ -299,7 +299,6 @@ impl BranchMerge {
                 merge_node.ctx = Context::Merge;
                 merge_node.branch_id = merge_node.id;
                 merge_node.owner_id = node.owner_id;
-                merge_node.profile_type = node.profile_type.clone();
                 merge_node.editor_ids = node.editor_ids.clone();
                 merge_node
                     .insert_cb(data)
