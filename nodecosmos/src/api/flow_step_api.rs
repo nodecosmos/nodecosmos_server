@@ -1,9 +1,11 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::api::WorkflowParams;
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::node::AuthNode;
+use crate::models::traits::FindOrInsertBranchedFromParams;
 use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 
 const LOCKER_TTL: usize = 1000 * 10; // 10 seconds
 
@@ -58,12 +60,22 @@ pub async fn update_flow_step_inputs(data: RequestData, mut flow_step: web::Json
 }
 
 #[delete("{nodeId}/{branchId}/{workflowId}/{flowId}/{flowIndex}/{id}")]
-pub async fn delete_flow_step(data: RequestData, mut flow_step: web::Path<FlowStep>) -> Response {
+pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 
     data.resource_locker()
         .lock_resource(flow_step.flow_id, flow_step.branch_id, LOCKER_TTL)
         .await?;
+
+    let mut flow_step = FlowStep::find_or_insert_branched(
+        data.db_session(),
+        &WorkflowParams {
+            node_id: flow_step.node_id,
+            branch_id: flow_step.branch_id,
+        },
+        flow_step.id,
+    )
+    .await?;
 
     flow_step.delete_cb(&data).execute(data.db_session()).await?;
 
@@ -71,5 +83,5 @@ pub async fn delete_flow_step(data: RequestData, mut flow_step: web::Path<FlowSt
         .unlock_resource(flow_step.flow_id, flow_step.branch_id)
         .await?;
 
-    Ok(HttpResponse::Ok().json(flow_step.into_inner()))
+    Ok(HttpResponse::Ok().json(flow_step))
 }

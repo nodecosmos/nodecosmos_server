@@ -99,27 +99,19 @@ impl FlowStep {
         Ok(())
     }
 
-    // syncs the prev and next flow steps when a new flow step is deleted
+    // syncs the prev and next flow steps when a flow step is deleted
     pub async fn sync_surrounding_fs_on_del(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let mut prev_flow_step = self.prev_flow_step(data.db_session()).await?;
         let mut next_flow_step = self.next_flow_step(data.db_session()).await?;
 
         if let Some(prev_flow_step) = prev_flow_step.as_mut() {
             prev_flow_step.next_flow_step_id = self.next_flow_step_id;
-            prev_flow_step
-                .as_native()
-                .update_cb(data)
-                .execute(data.db_session())
-                .await?;
+            prev_flow_step.update_cb(&None).execute(data.db_session()).await?;
         }
 
         if let Some(next_flow_step) = next_flow_step.as_mut() {
             next_flow_step.prev_flow_step_id = self.prev_flow_step_id;
-            next_flow_step
-                .as_native()
-                .update_cb(data)
-                .execute(data.db_session())
-                .await?;
+            next_flow_step.update_cb(&None).execute(data.db_session()).await?;
         }
 
         Ok(())

@@ -133,7 +133,7 @@ impl<'a> Recovery<'a> {
         let now = std::time::Instant::now();
 
         NodeDescendant::unlogged_batch()
-            .chunked_insert(self.db_session, &self.reorder_data.tree_descendants.clone(), 100)
+            .chunked_insert(self.db_session, &self.reorder_data.tree_descendants, 100)
             .await
             .map_err(|err| {
                 error!("restore_tree_descendants: {}", err);

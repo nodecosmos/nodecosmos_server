@@ -113,7 +113,7 @@ impl<'a> Reorder<'a> {
 
         update_order_node
             .update()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .execute(&self.db_session)
             .await?;
 
@@ -137,7 +137,7 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
@@ -167,7 +167,7 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_delete(&self.db_session, &descendants_to_delete, 100)
             .await
             .map_err(|err| {
@@ -196,7 +196,7 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_insert(&self.db_session, &descendants_to_add, 100)
             .await
             .map_err(|err| {
@@ -227,7 +227,7 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_insert(&self.db_session, &descendants, 100)
             .await
             .map_err(|err| {
@@ -262,7 +262,7 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {
@@ -302,7 +302,7 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
             .await
             .map_err(|err| {

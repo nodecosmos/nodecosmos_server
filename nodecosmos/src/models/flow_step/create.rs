@@ -65,9 +65,11 @@ impl FlowStep {
             },
             (Some(prev_flow_step), None) => {
                 if prev_flow_step.next_flow_step_id.is_some() {
-                    return Err(NodecosmosError::Conflict(
-                        "The previous flow step's next flow step id is not null".to_string(),
-                    ));
+                    return Err(NodecosmosError::InternalServerError(format!(
+                        "The previous flow step's next flow step id is not null. \
+                         BranchId: {:?} Prev id: {:?}  next id: {:?} ",
+                        self.branch_id, prev_flow_step.id, prev_flow_step.next_flow_step_id
+                    )));
                 }
             }
             (None, Some(next_flow_step)) => {

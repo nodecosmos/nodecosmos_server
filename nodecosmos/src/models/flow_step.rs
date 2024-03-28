@@ -12,6 +12,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
+use crate::models::utils::impl_updated_at_cb;
 use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -303,6 +304,8 @@ partial_flow_step!(
     created_at,
     updated_at
 );
+
+impl_updated_at_cb!(SiblingFlowStep);
 
 partial_flow_step!(
     UpdateInputIdsFlowStep,

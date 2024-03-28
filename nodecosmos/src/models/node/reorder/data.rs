@@ -49,13 +49,13 @@ impl ReorderData {
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         return if params.is_branched() {
-            node.descendants(&db_session, Some(Consistency::All))
+            node.branch_descendants(&db_session, Some(Consistency::Quorum)).await
+        } else {
+            node.descendants(&db_session, Some(Consistency::Quorum))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
-        } else {
-            node.branch_descendants(&db_session, Some(Consistency::All)).await
         };
     }
 
@@ -97,13 +97,15 @@ impl ReorderData {
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         if params.is_branched() {
             tree_root
-                .descendants(&db_session, Some(Consistency::All))
+                .branch_descendants(&db_session, Some(Consistency::Quorum))
+                .await
+        } else {
+            tree_root
+                .descendants(&db_session, Some(Consistency::Quorum))
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
-        } else {
-            tree_root.branch_descendants(&db_session, Some(Consistency::All)).await
         }
     }
 
@@ -114,7 +116,8 @@ impl ReorderData {
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
         if let Some(id) = id {
             let node =
-                GetStructureNode::find_branched_or_original(&db_session, id, branch_id, Some(Consistency::All)).await?;
+                GetStructureNode::find_branched_or_original(&db_session, id, branch_id, Some(Consistency::Quorum))
+                    .await?;
 
             return Ok(Some(node));
         }
@@ -182,7 +185,7 @@ impl ReorderData {
     }
 
     pub async fn from_params(params: &ReorderParams, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, Some(Consistency::All)).await?;
+        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, Some(Consistency::Quorum)).await?;
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 
