@@ -7,6 +7,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::input_output::Io;
 use crate::models::node::Node;
+use crate::models::traits::context::Context;
 use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
 use crate::models::workflow::diagram::WorkflowDiagram;
@@ -40,8 +41,8 @@ pub struct Workflow {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(rename = "rootNodeId")]
-    pub root_node_id: Uuid,
+    #[serde(rename = "rootId")]
+    pub root_id: Uuid,
 
     pub title: Option<Text>,
 
@@ -57,6 +58,10 @@ pub struct Workflow {
 
     #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub ctx: Context,
 }
 
 impl Callbacks for Workflow {
@@ -109,7 +114,7 @@ impl Workflow {
     pub async fn input_outputs(&self, db_session: &CachingSession) -> Result<Vec<Io>, NodecosmosError> {
         Io::branched(
             db_session,
-            self.root_node_id,
+            self.root_id,
             &WorkflowParams {
                 node_id: self.node_id,
                 branch_id: self.branch_id,
@@ -156,8 +161,6 @@ impl Callbacks for UpdateInitialInputsWorkflow {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = chrono::Utc::now();
-
         if self.is_branched() {
             self.update_branch(data).await?;
         }

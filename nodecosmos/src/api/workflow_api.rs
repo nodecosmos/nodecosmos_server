@@ -29,7 +29,7 @@ pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Pa
     let workflow = Workflow::branched(&db_session, &params).await?;
     let flows = Flow::branched(&db_session, &params).await?;
     let flow_steps = FlowStep::branched(&db_session, &params).await?;
-    let input_outputs = Io::branched(&db_session, workflow.root_node_id, &params).await?;
+    let input_outputs = Io::branched(&db_session, workflow.root_id, &params).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,

@@ -6,8 +6,8 @@ use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::node::Parent;
+use crate::models::traits::ref_cloned::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
@@ -141,6 +141,8 @@ impl Node {
                     self.id, e
                 );
 
+                self.remove_from_ancestors(db_session).await?;
+
                 return Err(NodecosmosError::from(e));
             }
         }
@@ -190,7 +192,7 @@ impl Node {
         if self.is_branched() {
             let mut futures = vec![];
 
-            for ancestor_id in self.ancestor_ids.cloned_ref() {
+            for ancestor_id in self.ancestor_ids.ref_cloned() {
                 let ancestor = Node {
                     id: ancestor_id,
                     branch_id: self.branch_id,
@@ -351,7 +353,7 @@ impl Node {
 
     pub async fn create_workflow(&self, data: &RequestData) {
         let _ = Workflow {
-            root_node_id: self.root_id,
+            root_id: self.root_id,
             node_id: self.id,
             branch_id: self.branch_id,
             title: Some(format!("{} Workflow", self.title)),
@@ -370,15 +372,6 @@ impl Node {
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
-        }
-
-        Ok(())
-    }
-
-    #[allow(unused)]
-    pub async fn undo_update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::undo_update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
         }
 
         Ok(())

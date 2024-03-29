@@ -28,4 +28,13 @@ pub struct Conflict {
 
     #[serde(rename = "deletedEditedNodes")]
     pub deleted_edited_nodes: Option<Frozen<Set<Uuid>>>,
+
+    #[serde(rename = "deletedEditedFlows")]
+    pub deleted_edited_flows: Option<Frozen<Set<Uuid>>>,
+
+    #[serde(rename = "deletedEditedFlowSteps")]
+    pub deleted_edited_flow_steps: Option<Frozen<Set<Uuid>>>,
+
+    #[serde(rename = "deletedEditedFlowStepItems")]
+    pub deleted_edited_ios: Option<Frozen<Set<Uuid>>>,
 }

@@ -37,6 +37,9 @@ pub trait Branchable {
 
         Ok(branch)
     }
+
+    /// Sets the branch_id to the original_id
+    fn set_original_id(&mut self);
 }
 
 impl Branchable for ReorderData {
@@ -47,4 +50,6 @@ impl Branchable for ReorderData {
     fn branch_id(&self) -> Uuid {
         self.branch_id
     }
+
+    fn set_original_id(&mut self) {}
 }

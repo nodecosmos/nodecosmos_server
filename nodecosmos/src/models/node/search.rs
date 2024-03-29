@@ -42,7 +42,7 @@ pub struct IndexNode {
     #[serde(rename = "isPublic")]
     pub is_public: bool,
 
-    #[serde(rename = "createdAt")]
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     pub owner: Profile,

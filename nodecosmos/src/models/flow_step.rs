@@ -11,6 +11,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
+use crate::models::traits::context::Context;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
 use crate::models::utils::impl_updated_at_cb;
 use crate::models::workflow::Workflow;
@@ -63,11 +64,11 @@ pub struct FlowStep {
     #[serde(rename = "nextFlowStepId")]
     pub next_flow_step_id: Option<Uuid>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 
     #[serde(skip)]
     #[charybdis(ignore)]
@@ -80,6 +81,10 @@ pub struct FlowStep {
     #[serde(skip)]
     #[charybdis(ignore)]
     pub next_flow_step: Option<SiblingFlowStep>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub ctx: Context,
 }
 
 impl Callbacks for FlowStep {
@@ -91,17 +96,7 @@ impl Callbacks for FlowStep {
         self.validate_conflicts(db_session).await?;
         self.calculate_index(db_session).await?;
         self.sync_surrounding_fs_on_creation(data).await?;
-
-        if self.is_branched() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
-
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Flow::find_or_insert_branched(db_session, &params, self.flow_id).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
-        }
+        self.update_branch_with_creation(data).await?;
 
         Ok(())
     }
@@ -110,19 +105,13 @@ impl Callbacks for FlowStep {
         self.pull_outputs_from_next_workflow_step(data).await?;
         self.delete_fs_outputs(data).await?;
         self.sync_surrounding_fs_on_del(data).await?;
-
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
-        }
+        self.update_branch_with_deletion(data).await?;
 
         Ok(())
     }
 
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        if self.is_branched() {
-            self.create_branched_if_original_exists(data).await?;
-        }
+        self.create_branched_if_original_exists(data).await?;
 
         Ok(())
     }
@@ -294,7 +283,8 @@ partial_flow_step!(
     prev_flow_step_id,
     next_flow_step_id,
     created_at,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl_updated_at_cb!(SiblingFlowStep);
@@ -307,7 +297,8 @@ partial_flow_step!(
     flow_index,
     id,
     input_ids_by_node_id,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl Callbacks for UpdateInputIdsFlowStep {
@@ -315,8 +306,6 @@ impl Callbacks for UpdateInputIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
@@ -344,7 +333,8 @@ partial_flow_step!(
     flow_index,
     id,
     output_ids_by_node_id,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl Callbacks for UpdateOutputIdsFlowStep {
@@ -352,8 +342,6 @@ impl Callbacks for UpdateOutputIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
@@ -381,7 +369,8 @@ partial_flow_step!(
     flow_index,
     id,
     node_ids,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl Callbacks for UpdateNodeIdsFlowStep {
@@ -389,8 +378,6 @@ impl Callbacks for UpdateNodeIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(

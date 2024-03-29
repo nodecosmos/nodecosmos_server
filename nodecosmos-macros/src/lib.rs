@@ -61,6 +61,10 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
                 fn branch_id(&self) -> Uuid {
                     self.branch_id
                 }
+
+                fn set_original_id(&mut self) {
+                    self.branch_id = self.original_id();
+                }
             }
         };
 

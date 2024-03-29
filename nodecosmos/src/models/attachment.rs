@@ -34,11 +34,11 @@ pub struct Attachment {
     #[serde(rename = "userId")]
     pub user_id: Option<Uuid>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 }
 
 impl Attachment {

@@ -1,18 +1,18 @@
 pub mod create;
+mod update_title;
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
+use crate::models::traits::context::Context;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
-use charybdis::types::{Double, Int, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::Branchable;
+use nodecosmos_macros::{Branchable, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -23,7 +23,7 @@ use std::collections::HashSet;
     clustering_keys = [vertical_index, start_index, id],
     local_secondary_indexes = [id]
 )]
-#[derive(Branchable, Serialize, Deserialize, Default, Clone)]
+#[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
 pub struct Flow {
     #[serde(rename = "nodeId")]
     #[branch(original_id)]
@@ -43,13 +43,17 @@ pub struct Flow {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    pub title: Option<Text>,
+    pub title: Text,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub ctx: Context,
 }
 
 impl Callbacks for Flow {
@@ -57,25 +61,15 @@ impl Callbacks for Flow {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let now = chrono::Utc::now();
-
         self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
 
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
-        }
+        self.update_branch_with_creation(data).await?;
 
         Ok(())
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
-        }
+        self.update_branch_with_deletion(data).await?;
 
         let flow_steps = self.flow_steps(db_session).await?;
 
@@ -89,9 +83,7 @@ impl Callbacks for Flow {
     }
 
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        if self.is_branched() {
-            self.create_branched_if_original_exists(data).await?;
-        }
+        self.create_branched_if_original_exists(data).await?;
 
         Ok(())
     }
@@ -160,7 +152,8 @@ partial_flow!(
     vertical_index,
     id,
     title,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl Callbacks for UpdateTitleFlow {
@@ -168,21 +161,7 @@ impl Callbacks for UpdateTitleFlow {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Flow::find_or_insert_branched(
-                data.db_session(),
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.id,
-            )
-            .await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditFlowTitle(self.id)).await?;
-        }
+        self.update_branch(data).await?;
 
         Ok(())
     }

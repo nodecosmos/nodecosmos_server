@@ -5,39 +5,36 @@ mod update_title;
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
-use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
+use crate::models::traits::context::Context;
 use crate::models::traits::node::FindBranched;
-use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::traits::Branchable;
 use crate::models::udts::Property;
 use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::model::AsNative;
 use charybdis::operations::Insert;
-use charybdis::types::{Frozen, List, Text, Timestamp, Uuid};
+use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::Branchable;
+use nodecosmos_macros::{Branchable, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-/// Ios are grouped by `root_node_id`, so they are accessible to all workflows within a same root node.
-/// Original Ios are the ones where `branch_id` == `root_node_id`.
+/// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node.
+/// Original Ios are the ones where `branch_id` == `root_id`.
 #[charybdis_model(
     table_name = input_outputs,
-    partition_keys = [root_node_id, branch_id],
+    partition_keys = [root_id, branch_id],
     clustering_keys = [node_id, id],
     local_secondary_indexes = [id, main_id]
 )]
-#[derive(Branchable, Serialize, Deserialize, Default)]
+#[derive(Id, Branchable, Serialize, Deserialize, Default)]
 pub struct Io {
-    #[serde(rename = "rootNodeId")]
+    #[serde(rename = "rootId")]
     #[branch(original_id)]
-    pub root_node_id: Uuid,
+    pub root_id: Uuid,
 
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
@@ -66,11 +63,11 @@ pub struct Io {
 
     pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -83,6 +80,10 @@ pub struct Io {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub node: Option<Node>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub ctx: Context,
 }
 
 impl Callbacks for Io {
@@ -90,23 +91,11 @@ impl Callbacks for Io {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.validate_root_node_id(db_session).await?;
-        self.set_defaults();
-        self.copy_vals_from_main(db_session).await?;
-
-        if self.is_branched() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
-
-            if let Some(flow_step_id) = self.flow_step_id {
-                let fs = FlowStep::find_or_insert_branched(db_session, &params, flow_step_id).await?;
-                Flow::find_or_insert_branched(db_session, &params, fs.flow_id).await?;
-            }
-
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateIo(self.id)).await?;
+        if self.ctx.is_default() {
+            self.validate_root_id(db_session).await?;
+            self.set_defaults();
+            self.copy_vals_from_main(db_session).await?;
+            self.update_branch_with_creation(data).await?;
         }
 
         Ok(())
@@ -116,19 +105,13 @@ impl Callbacks for Io {
         self.pull_from_initial_input_ids(db_session).await?;
         self.pull_form_flow_step_outputs(data).await?;
         self.pull_from_next_workflow_step(data).await?;
-
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
-        }
+        self.update_branch_with_deletion(data).await?;
 
         Ok(())
     }
 
-    async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        if self.is_branched() {
-            self.create_branched_if_original_exists(data).await?;
-        }
+    async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.create_branched_if_original_exists(data).await?;
 
         Ok(())
     }
@@ -137,17 +120,17 @@ impl Callbacks for Io {
 impl Io {
     pub async fn branched(
         db_session: &CachingSession,
-        root_node_id: Uuid,
+        root_id: Uuid,
         params: &WorkflowParams,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let mut ios = Self::find_by_root_node_id_and_branch_id(root_node_id, params.branch_id)
+        let mut ios = Self::find_by_root_id_and_branch_id(root_id, params.branch_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(ios.try_collect().await?)
         } else {
-            let mut original_ios = Self::find_by_root_node_id_and_branch_id(root_node_id, root_node_id)
+            let mut original_ios = Self::find_by_root_id_and_branch_id(root_id, root_id)
                 .execute(db_session)
                 .await?;
             let mut branched_ios_set = HashSet::new();
@@ -169,6 +152,21 @@ impl Io {
 
             Ok(branch_ios)
         }
+    }
+
+    pub async fn find_by_root_id_and_branch_id_and_ids(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        branch_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Io>, NodecosmosError> {
+        let ios = find_io!("root_id = ? AND branch_id = ? AND id IN ?", (root_id, branch_id, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(ios)
     }
 
     pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
@@ -225,13 +223,9 @@ impl Io {
 
     async fn original_main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(main_id) = self.main_id {
-            let res = Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(
-                self.root_node_id,
-                self.original_id(),
-                main_id,
-            )
-            .execute(db_session)
-            .await?;
+            let res = Self::maybe_find_first_by_root_id_and_branch_id_and_id(self.root_id, self.original_id(), main_id)
+                .execute(db_session)
+                .await?;
 
             Ok(res)
         } else {
@@ -261,10 +255,9 @@ impl Io {
 
     async fn maybe_main(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(main_id) = self.main_id {
-            let res =
-                Self::maybe_find_first_by_root_node_id_and_branch_id_and_id(self.root_node_id, self.branch_id, main_id)
-                    .execute(db_session)
-                    .await?;
+            let res = Self::maybe_find_first_by_root_id_and_branch_id_and_id(self.root_id, self.branch_id, main_id)
+                .execute(db_session)
+                .await?;
 
             return Ok(res);
         }
@@ -275,13 +268,14 @@ impl Io {
 
 partial_io!(
     UpdateTitleIo,
-    root_node_id,
+    root_id,
     node_id,
     branch_id,
     id,
     main_id,
     title,
-    updated_at
+    updated_at,
+    ctx
 );
 
 impl Callbacks for UpdateTitleIo {
@@ -289,14 +283,7 @@ impl Callbacks for UpdateTitleIo {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        self.updated_at = Some(chrono::Utc::now());
-
-        if self.is_branched() {
-            self.as_native().create_branched_if_original_exists(data).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
-        }
-
+        self.update_branch(data).await?;
         self.update_ios_titles_by_main_id(db_session).await?;
 
         Ok(())
@@ -306,11 +293,26 @@ impl Callbacks for UpdateTitleIo {
 impl UpdateTitleIo {
     pub async fn ios_by_main_id(
         db_session: &CachingSession,
-        root_node_id: Uuid,
+        root_id: Uuid,
         branch_id: Uuid,
         main_id: Uuid,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = UpdateTitleIo::find_by_root_node_id_and_branch_id_and_main_id(root_node_id, branch_id, main_id)
+        let ios = UpdateTitleIo::find_by_root_id_and_branch_id_and_main_id(root_id, branch_id, main_id)
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(ios)
+    }
+
+    pub async fn find_by_root_id_and_branch_id_and_ids(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        branch_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let ios = find_update_title_io!("root_id = ? AND branch_id = ? AND id IN ?", (root_id, branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -320,6 +322,6 @@ impl UpdateTitleIo {
     }
 }
 
-partial_io!(UpdateWorkflowIndexIo, root_node_id, node_id, branch_id, id);
+partial_io!(UpdateWorkflowIndexIo, root_id, node_id, branch_id, id);
 
-partial_io!(DeleteIo, root_node_id, node_id, branch_id, id, flow_step_id);
+partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_step_id);

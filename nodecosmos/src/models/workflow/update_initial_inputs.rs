@@ -31,7 +31,7 @@ impl UpdateInitialInputsWorkflow {
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::CreatedWorkflowInitialInputs(added_input_ids),
+                BranchUpdate::CreatedWorkflowInitialInputs(self.node_id, added_input_ids),
             )
             .await?;
 
@@ -49,7 +49,7 @@ impl UpdateInitialInputsWorkflow {
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::DeleteWorkflowInitialInputs(removed_input_ids),
+                BranchUpdate::DeleteWorkflowInitialInputs(self.node_id, removed_input_ids),
             )
             .await?;
         } else {
@@ -57,7 +57,10 @@ impl UpdateInitialInputsWorkflow {
             Branch::update(
                 data,
                 self.branch_id,
-                BranchUpdate::CreatedWorkflowInitialInputs(self.initial_input_ids.clone().unwrap_or_default()),
+                BranchUpdate::CreatedWorkflowInitialInputs(
+                    self.node_id,
+                    self.initial_input_ids.clone().unwrap_or_default(),
+                ),
             )
             .await?;
         }

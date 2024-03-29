@@ -3,8 +3,8 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::node::{Descendants, FindBranched, Parent};
+use crate::models::traits::ref_cloned::RefCloned;
 use crate::models::traits::{Branchable, Pluck};
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
@@ -126,7 +126,7 @@ impl ReorderData {
     }
 
     fn build_new_ancestor_ids(new_parent: &BaseNode) -> Set<Uuid> {
-        let mut new_ancestors = new_parent.ancestor_ids.cloned_ref();
+        let mut new_ancestors = new_parent.ancestor_ids.ref_cloned();
 
         new_ancestors.insert(new_parent.id);
 
@@ -192,7 +192,7 @@ impl ReorderData {
         let old_parent_id = node.parent_id;
         let new_parent = Self::find_new_parent(data.db_session(), params).await?;
 
-        let old_ancestor_ids = node.ancestor_ids.cloned_ref();
+        let old_ancestor_ids = node.ancestor_ids.ref_cloned();
         let new_ancestor_ids = Self::build_new_ancestor_ids(&new_parent);
 
         let removed_ancestor_ids = Self::extract_removed_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);

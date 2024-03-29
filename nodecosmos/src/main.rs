@@ -105,7 +105,17 @@ async fn main() {
                     .service(get_presigned_url)
                     .service(create_attachment),
             )
-            .service(web::scope("branches").service(restore_node).service(undo_delete_node))
+            .service(
+                web::scope("branches")
+                    .service(restore_node)
+                    .service(undo_delete_node)
+                    .service(restore_io)
+                    .service(undo_delete_io)
+                    .service(restore_flow)
+                    .service(undo_delete_flow)
+                    .service(restore_flow_step)
+                    .service(undo_delete_flow_step),
+            )
             .service(
                 web::scope("comments")
                     .service(get_comments)

@@ -32,7 +32,7 @@ pub struct NodeCommit {
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(rename = "createdAt")]
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     pub id: Uuid,

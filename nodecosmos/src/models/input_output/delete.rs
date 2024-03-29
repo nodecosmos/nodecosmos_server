@@ -17,7 +17,7 @@ impl Io {
 
         for output_id in ids.iter() {
             let mut output = Io {
-                root_node_id: workflow.root_node_id,
+                root_id: workflow.root_id,
                 branch_id: workflow.branch_id,
                 node_id: workflow.node_id,
                 id: *output_id,

@@ -6,7 +6,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::udts::Profile;
-use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb};
+use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
@@ -60,11 +60,11 @@ pub struct ContributionRequest {
     pub title: Option<Text>,
     pub description: Option<Text>,
 
-    #[serde(rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 
     #[serde(default = "ContributionRequestStatus::default")]
     pub status: Option<Text>,
@@ -95,11 +95,7 @@ impl Callbacks for ContributionRequest {
         Ok(())
     }
 
-    async fn before_update(&mut self, _: &CachingSession, _: &Self::Extension) -> Result<(), NodecosmosError> {
-        self.updated_at = Some(chrono::Utc::now());
-
-        Ok(())
-    }
+    updated_at_cb_fn!();
 }
 
 impl ContributionRequest {

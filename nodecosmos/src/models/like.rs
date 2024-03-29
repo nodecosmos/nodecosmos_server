@@ -46,10 +46,10 @@ pub struct Like {
     pub username: Text,
 
     #[serde(default, rename = "createdAt")]
-    pub created_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 
     #[serde(default, rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    pub updated_at: Timestamp,
 
     #[serde(skip)]
     #[charybdis(ignore)]

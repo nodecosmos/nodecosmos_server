@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
-#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Copy, Clone, Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ObjectType {
     Node,
     Workflow,
@@ -53,8 +53,8 @@ pub struct Description {
     pub markdown: Option<Text>,
     pub base64: Option<Text>,
 
-    #[serde(rename = "updatedAt")]
-    pub updated_at: Option<Timestamp>,
+    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    pub updated_at: Timestamp,
 }
 
 impl Callbacks for Description {

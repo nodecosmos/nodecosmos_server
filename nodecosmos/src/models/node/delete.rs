@@ -10,9 +10,9 @@ use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::cloned_ref::ClonedRef;
 use crate::models::traits::node::Descendants;
-use crate::models::traits::{Branchable, ElasticDocument};
+use crate::models::traits::ref_cloned::RefCloned;
+use crate::models::traits::{Branchable, ElasticDocument, Pluck};
 use crate::models::workflow::DeleteWorkflow;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Delete;
@@ -44,7 +44,16 @@ impl Node {
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::update(&data, self.branch_id, BranchUpdate::DeleteNode(self.id)).await?;
+            let mut node_ids = vec![self.id];
+            let descendant_ids = self
+                .descendants(data.db_session(), None)
+                .await?
+                .try_collect()
+                .await?
+                .pluck_id();
+            node_ids.extend(descendant_ids);
+
+            Branch::update(&data, self.branch_id, BranchUpdate::DeleteNodes(node_ids)).await?;
         }
 
         Ok(())
@@ -221,7 +230,7 @@ impl<'a> NodeDelete<'a> {
                     .push((self.node.id, order_index));
 
                 let mut delete_stack = vec![parent_id];
-                let mut current_ancestor_ids = self.node.ancestor_ids.cloned_ref();
+                let mut current_ancestor_ids = self.node.ancestor_ids.ref_cloned();
 
                 while let Some(parent_id) = delete_stack.pop() {
                     current_ancestor_ids.insert(parent_id);

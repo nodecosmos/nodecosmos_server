@@ -28,6 +28,6 @@ pub struct FlowStepCommits {
     pub output_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
     pub prev_flow_step_id: Option<Uuid>,
     pub next_flow_step_id: Option<Uuid>,
-    pub created_at: Option<Timestamp>,
-    pub updated_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }

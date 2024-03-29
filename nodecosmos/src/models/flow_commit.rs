@@ -24,6 +24,6 @@ pub struct FlowCommit {
     pub title: Text,
     pub description_commit: Option<Uuid>,
     pub flow_step_ids: Frozen<List<Uuid>>,
-    pub created_at: Option<Timestamp>,
-    pub updated_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }

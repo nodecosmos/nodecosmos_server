@@ -1,7 +1,7 @@
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::{Node, PkNode};
-use crate::models::traits::cloned_ref::ClonedRef;
+use crate::models::traits::ref_cloned::RefCloned;
 use crate::models::traits::Pluck;
 use crate::models::udts::{Conflict, ConflictStatus};
 use charybdis::operations::Update;
@@ -61,9 +61,9 @@ impl<'a> BranchConflict<'a> {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
-        let created_node_ids = self.branch.created_nodes.cloned_ref();
-        let restored_node_ids = self.branch.restored_nodes.cloned_ref();
-        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
+        let created_node_ids = self.branch.created_nodes.ref_cloned();
+        let restored_node_ids = self.branch.restored_nodes.ref_cloned();
+        let deleted_node_ids = self.branch.deleted_nodes.ref_cloned();
         let mut deleted_edited_nodes = HashSet::new();
 
         if let Some(edit_description_node_ids) = &self.branch.edited_description_nodes {
@@ -117,12 +117,12 @@ impl<'a> BranchConflict<'a> {
         db_session: &CachingSession,
         del_anc_node: DelAncNode<'_>,
     ) -> Result<(), NodecosmosError> {
-        let created_node_ids = self.branch.created_nodes.cloned_ref();
-        let restored_node_ids = self.branch.restored_nodes.cloned_ref();
-        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
+        let created_node_ids = self.branch.created_nodes.ref_cloned();
+        let restored_node_ids = self.branch.restored_nodes.ref_cloned();
+        let deleted_node_ids = self.branch.deleted_nodes.ref_cloned();
         let ancestor_id = match del_anc_node {
-            DelAncNode::Node(node) => node.ancestor_ids.cloned_ref(),
-            DelAncNode::PkNode(pk_node) => pk_node.ancestor_ids.cloned_ref(),
+            DelAncNode::Node(node) => node.ancestor_ids.ref_cloned(),
+            DelAncNode::PkNode(pk_node) => pk_node.ancestor_ids.ref_cloned(),
         };
 
         let branch_ancestor_ids = ancestor_id

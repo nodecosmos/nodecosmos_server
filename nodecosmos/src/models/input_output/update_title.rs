@@ -1,4 +1,7 @@
+use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
 use crate::models::input_output::UpdateTitleIo;
 use crate::models::traits::Branchable;
 use charybdis::batch::ModelBatch;
@@ -12,7 +15,7 @@ impl UpdateTitleIo {
                 self.as_native().clone_main_ios_to_branch(db_session).await?;
             }
 
-            let ios = UpdateTitleIo::ios_by_main_id(db_session, self.root_node_id, self.branch_id, main_id).await?;
+            let ios = UpdateTitleIo::ios_by_main_id(db_session, self.root_id, self.branch_id, main_id).await?;
             let mut batch_ios = Vec::with_capacity(ios.len());
 
             for mut io in ios {
@@ -28,6 +31,16 @@ impl UpdateTitleIo {
             UpdateTitleIo::batch()
                 .chunked_update(db_session, &batch_ios, 100)
                 .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            self.as_native().create_branched_if_original_exists(data).await?;
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
+            Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
         }
 
         Ok(())

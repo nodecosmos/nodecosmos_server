@@ -1,5 +1,4 @@
 mod auth;
-pub mod context;
 mod create;
 mod delete;
 pub mod reorder;
@@ -12,7 +11,7 @@ mod update_title;
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
-use crate::models::node::context::Context;
+use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use charybdis::callbacks::Callbacks;
@@ -106,26 +105,16 @@ impl Callbacks for Node {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if &self.ctx != &Context::Merge && &self.ctx != &Context::BranchedInit {
+        if self.is_default_context() {
             self.set_defaults(db_session).await?;
             self.set_owner(data).await?;
             self.validate_root().await?;
             self.validate_owner().await?;
+            self.update_branch_with_creation(data).await?;
         }
 
         self.preserve_ancestors_for_branch(data).await?;
-
-        if let Err(e) = self.append_to_ancestors(db_session).await {
-            self.remove_from_ancestors(db_session).await?;
-            error!("[before_insert] Unexpected error updating branch with creation: {}", e);
-        }
-
-        if self.ctx != Context::BranchedInit {
-            if let Err(e) = self.update_branch_with_creation(data).await {
-                self.remove_from_ancestors(db_session).await?;
-                error!("[before_insert] Unexpected error updating branch with creation: {}", e);
-            }
-        }
+        self.append_to_ancestors(db_session).await?;
 
         Ok(())
     }
@@ -191,7 +180,7 @@ impl Node {
                     .execute(data.db_session())
                     .await?;
 
-                node.ctx = Context::BranchedInit;
+                node.set_branched_init_context();
                 node.branch_id = branch_id;
 
                 node.insert_cb(data)
@@ -300,7 +289,8 @@ partial_node!(
     root_id,
     parent_id,
     parent,
-    auth_branch
+    auth_branch,
+    ctx
 );
 
 impl Callbacks for UpdateTitleNode {
