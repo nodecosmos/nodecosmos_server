@@ -40,3 +40,7 @@ where
         .deserialize_option(OptionVisitor(std::marker::PhantomData))
         .or_else(|err| Err(de::Error::custom(format!("Field is missing from JSON: {}", err))))
 }
+
+pub fn bool_true() -> bool {
+    true
+}

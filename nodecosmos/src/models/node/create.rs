@@ -133,47 +133,12 @@ impl Node {
             }
 
             if let Err(e) = NodeDescendant::batch()
-                .chunked_insert(db_session, &descendants, 100)
+                .append_inserts(&descendants)
+                .execute(db_session)
                 .await
             {
                 error!(
                     "[append_to_ancestors::chunked_insert] Error for node {}: {:?}",
-                    self.id, e
-                );
-
-                self.remove_from_ancestors(db_session).await?;
-
-                return Err(NodecosmosError::from(e));
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn remove_from_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            let mut descendants = Vec::with_capacity(ancestor_ids.len());
-
-            for ancestor_id in ancestor_ids {
-                let node_descendant = NodeDescendant {
-                    root_id: self.root_id,
-                    node_id: *ancestor_id,
-                    id: self.id,
-                    branch_id: self.branchise_id(*ancestor_id),
-                    order_index: self.order_index,
-                    parent_id: self.parent_id.expect("parent_id must be present"),
-                    title: self.title.clone(),
-                };
-
-                descendants.push(node_descendant);
-            }
-
-            if let Err(e) = NodeDescendant::batch()
-                .chunked_delete(db_session, &descendants, 100)
-                .await
-            {
-                error!(
-                    "[remove_from_ancestors::chunked_delete] Error for node {}: {:?}",
                     self.id, e
                 );
 
@@ -250,7 +215,7 @@ impl Node {
                     }
 
                     node.append_to_ancestors(data.db_session()).await?;
-                    node.create_new_version(&data).await;
+                    node.create_commit(&data).await;
                 }
                 Err(e) => {
                     error!("Error finding non-branched node {}: {:?}", self.id, e);
@@ -341,7 +306,7 @@ impl Node {
         }
     }
 
-    pub async fn create_new_version(&self, data: &RequestData) {
+    pub async fn create_commit(&self, data: &RequestData) {
         let _ = NodeCommit::handle_creation(&data.db_session(), &self, data.current_user_id())
             .map_err(|e| {
                 error!("Error creating new version for node {}: {:?}", self.id, e);

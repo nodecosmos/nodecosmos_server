@@ -57,7 +57,7 @@ impl UpdateTitleNode {
         }
     }
 
-    pub async fn create_new_version(&self, data: &RequestData) {
+    pub async fn create_commit(&self, data: &RequestData) {
         let changes = vec![NodeChange::Title(self.title.clone())];
 
         let _ = NodeCommit::handle_change(
@@ -70,7 +70,7 @@ impl UpdateTitleNode {
         )
         .await
         .map_err(|e| {
-            error!("UpdateTitleNode::create_new_version {}", e);
+            error!("UpdateTitleNode::create_commit {}", e);
         });
     }
 }

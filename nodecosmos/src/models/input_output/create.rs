@@ -88,9 +88,7 @@ impl Io {
         .filter(|io| io.main_id == self.main_id)
         .collect();
 
-        let insert_branched_batch = Io::unlogged_batch();
-
-        insert_branched_batch
+        Io::unlogged_batch()
             .chunked_insert_if_not_exist(db_session, &branched, 100)
             .await?;
 

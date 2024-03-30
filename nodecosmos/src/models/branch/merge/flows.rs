@@ -11,10 +11,11 @@ use charybdis::operations::{DeleteWithCallbacks, Insert, InsertWithCallbacks, Up
 use charybdis::types::Uuid;
 use log::warn;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub struct MergeFlows<'a> {
-    branch: &'a Branch,
+#[derive(Serialize, Deserialize)]
+pub struct MergeFlows {
     restored_flows: Option<Vec<Flow>>,
     created_flows: Option<Vec<Flow>>,
     edited_title_flows: Option<Vec<UpdateTitleFlow>>,
@@ -25,7 +26,7 @@ pub struct MergeFlows<'a> {
     description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
-impl<'a> MergeFlows<'a> {
+impl MergeFlows {
     async fn original_title_flows(
         db_session: &CachingSession,
         branch: &Branch,
@@ -163,7 +164,7 @@ impl<'a> MergeFlows<'a> {
         Ok(None)
     }
 
-    pub async fn new(branch: &'a Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
+    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_flows = Self::restored_flows(&branch, data.db_session()).await?;
         let created_flows = Self::created_flows(&branch, data.db_session()).await?;
         let edited_title_flows = Self::edited_title_flows(&branch, data.db_session()).await?;
@@ -172,7 +173,6 @@ impl<'a> MergeFlows<'a> {
         let original_flow_descriptions = Self::original_flow_descriptions(data.db_session(), &branch).await?;
 
         Ok(Self {
-            branch,
             restored_flows,
             created_flows,
             edited_title_flows,
@@ -189,7 +189,7 @@ impl<'a> MergeFlows<'a> {
             for merge_flow in merge_flows {
                 merge_flow.set_merge_context();
                 merge_flow.set_original_id();
-                merge_flow.insert().execute(data.db_session()).await?;
+                merge_flow.insert_cb(data).execute(data.db_session()).await?;
             }
         }
 

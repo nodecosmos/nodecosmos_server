@@ -13,13 +13,14 @@ use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Upda
 use charybdis::types::{Frozen, List, Uuid};
 use log::{error, warn};
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub struct MergeNodes<'a> {
-    branch: &'a Branch,
+#[derive(Serialize, Deserialize)]
+pub struct MergeNodes {
     restored_nodes: Option<Vec<Node>>,
     created_nodes: Option<Vec<Node>>,
-    reordered_nodes_data: Option<Vec<&'a BranchReorderData>>,
+    reordered_nodes_data: Option<Vec<BranchReorderData>>,
     edited_title_nodes: Option<Vec<UpdateTitleNode>>,
     edited_node_descriptions: Option<Vec<Description>>,
     original_title_nodes: Option<HashMap<Uuid, UpdateTitleNode>>,
@@ -28,7 +29,7 @@ pub struct MergeNodes<'a> {
     description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
-impl<'a> MergeNodes<'a> {
+impl MergeNodes {
     pub async fn restored_nodes(
         branch: &Branch,
         db_session: &CachingSession,
@@ -64,8 +65,8 @@ impl<'a> MergeNodes<'a> {
         Ok(None)
     }
 
-    pub fn reordered_nodes_data(branch: &Branch) -> Option<List<Frozen<&BranchReorderData>>> {
-        if let Some(reordered_nodes) = &branch.reordered_nodes {
+    pub fn reordered_nodes_data(branch: &Branch) -> Option<List<Frozen<BranchReorderData>>> {
+        if let Some(reordered_nodes) = branch.reordered_nodes.ref_cloned() {
             Some(
                 reordered_nodes
                     .into_iter()
@@ -167,7 +168,7 @@ impl<'a> MergeNodes<'a> {
         Ok(None)
     }
 
-    pub async fn new(branch: &'a Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
+    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_nodes = Self::restored_nodes(&branch, data.db_session()).await?;
         let created_nodes = Self::created_nodes(&branch, data.db_session()).await?;
         let reordered_nodes_data = Self::reordered_nodes_data(&branch);
@@ -177,7 +178,6 @@ impl<'a> MergeNodes<'a> {
         let original_nodes_descriptions = Self::original_nodes_description(data.db_session(), &branch).await?;
 
         Ok(Self {
-            branch,
             restored_nodes,
             created_nodes,
             reordered_nodes_data,

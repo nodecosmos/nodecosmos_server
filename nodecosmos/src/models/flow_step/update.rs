@@ -3,7 +3,8 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
 use crate::models::traits::ref_cloned::RefCloned;
-use charybdis::operations::UpdateWithCallbacks;
+use crate::models::traits::Merge;
+use charybdis::operations::{DeleteWithCallbacks, UpdateWithCallbacks};
 
 impl FlowStep {
     // delete outputs models
@@ -16,7 +17,20 @@ impl FlowStep {
         if let Some(output_ids_by_node_id) = output_ids_by_node_id {
             for (node_id, output_ids) in output_ids_by_node_id.iter() {
                 if !cloned_node_ids.contains(node_id) {
-                    Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
+                    for output_id in output_ids {
+                        let mut output = Io {
+                            root_id: workflow.root_id,
+                            branch_id: workflow.branch_id,
+                            node_id: workflow.node_id,
+                            id: *output_id,
+                            workflow: Some(workflow.clone()),
+                            flow_step_id: Some(id),
+
+                            ..Default::default()
+                        };
+
+                        output.delete_cb(data).execute(data.db_session()).await?;
+                    }
                 }
             }
         }
@@ -46,5 +60,17 @@ impl FlowStep {
         }
 
         Ok(())
+    }
+
+    pub fn merge_inputs(&mut self, original: &FlowStep) {
+        self.input_ids_by_node_id.merge(original.input_ids_by_node_id.clone());
+    }
+
+    pub fn merge_nodes(&mut self, original: &FlowStep) {
+        self.node_ids.merge_unique(original.node_ids.clone());
+    }
+
+    pub fn merge_outputs(&mut self, original: &FlowStep) {
+        self.output_ids_by_node_id.merge(original.output_ids_by_node_id.clone());
     }
 }

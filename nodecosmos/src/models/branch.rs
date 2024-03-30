@@ -195,7 +195,7 @@ impl Branch {
             .set(node)
             .map_err(|_| NodecosmosError::InternalServerError("Failed to set branch node".to_string()))?;
 
-        Ok(self.node.get().unwrap())
+        Ok(self.node.get().expect("Just set node, so it must be present"))
     }
 
     fn created_ids(&self, object_type: ObjectType) -> &Option<Set<Uuid>> {

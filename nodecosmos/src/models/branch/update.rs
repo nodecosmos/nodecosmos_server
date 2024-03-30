@@ -14,7 +14,6 @@ use crate::models::branch::{
 };
 use crate::models::traits::Merge;
 use crate::models::udts::{BranchReorderData, TextChange};
-use crate::models::utils::append_statement_or_log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::Update;
@@ -94,28 +93,15 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteNodes(ids) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
                 let params = (ids, branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY,
-                    params,
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, params.clone())
+                    .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, params.clone())
+                    .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::UndoDeleteNodes(ids) => {
                 res = UpdateDeletedNodesBranch {
@@ -127,22 +113,15 @@ impl Branch {
                 .await;
             }
             BranchUpdate::RestoreNode(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY, params.clone())
+                    .append_statement(UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedTitleNodesBranch {
@@ -233,28 +212,16 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY,
-                    params,
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY, params.clone())
+                    .append_statement(UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY, params.clone())
+                    .append_statement(UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::UndoDeleteFlow(id) => {
                 res = UpdateDeletedFlowsBranch {
@@ -266,22 +233,15 @@ impl Branch {
                 .await;
             }
             BranchUpdate::RestoreFlow(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY, params.clone())
+                    .append_statement(UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::EditFlowTitle(id) => {
                 res = UpdateEditedFlowTitleBranch {
@@ -311,24 +271,16 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteIo(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(&mut batch, UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, params)?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY, params.clone())
+                    .append_statement(UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY, params.clone())
+                    .append_statement(UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::UndoDeleteIo(id) => {
                 res = UpdateDeletedIosBranch {
@@ -340,22 +292,15 @@ impl Branch {
                 .await;
             }
             BranchUpdate::RestoreIo(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY, params.clone())
+                    .append_statement(UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::EditIoTitle(id) => {
                 res = UpdateEditedTitleIosBranch {
@@ -385,28 +330,22 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY,
-                    params,
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(
+                        UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY,
+                        params.clone(),
+                    )
+                    .append_statement(
+                        UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY,
+                        params.clone(),
+                    )
+                    .append_statement(UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::UndoDeleteFlowStep(id) => {
                 res = UpdateDeletedFlowStepsBranch {
@@ -418,22 +357,18 @@ impl Branch {
                 .await;
             }
             BranchUpdate::RestoreFlowStep(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                res = batch
+                    .append_statement(
+                        UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY,
+                        params.clone(),
+                    )
+                    .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, params)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::EditFlowStepDescription(id) => {
                 res = UpdateEditedDescriptionFlowStepsBranch {

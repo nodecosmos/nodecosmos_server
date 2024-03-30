@@ -2,14 +2,16 @@ mod flow_steps;
 mod flows;
 mod ios;
 mod nodes;
-mod workflow;
+mod workflows;
 
 use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
+use crate::models::branch::merge::flow_steps::MergeFlowSteps;
 use crate::models::branch::merge::flows::MergeFlows;
 use crate::models::branch::merge::ios::MergeIos;
 use crate::models::branch::merge::nodes::MergeNodes;
+use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
 use crate::models::traits::Branchable;
 use crate::models::utils::file::read_file_names;
@@ -113,13 +115,42 @@ impl From<u8> for MergeStep {
 pub struct BranchMerge {
     branch: Branch,
     merge_step: MergeStep,
+    merge_nodes: MergeNodes,
+    merge_workflows: MergeWorkflows,
+    merge_ios: MergeIos,
+    merge_flows: MergeFlows,
+    merge_flow_steps: MergeFlowSteps,
 }
 
 impl BranchMerge {
     pub async fn run(branch: Branch, data: &RequestData) -> Result<Self, MergeError> {
+        let merge_nodes = MergeNodes::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
+
+        let merge_ios = MergeIos::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
+
+        let merge_flows = MergeFlows::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
+
+        let merge_flow_steps = MergeFlowSteps::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
+
         let mut branch_merge = BranchMerge {
             branch,
             merge_step: MergeStep::Start,
+            merge_nodes,
+            merge_ios,
+            merge_flows,
+            merge_flow_steps,
         };
 
         match branch_merge.merge(data).await {
@@ -185,23 +216,19 @@ impl BranchMerge {
 
     /// Merge the branch
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut merge_nodes = MergeNodes::new(&self.branch, data).await?;
-        let mut merge_ios = MergeIos::new(&self.branch, data).await?;
-        let mut merge_flows = MergeFlows::new(&self.branch, data).await?;
-
         while self.merge_step < MergeStep::Finish {
             match self.merge_step {
-                MergeStep::RestoreNodes => merge_nodes.restore_nodes(data).await?,
-                MergeStep::CreateNodes => merge_nodes.create_nodes(data).await?,
-                MergeStep::DeleteNodes => merge_nodes.delete_nodes(data).await?,
-                MergeStep::ReorderNodes => merge_nodes.reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => merge_nodes.update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => merge_nodes.update_nodes_description(data).await?,
-                MergeStep::RestoreIos => merge_ios.restore_ios(data).await?,
-                MergeStep::CreateIos => merge_ios.create_ios(data).await?,
-                MergeStep::DeleteIos => merge_ios.delete_ios(data).await?,
-                MergeStep::UpdateIoTitles => merge_ios.update_ios_titles(data).await?,
-                MergeStep::UpdateIosDescription => merge_ios.update_ios_description(data).await?,
+                MergeStep::RestoreNodes => self.merge_nodes.restore_nodes(data).await?,
+                MergeStep::CreateNodes => self.merge_nodes.create_nodes(data).await?,
+                MergeStep::DeleteNodes => self.merge_nodes.delete_nodes(data).await?,
+                MergeStep::ReorderNodes => self.merge_nodes.reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.merge_nodes.update_nodes_titles(data).await?,
+                MergeStep::UpdateNodesDescription => self.merge_nodes.update_nodes_description(data).await?,
+                MergeStep::RestoreIos => self.merge_ios.restore_ios(data).await?,
+                MergeStep::CreateIos => self.merge_ios.create_ios(data).await?,
+                MergeStep::DeleteIos => self.merge_ios.delete_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.merge_ios.update_ios_titles(data).await?,
+                MergeStep::UpdateIosDescription => self.merge_ios.update_ios_description(data).await?,
 
                 _ => {}
             }
@@ -214,22 +241,19 @@ impl BranchMerge {
 
     /// Recover from merge failure in reverse order
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut merge_nodes = MergeNodes::new(&self.branch, data).await?;
-        let mut merge_ios = MergeIos::new(&self.branch, data).await?;
-
         while self.merge_step > MergeStep::Start {
             match self.merge_step {
-                MergeStep::RestoreNodes => merge_nodes.undo_restore_nodes(data).await?,
-                MergeStep::CreateNodes => merge_nodes.undo_create_nodes(data).await?,
-                MergeStep::DeleteNodes => merge_nodes.undo_delete_nodes(data).await?,
-                MergeStep::ReorderNodes => merge_nodes.undo_reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => merge_nodes.undo_update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => merge_nodes.undo_update_nodes_description(data).await?,
-                MergeStep::RestoreIos => merge_ios.undo_restore_ios(data).await?,
-                MergeStep::CreateIos => merge_ios.undo_create_ios(data).await?,
-                MergeStep::DeleteIos => merge_ios.undo_delete_ios(data).await?,
-                MergeStep::UpdateIoTitles => merge_ios.undo_update_ios_titles(data).await?,
-                MergeStep::UpdateIosDescription => merge_ios.undo_update_ios_description(data).await?,
+                MergeStep::RestoreNodes => self.merge_nodes.undo_restore_nodes(data).await?,
+                MergeStep::CreateNodes => self.merge_nodes.undo_create_nodes(data).await?,
+                MergeStep::DeleteNodes => self.merge_nodes.undo_delete_nodes(data).await?,
+                MergeStep::ReorderNodes => self.merge_nodes.undo_reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.merge_nodes.undo_update_nodes_titles(data).await?,
+                MergeStep::UpdateNodesDescription => self.merge_nodes.undo_update_nodes_description(data).await?,
+                MergeStep::RestoreIos => self.merge_ios.undo_restore_ios(data).await?,
+                MergeStep::CreateIos => self.merge_ios.undo_create_ios(data).await?,
+                MergeStep::DeleteIos => self.merge_ios.undo_delete_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.merge_ios.undo_update_ios_titles(data).await?,
+                MergeStep::UpdateIosDescription => self.merge_ios.undo_update_ios_description(data).await?,
                 _ => {}
             }
 

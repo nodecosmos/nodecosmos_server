@@ -3,17 +3,18 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
-use crate::models::traits::ref_cloned::RefCloned;
+use crate::models::traits::context::ModelContext;
 use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjId, Pluck};
 use crate::models::udts::TextChange;
 use charybdis::operations::{DeleteWithCallbacks, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::{Set, Uuid};
 use log::warn;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub struct MergeFlowSteps<'a> {
-    branch: &'a Branch,
+#[derive(Serialize, Deserialize)]
+pub struct MergeFlowSteps {
     restored_flow_steps: Option<Vec<FlowStep>>,
     created_flow_steps: Option<Vec<FlowStep>>,
     edited_flow_step_descriptions: Option<Vec<Description>>,
@@ -25,7 +26,7 @@ pub struct MergeFlowSteps<'a> {
     description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
-impl<'a> MergeFlowSteps<'a> {
+impl MergeFlowSteps {
     async fn original_flow_step_descriptions(
         db_session: &CachingSession,
         branch: &Branch,
@@ -192,7 +193,7 @@ impl<'a> MergeFlowSteps<'a> {
         Ok(None)
     }
 
-    pub async fn new(branch: &'a Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
+    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_flow_steps = Self::restored_flow_steps(&branch, data.db_session()).await?;
         let created_flow_steps = Self::created_flow_steps(&branch, data.db_session()).await?;
         let edited_flow_step_descriptions = Self::edited_flow_step_descriptions(&branch, data.db_session()).await?;
@@ -202,7 +203,6 @@ impl<'a> MergeFlowSteps<'a> {
         let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
 
         Ok(Self {
-            branch,
             restored_flow_steps,
             created_flow_steps,
             edited_flow_step_descriptions,
@@ -217,12 +217,37 @@ impl<'a> MergeFlowSteps<'a> {
 
     async fn insert_flow_steps(
         data: &RequestData,
+        branch: &Branch,
         merge_flow_steps: &mut Option<Vec<FlowStep>>,
     ) -> Result<(), NodecosmosError> {
         if let Some(merge_flow_steps) = merge_flow_steps {
             for merge_flow_step in merge_flow_steps {
+                // For branch-created flow_steps, surrounding flow_steps should be already in sync.
+                // We need to init them so flow_step insertion doesn't fail. Otherwise flow step may have
+                // next_flow_step_id that is present in branch but it's not created for original flow_step.
+                if let Some(prev_flow_step_id) = merge_flow_step.prev_flow_step_id {
+                    if branch
+                        .created_flow_steps
+                        .as_ref()
+                        .is_some_and(|cfs| cfs.contains(&prev_flow_step_id))
+                    {
+                        merge_flow_step.prev_flow_step(data.db_session()).await?;
+                    }
+                }
+
+                if let Some(next_flow_step_id) = merge_flow_step.next_flow_step_id {
+                    if branch
+                        .created_flow_steps
+                        .as_ref()
+                        .is_some_and(|cfs| cfs.contains(&next_flow_step_id))
+                    {
+                        merge_flow_step.next_flow_step(data.db_session()).await?;
+                    }
+                }
+
+                merge_flow_step.set_merge_context();
                 merge_flow_step.set_original_id();
-                merge_flow_step.insert().execute(data.db_session()).await?;
+                merge_flow_step.insert_cb(data).execute(data.db_session()).await?;
             }
         }
 
@@ -231,10 +256,12 @@ impl<'a> MergeFlowSteps<'a> {
 
     pub async fn delete_inserted_flow_steps(
         data: &RequestData,
+        branch: &Branch,
         merge_flow_steps: &mut Option<Vec<FlowStep>>,
     ) -> Result<(), NodecosmosError> {
         if let Some(merge_flow_steps) = merge_flow_steps {
             for merge_flow_step in merge_flow_steps {
+                merge_flow_step.set_merge_context();
                 merge_flow_step.set_original_id();
                 merge_flow_step.delete_cb(data).execute(data.db_session()).await?;
             }
@@ -244,25 +271,25 @@ impl<'a> MergeFlowSteps<'a> {
     }
 
     pub async fn restore_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, &mut self.restored_flow_steps).await?;
+        Self::insert_flow_steps(data, self.branch, &mut self.restored_flow_steps).await?;
 
         Ok(())
     }
 
     pub async fn undo_restore_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flow_steps(data, &mut self.restored_flow_steps).await?;
+        Self::delete_inserted_flow_steps(data, self.branch, &mut self.restored_flow_steps).await?;
 
         Ok(())
     }
 
     pub async fn create_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, &mut self.created_flow_steps).await?;
+        Self::insert_flow_steps(data, self.branch, &mut self.created_flow_steps).await?;
 
         Ok(())
     }
 
     pub async fn undo_create_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flow_steps(data, &mut self.created_flow_steps).await?;
+        Self::delete_inserted_flow_steps(data, self.branch, &mut self.created_flow_steps).await?;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::materialized_views::nodes_by_owner::NodesByProfile;
+use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
 use crate::models::node::UpdateOwnerNode;
 use crate::models::traits::ElasticDocument;
 use crate::models::udts::Profile;
@@ -11,7 +11,7 @@ use futures::StreamExt;
 use log::error;
 
 impl UpdateOwnerNode {
-    fn init(nodes_by_owner: &NodesByProfile, owner: Profile) -> Self {
+    fn init(nodes_by_owner: &NodesByOwner, owner: Profile) -> Self {
         Self {
             id: nodes_by_owner.id,
             branch_id: nodes_by_owner.branch_id,
@@ -35,7 +35,7 @@ impl UpdateOwnerNode {
     }
 
     async fn run(data: &RequestData, user: User) -> Result<(), NodecosmosError> {
-        let mut nodes_by_owner = NodesByProfile::find_by_owner_id(user.id)
+        let mut nodes_by_owner = NodesByOwner::find_by_owner_id(user.id)
             .execute(data.db_session())
             .await
             .map_err(|e| {

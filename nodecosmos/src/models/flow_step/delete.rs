@@ -2,8 +2,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
+use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
-use charybdis::operations::UpdateWithCallbacks;
+use charybdis::operations::{DeleteWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 
 impl FlowStep {
@@ -45,19 +46,31 @@ impl FlowStep {
 
         if let Some(output_ids_by_node_id) = output_ids_by_node_id {
             let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-            Io::delete_by_ids(data, output_ids.clone(), workflow, Some(id)).await?;
+            for output_id in output_ids {
+                let mut output = Io {
+                    root_id: workflow.root_id,
+                    branch_id: workflow.branch_id,
+                    node_id: workflow.node_id,
+                    id: output_id,
+                    workflow: Some(workflow.clone()),
+                    flow_step_id: Some(id),
+
+                    ..Default::default()
+                };
+
+                output.delete_cb(data).execute(data.db_session()).await?;
+            }
         }
 
         Ok(())
     }
 
-    // removes outputs as inputs from next flow step
+    // removes current step's outputs from next flow step's inputs
     pub async fn pull_outputs_from_next_flow_step(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
         let mut next_flow_step = self.next_flow_step(data.db_session()).await?;
 
         if let Some(next_flow_step) = next_flow_step.as_mut() {
-            let output_ids_by_node_id = self.output_ids_by_node_id.clone();
-
             if let Some(output_ids_by_node_id) = output_ids_by_node_id {
                 let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
@@ -70,7 +83,7 @@ impl FlowStep {
         Ok(())
     }
 
-    // removes outputs as inputs from next workflow step
+    // removes current step's outputs from next workflow step's inputs
     pub async fn pull_outputs_from_next_workflow_step(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let output_ids_by_node_id = self.output_ids_by_node_id.clone();
         let flow_step_id = self.id;
@@ -100,17 +113,36 @@ impl FlowStep {
 
     // syncs the prev and next flow steps when a flow step is deleted
     pub async fn sync_surrounding_fs_on_del(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut prev_flow_step = self.prev_flow_step(data.db_session()).await?;
-        let mut next_flow_step = self.next_flow_step(data.db_session()).await?;
-
-        if let Some(prev_flow_step) = prev_flow_step.as_mut() {
-            prev_flow_step.next_flow_step_id = self.next_flow_step_id;
-            prev_flow_step.update_cb(&None).execute(data.db_session()).await?;
+        if self.sync_surrounding_fs.map_or(true, |v| v) && !self.siblings_already_in_sync(data.db_session()).await? {
+            return Ok(());
         }
 
-        if let Some(next_flow_step) = next_flow_step.as_mut() {
-            next_flow_step.prev_flow_step_id = self.prev_flow_step_id;
-            next_flow_step.update_cb(&None).execute(data.db_session()).await?;
+        let mut prev_flow_step = self.prev_flow_step(data.db_session()).await?.map(|fs| fs.as_native());
+        let mut next_flow_step = self.next_flow_step(data.db_session()).await?.map(|fs| fs.as_native());
+
+        match (prev_flow_step.as_mut(), next_flow_step.as_mut()) {
+            (Some(prev_fs), Some(next_fs)) => {
+                prev_fs.next_flow_step_id = Some(next_fs.id);
+                next_fs.prev_flow_step_id = Some(prev_fs.id);
+
+                prev_fs.updated_at = chrono::Utc::now();
+                next_fs.updated_at = chrono::Utc::now();
+
+                FlowStep::batch()
+                    .append_update(prev_fs)
+                    .append_update(next_fs)
+                    .execute(data.db_session())
+                    .await?;
+            }
+            (Some(prev_fs), None) => {
+                prev_fs.next_flow_step_id = None;
+                prev_fs.update_cb(data).execute(data.db_session()).await?;
+            }
+            (None, Some(next_fs)) => {
+                next_fs.prev_flow_step_id = None;
+                next_fs.update_cb(data).execute(data.db_session()).await?;
+            }
+            _ => {}
         }
 
         Ok(())

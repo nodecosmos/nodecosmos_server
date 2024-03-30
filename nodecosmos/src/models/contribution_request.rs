@@ -113,7 +113,7 @@ impl ContributionRequest {
             self.init_node(db_session).await?;
         }
 
-        Ok(self.node.as_mut().unwrap())
+        Ok(self.node.as_mut().expect("Node should be initialized"))
     }
 
     pub async fn branch(&mut self, db_session: &CachingSession) -> Result<&Branch, NodecosmosError> {

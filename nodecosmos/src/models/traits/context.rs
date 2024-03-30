@@ -50,7 +50,7 @@ pub trait ModelContext {
         self.context_ref().is_default()
     }
 
-    fn is.set_merge_context()(&self) -> bool {
+    fn is_merge_context(&self) -> bool {
         self.context_ref().is_merge()
     }
 

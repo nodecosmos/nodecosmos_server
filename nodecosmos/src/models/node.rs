@@ -20,7 +20,6 @@ use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::{Boolean, Double, Frozen, Int, Set, Text, Timestamp, Uuid};
 use futures::TryFutureExt;
-use log::error;
 use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use scylla::statement::Consistency;
 use scylla::CachingSession;
@@ -125,7 +124,7 @@ impl Callbacks for Node {
 
         tokio::spawn(async move {
             self_clone.add_to_elastic(data.elastic_client()).await;
-            self_clone.create_new_version(&data).await;
+            self_clone.create_commit(&data).await;
             self_clone.create_workflow(&data).await;
         });
 
@@ -148,7 +147,7 @@ impl Callbacks for Node {
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.create_new_version_for_ancestors(&data).await;
+            self_clone.create_commit_for_ancestors(&data).await;
         });
 
         Ok(())
@@ -285,7 +284,6 @@ partial_node!(
     ancestor_ids,
     title,
     updated_at,
-    ctx,
     root_id,
     parent_id,
     parent,
@@ -315,7 +313,7 @@ impl Callbacks for UpdateTitleNode {
 
         tokio::spawn(async move {
             self_clone.update_elastic_index(data.elastic_client()).await;
-            self_clone.create_new_version(&data).await;
+            self_clone.create_commit(&data).await;
         });
 
         Ok(())

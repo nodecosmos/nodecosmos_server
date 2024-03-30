@@ -185,7 +185,7 @@ impl Io {
             }
         }
 
-        Ok(self.workflow.as_mut().unwrap())
+        Ok(self.workflow.as_mut().expect("Workflow should be initialized"))
     }
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
@@ -194,7 +194,7 @@ impl Io {
             self.node = Some(node);
         }
 
-        Ok(self.node.as_mut().unwrap())
+        Ok(self.node.as_mut().expect("Node should be initialized"))
     }
 
     pub async fn flow_step(&mut self, db_session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {

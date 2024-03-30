@@ -1,41 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::input_output::Io;
-use crate::models::workflow::Workflow;
 use charybdis::batch::ModelBatch;
-use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 impl Io {
-    pub async fn delete_by_ids(
-        data: &RequestData,
-        ids: Vec<Uuid>,
-        workflow: &Workflow,
-        flow_step_id: Option<Uuid>,
-    ) -> Result<(), NodecosmosError> {
-        let mut batch = Self::delete_batch();
-
-        for output_id in ids.iter() {
-            let mut output = Io {
-                root_id: workflow.root_id,
-                branch_id: workflow.branch_id,
-                node_id: workflow.node_id,
-                id: *output_id,
-                workflow: Some(workflow.clone()),
-                flow_step_id,
-                ..Default::default()
-            };
-
-            batch.append_delete(&output)?;
-
-            output.pull_from_next_workflow_step(data).await?;
-        }
-
-        batch.execute(data.db_session()).await?;
-
-        Ok(())
-    }
-
     pub async fn pull_from_initial_input_ids(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let id = self.id;
         let workflow = self.workflow(db_session).await?;

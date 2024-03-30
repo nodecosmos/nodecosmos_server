@@ -5,11 +5,11 @@ use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::context::Context;
-use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::traits::context::{Context, ModelContext};
+use crate::models::traits::Branchable;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Delete;
+use charybdis::operations::DeleteWithCallbacks;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use nodecosmos_macros::{Branchable, Id};
@@ -61,9 +61,11 @@ impl Callbacks for Flow {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.id = Uuid::new_v4();
+        if self.is_default_context() {
+            self.id = Uuid::new_v4();
 
-        self.update_branch_with_creation(data).await?;
+            self.update_branch_with_creation(data).await?;
+        }
 
         Ok(())
     }
@@ -74,9 +76,8 @@ impl Callbacks for Flow {
         let flow_steps = self.flow_steps(db_session).await?;
 
         for mut flow_step in flow_steps {
-            flow_step.pull_outputs_from_next_workflow_step(data).await?;
-            flow_step.delete_fs_outputs(data).await?;
-            flow_step.delete().execute(db_session).await?;
+            flow_step.sync_surrounding_fs = Some(false);
+            flow_step.delete_cb(data).execute(db_session).await?;
         }
 
         Ok(())

@@ -11,10 +11,11 @@ use charybdis::operations::{DeleteWithCallbacks, Insert, InsertWithCallbacks, Up
 use charybdis::types::Uuid;
 use log::warn;
 use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub struct MergeIos<'a> {
-    branch: &'a Branch,
+#[derive(Serialize, Deserialize)]
+pub struct MergeIos {
     restored_ios: Option<Vec<Io>>,
     created_ios: Option<Vec<Io>>,
     edited_title_ios: Option<Vec<UpdateTitleIo>>,
@@ -25,7 +26,7 @@ pub struct MergeIos<'a> {
     description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
-impl<'a> MergeIos<'a> {
+impl MergeIos {
     pub async fn restored_ios(
         branch: &Branch,
         db_session: &CachingSession,
@@ -137,7 +138,7 @@ impl<'a> MergeIos<'a> {
         Ok(None)
     }
 
-    pub async fn new(branch: &'a Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
+    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_ios = Self::restored_ios(branch, data.db_session()).await?;
         let created_ios = Self::created_ios(branch, data.db_session()).await?;
         let edited_title_ios = Self::edited_title_ios(branch, data.db_session()).await?;
@@ -147,7 +148,6 @@ impl<'a> MergeIos<'a> {
         let original_ios_descriptions = Self::original_ios_description(data.db_session(), &branch).await?;
 
         Ok(Self {
-            branch,
             restored_ios,
             created_ios,
             edited_title_ios,

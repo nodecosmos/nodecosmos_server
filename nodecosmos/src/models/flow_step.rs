@@ -10,10 +10,9 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::flow::Flow;
 use crate::models::traits::context::Context;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
-use crate::models::utils::impl_updated_at_cb;
+use crate::models::utils::{impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -85,6 +84,10 @@ pub struct FlowStep {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub ctx: Context,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub sync_surrounding_fs: Option<bool>,
 }
 
 impl Callbacks for FlowStep {
@@ -100,6 +103,8 @@ impl Callbacks for FlowStep {
 
         Ok(())
     }
+
+    updated_at_cb_fn!();
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.pull_outputs_from_next_workflow_step(data).await?;
@@ -158,18 +163,6 @@ impl FlowStep {
         }
     }
 
-    pub fn merge_inputs(&mut self, original: &FlowStep) {
-        self.input_ids_by_node_id.merge(original.input_ids_by_node_id.clone());
-    }
-
-    pub fn merge_nodes(&mut self, original: &FlowStep) {
-        self.node_ids.merge_unique(original.node_ids.clone());
-    }
-
-    pub fn merge_outputs(&mut self, original: &FlowStep) {
-        self.output_ids_by_node_id.merge(original.output_ids_by_node_id.clone());
-    }
-
     pub async fn find_by_flow(
         db_session: &CachingSession,
         params: &WorkflowParams,
@@ -205,13 +198,13 @@ impl FlowStep {
             self.workflow = Some(workflow);
         }
 
-        Ok(self.workflow.as_mut().unwrap())
+        Ok(self.workflow.as_mut().expect("Workflow should be initialized"))
     }
 
     pub async fn prev_flow_step(
         &mut self,
         db_session: &CachingSession,
-    ) -> Result<Option<SiblingFlowStep>, NodecosmosError> {
+    ) -> Result<Option<&mut SiblingFlowStep>, NodecosmosError> {
         if let Some(prev_flow_step_id) = self.prev_flow_step_id {
             if self.prev_flow_step.is_none() {
                 let res = SiblingFlowStep::find_or_insert_branched(
@@ -227,13 +220,13 @@ impl FlowStep {
             }
         }
 
-        Ok(self.prev_flow_step.clone())
+        Ok(self.prev_flow_step.as_mut())
     }
 
     pub async fn next_flow_step(
         &mut self,
         db_session: &CachingSession,
-    ) -> Result<Option<SiblingFlowStep>, NodecosmosError> {
+    ) -> Result<Option<&mut SiblingFlowStep>, NodecosmosError> {
         if let Some(next_flow_step_id) = self.next_flow_step_id {
             if self.next_flow_step.is_none() {
                 let res = SiblingFlowStep::find_or_insert_branched(
@@ -249,7 +242,7 @@ impl FlowStep {
             }
         }
 
-        Ok(self.next_flow_step.clone())
+        Ok(self.next_flow_step.as_mut())
     }
 
     pub async fn maybe_find_original(
@@ -265,6 +258,21 @@ impl FlowStep {
         .await?;
 
         Ok(original)
+    }
+
+    /// For branched merge, siblings steps might be already in sync if they are all created in the branch.
+    /// When merging a branched flow step, we assign the next and previous flow steps before triggering the merge.
+    pub async fn siblings_already_in_sync(&mut self, db_session: &CachingSession) -> Result<bool, NodecosmosError> {
+        let prev_fs_next_flow_step_id = self.prev_flow_step(db_session).await?.map(|fs| fs.next_flow_step_id);
+        let next_fs_prev_flow_step_id = self.next_flow_step(db_session).await?.map(|fs| fs.next_flow_step_id);
+
+        match (prev_fs_next_flow_step_id, next_fs_prev_flow_step_id) {
+            (Some(prev_fs_next_flow_step_id), Some(next_fs_prev_flow_step_id)) => {
+                Ok(prev_fs_next_flow_step_id == Some(self.id) && next_fs_prev_flow_step_id == Some(self.id))
+            }
+            (None, None) => Ok(true),
+            _ => Ok(false),
+        }
     }
 }
 

@@ -32,10 +32,10 @@ impl Node {
         Ok(())
     }
 
-    pub async fn create_new_version_for_ancestors(&self, data: &RequestData) {
+    pub async fn create_commit_for_ancestors(&self, data: &RequestData) {
         let _ = NodeCommit::handle_deletion(data, &self)
             .map_err(|e| {
-                error!("Node::create_new_version_for_ancestors:: id {}: {:?}", self.id, e);
+                error!("Node::create_commit_for_ancestors:: id {}: {:?}", self.id, e);
 
                 e
             })
@@ -90,6 +90,11 @@ impl<'a> NodeDelete<'a> {
             return err;
         })?;
 
+        self.delete_descendants().await.map_err(|err| {
+            error!("delete_descendants: {}", err);
+            return err;
+        })?;
+
         self.delete_related_data().await.map_err(|err| {
             error!("delete_related_data: {}", err);
             return err;
@@ -97,11 +102,6 @@ impl<'a> NodeDelete<'a> {
 
         self.delete_counter_data().await.map_err(|err| {
             error!("delete_counter_data: {}", err);
-            return err;
-        })?;
-
-        self.delete_descendants().await.map_err(|err| {
-            error!("delete_descendants: {}", err);
             return err;
         })?;
 
@@ -196,7 +196,7 @@ impl<'a> NodeDelete<'a> {
                     id: *id,
                     branch_id: self.node.branchise_id(*id),
                     ..Default::default()
-                })?;
+                });
             }
 
             batch.execute(self.db_session).await.map_err(|err| {
@@ -252,7 +252,7 @@ impl<'a> NodeDelete<'a> {
                                     order_index: *order_index,
                                     id: *child_id,
                                     ..Default::default()
-                                })?;
+                                });
                             }
 
                             // populate delete stack with child ids

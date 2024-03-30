@@ -129,7 +129,7 @@ impl Workflow {
             self.diagram = Some(diagram);
         }
 
-        Ok(self.diagram.as_mut().unwrap())
+        Ok(self.diagram.as_mut().expect("Diagram should be initialized"))
     }
 
     pub async fn flows(&self, db_session: &CachingSession) -> Result<Vec<Flow>, NodecosmosError> {
