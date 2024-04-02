@@ -65,7 +65,7 @@ macro_rules! impl_find_branched_or_original {
                         let parent = self.parent.take();
                         let auth_branch = self.auth_branch.take();
                         let branch_id = self.branch_id;
-                        let ctx = self.ctx;
+                        let ctx = self.ctx.clone();
 
                         *self = Self::find_by_primary_key_value(&(self.id, self.id))
                             .execute(db_session)

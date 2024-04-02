@@ -1,4 +1,5 @@
 pub mod conflict;
+pub mod edit;
 pub mod merge;
 pub mod update;
 

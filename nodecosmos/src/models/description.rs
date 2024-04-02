@@ -71,7 +71,7 @@ impl Callbacks for Description {
             *self = current;
         }
 
-        self.updated_at = Some(Utc::now());
+        self.updated_at = Utc::now();
 
         self.html.sanitize()?;
 

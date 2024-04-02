@@ -15,7 +15,7 @@ use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
 use crate::models::traits::Branchable;
 use crate::models::utils::file::read_file_names;
-use charybdis::operations::{Update, UpdateWithCallbacks};
+use charybdis::operations::Update;
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use std::fs::create_dir_all;
@@ -52,7 +52,7 @@ pub enum MergeStep {
     DeleteFlowStepInputs = 19,
     CreateFlowStepOutputs = 20,
     DeleteFlowStepOutputs = 21,
-    EditFlowStepsDescription = 22,
+    UpdateFlowStepsDescription = 22,
     RestoreIos = 23,
     CreateIos = 24,
     DeleteIos = 25,
@@ -96,7 +96,7 @@ impl From<u8> for MergeStep {
             19 => MergeStep::DeleteFlowStepInputs,
             20 => MergeStep::CreateFlowStepOutputs,
             21 => MergeStep::DeleteFlowStepOutputs,
-            22 => MergeStep::EditFlowStepsDescription,
+            22 => MergeStep::UpdateFlowStepsDescription,
             23 => MergeStep::RestoreIos,
             24 => MergeStep::CreateIos,
             25 => MergeStep::DeleteIos,
@@ -115,66 +115,81 @@ impl From<u8> for MergeStep {
 pub struct BranchMerge {
     branch: Branch,
     merge_step: MergeStep,
-    merge_nodes: MergeNodes,
-    merge_workflows: MergeWorkflows,
-    merge_ios: MergeIos,
-    merge_flows: MergeFlows,
-    merge_flow_steps: MergeFlowSteps,
+    nodes: MergeNodes,
+    workflows: MergeWorkflows,
+    ios: MergeIos,
+    flows: MergeFlows,
+    flow_steps: MergeFlowSteps,
 }
 
 impl BranchMerge {
-    pub async fn run(branch: Branch, data: &RequestData) -> Result<Self, MergeError> {
-        let merge_nodes = MergeNodes::new(&branch, data).await.map_err(|e| MergeError {
+    pub async fn new(branch: Branch, data: &RequestData) -> Result<Self, MergeError> {
+        let nodes = MergeNodes::new(&branch, data).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let merge_ios = MergeIos::new(&branch, data).await.map_err(|e| MergeError {
+        let workflows = MergeWorkflows::new(&branch);
+
+        let ios = MergeIos::new(&branch, data).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let merge_flows = MergeFlows::new(&branch, data).await.map_err(|e| MergeError {
+        let flows = MergeFlows::new(&branch, data).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let merge_flow_steps = MergeFlowSteps::new(&branch, data).await.map_err(|e| MergeError {
+        let flow_steps = MergeFlowSteps::new(&branch, data).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let mut branch_merge = BranchMerge {
+        Ok(BranchMerge {
             branch,
             merge_step: MergeStep::Start,
-            merge_nodes,
-            merge_ios,
-            merge_flows,
-            merge_flow_steps,
-        };
+            nodes,
+            workflows,
+            ios,
+            flows,
+            flow_steps,
+        })
+    }
 
-        match branch_merge.merge(data).await {
+    pub async fn check_conflicts(mut self, data: &RequestData) -> Result<(Self), NodecosmosError> {
+        self.nodes.check_conflicts(data).await?;
+        self.workflows.check_conflicts(data).await?;
+        self.ios.check_conflicts(data).await?;
+        self.flows.check_conflicts(data).await?;
+        self.flow_steps.check_conflicts(data).await?;
+
+        Ok(self)
+    }
+
+    pub async fn run(mut self, data: &RequestData) -> Result<Self, MergeError> {
+        match self.merge(data).await {
             Ok(_) => {
-                branch_merge.branch.status = Some(BranchStatus::Merged.to_string());
-                Ok(branch_merge)
+                self.branch.status = Some(BranchStatus::Merged.to_string());
+                Ok(self)
             }
-            Err(e) => match branch_merge.recover(data).await {
+            Err(e) => match self.recover(data).await {
                 Ok(_) => {
-                    branch_merge.branch.status = Some(BranchStatus::Recovered.to_string());
+                    self.branch.status = Some(BranchStatus::Recovered.to_string());
                     Err(MergeError {
                         inner: e,
-                        branch: branch_merge.branch,
+                        branch: self.branch,
                     })
                 }
                 Err(recovery_err) => {
-                    branch_merge.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
+                    self.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
 
                     error!("Mere::Failed to recover: {}", recovery_err);
-                    branch_merge.serialize_and_store_to_disk();
+                    self.serialize_and_store_to_disk();
 
                     Err(MergeError {
                         inner: NodecosmosError::FatalMergeError(format!("Failed to merge and recover: {}", e)),
-                        branch: branch_merge.branch,
+                        branch: self.branch,
                     })
                 }
             },
@@ -218,19 +233,37 @@ impl BranchMerge {
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step < MergeStep::Finish {
             match self.merge_step {
-                MergeStep::RestoreNodes => self.merge_nodes.restore_nodes(data).await?,
-                MergeStep::CreateNodes => self.merge_nodes.create_nodes(data).await?,
-                MergeStep::DeleteNodes => self.merge_nodes.delete_nodes(data).await?,
-                MergeStep::ReorderNodes => self.merge_nodes.reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => self.merge_nodes.update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => self.merge_nodes.update_nodes_description(data).await?,
-                MergeStep::RestoreIos => self.merge_ios.restore_ios(data).await?,
-                MergeStep::CreateIos => self.merge_ios.create_ios(data).await?,
-                MergeStep::DeleteIos => self.merge_ios.delete_ios(data).await?,
-                MergeStep::UpdateIoTitles => self.merge_ios.update_ios_titles(data).await?,
-                MergeStep::UpdateIosDescription => self.merge_ios.update_ios_description(data).await?,
-
-                _ => {}
+                MergeStep::Start => (),
+                MergeStep::RestoreNodes => self.nodes.restore_nodes(data, &self.branch).await?,
+                MergeStep::CreateNodes => self.nodes.create_nodes(data, &self.branch).await?,
+                MergeStep::DeleteNodes => self.nodes.delete_nodes(data).await?,
+                MergeStep::ReorderNodes => self.nodes.reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.nodes.update_title(data, &mut self.branch).await?,
+                MergeStep::UpdateNodesDescription => self.nodes.update_description(data, &mut self.branch).await?,
+                MergeStep::UpdateWorkflowInitialInputs => self.workflows.update_initial_inputs(data).await?,
+                MergeStep::RestoreFlows => self.flows.restore_flows(data).await?,
+                MergeStep::CreateFlows => self.flows.create_flows(data).await?,
+                MergeStep::DeleteFlows => self.flows.delete_flows(data).await?,
+                MergeStep::UpdateFlowsTitles => self.flows.update_title(data, &mut self.branch).await?,
+                MergeStep::UpdateFlowsDescription => self.flows.update_description(data, &mut self.branch).await?,
+                MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data, &self.branch).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &self.branch).await?,
+                MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
+                MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data, &self.branch).await?,
+                MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
+                MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data, &self.branch).await?,
+                MergeStep::DeleteFlowStepInputs => self.flow_steps.delete_inputs(data, &self.branch).await?,
+                MergeStep::CreateFlowStepOutputs => self.flow_steps.create_outputs(data, &self.branch).await?,
+                MergeStep::DeleteFlowStepOutputs => self.flow_steps.delete_outputs(data, &self.branch).await?,
+                MergeStep::UpdateFlowStepsDescription => {
+                    self.flow_steps.update_description(data, &mut self.branch).await?
+                }
+                MergeStep::RestoreIos => self.ios.restore_ios(data).await?,
+                MergeStep::CreateIos => self.ios.create_ios(data).await?,
+                MergeStep::DeleteIos => self.ios.delete_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.ios.update_title(data, &mut self.branch).await?,
+                MergeStep::UpdateIosDescription => self.ios.update_description(data, &mut self.branch).await?,
+                MergeStep::Finish => (),
             }
 
             self.merge_step.increment();
@@ -243,18 +276,35 @@ impl BranchMerge {
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step > MergeStep::Start {
             match self.merge_step {
-                MergeStep::RestoreNodes => self.merge_nodes.undo_restore_nodes(data).await?,
-                MergeStep::CreateNodes => self.merge_nodes.undo_create_nodes(data).await?,
-                MergeStep::DeleteNodes => self.merge_nodes.undo_delete_nodes(data).await?,
-                MergeStep::ReorderNodes => self.merge_nodes.undo_reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => self.merge_nodes.undo_update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => self.merge_nodes.undo_update_nodes_description(data).await?,
-                MergeStep::RestoreIos => self.merge_ios.undo_restore_ios(data).await?,
-                MergeStep::CreateIos => self.merge_ios.undo_create_ios(data).await?,
-                MergeStep::DeleteIos => self.merge_ios.undo_delete_ios(data).await?,
-                MergeStep::UpdateIoTitles => self.merge_ios.undo_update_ios_titles(data).await?,
-                MergeStep::UpdateIosDescription => self.merge_ios.undo_update_ios_description(data).await?,
-                _ => {}
+                MergeStep::Start => (),
+                MergeStep::RestoreNodes => self.nodes.undo_delete_nodes(data).await?,
+                MergeStep::CreateNodes => self.nodes.undo_create_nodes(data).await?,
+                MergeStep::DeleteNodes => self.nodes.undo_restore_nodes(data).await?,
+                MergeStep::ReorderNodes => self.nodes.undo_reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.nodes.undo_update_title(data).await?,
+                MergeStep::UpdateNodesDescription => self.nodes.undo_update_description(data).await?,
+                MergeStep::UpdateWorkflowInitialInputs => self.workflows.undo_update_initial_inputs(data).await?,
+                MergeStep::RestoreFlows => self.flows.undo_create_flows(data).await?,
+                MergeStep::CreateFlows => self.flows.undo_delete_flows(data).await?,
+                MergeStep::DeleteFlows => self.flows.undo_restore_flows(data).await?,
+                MergeStep::UpdateFlowsTitles => self.flows.undo_update_title(data).await?,
+                MergeStep::UpdateFlowsDescription => self.flows.undo_update_description(data).await?,
+                MergeStep::RestoreFlowSteps => self.flow_steps.undo_create_flow_steps(data).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.undo_delete_flow_steps(data).await?,
+                MergeStep::DeleteFlowSteps => self.flow_steps.undo_restore_flow_steps(data).await?,
+                MergeStep::CreateFlowStepNodes => self.flow_steps.undo_delete_flow_step_nodes(data).await?,
+                MergeStep::DeleteFlowStepNodes => self.flow_steps.undo_create_flow_step_nodes(data).await?,
+                MergeStep::CreateFlowStepInputs => self.flow_steps.undo_delete_inputs(data).await?,
+                MergeStep::DeleteFlowStepInputs => self.flow_steps.undo_create_inputs(data).await?,
+                MergeStep::CreateFlowStepOutputs => self.flow_steps.undo_delete_outputs(data).await?,
+                MergeStep::DeleteFlowStepOutputs => self.flow_steps.undo_create_outputs(data).await?,
+                MergeStep::UpdateFlowStepsDescription => self.flow_steps.undo_update_description(data).await?,
+                MergeStep::RestoreIos => self.ios.undo_create_ios(data).await?,
+                MergeStep::CreateIos => self.ios.undo_delete_ios(data).await?,
+                MergeStep::DeleteIos => self.ios.undo_restore_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.ios.undo_update_title(data).await?,
+                MergeStep::UpdateIosDescription => self.ios.undo_update_description(data).await?,
+                MergeStep::Finish => (),
             }
 
             self.merge_step.decrement();
@@ -296,11 +346,7 @@ impl Branch {
             return Err(MergeError { inner: e, branch: self });
         }
 
-        if let Err(e) = self.check_conflicts(data.db_session()).await {
-            return Err(MergeError { inner: e, branch: self });
-        }
-
-        let merge = BranchMerge::run(self, data).await?;
+        let merge = BranchMerge::new(self, data).await?.run(data).await?;
 
         let res = merge.branch.update().execute(data.db_session()).await;
 

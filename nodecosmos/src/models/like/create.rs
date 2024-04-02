@@ -17,8 +17,8 @@ impl Like {
             self.branch_id = self.object_id;
         }
 
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
+        self.created_at = now;
+        self.updated_at = now;
     }
 
     pub async fn validate_not_liked(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {

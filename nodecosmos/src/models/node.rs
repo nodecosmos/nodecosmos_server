@@ -205,6 +205,16 @@ impl Node {
 
         Ok(res)
     }
+
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &Set<Uuid>) -> Result<Vec<Node>, NodecosmosError> {
+        let res = find_node!("id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(res)
+    }
 }
 
 partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);

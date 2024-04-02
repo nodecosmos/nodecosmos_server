@@ -10,7 +10,7 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::traits::context::Context;
+use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
 use crate::models::utils::{impl_updated_at_cb, updated_at_cb_fn};
 use crate::models::workflow::Workflow;
@@ -95,11 +95,14 @@ impl Callbacks for FlowStep {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.set_defaults();
-        self.validate_conflicts(db_session).await?;
-        self.calculate_index(db_session).await?;
+        if self.is_default_context() {
+            self.set_defaults();
+            self.validate_conflicts(db_session).await?;
+            self.calculate_index(db_session).await?;
+            self.update_branch_with_creation(data).await?;
+        }
+
         self.sync_surrounding_fs_on_creation(data).await?;
-        self.update_branch_with_creation(data).await?;
 
         Ok(())
     }
@@ -142,9 +145,9 @@ impl FlowStep {
             while let Some(original_flow_step) = original_flow_steps.next().await {
                 let mut original_flow_step = original_flow_step?;
                 if let Some(branched_flow_step) = branch_flow_steps.get_mut(&original_flow_step.id) {
-                    branched_flow_step.merge_inputs(&original_flow_step);
-                    branched_flow_step.merge_nodes(&original_flow_step);
-                    branched_flow_step.merge_outputs(&original_flow_step);
+                    branched_flow_step.merge_original_inputs(&original_flow_step);
+                    branched_flow_step.merge_original_nodes(&original_flow_step);
+                    branched_flow_step.merge_original_outputs(&original_flow_step);
                 } else {
                     original_flow_step.branch_id = params.branch_id;
                     branch_flow_steps.insert(original_flow_step.id, original_flow_step);
@@ -333,6 +336,17 @@ impl Callbacks for UpdateInputIdsFlowStep {
     }
 }
 
+impl UpdateInputIdsFlowStep {
+    pub fn merge_inputs(&mut self, other: &Self) {
+        self.input_ids_by_node_id
+            .merge_unique(other.input_ids_by_node_id.clone());
+    }
+
+    pub fn unmerge_inputs(&mut self, other: &Self) {
+        self.input_ids_by_node_id.unmerge(other.input_ids_by_node_id.clone());
+    }
+}
+
 partial_flow_step!(
     UpdateOutputIdsFlowStep,
     node_id,
@@ -366,6 +380,17 @@ impl Callbacks for UpdateOutputIdsFlowStep {
         }
 
         Ok(())
+    }
+}
+
+impl UpdateOutputIdsFlowStep {
+    pub fn merge_outputs(&mut self, other: &Self) {
+        self.output_ids_by_node_id
+            .merge_unique(other.output_ids_by_node_id.clone());
+    }
+
+    pub fn unmerge_outputs(&mut self, other: &Self) {
+        self.output_ids_by_node_id.unmerge(other.output_ids_by_node_id.clone());
     }
 }
 
@@ -412,6 +437,16 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         flow_step.remove_inputs_from_removed_nodes(data).await?;
 
         Ok(())
+    }
+}
+
+impl UpdateNodeIdsFlowStep {
+    pub fn merge_nodes(&mut self, other: &Self) {
+        self.node_ids.merge_unique(other.node_ids.clone());
+    }
+
+    pub fn unmerge_nodes(&mut self, other: &Self) {
+        self.node_ids.unmerge(other.node_ids.clone());
     }
 }
 

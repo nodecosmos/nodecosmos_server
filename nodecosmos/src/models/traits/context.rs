@@ -1,5 +1,5 @@
 use crate::models::flow::{Flow, UpdateTitleFlow};
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::input_output::{Io, UpdateTitleIo};
 use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::workflow::Workflow;
@@ -9,29 +9,8 @@ pub enum Context {
     #[default]
     None,
     Merge,
+    MergeRecovery,
     BranchedInit,
-}
-
-impl Context {
-    pub fn merge(&mut self) {
-        *self = Context::Merge;
-    }
-
-    pub fn branched_init(&mut self) {
-        *self = Context::BranchedInit;
-    }
-
-    pub fn is_default(&self) -> bool {
-        *self == Context::None
-    }
-
-    pub fn is_merge(&self) -> bool {
-        *self == Context::Merge
-    }
-
-    pub fn is_branched_init(&self) -> bool {
-        *self == Context::BranchedInit
-    }
 }
 
 pub trait ModelContext {
@@ -39,23 +18,23 @@ pub trait ModelContext {
     fn context_ref(&self) -> &Context;
 
     fn set_merge_context(&mut self) {
-        self.context().merge();
+        *self.context() = Context::Merge;
     }
 
     fn set_branched_init_context(&mut self) {
-        self.context().branched_init();
+        *self.context() = Context::BranchedInit;
     }
 
     fn is_default_context(&self) -> bool {
-        self.context_ref().is_default()
+        self.context_ref() == &Context::None
     }
 
     fn is_merge_context(&self) -> bool {
-        self.context_ref().is_merge()
+        self.context_ref() == &Context::Merge
     }
 
     fn is_branched_init_context(&self) -> bool {
-        self.context_ref().is_branched_init()
+        self.context_ref() == &Context::BranchedInit
     }
 }
 
@@ -82,6 +61,9 @@ impl_context!(
     Flow,
     UpdateTitleFlow,
     FlowStep,
+    UpdateNodeIdsFlowStep,
+    UpdateInputIdsFlowStep,
+    UpdateOutputIdsFlowStep,
     Io,
     UpdateTitleIo
 );

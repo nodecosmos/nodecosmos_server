@@ -12,8 +12,8 @@ impl ContributionRequest {
         let owner = Profile::init_from_current_user(&data.current_user);
 
         self.id = Uuid::new_v4();
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
+        self.created_at = now;
+        self.updated_at = now;
 
         self.owner_id = owner.id;
         self.owner = Some(owner);

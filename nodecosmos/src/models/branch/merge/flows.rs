@@ -4,12 +4,10 @@ use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
 use crate::models::flow::{find_update_title_flow, Flow, UpdateTitleFlow};
 use crate::models::traits::context::ModelContext;
-use crate::models::traits::ref_cloned::RefCloned;
 use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjId, Pluck};
 use crate::models::udts::TextChange;
-use charybdis::operations::{DeleteWithCallbacks, Insert, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use log::warn;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,12 +16,11 @@ use std::collections::HashMap;
 pub struct MergeFlows {
     restored_flows: Option<Vec<Flow>>,
     created_flows: Option<Vec<Flow>>,
+    deleted_flows: Option<Vec<Flow>>,
     edited_title_flows: Option<Vec<UpdateTitleFlow>>,
     edited_flow_descriptions: Option<Vec<Description>>,
     original_title_flows: Option<HashMap<Uuid, UpdateTitleFlow>>,
     original_flow_descriptions: Option<HashMap<Uuid, Description>>,
-    title_change_by_object: Option<HashMap<Uuid, TextChange>>,
-    description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
 impl MergeFlows {
@@ -119,6 +116,21 @@ impl MergeFlows {
         Ok(None)
     }
 
+    pub async fn deleted_flows(
+        branch: &Branch,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(deleted_flow_ids)) =
+            (&branch.edited_workflow_nodes, &branch.deleted_flows)
+        {
+            let flows = Flow::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_ids).await?;
+
+            return Ok(Some(flows));
+        }
+
+        Ok(None)
+    }
+
     pub async fn edited_title_flows(
         branch: &Branch,
         db_session: &CachingSession,
@@ -167,6 +179,7 @@ impl MergeFlows {
     pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_flows = Self::restored_flows(&branch, data.db_session()).await?;
         let created_flows = Self::created_flows(&branch, data.db_session()).await?;
+        let deleted_flows = Self::deleted_flows(&branch, data.db_session()).await?;
         let edited_title_flows = Self::edited_title_flows(&branch, data.db_session()).await?;
         let edited_flow_descriptions = Self::edited_flow_descriptions(&branch, data.db_session()).await?;
         let original_title_flows = Self::original_title_flows(data.db_session(), &branch).await?;
@@ -175,12 +188,11 @@ impl MergeFlows {
         Ok(Self {
             restored_flows,
             created_flows,
+            deleted_flows,
             edited_title_flows,
             edited_flow_descriptions,
             original_title_flows,
             original_flow_descriptions,
-            title_change_by_object: None,
-            description_change_by_object: None,
         })
     }
 
@@ -236,24 +248,10 @@ impl MergeFlows {
     }
 
     pub async fn delete_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_flow_ids = self.branch.deleted_flows.ref_cloned();
-        let node_id = self.branch.node(data.db_session()).await?.id;
-
-        for deleted_flow_id in deleted_flow_ids {
-            let deleted_flow =
-                Flow::maybe_find_first_by_node_id_and_branch_id_and_id(node_id, node_id, deleted_flow_id)
-                    .execute(data.db_session())
-                    .await?;
-
-            if let Some(mut deleted_flow) = deleted_flow {
-                deleted_flow.set_original_id();
+        if let Some(deleted_flows) = &mut self.deleted_flows {
+            for deleted_flow in deleted_flows {
                 deleted_flow.set_merge_context();
                 deleted_flow.delete_cb(data).execute(data.db_session()).await?;
-            } else {
-                warn!(
-                    "Failed to find deleted io with id {} and branch id {}",
-                    deleted_flow_id, deleted_flow_id
-                );
             }
         }
 
@@ -261,30 +259,17 @@ impl MergeFlows {
     }
 
     pub async fn undo_delete_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_flow_ids = self.branch.deleted_flows.ref_cloned();
-        let node_id = self.branch.node(data.db_session()).await?.id;
-
-        for deleted_flow_id in deleted_flow_ids.clone() {
-            let deleted_flow =
-                Flow::maybe_find_first_by_node_id_and_branch_id_and_id(node_id, self.branch.id, deleted_flow_id)
-                    .execute(data.db_session())
-                    .await?;
-
-            if let Some(mut deleted_flow) = deleted_flow {
-                deleted_flow.set_original_id();
+        if let Some(deleted_flows) = &mut self.deleted_flows {
+            for deleted_flow in deleted_flows {
+                deleted_flow.set_merge_context();
                 deleted_flow.insert_cb(data).execute(data.db_session()).await?;
-            } else {
-                warn!(
-                    "Failed to find deleted io with id {} and branch id {}",
-                    deleted_flow_id, deleted_flow_id
-                );
             }
         }
 
         Ok(())
     }
 
-    pub async fn update_flows_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_title(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         let original_title_flows = match self.original_title_flows.as_ref() {
             Some(ios) => ios,
             None => return Ok(()),
@@ -306,7 +291,8 @@ impl MergeFlows {
                     edited_flow_title.set_merge_context();
                     edited_flow_title.update_cb(data).execute(data.db_session()).await?;
 
-                    self.title_change_by_object
+                    branch
+                        .title_change_by_object
                         .get_or_insert_with(HashMap::default)
                         .insert(edited_flow_title.id, text_change);
                 }
@@ -316,7 +302,7 @@ impl MergeFlows {
         Ok(())
     }
 
-    pub async fn undo_update_flows_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn undo_update_title(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_title_flows) = &mut self.original_title_flows {
             for original_title_flow in original_title_flows.values_mut() {
                 original_title_flow.update_cb(data).execute(data.db_session()).await?;
@@ -326,7 +312,7 @@ impl MergeFlows {
         Ok(())
     }
 
-    pub async fn update_flows_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         let edited_flow_descriptions = match self.edited_flow_descriptions.as_mut() {
             Some(descriptions) => descriptions,
             None => return Ok(()),
@@ -357,7 +343,8 @@ impl MergeFlows {
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
-            self.description_change_by_object
+            branch
+                .description_change_by_object
                 .get_or_insert_with(HashMap::default)
                 .insert(object_id, text_change);
         }
@@ -365,7 +352,7 @@ impl MergeFlows {
         Ok(())
     }
 
-    pub async fn undo_update_flows_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_flow_descriptions) = &mut self.original_flow_descriptions {
             for original_flow_description in original_flow_descriptions.values_mut() {
                 // description merge is handled within before_insert callback, so we use update to revert as

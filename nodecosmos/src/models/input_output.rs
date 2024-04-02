@@ -7,7 +7,7 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
-use crate::models::traits::context::Context;
+use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
 use crate::models::udts::Property;
@@ -91,7 +91,7 @@ impl Callbacks for Io {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.ctx.is_default() {
+        if self.is_default_context() {
             self.validate_root_id(db_session).await?;
             self.set_defaults();
             self.copy_vals_from_main(db_session).await?;

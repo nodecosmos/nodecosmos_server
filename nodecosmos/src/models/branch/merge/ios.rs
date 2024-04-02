@@ -4,12 +4,10 @@ use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
 use crate::models::input_output::{find_update_title_io, Io, UpdateTitleIo};
 use crate::models::traits::context::ModelContext;
-use crate::models::traits::ref_cloned::RefCloned;
 use crate::models::traits::{Branchable, GroupById, GroupByObjId, Pluck};
 use crate::models::udts::TextChange;
-use charybdis::operations::{DeleteWithCallbacks, Insert, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use log::warn;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,12 +16,11 @@ use std::collections::HashMap;
 pub struct MergeIos {
     restored_ios: Option<Vec<Io>>,
     created_ios: Option<Vec<Io>>,
+    deleted_ios: Option<Vec<Io>>,
     edited_title_ios: Option<Vec<UpdateTitleIo>>,
     edited_io_descriptions: Option<Vec<Description>>,
     original_title_ios: Option<HashMap<Uuid, UpdateTitleIo>>,
     original_ios_descriptions: Option<HashMap<Uuid, Description>>,
-    title_change_by_object: Option<HashMap<Uuid, TextChange>>,
-    description_change_by_object: Option<HashMap<Uuid, TextChange>>,
 }
 
 impl MergeIos {
@@ -55,6 +52,18 @@ impl MergeIos {
                     .await?;
 
             return Ok(Some(created_ios));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn deleted_ios(branch: &Branch, db_session: &CachingSession) -> Result<Option<Vec<Io>>, NodecosmosError> {
+        if let Some(deleted_io_ids) = &branch.deleted_ios {
+            let deleted_ios =
+                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.root_id, deleted_io_ids)
+                    .await?;
+
+            return Ok(Some(deleted_ios));
         }
 
         Ok(None)
@@ -141,21 +150,20 @@ impl MergeIos {
     pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_ios = Self::restored_ios(branch, data.db_session()).await?;
         let created_ios = Self::created_ios(branch, data.db_session()).await?;
+        let deleted_ios = Self::deleted_ios(branch, data.db_session()).await?;
         let edited_title_ios = Self::edited_title_ios(branch, data.db_session()).await?;
         let edited_io_descriptions = Self::edited_io_descriptions(branch, data.db_session()).await?;
-
         let original_title_ios = Self::original_title_ios(data.db_session(), &branch).await?;
         let original_ios_descriptions = Self::original_ios_description(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_ios,
             created_ios,
+            deleted_ios,
             edited_title_ios,
             edited_io_descriptions,
             original_title_ios,
             original_ios_descriptions,
-            title_change_by_object: None,
-            description_change_by_object: None,
         })
     }
 
@@ -211,23 +219,10 @@ impl MergeIos {
     }
 
     pub async fn delete_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_io_ids = self.branch.deleted_ios.ref_cloned();
-        let root_id = self.branch.node(data.db_session()).await?.root_id;
-
-        for deleted_io_id in deleted_io_ids.clone() {
-            let deleted_io = Io::maybe_find_first_by_root_id_and_branch_id_and_id(root_id, root_id, deleted_io_id)
-                .execute(data.db_session())
-                .await?;
-
-            if let Some(mut deleted_io) = deleted_io {
+        if let Some(deleted_ios) = &mut self.deleted_ios {
+            for deleted_io in deleted_ios {
                 deleted_io.set_merge_context();
-                deleted_io.set_original_id();
                 deleted_io.delete_cb(data).execute(data.db_session()).await?;
-            } else {
-                warn!(
-                    "Failed to find deleted io with id {} and branch id {}",
-                    deleted_io_id, deleted_io_id
-                );
             }
         }
 
@@ -235,31 +230,17 @@ impl MergeIos {
     }
 
     pub async fn undo_delete_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_io_ids = self.branch.deleted_ios.ref_cloned();
-        let root_id = self.branch.node(data.db_session()).await?.root_id;
-
-        for deleted_io_id in deleted_io_ids.clone() {
-            let deleted_io =
-                Io::maybe_find_first_by_root_id_and_branch_id_and_id(root_id, self.branch.id, deleted_io_id)
-                    .execute(data.db_session())
-                    .await?;
-
-            if let Some(mut deleted_io) = deleted_io {
+        if let Some(deleted_ios) = &mut self.deleted_ios {
+            for deleted_io in deleted_ios {
                 deleted_io.set_merge_context();
-                deleted_io.set_original_id();
                 deleted_io.insert_cb(data).execute(data.db_session()).await?;
-            } else {
-                warn!(
-                    "Failed to find deleted io with id {} and branch id {}",
-                    deleted_io_id, deleted_io_id
-                );
             }
         }
 
         Ok(())
     }
 
-    pub async fn update_ios_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_title(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         let original_title_ios = match self.original_title_ios.as_ref() {
             Some(ios) => ios,
             None => return Ok(()),
@@ -281,7 +262,8 @@ impl MergeIos {
                     edited_io_title.set_original_id();
                     edited_io_title.update_cb(data).execute(data.db_session()).await?;
 
-                    self.title_change_by_object
+                    branch
+                        .title_change_by_object
                         .get_or_insert_with(HashMap::default)
                         .insert(edited_io_title.id, text_change);
                 }
@@ -291,7 +273,7 @@ impl MergeIos {
         Ok(())
     }
 
-    pub async fn undo_update_ios_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn undo_update_title(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_title_ios) = &mut self.original_title_ios {
             for original_title_io in original_title_ios.values_mut() {
                 original_title_io.update_cb(data).execute(data.db_session()).await?;
@@ -301,7 +283,7 @@ impl MergeIos {
         Ok(())
     }
 
-    pub async fn update_ios_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         let edited_io_descriptions = match self.edited_io_descriptions.as_mut() {
             Some(descriptions) => descriptions,
             None => return Ok(()),
@@ -332,7 +314,8 @@ impl MergeIos {
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
-            self.description_change_by_object
+            branch
+                .description_change_by_object
                 .get_or_insert_with(HashMap::default)
                 .insert(object_id, text_change);
         }
@@ -340,7 +323,7 @@ impl MergeIos {
         Ok(())
     }
 
-    pub async fn undo_update_ios_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_ios_description) = &mut self.original_ios_descriptions {
             for original_io_description in original_ios_description.values_mut() {
                 // description merge is handled within before_insert callback, so we use update to revert as

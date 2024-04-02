@@ -70,6 +70,12 @@ pub trait FindForBranchMerge: Model {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError>;
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError>;
 }
 
 impl FindForBranchMerge for Flow {
@@ -80,6 +86,20 @@ impl FindForBranchMerge for Flow {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let flows = find_flow!("node_id IN ? AND branch_id = ? AND id IN ?", (node_ids, branch_id, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(flows)
+    }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows = find_flow!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -104,6 +124,20 @@ impl FindForBranchMerge for UpdateTitleFlow {
 
         Ok(flows)
     }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows = find_update_title_flow!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(flows)
+    }
 }
 
 impl FindForBranchMerge for FlowStep {
@@ -114,6 +148,20 @@ impl FindForBranchMerge for FlowStep {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let flows = find_flow_step!("node_id IN ? AND branch_id = ? AND id IN ?", (node_ids, branch_id, ids))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(flows)
+    }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows = find_flow_step!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -139,6 +187,21 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
 
         Ok(flows)
     }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows =
+            find_update_input_ids_flow_step!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
+
+        Ok(flows)
+    }
 }
 
 impl FindForBranchMerge for UpdateOutputIdsFlowStep {
@@ -157,6 +220,21 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
 
         Ok(flows)
     }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows =
+            find_update_output_ids_flow_step!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
+
+        Ok(flows)
+    }
 }
 
 impl FindForBranchMerge for UpdateNodeIdsFlowStep {
@@ -168,6 +246,21 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
     ) -> Result<Vec<Self>, NodecosmosError> {
         let flows =
             find_update_node_ids_flow_step!("node_id IN ? AND branch_id = ? AND id IN ?", (node_ids, branch_id, ids))
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
+
+        Ok(flows)
+    }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let flows =
+            find_update_node_ids_flow_step!("node_id IN ? AND branch_id IN ? AND id IN ?", (node_ids, node_ids, ids))
                 .execute(db_session)
                 .await?
                 .try_collect()
