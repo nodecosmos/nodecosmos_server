@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::types::{Double, Uuid};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Clone)]
 #[charybdis_udt_model(type_name = BranchReorderData)]
 pub struct BranchReorderData {
     pub id: Uuid,

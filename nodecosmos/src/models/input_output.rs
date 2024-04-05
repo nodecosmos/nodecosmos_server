@@ -7,17 +7,16 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
-use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
+use crate::models::traits::{Context, ModelContext};
 use crate::models::udts::Property;
-use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
 use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::{Branchable, Id};
+use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -27,10 +26,10 @@ use std::collections::HashSet;
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_id, branch_id],
-    clustering_keys = [node_id, id],
-    local_secondary_indexes = [id, main_id]
+    clustering_keys = [id],
+    local_secondary_indexes = [main_id]
 )]
-#[derive(Id, Branchable, Serialize, Deserialize, Default)]
+#[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default)]
 pub struct Io {
     #[serde(rename = "rootId")]
     #[branch(original_id)]
@@ -48,9 +47,15 @@ pub struct Io {
     #[serde(rename = "mainId")]
     pub main_id: Option<Uuid>,
 
+    #[serde(rename = "flowId")]
+    pub flow_id: Option<Uuid>,
+
     /// outputted by flow step
     #[serde(rename = "flowStepId")]
     pub flow_step_id: Option<Uuid>,
+
+    #[serde(rename = "inputtedByFlowSteps")]
+    pub inputted_by_flow_steps: Option<Set<Uuid>>,
 
     pub title: Option<Text>,
 
@@ -75,10 +80,6 @@ pub struct Io {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub workflow: Option<Workflow>,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
     pub node: Option<Node>,
 
     #[charybdis(ignore)]
@@ -98,13 +99,21 @@ impl Callbacks for Io {
             self.update_branch_with_creation(data).await?;
         }
 
+        if self.is_default_context() || self.is_branched_init_context() {
+            self.preserve_branch_node(data).await?;
+            self.preserve_branch_flow_step(data).await?;
+        }
+
         Ok(())
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.pull_from_initial_input_ids(db_session).await?;
-        self.pull_form_flow_step_outputs(data).await?;
-        self.pull_from_next_workflow_step(data).await?;
+        if !self.is_parent_delete_context() {
+            self.pull_from_initial_input_ids(db_session).await?;
+            self.pull_form_flow_step_outputs(data).await?;
+            self.preserve_branch_flow_step(data).await?;
+        }
+        self.pull_from_flow_steps_inputs(data).await?;
         self.update_branch_with_deletion(data).await?;
 
         Ok(())
@@ -167,25 +176,6 @@ impl Io {
             .await?;
 
         Ok(ios)
-    }
-
-    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
-        if self.workflow.is_none() {
-            if let Some(flow_step) = &mut self.flow_step {
-                return flow_step.workflow(db_session).await;
-            } else {
-                let params = WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                };
-
-                let workflow = Workflow::branched(db_session, &params).await?;
-
-                self.workflow = Some(workflow);
-            }
-        }
-
-        Ok(self.workflow.as_mut().expect("Workflow should be initialized"))
     }
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
@@ -322,6 +312,4 @@ impl UpdateTitleIo {
     }
 }
 
-partial_io!(UpdateWorkflowIndexIo, root_id, node_id, branch_id, id);
-
-partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_step_id);
+partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_id, flow_step_id);

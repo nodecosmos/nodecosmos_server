@@ -137,5 +137,5 @@ async fn main() {
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
     .run()
     .await
-    .unwrap_or_else(|e| panic!("Could not run server to port {}.\n{}", port, e));
+    .unwrap_or_else(|e| panic!("Could not run server to port {}.\n{}", port, e))
 }

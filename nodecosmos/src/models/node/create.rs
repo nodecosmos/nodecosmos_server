@@ -7,13 +7,13 @@ use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::node::Parent;
-use crate::models::traits::ref_cloned::RefCloned;
+use crate::models::traits::ModelContext;
+use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert, InsertWithCallbacks};
-use charybdis::options::Consistency;
 use charybdis::types::{Set, Uuid};
 use elasticsearch::Elasticsearch;
 use futures::{stream, StreamExt, TryFutureExt};
@@ -153,7 +153,7 @@ impl Node {
     /// we need to create branched version for all ancestors,
     /// so we can preserve branch changes in case any of ancestor is deleted,
     /// and we can allow users to resolve conflicts.
-    pub async fn preserve_ancestors_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn preserve_branch_ancestors(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut futures = vec![];
 
@@ -178,7 +178,7 @@ impl Node {
             {
                 if let Err(e) = future {
                     error!(
-                        "[preserve_ancestors_for_branch] Error preserving ancestors for branch: {:?}",
+                        "[preserve_branch_ancestors] Error preserving ancestors for branch: {:?}",
                         e
                     );
 
@@ -201,11 +201,8 @@ impl Node {
             match non_branched_res {
                 Ok(mut node) => {
                     node.branch_id = self.branch_id;
-                    let insert = node
-                        .insert()
-                        .consistency(Consistency::All)
-                        .execute(data.db_session())
-                        .await;
+                    node.set_branched_init_context();
+                    let insert = node.insert().execute(data.db_session()).await;
 
                     if let Err(e) = insert {
                         error!(
@@ -215,6 +212,7 @@ impl Node {
                     }
 
                     node.append_to_ancestors(data.db_session()).await?;
+                    node.maybe_create_workflow(&data).await?;
                     node.create_commit(&data).await;
                 }
                 Err(e) => {
@@ -228,7 +226,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn preserve_descendants_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn preserve_branch_descendants(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut descendants =
                 NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
@@ -259,7 +257,7 @@ impl Node {
             {
                 if let Err(e) = future {
                     error!(
-                        "[preserve_descendants_for_branch] Error preserving descendants for branch: {:?}",
+                        "[preserve_branch_descendants] Error preserving descendants for branch: {:?}",
                         e
                     );
 
@@ -332,6 +330,27 @@ impl Node {
             e
         })
         .await;
+    }
+
+    pub async fn maybe_create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(self.id, self.branch_id)
+            .execute(data.db_session())
+            .await?;
+
+        if maybe_branched.is_none() {
+            Workflow {
+                root_id: self.root_id,
+                node_id: self.id,
+                branch_id: self.branch_id,
+                title: Some(format!("{} Workflow", self.title)),
+                ..Default::default()
+            }
+            .insert()
+            .execute(data.db_session())
+            .await?;
+        }
+
+        Ok(())
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {

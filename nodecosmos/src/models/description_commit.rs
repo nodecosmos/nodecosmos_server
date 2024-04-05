@@ -20,6 +20,7 @@ pub struct DescriptionCommit {
 
 // TODO: Use `y-crdt` to extract desc state from only base64 description
 impl DescriptionCommit {
+    #[allow(unused)]
     pub fn new(description_base64: Option<Text>) -> Self {
         Self {
             id: Uuid::new_v4(),

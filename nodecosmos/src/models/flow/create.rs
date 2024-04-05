@@ -3,6 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
+use crate::models::node::Node;
 use crate::models::traits::Branchable;
 use charybdis::operations::{Find, Insert};
 
@@ -22,6 +23,14 @@ impl Flow {
 
                 maybe_original.insert().execute(data.db_session()).await?;
             }
+        }
+
+        Ok(())
+    }
+
+    pub async fn preserve_branch_node(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            Node::find_or_insert_branched(data, self.node_id, self.branch_id, None).await?;
         }
 
         Ok(())

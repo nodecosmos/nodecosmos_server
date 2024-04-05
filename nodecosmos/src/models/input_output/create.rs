@@ -3,9 +3,9 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
+use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert};
@@ -95,18 +95,34 @@ impl Io {
         Ok(())
     }
 
+    pub async fn preserve_branch_node(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            Node::find_or_insert_branched(data, self.node_id, self.branch_id, None).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn preserve_branch_flow_step(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            if let Some(flow_step_id) = self.flow_step_id {
+                FlowStep::find_or_insert_branched(
+                    data,
+                    &WorkflowParams {
+                        node_id: self.node_id,
+                        branch_id: self.branch_id,
+                    },
+                    flow_step_id,
+                )
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
-
-            if let Some(flow_step_id) = self.flow_step_id {
-                let fs = FlowStep::find_or_insert_branched(data.db_session(), &params, flow_step_id).await?;
-                Flow::find_or_insert_branched(data.db_session(), &params, fs.flow_id).await?;
-            }
-
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateIo(self.id)).await?;
         }
@@ -116,6 +132,17 @@ impl Io {
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
+            if let Some(flow_step_id) = self.flow_step_id {
+                FlowStep::find_or_insert_branched(
+                    data,
+                    &WorkflowParams {
+                        node_id: self.node_id,
+                        branch_id: self.branch_id,
+                    },
+                    flow_step_id,
+                )
+                .await?;
+            }
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
         }

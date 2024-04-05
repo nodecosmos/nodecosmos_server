@@ -163,13 +163,13 @@ impl ResponseError for NodecosmosError {
                     }))
                 }
                 _ => {
-                    error!("CharybdisError: {:?}", self);
+                    error!("{}", self.to_string());
 
                     NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string())).error_response()
                 }
             },
             _ => {
-                error!("InternalServerError: {:?}", self);
+                error!("InternalServerError: {}", self.to_string());
 
                 return HttpResponse::InternalServerError().json(json!({
                     "status": 500,

@@ -10,19 +10,19 @@ use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
-use crate::models::utils::{impl_updated_at_cb, updated_at_cb_fn};
+use crate::models::traits::{Context, ModelContext};
+use crate::models::utils::updated_at_cb_fn;
 use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::model::AsNative;
 use charybdis::operations::Find;
-use charybdis::types::{Double, Frozen, List, Map, Timestamp, Uuid};
+use charybdis::types::{Double, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
-use nodecosmos_macros::{Branchable, Id};
+use nodecosmos_macros::{Branchable, FlowId, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 #[charybdis_model(
     table_name = flow_steps,
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [flow_id, flow_index, id],
     local_secondary_indexes = [id]
 )]
-#[derive(Branchable, Id, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, Id, FlowId, Serialize, Deserialize, Default, Clone)]
 pub struct FlowStep {
     #[serde(rename = "nodeId")]
     #[branch(original_id)]
@@ -47,6 +47,9 @@ pub struct FlowStep {
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
+    #[serde(rename = "rootId")]
+    pub root_id: Uuid,
 
     #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
@@ -71,35 +74,35 @@ pub struct FlowStep {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub workflow: Option<Workflow>,
+    pub workflow: Arc<Mutex<Option<Workflow>>>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub prev_flow_step: Option<SiblingFlowStep>,
+    pub prev_flow_step: Arc<Mutex<Option<SiblingFlowStep>>>,
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub next_flow_step: Option<SiblingFlowStep>,
+    pub next_flow_step: Arc<Mutex<Option<SiblingFlowStep>>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
     pub ctx: Context,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub sync_surrounding_fs: Option<bool>,
 }
 
 impl Callbacks for FlowStep {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_default_context() {
             self.set_defaults();
-            self.validate_conflicts(db_session).await?;
-            self.calculate_index(db_session).await?;
+            self.validate_conflicts(data).await?;
+            self.calculate_index(data).await?;
             self.update_branch_with_creation(data).await?;
+        }
+
+        if self.is_default_context() || self.is_branched_init_context() {
+            self.preserve_branch_flow(data).await?;
         }
 
         self.sync_surrounding_fs_on_creation(data).await?;
@@ -110,9 +113,9 @@ impl Callbacks for FlowStep {
     updated_at_cb_fn!();
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.pull_outputs_from_next_workflow_step(data).await?;
         self.delete_fs_outputs(data).await?;
-        self.sync_surrounding_fs_on_del(data).await?;
+        self.sync_surrounding_fs_on_deletion(data).await?;
+        self.preserve_branch_flow(data).await?;
         self.update_branch_with_deletion(data).await?;
 
         Ok(())
@@ -189,63 +192,78 @@ impl FlowStep {
         Ok(flow_steps)
     }
 
-    pub async fn workflow(&mut self, db_session: &CachingSession) -> Result<&mut Workflow, NodecosmosError> {
-        if self.workflow.is_none() {
+    pub async fn find_by_node_id_and_branch_id_and_ids(
+        db_session: &CachingSession,
+        node_id: Uuid,
+        branch_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<FlowStep>, NodecosmosError> {
+        let flow_steps = find_flow_step!(
+            "node_id = ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
+            (node_id, branch_id, ids)
+        )
+        .execute(db_session)
+        .await?
+        .try_collect()
+        .await?;
+
+        Ok(flow_steps)
+    }
+
+    pub async fn workflow(&self, db_session: &CachingSession) -> Result<&Mutex<Option<Workflow>>, NodecosmosError> {
+        let mut workflow = self.workflow.lock()?;
+        if workflow.is_none() {
             let params = WorkflowParams {
                 node_id: self.node_id,
                 branch_id: self.branch_id,
             };
 
-            let workflow = Workflow::branched(db_session, &params).await?;
-
-            self.workflow = Some(workflow);
+            *workflow = Some(Workflow::branched(db_session, &params).await?);
         }
 
-        Ok(self.workflow.as_mut().expect("Workflow should be initialized"))
+        Ok(self.workflow.as_ref())
     }
 
-    pub async fn prev_flow_step(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<Option<&mut SiblingFlowStep>, NodecosmosError> {
+    pub async fn prev_flow_step(&self, data: &RequestData) -> Result<&Mutex<Option<SiblingFlowStep>>, NodecosmosError> {
         if let Some(prev_flow_step_id) = self.prev_flow_step_id {
-            if self.prev_flow_step.is_none() {
-                let res = SiblingFlowStep::find_or_insert_branched(
-                    db_session,
-                    &WorkflowParams {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                    },
-                    prev_flow_step_id,
-                )
-                .await?;
-                self.prev_flow_step = Some(res);
+            let mut pfs = self.prev_flow_step.lock()?;
+            if pfs.is_none() {
+                *pfs = Some(
+                    SiblingFlowStep::find_or_insert_branched(
+                        data,
+                        &WorkflowParams {
+                            node_id: self.node_id,
+                            branch_id: self.branch_id,
+                        },
+                        prev_flow_step_id,
+                    )
+                    .await?,
+                );
             }
         }
 
-        Ok(self.prev_flow_step.as_mut())
+        Ok(self.prev_flow_step.as_ref())
     }
 
-    pub async fn next_flow_step(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<Option<&mut SiblingFlowStep>, NodecosmosError> {
+    pub async fn next_flow_step(&self, data: &RequestData) -> Result<&Mutex<Option<SiblingFlowStep>>, NodecosmosError> {
         if let Some(next_flow_step_id) = self.next_flow_step_id {
-            if self.next_flow_step.is_none() {
-                let res = SiblingFlowStep::find_or_insert_branched(
-                    db_session,
-                    &WorkflowParams {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                    },
-                    next_flow_step_id,
-                )
-                .await?;
-                self.next_flow_step = Some(res);
+            let mut nfs = self.next_flow_step.lock()?;
+            if nfs.is_none() {
+                *nfs = Some(
+                    SiblingFlowStep::find_or_insert_branched(
+                        data,
+                        &WorkflowParams {
+                            node_id: self.node_id,
+                            branch_id: self.branch_id,
+                        },
+                        next_flow_step_id,
+                    )
+                    .await?,
+                );
             }
         }
 
-        Ok(self.next_flow_step.as_mut())
+        Ok(self.next_flow_step.as_ref())
     }
 
     pub async fn maybe_find_original(
@@ -265,9 +283,19 @@ impl FlowStep {
 
     /// For branched merge, siblings steps might be already in sync if they are all created in the branch.
     /// When merging a branched flow step, we assign the next and previous flow steps before triggering the merge.
-    pub async fn siblings_already_in_sync(&mut self, db_session: &CachingSession) -> Result<bool, NodecosmosError> {
-        let prev_fs_next_flow_step_id = self.prev_flow_step(db_session).await?.map(|fs| fs.next_flow_step_id);
-        let next_fs_prev_flow_step_id = self.next_flow_step(db_session).await?.map(|fs| fs.next_flow_step_id);
+    pub async fn siblings_already_in_sync(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
+        let prev_fs_next_flow_step_id = self
+            .prev_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.next_flow_step_id);
+        let next_fs_prev_flow_step_id = self
+            .next_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.next_flow_step_id);
 
         match (prev_fs_next_flow_step_id, next_fs_prev_flow_step_id) {
             (Some(prev_fs_next_flow_step_id), Some(next_fs_prev_flow_step_id)) => {
@@ -298,7 +326,12 @@ partial_flow_step!(
     ctx
 );
 
-impl_updated_at_cb!(SiblingFlowStep);
+impl Callbacks for SiblingFlowStep {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    updated_at_cb_fn!();
+}
 
 partial_flow_step!(
     UpdateInputIdsFlowStep,
@@ -307,6 +340,7 @@ partial_flow_step!(
     flow_id,
     flow_index,
     id,
+    root_id,
     input_ids_by_node_id,
     updated_at,
     ctx
@@ -320,7 +354,67 @@ impl Callbacks for UpdateInputIdsFlowStep {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
-                data.db_session(),
+                data,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+
+            self.update_branch(data).await?;
+        }
+
+        self.update_ios(data).await?;
+
+        Ok(())
+    }
+}
+
+impl UpdateInputIdsFlowStep {
+    pub fn merge_inputs(&mut self, other: &Self) {
+        self.input_ids_by_node_id
+            .merge_unique(other.input_ids_by_node_id.clone());
+    }
+
+    pub fn unmerge_inputs(&mut self, other: &Self) {
+        self.input_ids_by_node_id.unmerge(other.input_ids_by_node_id.clone());
+    }
+}
+
+partial_flow_step!(
+    UpdateNodeIdsFlowStep,
+    node_id,
+    branch_id,
+    flow_id,
+    flow_index,
+    id,
+    root_id,
+    node_ids,
+    output_ids_by_node_id,
+    input_ids_by_node_id,
+    updated_at,
+    ctx
+);
+
+impl Callbacks for UpdateNodeIdsFlowStep {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        let current = self.find_by_primary_key().execute(data.db_session()).await?;
+        self.output_ids_by_node_id = current.output_ids_by_node_id;
+        self.input_ids_by_node_id = current.input_ids_by_node_id;
+
+        self.delete_output_records_from_removed_nodes(data).await?;
+        self.remove_output_references_from_removed_nodes().await?;
+        self.remove_input_references_from_removed_nodes().await?;
+
+        if self.is_branched() {
+            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
+            FlowStep::find_or_insert_branched(
+                data,
                 &WorkflowParams {
                     node_id: self.node_id,
                     branch_id: self.branch_id,
@@ -336,14 +430,13 @@ impl Callbacks for UpdateInputIdsFlowStep {
     }
 }
 
-impl UpdateInputIdsFlowStep {
-    pub fn merge_inputs(&mut self, other: &Self) {
-        self.input_ids_by_node_id
-            .merge_unique(other.input_ids_by_node_id.clone());
+impl UpdateNodeIdsFlowStep {
+    pub fn merge_nodes(&mut self, other: &Self) {
+        self.node_ids.merge_unique(other.node_ids.clone());
     }
 
-    pub fn unmerge_inputs(&mut self, other: &Self) {
-        self.input_ids_by_node_id.unmerge(other.input_ids_by_node_id.clone());
+    pub fn unmerge_nodes(&mut self, other: &Self) {
+        self.node_ids.unmerge(other.node_ids.clone());
     }
 }
 
@@ -367,7 +460,7 @@ impl Callbacks for UpdateOutputIdsFlowStep {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
-                data.db_session(),
+                data,
                 &WorkflowParams {
                     node_id: self.node_id,
                     branch_id: self.branch_id,
@@ -391,62 +484,6 @@ impl UpdateOutputIdsFlowStep {
 
     pub fn unmerge_outputs(&mut self, other: &Self) {
         self.output_ids_by_node_id.unmerge(other.output_ids_by_node_id.clone());
-    }
-}
-
-partial_flow_step!(
-    UpdateNodeIdsFlowStep,
-    node_id,
-    branch_id,
-    flow_id,
-    flow_index,
-    id,
-    node_ids,
-    updated_at,
-    ctx
-);
-
-impl Callbacks for UpdateNodeIdsFlowStep {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            FlowStep::find_or_insert_branched(
-                data.db_session(),
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.id,
-            )
-            .await?;
-
-            self.update_branch(data).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn after_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut flow_step = self.as_native().find_by_primary_key().execute(db_session).await?;
-
-        flow_step.delete_outputs_from_removed_nodes(data).await?;
-        flow_step.remove_outputs_from_removed_nodes(data).await?;
-        flow_step.remove_inputs_from_removed_nodes(data).await?;
-
-        Ok(())
-    }
-}
-
-impl UpdateNodeIdsFlowStep {
-    pub fn merge_nodes(&mut self, other: &Self) {
-        self.node_ids.merge_unique(other.node_ids.clone());
-    }
-
-    pub fn unmerge_nodes(&mut self, other: &Self) {
-        self.node_ids.unmerge(other.node_ids.clone());
     }
 }
 

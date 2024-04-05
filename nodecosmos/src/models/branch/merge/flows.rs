@@ -2,9 +2,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
-use crate::models::flow::{find_update_title_flow, Flow, UpdateTitleFlow};
-use crate::models::traits::context::ModelContext;
-use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjId, Pluck};
+use crate::models::flow::{Flow, UpdateTitleFlow};
+use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId};
+use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
@@ -28,17 +28,11 @@ impl MergeFlows {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleFlow>>, NodecosmosError> {
-        let node_id = branch.node(&db_session).await?.id;
-
         if let (Some(ids), Some(edited_wf_node_ids)) = (&branch.edited_title_flows, &branch.edited_workflow_nodes) {
-            let ios_by_id = find_update_title_flow!(
-                "node_id in ? AND branch_id = ? AND id IN = ?",
-                (edited_wf_node_ids, node_id, ids)
-            )
-            .execute(db_session)
-            .await?
-            .group_by_id()
-            .await?;
+            let ios_by_id = UpdateTitleFlow::find_original_by_ids(db_session, edited_wf_node_ids, ids)
+                .await?
+                .group_by_id()
+                .await?;
 
             return Ok(Some(ios_by_id));
         }
@@ -54,7 +48,7 @@ impl MergeFlows {
             let ios_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
-                .group_by_obj_id()
+                .group_by_object_id()
                 .await?;
 
             return Ok(Some(ios_by_id));
@@ -78,14 +72,11 @@ impl MergeFlows {
             )
             .await?;
 
-            let already_restored_ids = Flow::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                edited_workflow_node_ids,
-            )
-            .await?
-            .pluck_id_set();
+            let already_restored_ids =
+                Flow::find_original_by_ids(db_session, edited_workflow_node_ids, restored_flow_ids)
+                    .await?
+                    .pluck_id_set()
+                    .await?;
 
             flows.retain(|flow| !already_restored_ids.contains(&flow.id));
 
@@ -123,7 +114,10 @@ impl MergeFlows {
         if let (Some(edited_workflow_node_ids), Some(deleted_flow_ids)) =
             (&branch.edited_workflow_nodes, &branch.deleted_flows)
         {
-            let flows = Flow::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_ids).await?;
+            let flows = Flow::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flows));
         }

@@ -11,7 +11,7 @@ impl UpdateTitleFlow {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Flow::find_or_insert_branched(
-                data.db_session(),
+                data,
                 &WorkflowParams {
                     node_id: self.node_id,
                     branch_id: self.branch_id,

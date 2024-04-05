@@ -30,17 +30,20 @@ impl ContributionRequest {
     }
 
     pub async fn create_branch(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let is_public = self.node(data.db_session()).await?.is_public;
+        let node = self.node(data.db_session()).await?;
+        let root_id = node.root_id;
+        let is_public = node.is_public;
 
         let branch = Branch {
             id: self.id, //
+            node_id: self.node_id,
+            root_id,
             title: self.title.clone(),
             description: self.description.clone(),
             owner_id: self.owner_id,
             owner: self.owner.clone(),
             is_public,
             is_contribution_request: Some(true),
-            node_id: self.node_id,
             ..Default::default()
         };
 

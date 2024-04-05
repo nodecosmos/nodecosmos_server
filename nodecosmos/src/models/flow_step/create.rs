@@ -5,13 +5,12 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::context::ModelContext;
+use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use scylla::CachingSession;
 
 impl FlowStep {
     pub fn set_defaults(&mut self) {
@@ -48,14 +47,23 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn validate_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let prev_flow_step = self.prev_flow_step(db_session).await?;
-        let prev_flow_step_id = prev_flow_step.as_ref().map(|fs| fs.id);
-        let prev_flow_step_next_flow_step_id = prev_flow_step.map(|fs| fs.next_flow_step_id);
+    pub async fn validate_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_parent_delete_context() && !self.siblings_already_in_sync(data).await? {
+            return Ok(());
+        }
 
-        let next_flow_step = self.next_flow_step(db_session).await?;
+        println!("Validating conflicts");
+
+        let prev_flow_step = self.prev_flow_step(data).await?.lock()?;
+        println!("prev_flow_step");
+        let prev_flow_step_id = prev_flow_step.as_ref().map(|fs| fs.id);
+        let prev_flow_step_next_flow_step_id = prev_flow_step.as_ref().map(|fs| fs.next_flow_step_id);
+
+        println!("find next flow step {:?}", self.next_flow_step_id);
+        let next_flow_step = self.next_flow_step(data).await?.lock()?;
+        println!("next_flow_step");
         let next_flow_step_id = next_flow_step.as_ref().map(|fs| fs.id);
-        let next_flow_step_prev_flow_step_id = next_flow_step.map(|fs| fs.prev_flow_step_id);
+        let next_flow_step_prev_flow_step_id = next_flow_step.as_ref().map(|fs| fs.prev_flow_step_id);
 
         match (prev_flow_step_id, next_flow_step_id) {
             (Some(_), Some(_)) => {
@@ -105,9 +113,19 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn calculate_index(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let prev_flow_step_index = self.prev_flow_step(db_session).await?.map(|fs| fs.flow_index);
-        let next_flow_step_index = self.next_flow_step(db_session).await?.map(|fs| fs.flow_index);
+    pub async fn calculate_index(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let prev_flow_step_index = self
+            .prev_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.flow_index);
+        let next_flow_step_index = self
+            .next_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.flow_index);
 
         match (prev_flow_step_index, next_flow_step_index) {
             (Some(prev_flow_step_index), Some(next_flow_step_index)) => {
@@ -128,12 +146,22 @@ impl FlowStep {
     }
 
     pub async fn sync_surrounding_fs_on_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.sync_surrounding_fs.map_or(true, |v| v) && !self.siblings_already_in_sync(data.db_session()).await? {
+        if self.siblings_already_in_sync(data).await? {
             return Ok(());
         }
 
-        let mut prev_flow_step = self.prev_flow_step(data.db_session()).await?.map(|fs| fs.as_native());
-        let mut next_flow_step = self.next_flow_step(data.db_session()).await?.map(|fs| fs.as_native());
+        let mut prev_flow_step = self
+            .prev_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.as_native());
+        let mut next_flow_step = self
+            .next_flow_step(data)
+            .await?
+            .lock()?
+            .as_ref()
+            .map(|fs| fs.as_native());
 
         match (prev_flow_step.as_mut(), next_flow_step.as_mut()) {
             (Some(prev_fs), Some(next_fs)) => {
@@ -176,14 +204,24 @@ impl FlowStep {
         Ok(())
     }
 
+    pub async fn preserve_branch_flow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            Flow::find_or_insert_branched(
+                data,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.flow_id,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
-
-            Flow::find_or_insert_branched(data.db_session(), &params, self.flow_id).await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }

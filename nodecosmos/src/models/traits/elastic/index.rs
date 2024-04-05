@@ -4,7 +4,7 @@ use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesExistsParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -73,7 +73,7 @@ impl<T: ElasticIndex> BuildIndex for T {
         });
 
         if !response.status_code().is_success() {
-            eprintln!("Failed Elasticsearch operation. Debug info: ...");
+            error!("Failed Elasticsearch operation. Debug info: ...");
 
             panic!(
                 "Failed to handle node index: {}! Response body: {}",

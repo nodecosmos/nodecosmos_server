@@ -11,6 +11,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
+use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -130,7 +131,7 @@ impl User {
 
     fn set_password(&mut self) -> Result<(), NodecosmosError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
-            println!("{}", "error hashing password".bright_red().bold());
+            error!("{}", "error hashing password".bright_red().bold());
 
             NodecosmosError::InternalServerError(
                 "There was an error processing your request. Please try again later.".to_string(),

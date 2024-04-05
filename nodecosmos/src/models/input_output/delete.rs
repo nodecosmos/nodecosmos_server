@@ -1,18 +1,48 @@
 use crate::api::data::RequestData;
+use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
+use crate::models::flow_step::FlowStep;
 use crate::models::input_output::Io;
-use charybdis::batch::ModelBatch;
+use crate::models::workflow::Workflow;
 use scylla::CachingSession;
 
 impl Io {
     pub async fn pull_from_initial_input_ids(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let id = self.id;
-        let workflow = self.workflow(db_session).await?;
+        Workflow {
+            root_id: self.root_id,
+            branch_id: self.branch_id,
+            node_id: self.node_id,
+            ..Default::default()
+        }
+        .pull_initial_input_ids(&vec![self.id])
+        .execute(db_session)
+        .await?;
 
-        let initial_input_ids = workflow.initial_input_ids.as_ref().unwrap();
+        Ok(())
+    }
 
-        if initial_input_ids.contains(&id) {
-            workflow.pull_initial_input_ids(&vec![id]).execute(db_session).await?;
+    pub async fn pull_from_flow_steps_inputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if let Some(flow_step_ids) = &self.inputted_by_flow_steps {
+            let flow_steps = FlowStep::find_by_node_id_and_branch_id_and_ids(
+                data.db_session(),
+                self.node_id,
+                self.branch_id,
+                flow_step_ids,
+            )
+            .await?;
+
+            for flow_step in &mut flow_steps.chunks(MAX_PARALLEL_REQUESTS) {
+                let mut flow_step = flow_step.to_vec();
+                let mut futures = vec![];
+
+                for flow_step in &mut flow_step {
+                    let future = flow_step.pull_input_id(data, self.id);
+
+                    futures.push(future);
+                }
+
+                futures::future::try_join_all(futures).await?;
+            }
         }
 
         Ok(())
@@ -24,42 +54,6 @@ impl Io {
 
         if let Some(flow_step) = &mut flow_step.as_mut() {
             flow_step.pull_output_id(data, id).await?;
-        }
-
-        Ok(())
-    }
-
-    // remove output as input from next workflow step
-    pub async fn pull_from_next_workflow_step(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let current_step_wf_index;
-        let flow_step_id = self.flow_step_id;
-        let id = self.id;
-        let workflow = self.workflow(data.db_session()).await?;
-
-        let diagram = workflow.diagram(data.db_session()).await?;
-
-        // get current workflow index of flow step
-        if let Some(flow_step_id) = flow_step_id {
-            let wf_index = diagram.workflow_index(flow_step_id);
-
-            if let Some(wf_index) = wf_index {
-                current_step_wf_index = wf_index;
-            } else {
-                return Err(NodecosmosError::InternalServerError("MissingFlowStepIndex".to_string()));
-            }
-        } else {
-            current_step_wf_index = 0;
-        }
-
-        // get next flow steps within diagram
-        let next_wf_index = current_step_wf_index + 1;
-        let next_flow_steps = diagram.flow_steps_by_wf_index(next_wf_index)?;
-
-        if let Some(mut next_flow_steps) = next_flow_steps {
-            for flow_step in next_flow_steps.iter_mut() {
-                let mut flow_step = flow_step.lock()?;
-                flow_step.pull_input_id(data, id).await?;
-            }
         }
 
         Ok(())

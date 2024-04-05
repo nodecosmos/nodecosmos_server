@@ -11,7 +11,7 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::node::Descendants;
-use crate::models::traits::ref_cloned::RefCloned;
+use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument, Pluck};
 use crate::models::workflow::DeleteWorkflow;
 use charybdis::batch::ModelBatch;

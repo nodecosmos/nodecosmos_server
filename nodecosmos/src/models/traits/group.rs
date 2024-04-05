@@ -27,11 +27,12 @@ impl<T: Model + Id> GroupById<T> for CharybdisModelStream<T> {
     }
 }
 
-pub trait GroupByObjId<T: Model + ObjectId> {
-    async fn group_by_obj_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError>;
+pub trait GroupByObjectId<T: Model + ObjectId> {
+    async fn group_by_object_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError>;
 }
-impl<T: Model + ObjectId> GroupByObjId<T> for CharybdisModelStream<T> {
-    async fn group_by_obj_id(mut self) -> Result<HashMap<Uuid, T>, NodecosmosError> {
+
+impl<T: Model + ObjectId> GroupByObjectId<T> for CharybdisModelStream<T> {
+    async fn group_by_object_id(mut self) -> Result<HashMap<Uuid, T>, NodecosmosError> {
         let mut map: HashMap<Uuid, T> = HashMap::new();
 
         while let Some(result) = self.next().await {

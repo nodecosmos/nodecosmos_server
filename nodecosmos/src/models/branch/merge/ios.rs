@@ -3,8 +3,8 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
 use crate::models::input_output::{find_update_title_io, Io, UpdateTitleIo};
-use crate::models::traits::context::ModelContext;
-use crate::models::traits::{Branchable, GroupById, GroupByObjId, Pluck};
+use crate::models::traits::ModelContext;
+use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::udts::TextChange;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize)]
 pub struct MergeIos {
     restored_ios: Option<Vec<Io>>,
-    created_ios: Option<Vec<Io>>,
+    pub created_ios: Option<Vec<Io>>,
     deleted_ios: Option<Vec<Io>>,
     edited_title_ios: Option<Vec<UpdateTitleIo>>,
     edited_io_descriptions: Option<Vec<Description>>,
@@ -114,6 +114,8 @@ impl MergeIos {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
+        println!("original_title_ios");
+
         let root_id = branch.node(&db_session).await?.root_id;
 
         if let Some(ids) = &branch.edited_title_ios {
@@ -138,7 +140,7 @@ impl MergeIos {
             let ios_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
-                .group_by_obj_id()
+                .group_by_object_id()
                 .await?;
 
             return Ok(Some(ios_by_id));

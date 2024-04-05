@@ -68,7 +68,7 @@ pub async fn delete_flow_step(data: RequestData, flow_step: web::Path<FlowStep>)
         .await?;
 
     let mut flow_step = FlowStep::find_or_insert_branched(
-        data.db_session(),
+        &data,
         &WorkflowParams {
             node_id: flow_step.node_id,
             branch_id: flow_step.branch_id,

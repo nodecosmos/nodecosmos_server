@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
+use crate::models::branch::{AcceptedFlowSolution, Branch};
 use crate::models::traits::Authorization;
 use actix_web::{put, web, HttpResponse};
 use charybdis::types::Uuid;
@@ -25,7 +25,7 @@ pub async fn restore_node(data: RequestData, params: web::Json<BranchNodeParams>
 
     Branch::update(&data, params.branch_id, BranchUpdate::RestoreNode(params.node_id)).await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -37,9 +37,14 @@ pub async fn undo_delete_node(data: RequestData, params: web::Json<BranchNodePar
 
     branch.auth_update(&data).await?;
 
-    Branch::update(&data, params.branch_id, BranchUpdate::UndoDeleteNode(params.node_id)).await?;
+    Branch::update(
+        &data,
+        params.branch_id,
+        BranchUpdate::UndoDeleteNodes(vec![params.node_id]),
+    )
+    .await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -62,7 +67,7 @@ pub async fn restore_io(data: RequestData, params: web::Json<BranchIoParams>) ->
 
     Branch::update(&data, params.branch_id, BranchUpdate::RestoreIo(params.io_id)).await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -76,7 +81,7 @@ pub async fn undo_delete_io(data: RequestData, params: web::Json<BranchIoParams>
 
     Branch::update(&data, params.branch_id, BranchUpdate::UndoDeleteIo(params.io_id)).await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -99,7 +104,7 @@ pub async fn restore_flow(data: RequestData, params: web::Json<BranchFlowParams>
 
     Branch::update(&data, params.branch_id, BranchUpdate::RestoreFlow(params.flow_id)).await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -113,7 +118,37 @@ pub async fn undo_delete_flow(data: RequestData, params: web::Json<BranchFlowPar
 
     Branch::update(&data, params.branch_id, BranchUpdate::UndoDeleteFlow(params.flow_id)).await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().json(branch))
+}
+
+#[derive(Deserialize)]
+pub struct BranchFlowSolutionParams {
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
+
+    #[serde(rename = "nodeId")]
+    pub flow_id: Uuid,
+
+    pub solution: AcceptedFlowSolution,
+}
+
+#[put("/accept_flow_solution")]
+pub async fn accept_flow_solution(data: RequestData, params: web::Json<BranchFlowSolutionParams>) -> Response {
+    let params = params.into_inner();
+    let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
+
+    branch.auth_update(&data).await?;
+
+    Branch::update(
+        &data,
+        params.branch_id,
+        BranchUpdate::AcceptFlowSolution(params.flow_id, params.solution),
+    )
+    .await?;
+
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -141,7 +176,7 @@ pub async fn restore_flow_step(data: RequestData, params: web::Json<BranchFlowSt
     )
     .await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
@@ -160,7 +195,7 @@ pub async fn undo_delete_flow_step(data: RequestData, params: web::Json<BranchFl
     )
     .await?;
 
-    let _ = branch.check_conflicts(data.db_session()).await;
+    branch.reload(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }

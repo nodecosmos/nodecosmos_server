@@ -1,19 +1,19 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
-    Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
-    UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
-    UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
-    UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
-    UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
-    UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
-    UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
-    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodeWorkflowsBranch,
-    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes, UpdateRestoredFlowStepsBranch,
-    UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
+    AcceptedFlowSolution, Branch, UpdateAcceptedFlowSolutionBranch, UpdateCreatedFlowStepInputsByNodeBranch,
+    UpdateCreatedFlowStepNodesBranch, UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch,
+    UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch,
+    UpdateCreatedWorkflowInitialInputsBranch, UpdateDeletedFlowStepInputsByNodeBranch,
+    UpdateDeletedFlowStepNodesBranch, UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
+    UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
+    UpdateDeletedWorkflowInitialInputsBranch, UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch,
+    UpdateEditedDescriptionNodesBranch, UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch,
+    UpdateEditedNodeWorkflowsBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes,
+    UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
 use crate::models::traits::Merge;
-use crate::models::udts::{BranchReorderData, TextChange};
+use crate::models::udts::BranchReorderData;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::Update;
@@ -40,12 +40,7 @@ pub enum BranchUpdate {
     RestoreFlow(Uuid),
     EditFlowTitle(Uuid),
     EditFlowDescription(Uuid),
-    CreateIo(Uuid),
-    DeleteIo(Uuid),
-    UndoDeleteIo(Uuid),
-    RestoreIo(Uuid),
-    EditIoTitle(Uuid),
-    EditIoDescription(Uuid),
+    AcceptFlowSolution(Uuid, AcceptedFlowSolution),
     CreateFlowStep(Uuid),
     DeleteFlowStep(Uuid),
     UndoDeleteFlowStep(Uuid),
@@ -57,30 +52,18 @@ pub enum BranchUpdate {
     DeletedFlowStepInputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
     CreatedFlowStepOutputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
     DeletedFlowStepOutputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
+    CreateIo(Uuid),
+    DeleteIo(Uuid),
+    UndoDeleteIo(Uuid),
+    RestoreIo(Uuid),
+    EditIoTitle(Uuid),
+    EditIoDescription(Uuid),
 }
 
 impl Branch {
-    async fn check_branch_conflicts(data: &RequestData, branch_id: Uuid) {
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            let branch = Branch::find_by_id(branch_id).execute(data.db_session()).await;
-
-            return match branch {
-                Ok(mut branch) => {
-                    let res = branch.check_conflicts(data.db_session()).await;
-
-                    if let Err(err) = res {
-                        error!("Failed to check_conflicts: {}", err);
-                    }
-                }
-                Err(err) => error!("Failed to find branch: {}", err),
-            };
-        });
-    }
-
     pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
+        let mut check_conflicts = false;
 
         match update {
             BranchUpdate::CreateNode(id) => {
@@ -93,15 +76,21 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteNodes(ids) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
                 let params = (ids, branch_id);
 
                 res = batch
-                    .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, params.clone())
-                    .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, params.clone())
-                    .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, params)
+                    .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, &params)
+                    .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, &params)
+                    .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, &params)
+                    .append_statement(
+                        UpdateEditedNodeWorkflowsBranch::PULL_EDITED_WORKFLOW_NODES_QUERY,
+                        &params,
+                    )
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::UndoDeleteNodes(ids) => {
                 res = UpdateDeletedNodesBranch {
@@ -111,17 +100,21 @@ impl Branch {
                 .pull_deleted_nodes(ids)
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::RestoreNode(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
                 let params = (vec![id], branch_id);
 
                 res = batch
-                    .append_statement(UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY, params.clone())
-                    .append_statement(UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY, params)
+                    .append_statement(UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY, &params)
+                    .append_statement(UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY, &params)
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::EditNodeTitle(id) => {
                 res = UpdateEditedTitleNodesBranch {
@@ -165,6 +158,8 @@ impl Branch {
                         return Err(err.into());
                     }
                 }
+
+                check_conflicts = true;
             }
             BranchUpdate::EditNodeWorkflow(id) => {
                 res = UpdateEditedNodeWorkflowsBranch {
@@ -212,14 +207,14 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
                 let params = (vec![id], branch_id);
 
                 res = batch
-                    .append_statement(UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY, params.clone())
-                    .append_statement(UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY, params.clone())
-                    .append_statement(UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY, params)
+                    .append_statement(UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
             }
@@ -231,17 +226,21 @@ impl Branch {
                 .pull_deleted_flows(&vec![id])
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true
             }
             BranchUpdate::RestoreFlow(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
                 let params = (vec![id], branch_id);
 
                 res = batch
-                    .append_statement(UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY, params.clone())
-                    .append_statement(UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY, params)
+                    .append_statement(UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::EditFlowTitle(id) => {
                 res = UpdateEditedFlowTitleBranch {
@@ -261,64 +260,18 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::CreateIo(id) => {
-                res = UpdateCreatedIosBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_created_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteIo(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
-
-                let params = (vec![id], branch_id);
-
-                res = batch
-                    .append_statement(UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY, params.clone())
-                    .append_statement(UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY, params.clone())
-                    .append_statement(UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, params)
+            BranchUpdate::AcceptFlowSolution(id, solution) => {
+                let mut branch = UpdateAcceptedFlowSolutionBranch::find_by_id(branch_id)
                     .execute(data.db_session())
-                    .await;
-            }
-            BranchUpdate::UndoDeleteIo(id) => {
-                res = UpdateDeletedIosBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_deleted_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::RestoreIo(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                    .await?;
 
-                let params = (vec![id], branch_id);
+                branch
+                    .accepted_flow_solutions
+                    .get_or_insert_with(HashMap::new)
+                    .insert(id, solution.to_string());
 
-                res = batch
-                    .append_statement(UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY, params.clone())
-                    .append_statement(UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY, params)
-                    .execute(data.db_session())
-                    .await;
-            }
-            BranchUpdate::EditIoTitle(id) => {
-                res = UpdateEditedTitleIosBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_edited_title_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditIoDescription(id) => {
-                res = UpdateEditedDescriptionIosBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_edited_description_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
+                res = branch.update().execute(data.db_session()).await;
+                check_conflicts = true
             }
             BranchUpdate::CreateFlowStep(id) => {
                 res = UpdateCreatedFlowStepsBranch {
@@ -330,22 +283,18 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
                 let params = (vec![id], branch_id);
 
                 res = batch
-                    .append_statement(
-                        UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY,
-                        params.clone(),
-                    )
-                    .append_statement(
-                        UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY,
-                        params.clone(),
-                    )
-                    .append_statement(UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY, params)
+                    .append_statement(UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::UndoDeleteFlowStep(id) => {
                 res = UpdateDeletedFlowStepsBranch {
@@ -355,20 +304,21 @@ impl Branch {
                 .pull_deleted_flow_steps(&vec![id])
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true
             }
             BranchUpdate::RestoreFlowStep(id) => {
-                let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
                 let params = (vec![id], branch_id);
 
                 res = batch
-                    .append_statement(
-                        UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY,
-                        params.clone(),
-                    )
-                    .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, params)
+                    .append_statement(UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::EditFlowStepDescription(id) => {
                 res = UpdateEditedDescriptionFlowStepsBranch {
@@ -433,13 +383,85 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
+            BranchUpdate::CreateIo(id) => {
+                res = UpdateCreatedIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_created_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::DeleteIo(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY, &params)
+                    .append_statement(UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY, &params)
+                    .append_statement(UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::UndoDeleteIo(id) => {
+                res = UpdateDeletedIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .pull_deleted_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::RestoreIo(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY, &params)
+                    .append_statement(UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::EditIoTitle(id) => {
+                res = UpdateEditedTitleIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_title_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::EditIoDescription(id) => {
+                res = UpdateEditedDescriptionIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_description_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
         }
 
         if let Err(err) = res {
             error!("Failed to update branch: {}", err)
         }
 
-        Self::check_branch_conflicts(data, branch_id).await;
+        if check_conflicts {
+            let _ = Branch::find_by_id(branch_id)
+                .execute(data.db_session())
+                .await?
+                .check_conflicts(data)
+                .await
+                .map_err(|err| {
+                    error!("Failed to check conflicts: {}", err);
+                });
+        }
 
         Ok(())
     }

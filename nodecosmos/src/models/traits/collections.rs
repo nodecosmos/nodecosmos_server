@@ -1,6 +1,52 @@
 use charybdis::types::Uuid;
 use std::collections::{HashMap, HashSet};
 
+pub trait ToHashSet<T> {
+    fn to_hash_set(self) -> HashSet<T>;
+}
+
+impl<T> ToHashSet<T> for Vec<T>
+where
+    T: std::hash::Hash + Eq,
+{
+    fn to_hash_set(self) -> HashSet<T> {
+        self.into_iter().collect()
+    }
+}
+
+/// Trait to convert a HashMap with Vec values to a HashMap with HashSet values
+pub trait HashMapVecValToSet<T> {
+    fn hash_map_vec_val_to_set(self) -> HashMap<T, HashSet<T>>;
+}
+
+impl<T: std::hash::Hash + Eq> HashMapVecValToSet<T> for HashMap<T, Vec<T>> {
+    fn hash_map_vec_val_to_set(self) -> HashMap<T, HashSet<T>> {
+        self.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
+    }
+}
+
+pub trait RefCloned<T> {
+    type Iterable<I>;
+
+    fn ref_cloned(&self) -> Self::Iterable<T>;
+}
+
+impl<T: Clone> RefCloned<T> for Option<Vec<T>> {
+    type Iterable<I> = Vec<T>;
+
+    fn ref_cloned(&self) -> Vec<T> {
+        self.as_ref().cloned().unwrap_or_default()
+    }
+}
+
+impl<T: Clone> RefCloned<T> for Option<HashSet<T>> {
+    type Iterable<I> = HashSet<T>;
+
+    fn ref_cloned(&self) -> HashSet<T> {
+        self.as_ref().cloned().unwrap_or_default()
+    }
+}
+
 pub trait Merge: Sized {
     fn merge(&mut self, other: Self);
 
@@ -117,5 +163,33 @@ impl<T: Merge> Merge for Option<T> {
                 self_map.unmerge(other);
             }
         }
+    }
+}
+
+pub trait ChainOptRef<'a, T> {
+    fn chain_opt_ref(&'a self, other: &'a Option<Vec<T>>) -> Option<Vec<&'a T>>;
+}
+
+impl<'a, T> ChainOptRef<'a, T> for Option<Vec<T>> {
+    fn chain_opt_ref(&'a self, other: &'a Option<Vec<T>>) -> Option<Vec<&'a T>> {
+        match (self, other) {
+            (Some(vec1), Some(vec2)) => {
+                let res = vec1.iter().chain(vec2.iter()).collect::<Vec<&T>>();
+                Some(res)
+            }
+            (Some(vec1), None) => Some(vec1.iter().collect()),
+            (None, Some(vec2)) => Some(vec2.iter().collect()),
+            (None, None) => None,
+        }
+    }
+}
+
+pub trait HashMapVecToSet<T> {
+    fn hash_map_vec_to_set(self) -> HashMap<T, HashSet<T>>;
+}
+
+impl<T: std::hash::Hash + Eq> HashMapVecToSet<T> for HashMap<T, Vec<T>> {
+    fn hash_map_vec_to_set(self) -> HashMap<T, HashSet<T>> {
+        self.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
     }
 }

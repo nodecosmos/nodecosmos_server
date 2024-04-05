@@ -1,6 +1,7 @@
 mod traits;
 
 use darling::{FromDeriveInput, FromField};
+use log::warn;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
@@ -338,6 +339,86 @@ pub fn object_id_derive(input: TokenStream) -> TokenStream {
         impl crate::models::traits::ObjectId for #name {
             fn object_id(&self) -> Uuid {
                 self.object_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(FlowId)]
+pub fn pluck_flow_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "flow_id",
+            None => false,
+        };
+    });
+
+    if id.is_none() {
+        panic!("Struct must have `flow_id` field to derive FlowId");
+    }
+
+    let expanded = quote! {
+        impl crate::models::traits::FlowId for #name {
+            fn flow_id(&self) -> Uuid {
+                self.flow_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(MaybeFlowId)]
+pub fn maybe_flow_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "flow_id",
+            None => false,
+        };
+    });
+
+    if id.is_none() {
+        warn!("Struct must have `flow_id` field to derive MaybeFlowId");
+        return TokenStream::new();
+    }
+
+    let expanded = quote! {
+        impl crate::models::traits::MaybeFlowId for #name {
+            fn maybe_flow_id(&self) -> Option<Uuid> {
+                self.flow_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(MaybeFlowStepId)]
+pub fn maybe_flow_step_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "flow_step_id",
+            None => false,
+        };
+    });
+
+    if id.is_none() {
+        warn!("Struct must have `flow_id` field to derive MaybeFlowStepId");
+        return TokenStream::new();
+    }
+
+    let expanded = quote! {
+        impl crate::models::traits::MaybeFlowStepId for #name {
+            fn maybe_flow_step_id(&self) -> Option<Uuid> {
+                self.flow_step_id
             }
         }
     };

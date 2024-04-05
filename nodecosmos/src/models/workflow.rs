@@ -1,16 +1,13 @@
-pub mod diagram;
 mod update_initial_inputs;
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::flow::Flow;
 use crate::models::input_output::Io;
 use crate::models::node::Node;
-use crate::models::traits::context::Context;
 use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
-use crate::models::workflow::diagram::WorkflowDiagram;
+use crate::models::traits::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -18,14 +15,16 @@ use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-/// Workflow model
+/// ### Workflow structure
+/// - Each `Workflow` has multiple `Flows`
+/// - Each `Flow` represents isolated process within the `Workflow`
+/// - Each `Flow` has multiple `FlowSteps`
+/// - Each `FlowStep` represents a single step within a `Flow`
 ///
-/// We only support one workflow per node.
-///
-/// Single `Workflow` can have multiple `Flows`.
-/// `Flow` represents isolated process within `Workflow`.
-/// Single `Flow` can have many `FlowSteps`.
-/// `FlowSteps` contains inputs, nodes and outputs.
+/// In back-end we don't have `WorkflowSteps` so in front-end we have to build
+/// them by understanding that each `WorkflowStep` have corresponding `FlowSteps` that are calculated
+/// by `Flow.startIndex` + index of a `FlowStep` within `Flow`.
+/// Each Flow starting position, within the `Workflow`, is determined by `flow.startIndex` attribute.
 #[charybdis_model(
     table_name = workflows,
     partition_keys = [node_id],
@@ -48,10 +47,6 @@ pub struct Workflow {
 
     #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub diagram: Option<WorkflowDiagram>,
 
     #[serde(rename = "createdAt", default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -121,28 +116,6 @@ impl Workflow {
             },
         )
         .await
-    }
-
-    pub async fn diagram(&mut self, db_session: &CachingSession) -> Result<&mut WorkflowDiagram, NodecosmosError> {
-        if self.diagram.is_none() {
-            let diagram = WorkflowDiagram::build(db_session, self).await?;
-            self.diagram = Some(diagram);
-        }
-
-        Ok(self.diagram.as_mut().expect("Diagram should be initialized"))
-    }
-
-    pub async fn flows(&self, db_session: &CachingSession) -> Result<Vec<Flow>, NodecosmosError> {
-        let flows = Flow::branched(
-            db_session,
-            &WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            },
-        )
-        .await?;
-
-        Ok(flows)
     }
 }
 

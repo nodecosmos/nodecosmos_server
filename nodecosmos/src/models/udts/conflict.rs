@@ -1,9 +1,8 @@
 use charybdis::macros::charybdis_udt_model;
 use charybdis::types::{Frozen, Set, Text, Uuid};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
-#[derive(Eq, PartialEq, Default)]
+#[derive(Eq, PartialEq, Default, strum_macros::Display, strum_macros::EnumString)]
 pub enum ConflictStatus {
     #[default]
     Pending,
@@ -11,16 +10,7 @@ pub enum ConflictStatus {
     Resolved,
 }
 
-impl fmt::Display for ConflictStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConflictStatus::Pending => write!(f, "Pending"),
-            ConflictStatus::Resolved => write!(f, "Resolved"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Default, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Eq, PartialEq, Clone)]
 #[charybdis_udt_model(type_name = conflict)]
 pub struct Conflict {
     pub status: Text,
@@ -39,4 +29,7 @@ pub struct Conflict {
 
     #[serde(rename = "deletedEditedFlowStepItems")]
     pub deleted_edited_ios: Option<Frozen<Set<Uuid>>>,
+
+    #[serde(rename = "divergedFlows")]
+    pub diverged_flows: Option<Frozen<Set<Uuid>>>,
 }

@@ -5,27 +5,21 @@ use crate::models::description::{find_description, Description, ObjectType};
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::traits::context::ModelContext;
-use crate::models::traits::ref_cloned::RefCloned;
-use crate::models::traits::{Branchable, GroupById, GroupByObjId, Pluck};
+use crate::models::traits::ModelContext;
+use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::udts::{BranchReorderData, TextChange};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::{Frozen, List, Set, Uuid};
+use charybdis::types::{Frozen, List, Uuid};
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-enum DelAncNode<'a> {
-    Node(&'a Node),
-    PkNode(&'a PkNode),
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct MergeNodes {
-    restored_nodes: Option<Vec<Node>>,
-    created_nodes: Option<Vec<Node>>,
-    deleted_nodes: Option<Vec<Node>>,
+    pub restored_nodes: Option<Vec<Node>>,
+    pub created_nodes: Option<Vec<Node>>,
+    pub deleted_nodes: Option<Vec<Node>>,
     reordered_nodes_data: Option<Vec<BranchReorderData>>,
     edited_title_nodes: Option<Vec<UpdateTitleNode>>,
     edited_node_descriptions: Option<Vec<Description>>,
@@ -178,7 +172,7 @@ impl MergeNodes {
             let nodes_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
                 .execute(db_session)
                 .await?
-                .group_by_obj_id()
+                .group_by_object_id()
                 .await?;
 
             return Ok(Some(nodes_by_id));
@@ -240,130 +234,6 @@ impl MergeNodes {
                 merge_node.delete_cb(data).execute(data.db_session()).await?;
             }
         }
-
-        Ok(())
-    }
-
-    pub async fn check_conflicts(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {}
-
-    async fn extract_created_nodes_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(created_nodes) = &self.created_nodes {
-            for created_node in created_nodes {
-                self.extract_deleted_ancestors(db_session, branch, DelAncNode::Node(created_node))
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
-    async fn extract_edited_description_nodes_conflicts(
-        &self,
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<(), NodecosmosError> {
-        let created_node_ids = branch.created_nodes.ref_cloned();
-        let restored_node_ids = branch.restored_nodes.ref_cloned();
-        let deleted_node_ids = branch.deleted_nodes.ref_cloned();
-        let mut deleted_edited_nodes = HashSet::new();
-
-        if let Some(edit_description_node_ids) = &branch.edited_description_nodes {
-            let edit_description_node_ids = edit_description_node_ids
-                .iter()
-                .filter_map(|id| {
-                    if created_node_ids.contains(id) || deleted_node_ids.contains(id) {
-                        None
-                    } else {
-                        Some(*id)
-                    }
-                })
-                .collect::<Vec<Uuid>>();
-
-            // check ancestors of edited description nodes
-            let desc_branched_nodes =
-                PkNode::find_by_ids_and_branch_id(&db_session, &edit_description_node_ids, branch.id).await?;
-
-            for node in &desc_branched_nodes {
-                self.extract_deleted_ancestors(db_session, DelAncNode::PkNode(&node))
-                    .await?;
-            }
-
-            let original_nodes_ids = PkNode::find_by_ids(&db_session, &edit_description_node_ids)
-                .await?
-                .pluck_id_set();
-
-            let deleted_edited_desc_nodes = edit_description_node_ids
-                .iter()
-                .filter_map(|id| {
-                    if original_nodes_ids.contains(id) || restored_node_ids.contains(id) {
-                        None
-                    } else {
-                        Some(*id)
-                    }
-                })
-                .collect::<Set<Uuid>>();
-
-            deleted_edited_nodes.extend(deleted_edited_desc_nodes);
-        }
-
-        if deleted_edited_nodes.len() > 0 {
-            self.deleted_edited_nodes = Some(deleted_edited_nodes);
-        }
-
-        Ok(())
-    }
-
-    async fn extract_deleted_ancestors(
-        &mut self,
-        db_session: &CachingSession,
-        branch: &mut Branch,
-        del_anc_node: DelAncNode<'_>,
-    ) -> Result<(), NodecosmosError> {
-        let created_node_ids = branch.created_nodes.ref_cloned();
-        let restored_node_ids = branch.restored_nodes.ref_cloned();
-        let deleted_node_ids = branch.deleted_nodes.ref_cloned();
-        let ancestor_id = match del_anc_node {
-            DelAncNode::Node(node) => node.ancestor_ids.ref_cloned(),
-            DelAncNode::PkNode(pk_node) => pk_node.ancestor_ids.ref_cloned(),
-        };
-
-        let branch_ancestor_ids = ancestor_id
-            .iter()
-            .filter_map(|id| {
-                if created_node_ids.contains(id) || restored_node_ids.contains(id) || deleted_node_ids.contains(id) {
-                    None
-                } else {
-                    Some(*id)
-                }
-            })
-            .collect::<Vec<Uuid>>();
-
-        let original_ancestor_ids_set = PkNode::find_by_ids(&db_session, &branch_ancestor_ids)
-            .await?
-            .pluck_id_set();
-
-        let branch_node_deleted_ancestor_ids = branch_ancestor_ids
-            .iter()
-            .filter_map(|id| {
-                if original_ancestor_ids_set.contains(id) {
-                    None
-                } else {
-                    Some(*id)
-                }
-            })
-            .collect::<Set<Uuid>>();
-
-        if branch_node_deleted_ancestor_ids.is_empty() {
-            return Ok(());
-        }
-
-        branch.deleted_ancestors = match self.deleted_ancestors.as_mut() {
-            Some(deleted_ancestors) => {
-                let mut deleted_ancestors = deleted_ancestors.clone();
-                deleted_ancestors.extend(branch_node_deleted_ancestor_ids);
-                Some(deleted_ancestors)
-            }
-            None => Some(branch_node_deleted_ancestor_ids),
-        };
 
         Ok(())
     }

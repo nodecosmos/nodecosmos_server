@@ -9,7 +9,7 @@ pub enum ProfileType {
     Organization,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone)]
 #[charybdis_udt_model(type_name = profile)]
 pub struct Profile {
     pub id: Uuid,

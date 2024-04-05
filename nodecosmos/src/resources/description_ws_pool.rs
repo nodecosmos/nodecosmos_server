@@ -2,6 +2,7 @@ use actix::prelude::*;
 use actix_web_actors::ws;
 use charybdis::types::Uuid;
 use dashmap::DashMap;
+use log::error;
 use std::sync::Arc;
 
 type RoomId = Uuid;
@@ -39,7 +40,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for DescriptionWsConn
                 } else {
                     ctx.close(None);
                     ctx.stop();
-                    println!("No connections for node {}", self.room_id);
+                    error!("No connections for node {}", self.room_id);
                 }
             }
             Ok(ws::Message::Close(reason)) => {

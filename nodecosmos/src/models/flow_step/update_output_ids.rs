@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateOutputIdsFlowStep;
-use crate::models::traits::hash_map::HashMapVecValToSet;
+use crate::models::traits::HashMapVecToSet;
 use charybdis::model::AsNative;
 use charybdis::types::{Set, Uuid};
 use std::collections::{HashMap, HashSet};
@@ -16,12 +16,12 @@ impl UpdateOutputIdsFlowStep {
             let original_node_outputs: Option<HashMap<Uuid, HashSet<Uuid>>> = original
                 .output_ids_by_node_id
                 .clone()
-                .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_val_to_set());
+                .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_to_set());
 
             let branched_node_outputs: Option<HashMap<Uuid, HashSet<Uuid>>> = self
                 .output_ids_by_node_id
                 .clone()
-                .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_val_to_set());
+                .map(|output_ids_by_node_id| output_ids_by_node_id.hash_map_vec_to_set());
 
             let mut created_output_ids_by_node_id = HashMap::new();
             let mut removed_output_ids_by_node_id = HashMap::new();

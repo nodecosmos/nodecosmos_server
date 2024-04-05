@@ -4,7 +4,7 @@ use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::node::{Descendants, FindBranched, Parent};
-use crate::models::traits::ref_cloned::RefCloned;
+use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, Pluck};
 use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};

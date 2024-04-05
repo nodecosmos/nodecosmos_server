@@ -102,7 +102,7 @@ impl NodeCommit {
         branch_id: &Uuid,
     ) -> Result<Self, CharybdisError> {
         let res = find_first_node_commit!(
-            "node_id = ? AND branch_id in ? LIMIT 1",
+            "node_id = ? AND branch_id IN ? LIMIT 1",
             (node_id, vec![branch_id, node_id])
         )
         .execute(db_session)

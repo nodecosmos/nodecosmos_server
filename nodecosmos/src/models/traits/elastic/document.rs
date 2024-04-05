@@ -6,26 +6,14 @@ use elasticsearch::{BulkOperation, BulkOperations, BulkParts, DeleteParts, Elast
 use log::error;
 use serde::Serialize;
 use serde_json::json;
-use std::fmt::Display;
 
+#[derive(strum_macros::Display, strum_macros::EnumString)]
 pub enum ElasticDocumentOp {
     Add,
     Update,
     Delete,
     BulkUpdate,
     BulkDelete,
-}
-
-impl Display for ElasticDocumentOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ElasticDocumentOp::Add => write!(f, "Add"),
-            ElasticDocumentOp::Update => write!(f, "Update"),
-            ElasticDocumentOp::Delete => write!(f, "Delete"),
-            ElasticDocumentOp::BulkUpdate => write!(f, "Bulk Update"),
-            ElasticDocumentOp::BulkDelete => write!(f, "Bulk Delete"),
-        }
-    }
 }
 
 pub trait ElasticDocument<T: ElasticIndex + Serialize> {

@@ -5,8 +5,8 @@ use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::Branchable;
+use crate::models::traits::{Context, ModelContext};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::DeleteWithCallbacks;
@@ -67,16 +67,21 @@ impl Callbacks for Flow {
             self.update_branch_with_creation(data).await?;
         }
 
+        if self.is_default_context() || self.is_branched_init_context() {
+            self.preserve_branch_node(data).await?;
+        }
+
         Ok(())
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.update_branch_with_deletion(data).await?;
+        self.preserve_branch_node(data).await?;
 
         let flow_steps = self.flow_steps(db_session).await?;
 
         for mut flow_step in flow_steps {
-            flow_step.sync_surrounding_fs = Some(false);
+            flow_step.set_parent_delete_context();
             flow_step.delete_cb(data).execute(db_session).await?;
         }
 
@@ -169,3 +174,5 @@ impl Callbacks for UpdateTitleFlow {
 }
 
 partial_flow!(DeleteFlow, node_id, branch_id, start_index, vertical_index, id);
+
+partial_flow!(PkFlow, node_id, branch_id, start_index, vertical_index, id);

@@ -11,8 +11,8 @@ mod update_title;
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
-use crate::models::traits::context::{Context, ModelContext};
 use crate::models::traits::Branchable;
+use crate::models::traits::{Context, ModelContext};
 use crate::models::udts::Profile;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -112,7 +112,7 @@ impl Callbacks for Node {
             self.update_branch_with_creation(data).await?;
         }
 
-        self.preserve_ancestors_for_branch(data).await?;
+        self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 
         Ok(())
@@ -133,8 +133,8 @@ impl Callbacks for Node {
 
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.delete_related_data(data).await?;
-        self.preserve_ancestors_for_branch(data).await?;
-        self.preserve_descendants_for_branch(data).await?;
+        self.preserve_branch_ancestors(data).await?;
+        self.preserve_branch_descendants(data).await?;
         self.update_branch_with_deletion(data).await?;
 
         Ok(())

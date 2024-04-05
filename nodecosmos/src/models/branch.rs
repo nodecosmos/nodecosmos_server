@@ -1,12 +1,10 @@
-pub mod conflict;
-pub mod edit;
 pub mod merge;
 pub mod update;
 
 use crate::errors::NodecosmosError;
 use crate::models::description::ObjectType;
 use crate::models::node::Node;
-use crate::models::traits::{FindForBranchMerge, Id, ObjectId, Pluck};
+use crate::models::traits::{Id, ObjectId};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
@@ -29,6 +27,12 @@ impl BranchStatus {
     pub fn default() -> Option<String> {
         Some(BranchStatus::Open.to_string())
     }
+}
+
+#[derive(Eq, PartialEq, Deserialize, strum_macros::Display, strum_macros::EnumString)]
+pub enum AcceptedFlowSolution {
+    Original,
+    Branch,
 }
 
 #[charybdis_model(
@@ -116,6 +120,10 @@ pub struct Branch {
     #[serde(default, rename = "editedDescriptionFlows")]
     pub edited_description_flows: Option<Set<Uuid>>,
 
+    // flow_id -> AcceptedFlowSolution
+    #[serde(rename = "acceptedFlowSolutions")]
+    pub accepted_flow_solutions: Option<Frozen<Map<Uuid, Text>>>,
+
     // flow steps
     #[serde(default, rename = "createdFlowSteps")]
     pub created_flow_steps: Option<Set<Uuid>>,
@@ -183,6 +191,12 @@ pub struct Branch {
 }
 
 impl Branch {
+    pub async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        *self = Branch::find_by_id(self.id).execute(db_session).await?;
+
+        Ok(())
+    }
+
     pub async fn node(&self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if let Some(node) = self.node.get() {
             return Ok(node);
@@ -231,10 +245,10 @@ impl Branch {
         objects.into_iter().filter(|object| {
             !created_ids
                 .as_ref()
-                .map_or(false, |created_nodes| created_nodes.contains(&object.object_id()))
+                .map_or(false, |created_ids| created_ids.contains(&object.object_id()))
                 && !deleted_ids
                     .as_ref()
-                    .map_or(false, |deleted_nodes| deleted_nodes.contains(&object.object_id()))
+                    .map_or(false, |deleted_ids| deleted_ids.contains(&object.object_id()))
         })
     }
 
@@ -250,10 +264,10 @@ impl Branch {
         records.into_iter().filter(|record| {
             !created_ids
                 .as_ref()
-                .map_or(false, |created_nodes| created_nodes.contains(&record.id()))
+                .map_or(false, |created_ids| created_ids.contains(&record.id()))
                 && !deleted_ids
                     .as_ref()
-                    .map_or(false, |deleted_nodes| deleted_nodes.contains(&record.id()))
+                    .map_or(false, |deleted_ids| deleted_ids.contains(&record.id()))
         })
     }
 }
@@ -296,15 +310,7 @@ partial_branch!(UpdateEditedFlowTitleBranch, id, edited_title_flows);
 
 partial_branch!(UpdateEditedFlowDescriptionBranch, id, edited_description_flows);
 
-partial_branch!(UpdateCreatedIosBranch, id, created_ios);
-
-partial_branch!(UpdateDeletedIosBranch, id, deleted_ios);
-
-partial_branch!(UpdateRestoredIosBranch, id, restored_ios);
-
-partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
-
-partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
+partial_branch!(UpdateAcceptedFlowSolutionBranch, id, accepted_flow_solutions);
 
 partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 
@@ -345,3 +351,13 @@ partial_branch!(
     id,
     deleted_flow_step_outputs_by_node
 );
+
+partial_branch!(UpdateCreatedIosBranch, id, created_ios);
+
+partial_branch!(UpdateDeletedIosBranch, id, deleted_ios);
+
+partial_branch!(UpdateRestoredIosBranch, id, restored_ios);
+
+partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
+
+partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
