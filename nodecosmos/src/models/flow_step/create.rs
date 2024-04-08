@@ -52,58 +52,48 @@ impl FlowStep {
             return Ok(());
         }
 
-        println!("Validating conflicts");
-
         let prev_flow_step = self.prev_flow_step(data).await?.lock()?;
-        println!("prev_flow_step");
-        let prev_flow_step_id = prev_flow_step.as_ref().map(|fs| fs.id);
-        let prev_flow_step_next_flow_step_id = prev_flow_step.as_ref().map(|fs| fs.next_flow_step_id);
-
-        println!("find next flow step {:?}", self.next_flow_step_id);
         let next_flow_step = self.next_flow_step(data).await?.lock()?;
-        println!("next_flow_step");
-        let next_flow_step_id = next_flow_step.as_ref().map(|fs| fs.id);
-        let next_flow_step_prev_flow_step_id = next_flow_step.as_ref().map(|fs| fs.prev_flow_step_id);
 
-        match (prev_flow_step_id, next_flow_step_id) {
-            (Some(_), Some(_)) => {
-                if prev_flow_step_next_flow_step_id != Some(next_flow_step_id) {
+        match (prev_flow_step.as_ref(), next_flow_step.as_ref()) {
+            (Some(prev_flow_step), Some(next_flow_step)) => {
+                if prev_flow_step.next_flow_step_id != Some(next_flow_step.id) {
                     return Err(NodecosmosError::Conflict(format!(
                         r#"
                         The previous flow step's next flow step id ({:?})
-                        does not match the next flow step's prev_flow_step id ({:?})
+                        does not match the next flow step's id ({:?})
                         "#,
-                        prev_flow_step_next_flow_step_id, next_flow_step_prev_flow_step_id
+                        prev_flow_step.next_flow_step_id, next_flow_step.id
                     )));
                 }
 
-                if next_flow_step_prev_flow_step_id != Some(prev_flow_step_id) {
+                if next_flow_step.prev_flow_step_id != Some(prev_flow_step.id) {
                     return Err(NodecosmosError::Conflict(format!(
                         r#"
                         The next flow step's prev flow step id ({:?})
-                        does not match the previous flow step's next_flow_step id ({:?})
+                        does not match the previous flow step's id ({:?})
                         "#,
-                        next_flow_step_prev_flow_step_id, prev_flow_step_next_flow_step_id
+                        next_flow_step.prev_flow_step_id, prev_flow_step.id
                     )));
                 }
             }
-            (Some(prev_flow_step_id), None) => {
-                if prev_flow_step_next_flow_step_id.is_some() {
+            (Some(prev_flow_step), None) => {
+                if prev_flow_step.next_flow_step_id.is_some() {
                     return Err(NodecosmosError::Conflict(format!(
                         "The previous flow step's next flow step id is not null.
                          BranchId: {:?} Prev id: {:?}  next id: {:?} ",
-                        self.branch_id, prev_flow_step_id, prev_flow_step_next_flow_step_id
+                        self.branch_id, prev_flow_step.id, prev_flow_step.next_flow_step_id
                     )));
                 }
             }
-            (None, Some(_)) => {
-                if next_flow_step_prev_flow_step_id.is_some() {
+            (None, Some(next_flow_step)) => {
+                if next_flow_step.prev_flow_step_id.is_some() {
                     return Err(NodecosmosError::Conflict(format!(
                         r#"
                         The next flow step's prev flow step id is not null.
                         BranchId: {:?} Next id: {:?}  prev_id id: {:?},
                         "#,
-                        self.branch_id, next_flow_step_id, next_flow_step_prev_flow_step_id
+                        self.branch_id, next_flow_step.id, next_flow_step.prev_flow_step_id
                     )));
                 }
             }

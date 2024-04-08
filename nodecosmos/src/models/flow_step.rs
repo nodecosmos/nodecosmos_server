@@ -316,6 +316,7 @@ partial_flow_step!(
     flow_id,
     flow_index,
     id,
+    root_id,
     node_ids,
     input_ids_by_node_id,
     output_ids_by_node_id,

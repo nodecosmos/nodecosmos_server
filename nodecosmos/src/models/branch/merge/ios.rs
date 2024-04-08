@@ -114,8 +114,6 @@ impl MergeIos {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
-        println!("original_title_ios");
-
         let root_id = branch.node(&db_session).await?.root_id;
 
         if let Some(ids) = &branch.edited_title_ios {

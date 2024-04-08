@@ -21,16 +21,19 @@ pub trait ElasticDocument<T: ElasticIndex + Serialize> {
     async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &Vec<Uuid>);
 
     async fn handle_response_error(response: Response, op: ElasticDocumentOp) {
-        if !response.status_code().is_success() {
+        let status_code = response.status_code();
+        let res_txt = response.text().await.unwrap_or("No Body!".to_string());
+
+        if !status_code.is_success() {
             error!(
                 "\n{} {} {} \n{} {} \n{} {}\n",
                 "Failed to".bright_red().bold(),
                 op.to_string().bright_yellow(),
                 T::ELASTIC_IDX_NAME.bright_yellow(),
                 "Status:".bright_red().bold(),
-                response.status_code(),
+                status_code,
                 "Response body:".bright_red(),
-                response.text().await.unwrap_or("No Body!".to_string()).red(),
+                res_txt.red(),
             );
         }
     }

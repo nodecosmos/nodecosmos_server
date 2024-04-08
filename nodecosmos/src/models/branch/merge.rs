@@ -162,8 +162,13 @@ impl BranchMerge {
         })
     }
 
-    pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, NodecosmosError> {
-        MergeConflicts::new(&mut self).run_check(data).await?;
+    pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, MergeError> {
+        if let Err(e) = MergeConflicts::new(&mut self).run_check(data).await {
+            return Err(MergeError {
+                inner: e,
+                branch: self.branch,
+            });
+        }
 
         Ok(self)
     }
@@ -230,7 +235,6 @@ impl BranchMerge {
         }
     }
 
-    /// Merge the branch
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step < MergeStep::Finish {
             match self.merge_step {
@@ -377,7 +381,8 @@ impl Branch {
             .await
             .map_err(|e| e.inner)?
             .check_conflicts(data)
-            .await?;
+            .await
+            .map_err(|e| e.inner)?;
 
         merge.branch.update().execute(data.db_session()).await?;
 

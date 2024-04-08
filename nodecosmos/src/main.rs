@@ -16,12 +16,11 @@ async fn main() {
     let port = app.port();
 
     app.init().await;
-
-    // web data
     let app_web_data = web::Data::new(app);
-    let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
-
     HttpServer::new(move || {
+        // web data
+        let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
+
         ActixWebApp::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(app_web_data.cors())
