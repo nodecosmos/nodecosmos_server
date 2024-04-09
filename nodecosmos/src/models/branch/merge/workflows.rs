@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::traits::Merge;
 use crate::models::workflow::UpdateInitialInputsWorkflow;
-use charybdis::operations::UpdateWithCallbacks;
+use charybdis::operations::Update;
 use charybdis::types::Uuid;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -50,7 +50,7 @@ impl MergeWorkflows {
                 }
             }
 
-            workflow.update_cb(data).execute(data.db_session()).await?;
+            workflow.update().execute(data.db_session()).await?;
         }
 
         Ok(())
@@ -72,7 +72,7 @@ impl MergeWorkflows {
                 workflow.initial_input_ids.merge(Some(deleted_inputs.clone()));
             }
 
-            workflow.update_cb(data).execute(data.db_session()).await?;
+            workflow.update().execute(data.db_session()).await?;
         }
 
         Ok(())

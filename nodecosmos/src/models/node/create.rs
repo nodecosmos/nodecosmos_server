@@ -13,7 +13,7 @@ use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
 use charybdis::batch::ModelBatch;
-use charybdis::operations::{Find, Insert, InsertWithCallbacks};
+use charybdis::operations::{Find, Insert};
 use charybdis::types::{Set, Uuid};
 use elasticsearch::Elasticsearch;
 use futures::{stream, StreamExt, TryFutureExt};
@@ -320,9 +320,11 @@ impl Node {
             node_id: self.id,
             branch_id: self.branch_id,
             title: Some(format!("{} Workflow", self.title)),
-            ..Default::default()
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            initial_input_ids: None,
         }
-        .insert_cb(data)
+        .insert_if_not_exists()
         .execute(data.db_session())
         .map_err(|e| {
             error!("Error creating new workflow for node {}: {:?}", self.id, e);

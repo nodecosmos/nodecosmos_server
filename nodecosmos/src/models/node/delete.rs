@@ -4,7 +4,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
-use crate::models::input_output::DeleteIo;
+use crate::models::io::DeleteIo;
 use crate::models::like::Like;
 use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;

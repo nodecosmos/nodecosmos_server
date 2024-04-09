@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateNodeIdsFlowStep;
-use crate::models::input_output::Io;
+use crate::models::io::Io;
 use crate::models::traits::{RefCloned, ToHashSet};
 use charybdis::model::AsNative;
 use charybdis::operations::DeleteWithCallbacks;

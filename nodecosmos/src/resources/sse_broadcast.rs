@@ -27,7 +27,7 @@ impl SseBroadcast {
             sender.send(model_msg).map_err(|e| {
                 error!("Error sending message to room {}: {}", node_id, e);
 
-                NodecosmosError::BroadcastError(e)
+                NodecosmosError::BroadcastError(format!("Error sending message to room {}: {}", node_id, e))
             })?;
         }
 

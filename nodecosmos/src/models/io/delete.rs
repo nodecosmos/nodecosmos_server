@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::input_output::Io;
+use crate::models::io::Io;
 use crate::models::workflow::Workflow;
 use scylla::CachingSession;
 

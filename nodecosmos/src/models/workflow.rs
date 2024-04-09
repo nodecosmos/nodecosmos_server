@@ -3,11 +3,7 @@ mod update_initial_inputs;
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::input_output::Io;
-use crate::models::node::Node;
-use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
-use crate::models::traits::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -25,6 +21,9 @@ use serde::{Deserialize, Serialize};
 /// them by understanding that each `WorkflowStep` have corresponding `FlowSteps` that are calculated
 /// by `Flow.startIndex` + index of a `FlowStep` within `Flow`.
 /// Each Flow starting position, within the `Workflow`, is determined by `flow.startIndex` attribute.
+///
+/// We support single workflow per node. In future we could get rid of this table and move initial_inputs
+/// to the node table. The reason we have it here is because initially we wanted to support multiple workflows per node.
 #[charybdis_model(
     table_name = workflows,
     partition_keys = [node_id],
@@ -53,24 +52,6 @@ pub struct Workflow {
 
     #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub ctx: Context,
-}
-
-impl Callbacks for Workflow {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id, None).await?;
-            node.create_branched_if_not_exist(data).await?;
-        }
-
-        Ok(())
-    }
 }
 
 impl Workflow {
@@ -104,18 +85,6 @@ impl Workflow {
 
             Ok(branched)
         }
-    }
-
-    pub async fn input_outputs(&self, db_session: &CachingSession) -> Result<Vec<Io>, NodecosmosError> {
-        Io::branched(
-            db_session,
-            self.root_id,
-            &WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            },
-        )
-        .await
     }
 }
 

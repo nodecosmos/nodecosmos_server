@@ -2,6 +2,7 @@ use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::app::App;
+use crate::errors::NodecosmosError;
 use crate::models::description::{BaseDescription, Description};
 use crate::models::node::AuthNode;
 use crate::models::traits::Branchable;
@@ -116,7 +117,10 @@ pub async fn description_ws(
         pool: data.description_ws_pool(),
     };
     let ws_builder = WsResponseBuilder::new(ws_desc_conn.clone(), &req, stream);
-    let (addr, resp) = ws_builder.start_with_addr()?;
+    let (addr, resp) = ws_builder
+        .start_with_addr()
+        .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to start websocket connection: {}", e)))?;
+
     let ws_desc_conn_pool = ws_desc_conn.pool;
     ws_desc_conn_pool
         .connections

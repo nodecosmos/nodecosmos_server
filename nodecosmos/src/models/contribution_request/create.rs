@@ -2,8 +2,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
+use crate::models::traits::ModelContext;
 use crate::models::udts::Profile;
-use charybdis::operations::Insert;
+use charybdis::operations::{Insert, InsertWithCallbacks};
 use charybdis::types::Uuid;
 
 impl ContributionRequest {
@@ -24,7 +25,8 @@ impl ContributionRequest {
 
         node.branch_id = self.id;
 
-        node.insert().execute(data.db_session()).await?;
+        node.set_branched_init_context();
+        node.insert_cb(data).execute(data.db_session()).await?;
 
         Ok(())
     }

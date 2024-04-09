@@ -6,6 +6,7 @@ use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
+use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -218,25 +219,33 @@ impl MergeFlows {
     }
 
     pub async fn restore_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_flows(data, &mut self.restored_flows).await?;
+        Self::insert_flows(data, &mut self.restored_flows)
+            .await
+            .context("Failed to restore flows")?;
 
         Ok(())
     }
 
     pub async fn undo_restore_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flows(data, &mut self.restored_flows).await?;
+        Self::delete_inserted_flows(data, &mut self.restored_flows)
+            .await
+            .context("Failed to undo restore flows")?;
 
         Ok(())
     }
 
     pub async fn create_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_flows(data, &mut self.created_flows).await?;
+        Self::insert_flows(data, &mut self.created_flows)
+            .await
+            .context("Failed to create flows")?;
 
         Ok(())
     }
 
     pub async fn undo_create_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flows(data, &mut self.created_flows).await?;
+        Self::delete_inserted_flows(data, &mut self.created_flows)
+            .await
+            .context("Failed to undo create flows")?;
 
         Ok(())
     }
@@ -245,7 +254,11 @@ impl MergeFlows {
         if let Some(deleted_flows) = &mut self.deleted_flows {
             for deleted_flow in deleted_flows {
                 deleted_flow.set_merge_context();
-                deleted_flow.delete_cb(data).execute(data.db_session()).await?;
+                deleted_flow
+                    .delete_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to delete flows")?;
             }
         }
 
@@ -256,7 +269,11 @@ impl MergeFlows {
         if let Some(deleted_flows) = &mut self.deleted_flows {
             for deleted_flow in deleted_flows {
                 deleted_flow.set_merge_context();
-                deleted_flow.insert_cb(data).execute(data.db_session()).await?;
+                deleted_flow
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to undo delete flows")?;
             }
         }
 
@@ -283,7 +300,11 @@ impl MergeFlows {
 
                     edited_flow_title.set_original_id();
                     edited_flow_title.set_merge_context();
-                    edited_flow_title.update_cb(data).execute(data.db_session()).await?;
+                    edited_flow_title
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Failed to update flow title")?;
 
                     branch
                         .title_change_by_object
@@ -299,7 +320,11 @@ impl MergeFlows {
     pub async fn undo_update_title(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_title_flows) = &mut self.original_title_flows {
             for original_title_flow in original_title_flows.values_mut() {
-                original_title_flow.update_cb(data).execute(data.db_session()).await?;
+                original_title_flow
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to undo update flow title")?;
             }
         }
 
@@ -333,7 +358,11 @@ impl MergeFlows {
 
             // description merge is handled within before_insert callback
             original.base64 = edited_flow_description.base64.clone();
-            original.insert_cb(data).execute(data.db_session()).await?;
+            original
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .context("Failed to update flow description")?;
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
@@ -354,7 +383,8 @@ impl MergeFlows {
                 original_flow_description
                     .update_cb(data)
                     .execute(data.db_session())
-                    .await?;
+                    .await
+                    .context("Failed to undo update flow description")?;
             }
         }
 

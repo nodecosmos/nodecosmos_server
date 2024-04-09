@@ -6,6 +6,7 @@ use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFl
 use crate::models::traits::{Branchable, FindForBranchMerge, GroupByObjectId};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
+use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::{Set, Uuid};
 use scylla::CachingSession;
@@ -371,25 +372,33 @@ impl MergeFlowSteps {
     }
 
     pub async fn restore_flow_steps(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, branch, &mut self.restored_flow_steps).await?;
+        Self::insert_flow_steps(data, branch, &mut self.restored_flow_steps)
+            .await
+            .context("Error restoring flow steps")?;
 
         Ok(())
     }
 
     pub async fn undo_restore_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flow_steps(data, &mut self.restored_flow_steps).await?;
+        Self::delete_inserted_flow_steps(data, &mut self.restored_flow_steps)
+            .await
+            .context("Error undoing restore flow steps")?;
 
         Ok(())
     }
 
     pub async fn create_flow_steps(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, branch, &mut self.created_flow_steps).await?;
+        Self::insert_flow_steps(data, branch, &mut self.created_flow_steps)
+            .await
+            .context("Error creating flow steps")?;
 
         Ok(())
     }
 
     pub async fn undo_create_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_flow_steps(data, &mut self.created_flow_steps).await?;
+        Self::delete_inserted_flow_steps(data, &mut self.created_flow_steps)
+            .await
+            .context("Error undoing create flow steps")?;
 
         Ok(())
     }
@@ -398,7 +407,11 @@ impl MergeFlowSteps {
         if let Some(deleted_flow_steps) = &mut self.deleted_flow_steps {
             for deleted_flow_step in deleted_flow_steps {
                 deleted_flow_step.set_merge_context();
-                deleted_flow_step.delete_cb(data).execute(data.db_session()).await?;
+                deleted_flow_step
+                    .delete_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error deleting flow step")?;
             }
         }
 
@@ -409,7 +422,11 @@ impl MergeFlowSteps {
         if let Some(deleted_flow_steps) = &mut self.deleted_flow_steps {
             for deleted_flow_step in deleted_flow_steps {
                 deleted_flow_step.set_merge_context();
-                deleted_flow_step.insert_cb(data).execute(data.db_session()).await?;
+                deleted_flow_step
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing delete flow step")?;
             }
         }
 
@@ -433,7 +450,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.merge_nodes(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error creating flow step nodes")?;
             }
         }
 
@@ -444,7 +465,11 @@ impl MergeFlowSteps {
         if let Some(created_fs_nodes_flow_steps) = &mut self.created_fs_nodes_flow_steps {
             for original_flow_step in created_fs_nodes_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing create flow step nodes")?;
             }
         }
 
@@ -468,7 +493,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.unmerge_nodes(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error deleting flow step nodes")?;
             }
         }
 
@@ -479,7 +508,11 @@ impl MergeFlowSteps {
         if let Some(deleted_fs_nodes_flow_steps) = &mut self.deleted_fs_nodes_flow_steps {
             for original_flow_step in deleted_fs_nodes_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing delete flow step nodes")?;
             }
         }
 
@@ -503,7 +536,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.merge_inputs(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error creating inputs")?;
             }
         }
 
@@ -514,7 +551,11 @@ impl MergeFlowSteps {
         if let Some(created_fs_inputs_flow_steps) = &mut self.created_fs_inputs_flow_steps {
             for original_flow_step in created_fs_inputs_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing create inputs")?;
             }
         }
 
@@ -538,7 +579,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.unmerge_inputs(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error deleting inputs")?;
             }
         }
 
@@ -549,7 +594,11 @@ impl MergeFlowSteps {
         if let Some(deleted_fs_inputs_flow_steps) = &mut self.deleted_fs_inputs_flow_steps {
             for original_flow_step in deleted_fs_inputs_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing delete inputs")?;
             }
         }
 
@@ -573,7 +622,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.merge_outputs(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error creating outputs")?;
             }
         }
 
@@ -584,7 +637,11 @@ impl MergeFlowSteps {
         if let Some(created_fs_outputs_flow_steps) = &mut self.created_fs_outputs_flow_steps {
             for original_flow_step in created_fs_outputs_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing create outputs")?;
             }
         }
 
@@ -608,7 +665,11 @@ impl MergeFlowSteps {
 
                 original_flow_step.unmerge_outputs(&branched);
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error deleting outputs")?;
             }
         }
 
@@ -619,7 +680,11 @@ impl MergeFlowSteps {
         if let Some(deleted_fs_outputs_flow_steps) = &mut self.deleted_fs_outputs_flow_steps {
             for original_flow_step in deleted_fs_outputs_flow_steps {
                 original_flow_step.set_merge_context();
-                original_flow_step.update_cb(data).execute(data.db_session()).await?;
+                original_flow_step
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Error undoing delete outputs")?;
             }
         }
 
@@ -656,7 +721,11 @@ impl MergeFlowSteps {
 
             // description merge is handled within before_insert callback
             original.base64 = edited_flow_step_description.base64.clone();
-            original.insert_cb(data).execute(data.db_session()).await?;
+            original
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .context("Error flow step updating description")?;
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
@@ -677,7 +746,8 @@ impl MergeFlowSteps {
                 original_flow_step_description
                     .update_cb(data)
                     .execute(data.db_session())
-                    .await?;
+                    .await
+                    .context("Error undoing update flow step description")?;
             }
         }
 

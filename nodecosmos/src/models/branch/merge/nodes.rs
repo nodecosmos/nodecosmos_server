@@ -8,6 +8,7 @@ use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode}
 use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::udts::{BranchReorderData, TextChange};
+use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::{Frozen, List, Uuid};
 use log::error;
@@ -239,25 +240,33 @@ impl MergeNodes {
     }
 
     pub async fn restore_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_nodes(data, branch, &mut self.restored_nodes).await?;
+        Self::insert_nodes(data, branch, &mut self.restored_nodes)
+            .await
+            .context("Failed to restore nodes")?;
 
         Ok(())
     }
 
     pub async fn undo_restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_nodes(data, &mut self.restored_nodes).await?;
+        Self::delete_inserted_nodes(data, &mut self.restored_nodes)
+            .await
+            .context("Failed to undo restore nodes")?;
 
         Ok(())
     }
 
     pub async fn create_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_nodes(data, branch, &mut self.created_nodes).await?;
+        Self::insert_nodes(data, branch, &mut self.created_nodes)
+            .await
+            .context("Failed to create nodes")?;
 
         Ok(())
     }
 
     pub async fn undo_create_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_nodes(data, &mut self.created_nodes).await?;
+        Self::delete_inserted_nodes(data, &mut self.created_nodes)
+            .await
+            .context("Failed to undo create nodes")?;
 
         Ok(())
     }
@@ -275,7 +284,11 @@ impl MergeNodes {
                     }
 
                     deleted_node.set_merge_context();
-                    deleted_node.delete_cb(data).execute(data.db_session()).await?;
+                    deleted_node
+                        .delete_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Failed to delete node")?;
                 }
             }
         }
@@ -296,7 +309,11 @@ impl MergeNodes {
                     }
 
                     deleted_node.set_merge_context();
-                    deleted_node.insert_cb(data).execute(data.db_session()).await?;
+                    deleted_node
+                        .insert_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Failed to insert node")?;
                 }
             }
         }
@@ -394,7 +411,11 @@ impl MergeNodes {
                     text_change.assign_new(Some(edited_node_title.title.clone()));
 
                     edited_node_title.set_original_id();
-                    edited_node_title.update_cb(data).execute(data.db_session()).await?;
+                    edited_node_title
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Failed to update node title")?;
 
                     branch
                         .title_change_by_object
@@ -447,7 +468,11 @@ impl MergeNodes {
 
             // description merge is handled within before_insert callback
             original.base64 = edited_node_description.base64.clone();
-            original.insert_cb(data).execute(data.db_session()).await?;
+            original
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .context("Failed to update node description")?;
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
@@ -468,7 +493,8 @@ impl MergeNodes {
                 original_node_description
                     .update_cb(data)
                     .execute(data.db_session())
-                    .await?;
+                    .await
+                    .context("Failed to update node description")?;
             }
         }
 

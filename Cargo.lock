@@ -2734,6 +2734,7 @@ dependencies = [
  "actix-web",
  "actix-web-actors",
  "ammonia",
+ "anyhow",
  "aws-config",
  "aws-sdk-s3",
  "base64 0.22.0",

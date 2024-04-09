@@ -164,6 +164,8 @@ impl BranchMerge {
 
     pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, MergeError> {
         if let Err(e) = MergeConflicts::new(&mut self).run_check(data).await {
+            error!("Merge::Failed to check conflicts: {}", e);
+
             return Err(MergeError {
                 inner: e,
                 branch: self.branch,
@@ -182,6 +184,8 @@ impl BranchMerge {
             Err(e) => match self.recover(data).await {
                 Ok(_) => {
                     self.branch.status = Some(BranchStatus::Recovered.to_string());
+                    warn!("Merge::Recovered from error: {}", e);
+
                     Err(MergeError {
                         inner: e,
                         branch: self.branch,

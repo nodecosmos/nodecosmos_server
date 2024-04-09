@@ -12,8 +12,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::traits::Branchable;
-use crate::models::traits::{Context, ModelContext};
+use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
+use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
@@ -24,7 +25,6 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
 /// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all partial models
 /// if they have `auth_branch` field.
@@ -96,7 +96,7 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub ctx: Context,
+    pub ctx: Ctx,
 }
 
 impl Callbacks for Node {
@@ -109,7 +109,9 @@ impl Callbacks for Node {
             self.set_owner(data).await?;
             self.validate_root().await?;
             self.validate_owner().await?;
-            self.update_branch_with_creation(data).await?;
+            self.update_branch_with_creation(data)
+                .await
+                .context("Failed to update branch")?;
         }
 
         self.preserve_branch_ancestors(data).await?;

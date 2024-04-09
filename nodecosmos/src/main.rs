@@ -64,7 +64,6 @@ async fn main() {
             .service(
                 web::scope("/workflows")
                     .service(get_workflow)
-                    .service(create_workflow)
                     .service(update_initial_inputs)
                     .service(update_workflow_title),
             )

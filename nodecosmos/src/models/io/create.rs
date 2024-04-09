@@ -4,7 +4,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
-use crate::models::input_output::Io;
+use crate::models::io::Io;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
 use charybdis::batch::ModelBatch;

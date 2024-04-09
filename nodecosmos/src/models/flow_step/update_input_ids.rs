@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateInputIdsFlowStep;
-use crate::models::input_output::Io;
+use crate::models::io::Io;
 use crate::models::traits::HashMapVecToSet;
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;

@@ -1,6 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::input_output::{Io, UpdateTitleIo};
+use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
 use actix_web::{delete, post, put, web, HttpResponse};

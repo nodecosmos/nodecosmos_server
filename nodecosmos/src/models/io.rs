@@ -11,6 +11,7 @@ use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
 use crate::models::traits::{Context, ModelContext};
 use crate::models::udts::Property;
+use anyhow::Context as _;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
@@ -96,7 +97,9 @@ impl Callbacks for Io {
             self.validate_root_id(db_session).await?;
             self.set_defaults();
             self.copy_vals_from_main(db_session).await?;
-            self.update_branch_with_creation(data).await?;
+            self.update_branch_with_creation(data)
+                .await
+                .context("Failed to update branch with creation")?;
         }
 
         if self.is_default_context() || self.is_branched_init_context() {
@@ -108,13 +111,16 @@ impl Callbacks for Io {
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if !self.is_parent_delete_context() {
+        if self.is_default_context() {
             self.pull_from_initial_input_ids(db_session).await?;
             self.pull_form_flow_step_outputs(data).await?;
             self.preserve_branch_flow_step(data).await?;
         }
-        self.pull_from_flow_steps_inputs(data).await?;
-        self.update_branch_with_deletion(data).await?;
+
+        if !self.is_merge_context() {
+            self.pull_from_flow_steps_inputs(data).await?;
+            self.update_branch_with_deletion(data).await?;
+        }
 
         Ok(())
     }

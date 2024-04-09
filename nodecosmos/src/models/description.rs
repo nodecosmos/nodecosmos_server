@@ -2,6 +2,7 @@ mod save;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::traits::Branchable;
 use crate::models::traits::SanitizeDescription;
 use crate::models::utils::DescriptionXmlParser;
 use base64::engine::general_purpose::STANDARD;
@@ -155,7 +156,7 @@ macro_rules! find_branched {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value(&&(self.object_id, self.object_id))
+                        *self = Self::find_by_primary_key_value(&(self.object_id, self.original_id()))
                             .execute(db_session)
                             .await?;
 

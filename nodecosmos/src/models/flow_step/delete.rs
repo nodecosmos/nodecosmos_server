@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::{FlowStep, SiblingFlowStep};
-use crate::models::input_output::Io;
+use crate::models::io::Io;
 use crate::models::traits::ModelContext;
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;

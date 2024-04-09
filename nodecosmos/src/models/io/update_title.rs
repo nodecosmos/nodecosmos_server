@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::input_output::UpdateTitleIo;
+use crate::models::io::UpdateTitleIo;
 use crate::models::traits::Branchable;
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;

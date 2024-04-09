@@ -2,10 +2,11 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::description::{find_description, Description, ObjectType};
-use crate::models::input_output::{find_update_title_io, Io, UpdateTitleIo};
+use crate::models::io::{find_update_title_io, Io, UpdateTitleIo};
 use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::udts::TextChange;
+use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
@@ -195,25 +196,33 @@ impl MergeIos {
     }
 
     pub async fn restore_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_ios(data, &mut self.restored_ios).await?;
+        Self::insert_ios(data, &mut self.restored_ios)
+            .await
+            .context("Failed to restore ios")?;
 
         Ok(())
     }
 
     pub async fn undo_restore_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_ios(data, &mut self.restored_ios).await?;
+        Self::delete_inserted_ios(data, &mut self.restored_ios)
+            .await
+            .context("Failed to undo restore ios")?;
 
         Ok(())
     }
 
     pub async fn create_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::insert_ios(data, &mut self.created_ios).await?;
+        Self::insert_ios(data, &mut self.created_ios)
+            .await
+            .context("Failed to create ios")?;
 
         Ok(())
     }
 
     pub async fn undo_create_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_ios(data, &mut self.created_ios).await?;
+        Self::delete_inserted_ios(data, &mut self.created_ios)
+            .await
+            .context("Failed to undo create ios")?;
 
         Ok(())
     }
@@ -222,7 +231,11 @@ impl MergeIos {
         if let Some(deleted_ios) = &mut self.deleted_ios {
             for deleted_io in deleted_ios {
                 deleted_io.set_merge_context();
-                deleted_io.delete_cb(data).execute(data.db_session()).await?;
+                deleted_io
+                    .delete_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to delete ios")?;
             }
         }
 
@@ -233,7 +246,11 @@ impl MergeIos {
         if let Some(deleted_ios) = &mut self.deleted_ios {
             for deleted_io in deleted_ios {
                 deleted_io.set_merge_context();
-                deleted_io.insert_cb(data).execute(data.db_session()).await?;
+                deleted_io
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to undo delete ios")?;
             }
         }
 
@@ -260,7 +277,11 @@ impl MergeIos {
 
                     edited_io_title.set_merge_context();
                     edited_io_title.set_original_id();
-                    edited_io_title.update_cb(data).execute(data.db_session()).await?;
+                    edited_io_title
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Failed to update io title")?;
 
                     branch
                         .title_change_by_object
@@ -276,7 +297,11 @@ impl MergeIos {
     pub async fn undo_update_title(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(original_title_ios) = &mut self.original_title_ios {
             for original_title_io in original_title_ios.values_mut() {
-                original_title_io.update_cb(data).execute(data.db_session()).await?;
+                original_title_io
+                    .update_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to undo update io title")?;
             }
         }
 
@@ -310,7 +335,11 @@ impl MergeIos {
 
             // description merge is handled within before_insert callback
             original.base64 = edited_io_description.base64.clone();
-            original.insert_cb(data).execute(data.db_session()).await?;
+            original
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .context("Failed to update io description")?;
 
             // update text change with new description
             text_change.assign_new(original.markdown.clone());
@@ -331,7 +360,8 @@ impl MergeIos {
                 original_io_description
                     .update_cb(data)
                     .execute(data.db_session())
-                    .await?;
+                    .await
+                    .context("Failed to undo update io description")?;
             }
         }
 
