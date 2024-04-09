@@ -1,8 +1,5 @@
-use crate::errors::NodecosmosError;
-use crate::models::branch::Branch;
 use crate::models::node::reorder::data::ReorderData;
 use charybdis::types::Uuid;
-use scylla::CachingSession;
 
 /// Branching records follows simple rule:
 /// - Original model has the same id and branch_id
@@ -30,12 +27,6 @@ pub trait Branchable {
         } else {
             self.branch_id()
         }
-    }
-
-    async fn branch(&self, db_session: &CachingSession) -> Result<Branch, NodecosmosError> {
-        let branch = Branch::find_by_id(self.branch_id()).execute(db_session).await?;
-
-        Ok(branch)
     }
 
     /// Sets the branch_id to the original_id

@@ -51,10 +51,6 @@ pub trait Authorization: AuthorizationFields {
         Ok(())
     }
 
-    async fn auth_deletion(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.auth_update(data).await
-    }
-
     async fn auth_view(&mut self, app: &web::Data<App>, current_user: OptCurrentUser) -> Result<(), NodecosmosError> {
         self.init_auth_info(&app.db_session).await?;
 

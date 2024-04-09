@@ -4,6 +4,3 @@ members = [
     "nodecosmos",
     "nodecosmos-macros",
 ]
-
-[profile.dev.package."nodecosmos"]
-opt-level = 1

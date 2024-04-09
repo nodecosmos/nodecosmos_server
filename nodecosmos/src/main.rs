@@ -17,6 +17,7 @@ async fn main() {
 
     app.init().await;
     let app_web_data = web::Data::new(app);
+
     HttpServer::new(move || {
         // web data
         let db_session_web_data = web::Data::from(app_web_data.db_session.clone());

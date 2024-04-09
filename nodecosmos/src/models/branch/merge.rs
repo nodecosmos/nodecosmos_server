@@ -353,7 +353,12 @@ impl Branch {
             return Err(MergeError { inner: e, branch: self });
         }
 
-        let merge = BranchMerge::new(data, self).await?.run(data).await?;
+        let merge = BranchMerge::new(data, self)
+            .await?
+            .check_conflicts(data)
+            .await?
+            .run(data)
+            .await?;
 
         let res = merge.branch.update().execute(data.db_session()).await;
 
