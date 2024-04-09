@@ -11,7 +11,6 @@ use crate::models::traits::node::FindBranched;
 use crate::models::traits::Branchable;
 use crate::models::traits::{Context, ModelContext};
 use crate::models::udts::Property;
-use anyhow::Context as _;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
@@ -97,9 +96,7 @@ impl Callbacks for Io {
             self.validate_root_id(db_session).await?;
             self.set_defaults();
             self.copy_vals_from_main(db_session).await?;
-            self.update_branch_with_creation(data)
-                .await
-                .context("Failed to update branch with creation")?;
+            self.update_branch_with_creation(data).await?;
         }
 
         if self.is_default_context() || self.is_branched_init_context() {

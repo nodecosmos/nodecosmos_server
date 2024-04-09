@@ -3,7 +3,7 @@ mod update_initial_inputs;
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, Merge};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -73,7 +73,7 @@ impl Workflow {
                 // merge original initial input ids with branched initial input ids
                 if let Some(original_initial_input_ids) = original.initial_input_ids {
                     let mut branched_initial_input_ids = maybe_branched.initial_input_ids.unwrap_or_default();
-                    branched_initial_input_ids.extend(original_initial_input_ids);
+                    branched_initial_input_ids.merge_unique(original_initial_input_ids);
                     maybe_branched.initial_input_ids = Some(branched_initial_input_ids);
                 }
 

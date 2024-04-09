@@ -365,6 +365,7 @@ impl Callbacks for UpdateInputIdsFlowStep {
             .await?;
 
             self.update_branch(data).await?;
+            self.preserve_branch_ios(data).await?;
         }
 
         self.update_ios(data).await?;
@@ -404,6 +405,18 @@ impl Callbacks for UpdateNodeIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            FlowStep::find_or_insert_branched(
+                data,
+                &WorkflowParams {
+                    node_id: self.node_id,
+                    branch_id: self.branch_id,
+                },
+                self.id,
+            )
+            .await?;
+        }
+
         let current = self.find_by_primary_key().execute(data.db_session()).await?;
         self.output_ids_by_node_id = current.output_ids_by_node_id;
         self.input_ids_by_node_id = current.input_ids_by_node_id;
@@ -414,16 +427,6 @@ impl Callbacks for UpdateNodeIdsFlowStep {
 
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            FlowStep::find_or_insert_branched(
-                data,
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.id,
-            )
-            .await?;
-
             self.update_branch(data).await?;
         }
 

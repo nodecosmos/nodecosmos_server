@@ -4,7 +4,8 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateInputIdsFlowStep;
 use crate::models::io::Io;
-use crate::models::traits::HashMapVecToSet;
+use crate::models::traits::{Branchable, HashMapVecToSet};
+use anyhow::Context;
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
@@ -12,6 +13,39 @@ use charybdis::types::Uuid;
 use std::collections::{HashMap, HashSet};
 
 impl UpdateInputIdsFlowStep {
+    pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branched() {
+            // for each input and output create branch io if it does not exist
+            let io_ids = self
+                .input_ids_by_node_id
+                .clone()
+                .unwrap_or_default()
+                .into_values()
+                .flatten()
+                .into_iter()
+                .collect();
+
+            let ios =
+                Io::find_by_root_id_and_branch_id_and_ids(data.db_session(), self.root_id, self.original_id(), &io_ids)
+                    .await?
+                    .into_iter()
+                    .map(|mut io| {
+                        io.branch_id = self.branch_id;
+
+                        io
+                    })
+                    .collect::<Vec<Io>>();
+
+            Io::unlogged_batch()
+                .append_inserts_if_not_exist(&ios)
+                .execute(data.db_session())
+                .await
+                .context("Failed to preserve branch ios")?;
+        }
+
+        Ok(())
+    }
+
     pub async fn update_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         let current = self.find_by_primary_key().execute(data.db_session()).await?;
 

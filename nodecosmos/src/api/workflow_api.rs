@@ -6,6 +6,7 @@ use crate::models::io::Io;
 use crate::models::node::AuthNode;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 use actix_web::{get, put, web, HttpResponse};
+use anyhow::Context;
 use charybdis::operations::{Update, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use nodecosmos_macros::Branchable;
@@ -24,10 +25,18 @@ pub struct WorkflowParams {
 pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
     let params = params.into_inner();
 
-    let workflow = Workflow::branched(&db_session, &params).await?;
-    let flows = Flow::branched(&db_session, &params).await?;
-    let flow_steps = FlowStep::branched(&db_session, &params).await?;
-    let input_outputs = Io::branched(&db_session, workflow.root_id, &params).await?;
+    let workflow = Workflow::branched(&db_session, &params)
+        .await
+        .context("Failed to get workflow")?;
+    let flows = Flow::branched(&db_session, &params)
+        .await
+        .context("Failed to get flows")?;
+    let flow_steps = FlowStep::branched(&db_session, &params)
+        .await
+        .context("Failed to get flow steps")?;
+    let input_outputs = Io::branched(&db_session, workflow.root_id, &params)
+        .await
+        .context("Failed to get input outputs")?;
 
     Ok(HttpResponse::Ok().json(json!({
         "workflow": workflow,
