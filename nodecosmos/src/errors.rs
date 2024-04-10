@@ -149,7 +149,7 @@ impl ResponseError for NodecosmosError {
             }
             NodecosmosError::CharybdisError(e) => match e {
                 CharybdisError::NotFoundError(_e) => {
-                    warn!("{:?} {}", e, e.to_string());
+                    warn!("{}", e.to_string());
 
                     HttpResponse::NotFound().json(json!({
                         "status": 404,

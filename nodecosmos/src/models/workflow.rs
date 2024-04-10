@@ -56,7 +56,7 @@ pub struct Workflow {
 
 impl Workflow {
     pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
-        let original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
+        let mut original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
             .execute(db_session)
             .await?;
 
@@ -71,10 +71,9 @@ impl Workflow {
 
             if let Some(mut maybe_branched) = maybe_branched {
                 // merge original initial input ids with branched initial input ids
-                if let Some(original_initial_input_ids) = original.initial_input_ids {
-                    let mut branched_initial_input_ids = maybe_branched.initial_input_ids.unwrap_or_default();
-                    branched_initial_input_ids.merge_unique(original_initial_input_ids);
-                    maybe_branched.initial_input_ids = Some(branched_initial_input_ids);
+                if let Some(original_initial_input_ids) = original.initial_input_ids.as_mut() {
+                    original_initial_input_ids.merge_unique(maybe_branched.initial_input_ids.unwrap_or_default());
+                    maybe_branched.initial_input_ids = original.initial_input_ids;
                 }
 
                 branched = maybe_branched;

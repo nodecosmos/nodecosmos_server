@@ -66,8 +66,8 @@ impl UpdateNodeIdsFlowStep {
             let original_node_ids = original.node_ids.clone();
             let current_node_ids = self.node_ids.clone();
 
-            let mut created_node_ids = None;
-            let mut deleted_node_ids = None;
+            let mut created_node_ids = HashSet::new();
+            let mut deleted_node_ids = HashSet::new();
 
             match (original_node_ids, current_node_ids) {
                 (Some(original_node_ids), Some(current_node_ids)) => {
@@ -85,37 +85,26 @@ impl UpdateNodeIdsFlowStep {
                         .collect();
 
                     if !created.is_empty() {
-                        created_node_ids = Some(created);
+                        created_node_ids = created;
                     }
                     if !deleted.is_empty() {
-                        deleted_node_ids = Some(deleted);
+                        deleted_node_ids = deleted;
                     }
                 }
                 (Some(original_node_ids), None) => {
-                    deleted_node_ids = Some(original_node_ids.to_hash_set());
+                    deleted_node_ids = original_node_ids.to_hash_set();
                 }
                 (None, Some(current_node_ids)) => {
-                    created_node_ids = Some(current_node_ids.to_hash_set());
+                    created_node_ids = current_node_ids.to_hash_set();
                 }
                 (None, None) => {}
             }
 
-            let mut created_flow_step_nodes = None;
-            let mut deleted_flow_step_nodes = None;
+            let mut created_flow_step_nodes = HashMap::new();
+            created_flow_step_nodes.insert(self.id, created_node_ids);
 
-            if let Some(created_node_ids) = created_node_ids {
-                let mut value = HashMap::new();
-                value.insert(self.id, created_node_ids);
-
-                created_flow_step_nodes = Some(value);
-            }
-
-            if let Some(deleted_node_ids) = deleted_node_ids {
-                let mut value = HashMap::new();
-                value.insert(self.id, deleted_node_ids);
-
-                deleted_flow_step_nodes = Some(value);
-            }
+            let mut deleted_flow_step_nodes = HashMap::new();
+            deleted_flow_step_nodes.insert(self.id, deleted_node_ids);
 
             Branch::update(
                 data,

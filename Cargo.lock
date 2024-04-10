@@ -1297,6 +1297,8 @@ dependencies = [
  "scylla",
  "serde",
  "serde_json",
+ "strum 0.26.2",
+ "strum_macros 0.26.2",
  "syn 2.0.53",
  "walkdir",
 ]

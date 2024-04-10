@@ -9,6 +9,7 @@ use crate::models::udts::Profile;
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::Delete;
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -96,6 +97,12 @@ impl Callbacks for ContributionRequest {
     }
 
     updated_at_cb_fn!();
+
+    async fn after_delete(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), Self::Error> {
+        self.branch(db_session).await?.delete().execute(db_session).await?;
+
+        Ok(())
+    }
 }
 
 impl ContributionRequest {

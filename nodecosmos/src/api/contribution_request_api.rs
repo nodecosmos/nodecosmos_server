@@ -9,7 +9,7 @@ use crate::models::traits::Authorization;
 use crate::resources::resource_locker::ResourceLocker;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{Delete, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
@@ -96,7 +96,7 @@ pub async fn delete_contribution_request(
 
     contribution_request.auth_update(&data).await?;
 
-    contribution_request.delete().execute(data.db_session()).await?;
+    contribution_request.delete_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(contribution_request))
 }

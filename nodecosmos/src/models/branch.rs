@@ -98,11 +98,11 @@ pub struct Branch {
 
     /// node_id -> initial_input_ids
     #[serde(default, rename = "createdWorkflowInitialInputs")]
-    pub created_workflow_initial_inputs: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
+    pub created_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
 
     /// node_id -> initial_input_ids
     #[serde(default, rename = "deletedWorkflowInitialInputs")]
-    pub deleted_workflow_initial_inputs: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
+    pub deleted_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
 
     // flows
     #[serde(default, rename = "createdFlows")]
@@ -139,27 +139,27 @@ pub struct Branch {
 
     /// flow_step_id -> node_id
     #[serde(default, rename = "createdFlowStepNodes")]
-    pub created_flow_step_nodes: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub created_flow_step_nodes: Option<Map<Uuid, Frozen<Set<Uuid>>>>,
 
     /// flow_step_id -> node_id
     #[serde(default, rename = "deletedFlowStepNodes")]
-    pub deleted_flow_step_nodes: Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>,
+    pub deleted_flow_step_nodes: Option<Map<Uuid, Frozen<Set<Uuid>>>>,
 
     /// flow_step_id -> node_id -> io_id
     #[serde(default, rename = "createdFlowStepInputsByNode")]
-    pub created_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
+    pub created_flow_step_inputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
 
     /// flow_step_id -> node_id -> io_id
     #[serde(default, rename = "deletedFlowStepInputsByNode")]
-    pub deleted_flow_step_inputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
+    pub deleted_flow_step_inputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
 
     /// flow_step_id -> node_id -> io_id
     #[serde(default, rename = "createdFlowStepOutputsByNode")]
-    pub created_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
+    pub created_flow_step_outputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
 
     /// flow_step_id -> node_id -> io_id
     #[serde(default, rename = "deletedFlowStepOutputsByNode")]
-    pub deleted_flow_step_outputs_by_node: Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>,
+    pub deleted_flow_step_outputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
 
     // ios
     #[serde(default, rename = "createdIos")]
@@ -191,12 +191,6 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        *self = Branch::find_by_id(self.id).execute(db_session).await?;
-
-        Ok(())
-    }
-
     pub async fn node(&self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if let Some(node) = self.node.get() {
             return Ok(node);

@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::{AcceptedFlowSolution, Branch};
-use crate::models::traits::Authorization;
+use crate::models::traits::{Authorization, Reload};
 use actix_web::{put, web, HttpResponse};
 use charybdis::types::Uuid;
 use serde::Deserialize;
@@ -22,7 +22,6 @@ pub async fn restore_node(data: RequestData, params: web::Json<BranchNodeParams>
     let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
 
     branch.auth_update(&data).await?;
-
     Branch::update(&data, params.branch_id, BranchUpdate::RestoreNode(params.node_id)).await?;
 
     branch.reload(data.db_session()).await?;

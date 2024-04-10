@@ -166,22 +166,11 @@ impl UpdateInputIdsFlowStep {
                 }
             }
 
-            let mut created_node_inputs_by_fow_step: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
-            let mut deleted_node_inputs_by_flow_step: Option<HashMap<Uuid, HashMap<Uuid, HashSet<Uuid>>>> = None;
+            let mut created_node_inputs_by_fow_step = HashMap::new();
+            created_node_inputs_by_fow_step.insert(self.id, created_input_ids_by_node_id);
 
-            if !created_input_ids_by_node_id.is_empty() {
-                let mut value = HashMap::new();
-                value.insert(self.id, created_input_ids_by_node_id);
-
-                created_node_inputs_by_fow_step = Some(value);
-            }
-
-            if !removed_input_ids_by_node_id.is_empty() {
-                let mut value = HashMap::new();
-                value.insert(self.id, removed_input_ids_by_node_id);
-
-                deleted_node_inputs_by_flow_step = Some(value);
-            }
+            let mut deleted_node_inputs_by_flow_step = HashMap::new();
+            deleted_node_inputs_by_flow_step.insert(self.id, removed_input_ids_by_node_id);
 
             Branch::update(
                 data,

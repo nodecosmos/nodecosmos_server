@@ -22,6 +22,7 @@ use futures::StreamExt;
 use nodecosmos_macros::{Branchable, FlowId, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[charybdis_model(
@@ -148,9 +149,13 @@ impl FlowStep {
             while let Some(original_flow_step) = original_flow_steps.next().await {
                 let mut original_flow_step = original_flow_step?;
                 if let Some(branched_flow_step) = branch_flow_steps.get_mut(&original_flow_step.id) {
-                    branched_flow_step.merge_original_inputs(&original_flow_step);
-                    branched_flow_step.merge_original_nodes(&original_flow_step);
-                    branched_flow_step.merge_original_outputs(&original_flow_step);
+                    original_flow_step.merge_original_inputs(&branched_flow_step);
+                    original_flow_step.merge_original_nodes(&branched_flow_step);
+                    original_flow_step.merge_original_outputs(&branched_flow_step);
+
+                    branched_flow_step.input_ids_by_node_id = original_flow_step.input_ids_by_node_id;
+                    branched_flow_step.node_ids = original_flow_step.node_ids;
+                    branched_flow_step.output_ids_by_node_id = original_flow_step.output_ids_by_node_id;
                 } else {
                     original_flow_step.branch_id = params.branch_id;
                     branch_flow_steps.insert(original_flow_step.id, original_flow_step);
@@ -375,13 +380,18 @@ impl Callbacks for UpdateInputIdsFlowStep {
 }
 
 impl UpdateInputIdsFlowStep {
-    pub fn merge_inputs(&mut self, other: &Self) {
-        self.input_ids_by_node_id
-            .merge_unique(other.input_ids_by_node_id.clone());
+    pub fn append_inputs(&mut self, inputs: &HashMap<Uuid, Vec<Uuid>>) {
+        self.input_ids_by_node_id.merge_unique(Some(inputs.clone()));
     }
 
-    pub fn unmerge_inputs(&mut self, other: &Self) {
-        self.input_ids_by_node_id.unmerge(other.input_ids_by_node_id.clone());
+    pub fn remove_inputs(&mut self, ids: &HashMap<Uuid, Vec<Uuid>>) {
+        if let Some(input_ids_by_node_id) = &mut self.input_ids_by_node_id {
+            for (node_id, input_ids) in input_ids_by_node_id.iter_mut() {
+                if let Some(ids) = ids.get(node_id) {
+                    input_ids.retain(|input_id| !ids.contains(input_id));
+                }
+            }
+        }
     }
 }
 
@@ -435,12 +445,14 @@ impl Callbacks for UpdateNodeIdsFlowStep {
 }
 
 impl UpdateNodeIdsFlowStep {
-    pub fn merge_nodes(&mut self, other: &Self) {
-        self.node_ids.merge_unique(other.node_ids.clone());
+    pub fn append_nodes(&mut self, ids: &Vec<Uuid>) {
+        self.node_ids.merge_unique(Some(ids.clone()));
     }
 
-    pub fn unmerge_nodes(&mut self, other: &Self) {
-        self.node_ids.unmerge(other.node_ids.clone());
+    pub fn remove_nodes(&mut self, ids: &Vec<Uuid>) {
+        if let Some(node_ids) = &mut self.node_ids {
+            node_ids.retain(|node_id| !ids.contains(node_id));
+        }
     }
 }
 
@@ -481,13 +493,18 @@ impl Callbacks for UpdateOutputIdsFlowStep {
 }
 
 impl UpdateOutputIdsFlowStep {
-    pub fn merge_outputs(&mut self, other: &Self) {
-        self.output_ids_by_node_id
-            .merge_unique(other.output_ids_by_node_id.clone());
+    pub fn append_outputs(&mut self, outputs: &HashMap<Uuid, Vec<Uuid>>) {
+        self.output_ids_by_node_id.merge_unique(Some(outputs.clone()));
     }
 
-    pub fn unmerge_outputs(&mut self, other: &Self) {
-        self.output_ids_by_node_id.unmerge(other.output_ids_by_node_id.clone());
+    pub fn remove_outputs(&mut self, ids: &HashMap<Uuid, Vec<Uuid>>) {
+        if let Some(output_ids_by_node_id) = &mut self.output_ids_by_node_id {
+            for (node_id, output_ids) in output_ids_by_node_id.iter_mut() {
+                if let Some(ids) = ids.get(node_id) {
+                    output_ids.retain(|output_id| !ids.contains(output_id));
+                }
+            }
+        }
     }
 }
 

@@ -3,6 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::workflow::UpdateInitialInputsWorkflow;
+use std::collections::HashMap;
 
 impl UpdateInitialInputsWorkflow {
     pub async fn update_branch(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -27,13 +28,10 @@ impl UpdateInitialInputsWorkflow {
                     }
                 })
                 .collect::<Vec<_>>();
+            let mut inputs = HashMap::new();
+            inputs.insert(self.node_id, added_input_ids);
 
-            Branch::update(
-                data,
-                self.branch_id,
-                BranchUpdate::CreatedWorkflowInitialInputs(self.node_id, added_input_ids),
-            )
-            .await?;
+            Branch::update(data, self.branch_id, BranchUpdate::CreatedWorkflowInitialInputs(inputs)).await?;
 
             let removed_input_ids = original_input_ids
                 .iter()
@@ -46,23 +44,16 @@ impl UpdateInitialInputsWorkflow {
                 })
                 .collect::<Vec<_>>();
 
-            Branch::update(
-                data,
-                self.branch_id,
-                BranchUpdate::DeleteWorkflowInitialInputs(self.node_id, removed_input_ids),
-            )
-            .await?;
+            let mut inputs = HashMap::new();
+            inputs.insert(self.node_id, removed_input_ids);
+
+            Branch::update(data, self.branch_id, BranchUpdate::DeleteWorkflowInitialInputs(inputs)).await?;
         } else {
             // wf is created within a branch
-            Branch::update(
-                data,
-                self.branch_id,
-                BranchUpdate::CreatedWorkflowInitialInputs(
-                    self.node_id,
-                    self.initial_input_ids.clone().unwrap_or_default(),
-                ),
-            )
-            .await?;
+            let mut inputs = HashMap::new();
+            inputs.insert(self.node_id, self.initial_input_ids.clone().unwrap_or_default());
+
+            Branch::update(data, self.branch_id, BranchUpdate::CreatedWorkflowInitialInputs(inputs)).await?;
         }
 
         Ok(())

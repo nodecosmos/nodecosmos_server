@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::traits::Merge;
+use crate::models::traits::{Branchable, Merge};
 use crate::models::workflow::UpdateInitialInputsWorkflow;
 use charybdis::operations::Update;
 use charybdis::types::Uuid;
@@ -50,6 +50,7 @@ impl MergeWorkflows {
                 }
             }
 
+            workflow.set_original_id();
             workflow.update().execute(data.db_session()).await?;
         }
 
@@ -72,6 +73,7 @@ impl MergeWorkflows {
                 workflow.initial_input_ids.merge(Some(deleted_inputs.clone()));
             }
 
+            workflow.set_original_id();
             workflow.update().execute(data.db_session()).await?;
         }
 

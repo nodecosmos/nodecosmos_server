@@ -12,7 +12,6 @@ use crate::models::branch::{
     UpdateEditedNodeWorkflowsBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes,
     UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
-use crate::models::traits::Merge;
 use crate::models::udts::BranchReorderData;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
@@ -32,8 +31,8 @@ pub enum BranchUpdate {
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
     EditNodeWorkflow(Uuid),
-    CreatedWorkflowInitialInputs(Uuid, Frozen<List<Uuid>>),
-    DeleteWorkflowInitialInputs(Uuid, Frozen<List<Uuid>>),
+    CreatedWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
+    DeleteWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     CreateFlow(Uuid),
     DeleteFlow(Uuid),
     UndoDeleteFlow(Uuid),
@@ -45,13 +44,13 @@ pub enum BranchUpdate {
     DeleteFlowStep(Uuid),
     UndoDeleteFlowStep(Uuid),
     RestoreFlowStep(Uuid),
-    CreatedFlowStepNodes(Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
-    DeletedFlowStepNodes(Option<Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreatedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    DeletedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    CreatedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreatedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
     EditFlowStepDescription(Uuid),
-    CreatedFlowStepInputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
-    DeletedFlowStepInputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
-    CreatedFlowStepOutputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
-    DeletedFlowStepOutputs(Option<Frozen<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>>),
     CreateIo(Uuid),
     DeleteIo(Uuid),
     UndoDeleteIo(Uuid),
@@ -170,32 +169,23 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::CreatedWorkflowInitialInputs(node_id, created_workflow_initial_inputs) => {
-                let mut branch = UpdateCreatedWorkflowInitialInputsBranch::find_by_id(branch_id)
-                    .execute(data.db_session())
-                    .await?;
-                branch
-                    .created_workflow_initial_inputs
-                    .get_or_insert_with(HashMap::new)
-                    .entry(node_id)
-                    .or_insert_with(Vec::new)
-                    .merge(created_workflow_initial_inputs);
-
-                res = branch.update().execute(data.db_session()).await;
+            BranchUpdate::CreatedWorkflowInitialInputs(created_workflow_initial_inputs) => {
+                res = UpdateCreatedWorkflowInitialInputsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_created_workflow_initial_inputs(created_workflow_initial_inputs)
+                .execute(data.db_session())
+                .await;
             }
-            BranchUpdate::DeleteWorkflowInitialInputs(node_id, deleted_workflow_initial_inputs) => {
-                let mut branch = UpdateDeletedWorkflowInitialInputsBranch::find_by_id(branch_id)
-                    .execute(data.db_session())
-                    .await?;
-
-                branch
-                    .deleted_workflow_initial_inputs
-                    .get_or_insert_with(HashMap::new)
-                    .entry(node_id)
-                    .or_insert_with(Vec::new)
-                    .merge(deleted_workflow_initial_inputs);
-
-                res = branch.update().execute(data.db_session()).await;
+            BranchUpdate::DeleteWorkflowInitialInputs(deleted_workflow_initial_inputs) => {
+                res = UpdateDeletedWorkflowInitialInputsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_deleted_workflow_initial_inputs(deleted_workflow_initial_inputs)
+                .execute(data.db_session())
+                .await;
             }
             BranchUpdate::CreateFlow(id) => {
                 res = UpdateCreatedFlowsBranch {
@@ -320,66 +310,66 @@ impl Branch {
 
                 check_conflicts = true;
             }
-            BranchUpdate::EditFlowStepDescription(id) => {
-                res = UpdateEditedDescriptionFlowStepsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_edited_description_flow_steps(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
             BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes) => {
                 res = UpdateCreatedFlowStepNodesBranch {
                     id: branch_id,
-                    created_flow_step_nodes,
+                    ..Default::default()
                 }
-                .update()
+                .push_created_flow_step_nodes(created_flow_step_nodes)
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
                 res = UpdateDeletedFlowStepNodesBranch {
                     id: branch_id,
-                    deleted_flow_step_nodes,
+                    ..Default::default()
                 }
-                .update()
+                .push_deleted_flow_step_nodes(deleted_flow_step_nodes)
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreatedFlowStepInputs(created_flow_step_inputs_by_node) => {
                 res = UpdateCreatedFlowStepInputsByNodeBranch {
                     id: branch_id,
-                    created_flow_step_inputs_by_node,
+                    ..Default::default()
                 }
-                .update()
+                .push_created_flow_step_inputs_by_node(created_flow_step_inputs_by_node)
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeletedFlowStepInputs(deleted_flow_step_inputs_by_node) => {
                 res = UpdateDeletedFlowStepInputsByNodeBranch {
                     id: branch_id,
-                    deleted_flow_step_inputs_by_node,
+                    ..Default::default()
                 }
-                .update()
+                .push_deleted_flow_step_inputs_by_node(deleted_flow_step_inputs_by_node)
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::CreatedFlowStepOutputs(created_flow_step_outputs_by_node) => {
                 res = UpdateCreatedFlowStepOutputsByNodeBranch {
                     id: branch_id,
-                    created_flow_step_outputs_by_node,
+                    ..Default::default()
                 }
-                .update()
+                .push_created_flow_step_outputs_by_node(created_flow_step_outputs_by_node)
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::DeletedFlowStepOutputs(deleted_flow_step_outputs_by_node) => {
                 res = UpdateDeletedFlowStepOutputsByNodeBranch {
                     id: branch_id,
-                    deleted_flow_step_outputs_by_node,
+                    ..Default::default()
                 }
-                .update()
+                .push_deleted_flow_step_outputs_by_node(deleted_flow_step_outputs_by_node)
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::EditFlowStepDescription(id) => {
+                res = UpdateEditedDescriptionFlowStepsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_description_flow_steps(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
