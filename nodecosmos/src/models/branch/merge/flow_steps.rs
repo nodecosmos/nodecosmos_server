@@ -1,9 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description, ObjectType};
+use crate::models::description::{find_description, Description};
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
-use crate::models::traits::{Branchable, FindForBranchMerge, GroupByObjectId, Reload};
+use crate::models::traits::{Branchable, FindForBranchMerge, GroupByObjectId, ObjectType, Reload};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
 use anyhow::Context;
@@ -48,6 +48,30 @@ impl MergeFlowSteps {
                 .await?;
 
             return Ok(Some(ios_by_id));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn edited_flow_step_descriptions(
+        branch: &Branch,
+        db_session: &CachingSession,
+    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
+        if let Some(edited_description_flow_step_ids) = &branch.edited_description_flow_steps {
+            let descriptions = find_description!(
+                "branch_id = ? AND object_id IN ?",
+                (branch.id, edited_description_flow_step_ids)
+            )
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+            return Ok(Some(
+                branch
+                    .map_original_objects(ObjectType::FlowStep, descriptions)
+                    .collect(),
+            ));
         }
 
         Ok(None)
@@ -117,30 +141,6 @@ impl MergeFlowSteps {
                     .await?;
 
             return Ok(Some(flow_steps));
-        }
-
-        Ok(None)
-    }
-
-    pub async fn edited_flow_step_descriptions(
-        branch: &Branch,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
-        if let Some(edited_description_flow_step_ids) = &branch.edited_description_flow_steps {
-            let descriptions = find_description!(
-                "branch_id = ? AND object_id IN ?",
-                (branch.id, edited_description_flow_step_ids)
-            )
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-            return Ok(Some(
-                branch
-                    .map_original_objects(ObjectType::FlowStep, descriptions)
-                    .collect(),
-            ));
         }
 
         Ok(None)
@@ -897,47 +897,42 @@ impl MergeFlowSteps {
     }
 
     pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        let edited_flow_step_descriptions = match self.edited_flow_step_descriptions.as_mut() {
-            Some(descriptions) => descriptions,
-            None => return Ok(()),
-        };
+        if let Some(edited_flow_step_descriptions) = self.edited_flow_step_descriptions.as_mut() {
+            for edited_flow_step_description in edited_flow_step_descriptions {
+                let object_id = edited_flow_step_description.object_id;
+                let mut text_change = TextChange::new();
 
-        let mut default = HashMap::default();
-        let original_flow_step_descriptions = self
-            .original_flow_step_descriptions
-            .as_mut()
-            .unwrap_or_else(|| &mut default);
+                if let Some(original) = self
+                    .original_flow_step_descriptions
+                    .as_mut()
+                    .map_or(None, |original| original.get_mut(&object_id))
+                {
+                    // skip if description is the same
+                    if original.html == edited_flow_step_description.html {
+                        continue;
+                    }
 
-        for edited_flow_step_description in edited_flow_step_descriptions {
-            let object_id = edited_flow_step_description.object_id;
-            let mut default_description = Description {
-                object_id,
-                branch_id: object_id,
-                ..Default::default()
-            };
+                    // assign old before updating the flow_step
+                    text_change.assign_old(original.markdown.clone());
+                }
 
-            let original = original_flow_step_descriptions
-                .get_mut(&object_id)
-                .unwrap_or_else(|| &mut default_description);
+                edited_flow_step_description.set_original_id();
 
-            // init text change for remembrance of diff between old and new description
-            let mut text_change = TextChange::new();
-            text_change.assign_old(original.markdown.clone());
+                // description merge is handled within before_insert callback
+                edited_flow_step_description
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update flow_step description")?;
 
-            // description merge is handled within before_insert callback
-            original.base64 = edited_flow_step_description.base64.clone();
-            original
-                .insert_cb(data)
-                .execute(data.db_session())
-                .await
-                .context("Error flow step updating description")?;
+                // assign new after updating the flow_step
+                text_change.assign_new(edited_flow_step_description.markdown.clone());
 
-            // update text change with new description
-            text_change.assign_new(original.markdown.clone());
-            branch
-                .description_change_by_object
-                .get_or_insert_with(HashMap::default)
-                .insert(object_id, text_change);
+                branch
+                    .description_change_by_object
+                    .get_or_insert_with(HashMap::default)
+                    .insert(object_id, text_change);
+            }
         }
 
         Ok(())

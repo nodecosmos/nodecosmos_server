@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
-use crate::models::like::{Like, ObjectType};
+use crate::models::like::{Like, LikeObjectType};
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::node_counter::NodeCounter;
 use charybdis::operations::Find;
@@ -47,8 +47,8 @@ impl Like {
         data: &RequestData,
         increment: bool,
     ) -> Result<(), NodecosmosError> {
-        match ObjectType::from(self.object_type.parse()?) {
-            ObjectType::Node => {
+        match LikeObjectType::from(self.object_type.parse()?) {
+            LikeObjectType::Node => {
                 if increment {
                     NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
                 } else {

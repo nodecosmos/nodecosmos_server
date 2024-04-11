@@ -2,9 +2,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::description::{Description, ObjectType};
+use crate::models::description::Description;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, ElasticDocument, UpdateNodeDescriptionElasticIdx};
+use crate::models::traits::{Branchable, ElasticDocument, ObjectType, UpdateNodeDescriptionElasticIdx};
 
 impl Description {
     pub async fn handle_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -20,6 +20,9 @@ impl Description {
                 }
                 ObjectType::Io => {
                     Branch::update(&data, self.branch_id, BranchUpdate::EditIoDescription(self.object_id)).await?;
+                }
+                ObjectType::FlowStep => {
+                    Branch::update(&data, self.branch_id, BranchUpdate::EditFlowDescription(self.object_id)).await?;
                 }
                 _ => {}
             }

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
-pub enum ObjectType {
+pub enum LikeObjectType {
     Node,
     Comment,
 }
@@ -96,8 +96,8 @@ impl Like {
             return Ok(c);
         }
 
-        match ObjectType::from(self.object_type.parse()?) {
-            ObjectType::Node => {
+        match LikeObjectType::from(self.object_type.parse()?) {
+            LikeObjectType::Node => {
                 let lc = NodeCounter::like_count(db_session, self.object_id, self.branch_id).await?;
 
                 self.like_count = Some(lc);

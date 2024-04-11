@@ -12,7 +12,7 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
-pub enum ObjectType {
+pub enum ThreadObjectType {
     ContributionRequest,
     Topic,
 }
@@ -37,7 +37,7 @@ pub enum CommentObject {
 }
 
 /// **objectId** corresponds to the following:
-/// * **`ContributionRequest['id']`** for ContributionRequest related comments  
+/// * **`ContributionRequest['id']`** for ContributionRequest related comments
 /// * **`Topic['id']`**  for Topic related comments
 ///
 /// **thread_node_id** if provided corresponds to Node of the following
@@ -91,8 +91,8 @@ pub struct CommentThread {
 
 impl CommentThread {
     pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
-        match ObjectType::from(self.object_type.parse()?) {
-            ObjectType::ContributionRequest => {
+        match ThreadObjectType::from(self.object_type.parse()?) {
+            ThreadObjectType::ContributionRequest => {
                 return match self.object_node_id {
                     Some(node_id) => {
                         let contribution_request = ContributionRequest::find_by_node_id_and_id(node_id, self.object_id)

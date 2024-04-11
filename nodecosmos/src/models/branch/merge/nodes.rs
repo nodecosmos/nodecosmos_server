@@ -1,12 +1,12 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description, ObjectType};
+use crate::models::description::{find_description, Description};
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
+use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -25,7 +25,7 @@ pub struct MergeNodes {
     edited_title_nodes: Option<Vec<UpdateTitleNode>>,
     edited_node_descriptions: Option<Vec<Description>>,
     original_title_nodes: Option<HashMap<Uuid, UpdateTitleNode>>,
-    original_nodes_descriptions: Option<HashMap<Uuid, Description>>,
+    original_node_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl MergeNodes {
@@ -190,7 +190,7 @@ impl MergeNodes {
         let edited_title_nodes = Self::edited_title_nodes(&branch, data.db_session()).await?;
         let edited_node_descriptions = Self::edited_node_descriptions(&branch, data.db_session()).await?;
         let original_title_nodes = Self::original_title_nodes(data.db_session(), &branch).await?;
-        let original_nodes_descriptions = Self::original_nodes_description(data.db_session(), &branch).await?;
+        let original_node_descriptions = Self::original_nodes_description(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_nodes,
@@ -200,7 +200,7 @@ impl MergeNodes {
             edited_title_nodes,
             edited_node_descriptions,
             original_title_nodes,
-            original_nodes_descriptions,
+            original_node_descriptions,
         })
     }
 
@@ -439,54 +439,49 @@ impl MergeNodes {
     }
 
     pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        let edited_node_descriptions = match self.edited_node_descriptions.as_mut() {
-            Some(descriptions) => descriptions,
-            None => return Ok(()),
-        };
+        if let Some(edited_node_descriptions) = self.edited_node_descriptions.as_mut() {
+            for edited_node_description in edited_node_descriptions {
+                let object_id = edited_node_description.object_id;
+                let mut text_change = TextChange::new();
 
-        let mut default = HashMap::default();
-        let original_nodes_description = self
-            .original_nodes_descriptions
-            .as_mut()
-            .unwrap_or_else(|| &mut default);
+                if let Some(original) = self
+                    .original_node_descriptions
+                    .as_mut()
+                    .map_or(None, |original| original.get_mut(&object_id))
+                {
+                    // skip if description is the same
+                    if original.html == edited_node_description.html {
+                        continue;
+                    }
 
-        for edited_node_description in edited_node_descriptions {
-            let object_id = edited_node_description.object_id;
-            let mut default_description = Description {
-                object_id,
-                branch_id: object_id,
-                ..Default::default()
-            };
+                    // assign old before updating the node
+                    text_change.assign_old(original.markdown.clone());
+                }
 
-            let original = original_nodes_description
-                .get_mut(&object_id)
-                .unwrap_or_else(|| &mut default_description);
+                edited_node_description.set_original_id();
 
-            // init text change for remembrance of diff between old and new description
-            let mut text_change = TextChange::new();
-            text_change.assign_old(original.markdown.clone());
+                // description merge is handled within before_insert callback
+                edited_node_description
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update node description")?;
 
-            // description merge is handled within before_insert callback
-            original.base64 = edited_node_description.base64.clone();
-            original
-                .insert_cb(data)
-                .execute(data.db_session())
-                .await
-                .context("Failed to update node description")?;
+                // assign new after updating the node
+                text_change.assign_new(edited_node_description.markdown.clone());
 
-            // update text change with new description
-            text_change.assign_new(original.markdown.clone());
-            branch
-                .description_change_by_object
-                .get_or_insert_with(HashMap::default)
-                .insert(object_id, text_change);
+                branch
+                    .description_change_by_object
+                    .get_or_insert_with(HashMap::default)
+                    .insert(object_id, text_change);
+            }
         }
 
         Ok(())
     }
 
     pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_nodes_description) = &mut self.original_nodes_descriptions {
+        if let Some(original_nodes_description) = &mut self.original_node_descriptions {
             for original_node_description in original_nodes_description.values_mut() {
                 // description merge is handled within before_insert callback, so we use update to revert as
                 // it will not trigger merge logic

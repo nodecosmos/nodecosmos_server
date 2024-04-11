@@ -18,15 +18,6 @@ use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
-#[derive(Copy, Clone, Deserialize, strum_macros::Display, strum_macros::EnumString)]
-pub enum ObjectType {
-    Node,
-    Workflow,
-    Flow,
-    FlowStep,
-    Io,
-}
-
 #[charybdis_model(
     table_name = description,
     partition_keys = [object_id],
@@ -68,8 +59,12 @@ impl Callbacks for Description {
             .await?;
 
         if let Some(mut current) = current {
+            let branch_id = self.branch_id;
+
             current.merge(self).await?;
+
             *self = current;
+            self.branch_id = branch_id;
         }
 
         self.updated_at = Utc::now();
@@ -145,9 +140,12 @@ macro_rules! find_branched {
     ($struct_name:ident) => {
         impl $struct_name {
             pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<&mut Self, NodecosmosError> {
+                use anyhow::Context;
+
                 let branch_self = Self::maybe_find_by_primary_key_value(&(self.object_id, self.branch_id))
                     .execute(db_session)
-                    .await?;
+                    .await
+                    .context("Failed to find branched description")?;
 
                 match branch_self {
                     Some(branch_self) => {

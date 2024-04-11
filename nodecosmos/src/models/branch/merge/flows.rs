@@ -1,9 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description, ObjectType};
+use crate::models::description::{find_description, Description};
 use crate::models::flow::{Flow, UpdateTitleFlow};
-use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId};
+use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId, ObjectType};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
 use anyhow::Context;
@@ -332,44 +332,42 @@ impl MergeFlows {
     }
 
     pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        let edited_flow_descriptions = match self.edited_flow_descriptions.as_mut() {
-            Some(descriptions) => descriptions,
-            None => return Ok(()),
-        };
+        if let Some(edited_flow_descriptions) = self.edited_flow_descriptions.as_mut() {
+            for edited_flow_description in edited_flow_descriptions {
+                let object_id = edited_flow_description.object_id;
+                let mut text_change = TextChange::new();
 
-        let mut default = HashMap::default();
-        let original_flow_descriptions = self.original_flow_descriptions.as_mut().unwrap_or_else(|| &mut default);
+                if let Some(original) = self
+                    .original_flow_descriptions
+                    .as_mut()
+                    .map_or(None, |original| original.get_mut(&object_id))
+                {
+                    // skip if description is the same
+                    if original.html == edited_flow_description.html {
+                        continue;
+                    }
 
-        for edited_flow_description in edited_flow_descriptions {
-            let object_id = edited_flow_description.object_id;
-            let mut default_description = Description {
-                object_id,
-                branch_id: object_id,
-                ..Default::default()
-            };
+                    // assign old before updating the flow
+                    text_change.assign_old(original.markdown.clone());
+                }
 
-            let original = original_flow_descriptions
-                .get_mut(&object_id)
-                .unwrap_or_else(|| &mut default_description);
+                edited_flow_description.set_original_id();
 
-            // init text change for remembrance of diff between old and new description
-            let mut text_change = TextChange::new();
-            text_change.assign_old(original.markdown.clone());
+                // description merge is handled within before_insert callback
+                edited_flow_description
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update flow description")?;
 
-            // description merge is handled within before_insert callback
-            original.base64 = edited_flow_description.base64.clone();
-            original
-                .insert_cb(data)
-                .execute(data.db_session())
-                .await
-                .context("Failed to update flow description")?;
+                // assign new after updating the flow
+                text_change.assign_new(edited_flow_description.markdown.clone());
 
-            // update text change with new description
-            text_change.assign_new(original.markdown.clone());
-            branch
-                .description_change_by_object
-                .get_or_insert_with(HashMap::default)
-                .insert(object_id, text_change);
+                branch
+                    .description_change_by_object
+                    .get_or_insert_with(HashMap::default)
+                    .insert(object_id, text_change);
+            }
         }
 
         Ok(())

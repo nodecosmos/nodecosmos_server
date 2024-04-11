@@ -1,10 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description, ObjectType};
+use crate::models::description::{find_description, Description};
 use crate::models::io::{find_update_title_io, Io, UpdateTitleIo};
-use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
+use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::TextChange;
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
@@ -21,7 +21,7 @@ pub struct MergeIos {
     edited_title_ios: Option<Vec<UpdateTitleIo>>,
     edited_io_descriptions: Option<Vec<Description>>,
     original_title_ios: Option<HashMap<Uuid, UpdateTitleIo>>,
-    original_ios_descriptions: Option<HashMap<Uuid, Description>>,
+    original_io_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl MergeIos {
@@ -155,7 +155,7 @@ impl MergeIos {
         let edited_title_ios = Self::edited_title_ios(branch, data.db_session()).await?;
         let edited_io_descriptions = Self::edited_io_descriptions(branch, data.db_session()).await?;
         let original_title_ios = Self::original_title_ios(data.db_session(), &branch).await?;
-        let original_ios_descriptions = Self::original_ios_description(data.db_session(), &branch).await?;
+        let original_io_descriptions = Self::original_ios_description(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_ios,
@@ -164,7 +164,7 @@ impl MergeIos {
             edited_title_ios,
             edited_io_descriptions,
             original_title_ios,
-            original_ios_descriptions,
+            original_io_descriptions,
         })
     }
 
@@ -309,51 +309,49 @@ impl MergeIos {
     }
 
     pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        let edited_io_descriptions = match self.edited_io_descriptions.as_mut() {
-            Some(descriptions) => descriptions,
-            None => return Ok(()),
-        };
+        if let Some(edited_io_descriptions) = self.edited_io_descriptions.as_mut() {
+            for edited_io_description in edited_io_descriptions {
+                let object_id = edited_io_description.object_id;
+                let mut text_change = TextChange::new();
 
-        let mut default = HashMap::default();
-        let original_ios_description = self.original_ios_descriptions.as_mut().unwrap_or_else(|| &mut default);
+                if let Some(original) = self
+                    .original_io_descriptions
+                    .as_mut()
+                    .map_or(None, |original| original.get_mut(&object_id))
+                {
+                    // skip if description is the same
+                    if original.html == edited_io_description.html {
+                        continue;
+                    }
 
-        for edited_io_description in edited_io_descriptions {
-            let object_id = edited_io_description.object_id;
-            let mut default_description = Description {
-                object_id,
-                branch_id: object_id,
-                ..Default::default()
-            };
+                    // assign old before updating the io
+                    text_change.assign_old(original.markdown.clone());
+                }
 
-            let original = original_ios_description
-                .get_mut(&object_id)
-                .unwrap_or_else(|| &mut default_description);
+                edited_io_description.set_original_id();
 
-            // init text change for remembrance of diff between old and new description
-            let mut text_change = TextChange::new();
-            text_change.assign_old(original.markdown.clone());
+                // description merge is handled within before_insert callback
+                edited_io_description
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update io description")?;
 
-            // description merge is handled within before_insert callback
-            original.base64 = edited_io_description.base64.clone();
-            original
-                .insert_cb(data)
-                .execute(data.db_session())
-                .await
-                .context("Failed to update io description")?;
+                // assign new after updating the io
+                text_change.assign_new(edited_io_description.markdown.clone());
 
-            // update text change with new description
-            text_change.assign_new(original.markdown.clone());
-            branch
-                .description_change_by_object
-                .get_or_insert_with(HashMap::default)
-                .insert(object_id, text_change);
+                branch
+                    .description_change_by_object
+                    .get_or_insert_with(HashMap::default)
+                    .insert(object_id, text_change);
+            }
         }
 
         Ok(())
     }
 
     pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_ios_description) = &mut self.original_ios_descriptions {
+        if let Some(original_ios_description) = &mut self.original_io_descriptions {
             for original_io_description in original_ios_description.values_mut() {
                 // description merge is handled within before_insert callback, so we use update to revert as
                 // it will not trigger merge logic

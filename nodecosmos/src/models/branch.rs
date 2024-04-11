@@ -2,9 +2,8 @@ pub mod merge;
 pub mod update;
 
 use crate::errors::NodecosmosError;
-use crate::models::description::ObjectType;
 use crate::models::node::Node;
-use crate::models::traits::{Id, ObjectId};
+use crate::models::traits::{Id, ObjectId, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 use charybdis::macros::charybdis_model;
