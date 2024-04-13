@@ -13,7 +13,6 @@ use crate::models::branch::Branch;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams, GroupById, Merge};
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
-use crate::models::workflow::Workflow;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
@@ -23,7 +22,6 @@ use nodecosmos_macros::{Branchable, FlowId, Id};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 #[charybdis_model(
     table_name = flow_steps,
@@ -61,29 +59,11 @@ pub struct FlowStep {
     #[serde(rename = "outputIdsByNodeId")]
     pub output_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
 
-    #[serde(rename = "prevFlowStepId")]
-    pub prev_flow_step_id: Option<Uuid>,
-
-    #[serde(rename = "nextFlowStepId")]
-    pub next_flow_step_id: Option<Uuid>,
-
     #[serde(rename = "createdAt", default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub workflow: Arc<Mutex<Option<Workflow>>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub prev_flow_step: Arc<Mutex<Option<SiblingFlowStep>>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub next_flow_step: Arc<Mutex<Option<SiblingFlowStep>>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -97,16 +77,13 @@ impl Callbacks for FlowStep {
     async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_default_context() {
             self.set_defaults();
-            self.validate_conflicts(data).await?;
-            self.calculate_index(data).await?;
+            self.validate_no_conflicts(data).await?;
             self.update_branch_with_creation(data).await?;
         }
 
         if self.is_default_context() || self.is_branched_init_context() {
             self.preserve_branch_flow(data).await?;
         }
-
-        self.sync_surrounding_fs_on_creation(data).await?;
 
         Ok(())
     }
@@ -115,7 +92,6 @@ impl Callbacks for FlowStep {
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.delete_fs_outputs(data).await?;
-        self.sync_surrounding_fs_on_deletion(data).await?;
         self.preserve_branch_flow(data).await?;
         self.update_branch_with_deletion(data).await?;
 
@@ -215,60 +191,16 @@ impl FlowStep {
         Ok(flow_steps)
     }
 
-    pub async fn workflow(&self, db_session: &CachingSession) -> Result<&Mutex<Option<Workflow>>, NodecosmosError> {
-        let mut workflow = self.workflow.lock()?;
-        if workflow.is_none() {
-            let params = WorkflowParams {
-                node_id: self.node_id,
-                branch_id: self.branch_id,
-            };
+    pub async fn maybe_find_by_flow_index(
+        &self,
+        db_session: &CachingSession,
+    ) -> Result<Option<FlowStep>, NodecosmosError> {
+        let q = find_flow_step_query!("node_id = ? AND branch_id = ? AND flow_id = ? AND flow_index = ? LIMIT 1");
+        let fs = FlowStep::maybe_find_first(q, (self.node_id, self.branch_id, self.flow_id, self.flow_index))
+            .execute(db_session)
+            .await?;
 
-            *workflow = Some(Workflow::branched(db_session, &params).await?);
-        }
-
-        Ok(self.workflow.as_ref())
-    }
-
-    pub async fn prev_flow_step(&self, data: &RequestData) -> Result<&Mutex<Option<SiblingFlowStep>>, NodecosmosError> {
-        if let Some(prev_flow_step_id) = self.prev_flow_step_id {
-            let mut pfs = self.prev_flow_step.lock()?;
-            if pfs.is_none() {
-                *pfs = Some(
-                    SiblingFlowStep::find_or_insert_branched(
-                        data,
-                        &WorkflowParams {
-                            node_id: self.node_id,
-                            branch_id: self.branch_id,
-                        },
-                        prev_flow_step_id,
-                    )
-                    .await?,
-                );
-            }
-        }
-
-        Ok(self.prev_flow_step.as_ref())
-    }
-
-    pub async fn next_flow_step(&self, data: &RequestData) -> Result<&Mutex<Option<SiblingFlowStep>>, NodecosmosError> {
-        if let Some(next_flow_step_id) = self.next_flow_step_id {
-            let mut nfs = self.next_flow_step.lock()?;
-            if nfs.is_none() {
-                *nfs = Some(
-                    SiblingFlowStep::find_or_insert_branched(
-                        data,
-                        &WorkflowParams {
-                            node_id: self.node_id,
-                            branch_id: self.branch_id,
-                        },
-                        next_flow_step_id,
-                    )
-                    .await?,
-                );
-            }
-        }
-
-        Ok(self.next_flow_step.as_ref())
+        Ok(fs)
     }
 
     pub async fn maybe_find_original(
@@ -285,58 +217,6 @@ impl FlowStep {
 
         Ok(original)
     }
-
-    /// For branched merge, siblings steps might be already in sync if they are all created in the branch.
-    /// When merging a branched flow step, we assign the next and previous flow steps before triggering the merge.
-    pub async fn siblings_already_in_sync(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
-        let prev_fs_next_flow_step_id = self
-            .prev_flow_step(data)
-            .await?
-            .lock()?
-            .as_ref()
-            .map(|fs| fs.next_flow_step_id);
-        let next_fs_prev_flow_step_id = self
-            .next_flow_step(data)
-            .await?
-            .lock()?
-            .as_ref()
-            .map(|fs| fs.next_flow_step_id);
-
-        match (prev_fs_next_flow_step_id, next_fs_prev_flow_step_id) {
-            (Some(prev_fs_next_flow_step_id), Some(next_fs_prev_flow_step_id)) => {
-                Ok(prev_fs_next_flow_step_id == Some(self.id) && next_fs_prev_flow_step_id == Some(self.id))
-            }
-            (None, None) => Ok(true),
-            _ => Ok(false),
-        }
-    }
-}
-
-// SiblingFlowStep is same as FlowStep, but we use it to avoid recursive structs
-// as we hold a reference to the next and previous flow steps in FlowStep
-partial_flow_step!(
-    SiblingFlowStep,
-    node_id,
-    branch_id,
-    flow_id,
-    flow_index,
-    id,
-    root_id,
-    node_ids,
-    input_ids_by_node_id,
-    output_ids_by_node_id,
-    prev_flow_step_id,
-    next_flow_step_id,
-    created_at,
-    updated_at,
-    ctx
-);
-
-impl Callbacks for SiblingFlowStep {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    updated_at_cb_fn!();
 }
 
 partial_flow_step!(
@@ -371,9 +251,8 @@ impl Callbacks for UpdateInputIdsFlowStep {
 
             self.update_branch(data).await?;
             self.preserve_branch_ios(data).await?;
+            self.update_ios(data).await?;
         }
-
-        self.update_ios(data).await?;
 
         Ok(())
     }

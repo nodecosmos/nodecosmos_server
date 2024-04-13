@@ -1,7 +1,5 @@
 use crate::models::flow::{Flow, UpdateTitleFlow};
-use crate::models::flow_step::{
-    FlowStep, SiblingFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
-};
+use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::{Node, UpdateTitleNode};
 
@@ -69,7 +67,6 @@ impl_context!(
     Flow,
     UpdateTitleFlow,
     FlowStep,
-    SiblingFlowStep,
     UpdateNodeIdsFlowStep,
     UpdateInputIdsFlowStep,
     UpdateOutputIdsFlowStep,

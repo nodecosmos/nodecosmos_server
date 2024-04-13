@@ -23,10 +23,9 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
         .unlock_resource(flow_step.flow_id, flow_step.branch_id)
         .await?;
 
-    match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(flow_step)),
-        Err(err) => Err(err),
-    }
+    res?;
+
+    Ok(HttpResponse::Ok().json(flow_step))
 }
 
 #[put("/nodes")]

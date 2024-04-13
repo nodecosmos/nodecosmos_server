@@ -449,7 +449,7 @@ impl Branch {
                 .check_conflicts(data)
                 .await
                 .map_err(|err| {
-                    error!("Failed to check conflicts: {}", err);
+                    error!("{}", err);
                 });
         }
 

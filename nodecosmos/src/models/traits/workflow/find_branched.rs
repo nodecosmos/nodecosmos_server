@@ -4,7 +4,7 @@ use crate::errors::NodecosmosError;
 use crate::models::flow::{find_flow, find_update_title_flow, Flow, UpdateTitleFlow};
 use crate::models::flow_step::{
     find_flow_step, find_update_input_ids_flow_step, find_update_node_ids_flow_step, find_update_output_ids_flow_step,
-    FlowStep, SiblingFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
+    FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::node::Node;
 use crate::models::traits::ModelContext;
@@ -104,7 +104,6 @@ macro_rules! find_or_insert_branched {
 
 find_or_insert_branched!(Flow);
 find_or_insert_branched!(FlowStep);
-find_or_insert_branched!(SiblingFlowStep);
 
 pub trait FindForBranchMerge: Model {
     async fn find_by_node_ids_and_branch_id_and_ids(

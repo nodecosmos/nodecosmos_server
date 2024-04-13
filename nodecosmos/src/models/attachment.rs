@@ -16,6 +16,7 @@ const MAX_IMAGE_WIDTH: u32 = 852;
     table_name = attachments,
     partition_keys = [node_id],
     clustering_keys = [object_id, id],
+    static_columns = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
 pub struct Attachment {

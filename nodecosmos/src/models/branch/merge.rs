@@ -164,8 +164,6 @@ impl BranchMerge {
 
     pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, MergeError> {
         if let Err(e) = MergeConflicts::new(&mut self).run_check(data).await {
-            error!("Merge::Failed to check conflicts: {}", e);
-
             return Err(MergeError {
                 inner: e,
                 branch: self.branch,
@@ -257,8 +255,8 @@ impl BranchMerge {
                 MergeStep::UpdateFlowsDescription => self.flows.update_description(data, &mut self.branch).await?,
                 MergeStep::AcceptFlowSolutions => (),
                 MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
-                MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data, &self.branch).await?,
-                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &self.branch).await?,
+                MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data).await?,
                 MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data, &self.branch).await?,
                 MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
                 MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data, &self.branch).await?,

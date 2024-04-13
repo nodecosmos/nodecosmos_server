@@ -8,7 +8,9 @@ use crate::models::io::Io;
 use crate::models::node::PkNode;
 use crate::models::traits::{Branchable, ChainOptRef, PluckFromStream, RefCloned};
 use crate::models::traits::{FindForBranchMerge, MaybePluckFlowId, MaybePluckFlowStepId, Pluck, PluckFlowId};
-use crate::models::udts::Conflict;
+use crate::models::udts::{Conflict, ConflictStatus};
+use anyhow::Context;
+use charybdis::operations::Update;
 use charybdis::types::{Set, Uuid};
 use std::collections::HashSet;
 
@@ -86,6 +88,33 @@ impl<'a> MergeConflicts<'a> {
         self.extract_deleted_edited_flow_steps(data).await?;
         self.extract_diverged_flows(data).await?;
         self.extract_deleted_ios(data).await?;
+
+        let branch = &mut self.branch_merge.branch;
+
+        if let Some(conflict) = branch.conflict.as_mut() {
+            if conflict.deleted_ancestors.is_none()
+                && conflict.deleted_edited_nodes.is_none()
+                && conflict.deleted_edited_flows.is_none()
+                && conflict.deleted_edited_flow_steps.is_none()
+                && conflict.deleted_edited_ios.is_none()
+                && conflict.diverged_flows.is_none()
+            {
+                conflict.status = ConflictStatus::Resolved.to_string();
+                branch
+                    .update()
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update branch with new conflicts")?;
+            } else {
+                conflict.status = ConflictStatus::Pending.to_string();
+                branch
+                    .update()
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to update branch with resolve")?;
+                return Err(NodecosmosError::Conflict("Conflict detected".to_string()));
+            }
+        }
 
         Ok(())
     }
@@ -239,7 +268,6 @@ impl<'a> MergeConflicts<'a> {
         let deleted_flow_step_ids = self.branch_merge.branch.deleted_flow_steps.ref_cloned();
         let mut edited_flow_step_ids = self.branch_merge.branch.edited_description_flow_steps.ref_cloned();
         edited_flow_step_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_id_set());
-        edited_flow_step_ids.extend(self.branch_merge.flow_steps.created_fs_inputs_flow_steps.pluck_id_set());
         edited_flow_step_ids.extend(
             self.branch_merge
                 .flow_steps
@@ -299,122 +327,41 @@ impl<'a> MergeConflicts<'a> {
 
     /// Diverged flows are flows that have created_flow_steps whose prev_flow_step's next_flow_step is not the same as
     /// created_flow_step's next_flow_step_id on original flow. User is then given option to choose which flow to keep.
+    /// TODO: check if prev or next is deleted in the branch
     async fn extract_diverged_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_flow_step_ids = self.branch_merge.branch.created_flow_steps.ref_cloned();
-
-        let accepted_flow_solutions = self
-            .branch_merge
-            .branch
-            .accepted_flow_solutions
-            .as_ref()
-            .cloned()
-            .unwrap_or_default();
-        let mut diverged_flows = HashSet::new();
-        let branch_flow_steps = self
+        let created_flow_ids = self.branch_merge.branch.created_flows.as_ref();
+        let created_flow_steps = self
             .branch_merge
             .flow_steps
             .created_flow_steps
             .chain_opt_ref(&self.branch_merge.flow_steps.restored_flow_steps);
 
-        if let Some(branch_flow_steps) = branch_flow_steps {
-            for branch_flow_step in branch_flow_steps {
-                if accepted_flow_solutions.contains_key(&branch_flow_step.flow_id)
-                    || diverged_flows.contains(&branch_flow_step.flow_id)
+        if let Some(created_flow_steps) = created_flow_steps {
+            let mut diverged_flows = HashSet::new();
+
+            for flow_step in created_flow_steps {
+                if diverged_flows.contains(&flow_step.flow_id)
+                    || created_flow_ids.is_some_and(|ids| ids.contains(&flow_step.flow_id))
                 {
                     continue;
                 }
 
-                let prev_flow_step_id = branch_flow_step.prev_flow_step_id;
-                let next_flow_step_id = branch_flow_step.next_flow_step_id;
-
-                match (prev_flow_step_id, next_flow_step_id) {
-                    (Some(prev_flow_step_id), Some(next_flow_step_id)) => {
-                        let prev_flow_step_next_flow_step_id = if created_flow_step_ids.contains(&prev_flow_step_id) {
-                            Some(next_flow_step_id)
-                        } else {
-                            let prev_flow_step = FlowStep::maybe_find_first_by_node_id_and_branch_id_and_id(
-                                branch_flow_step.node_id,
-                                branch_flow_step.original_id(),
-                                prev_flow_step_id,
-                            )
-                            .execute(data.db_session())
-                            .await?;
-
-                            prev_flow_step.map_or(None, |fs| fs.next_flow_step_id)
-                        };
-
-                        let next_flow_step_prev_flow_step_id = if created_flow_step_ids.contains(&next_flow_step_id) {
-                            Some(prev_flow_step_id)
-                        } else {
-                            let next_flow_step = FlowStep::maybe_find_first_by_node_id_and_branch_id_and_id(
-                                branch_flow_step.node_id,
-                                branch_flow_step.original_id(),
-                                next_flow_step_id,
-                            )
-                            .execute(data.db_session())
-                            .await?;
-
-                            next_flow_step.map_or(None, |fs| fs.prev_flow_step_id)
-                        };
-
-                        if prev_flow_step_next_flow_step_id != Some(next_flow_step_id)
-                            || next_flow_step_prev_flow_step_id != Some(prev_flow_step_id)
-                        {
-                            diverged_flows.insert(branch_flow_step.flow_id);
-                        }
-                    }
-                    (Some(prev_flow_step_id), None) => {
-                        let prev_flow_step_next_flow_step_id = if created_flow_step_ids.contains(&prev_flow_step_id) {
-                            None
-                        } else {
-                            let prev_flow_step = FlowStep::maybe_find_first_by_node_id_and_branch_id_and_id(
-                                branch_flow_step.node_id,
-                                branch_flow_step.original_id(),
-                                prev_flow_step_id,
-                            )
-                            .execute(data.db_session())
-                            .await?;
-
-                            prev_flow_step.map_or(None, |fs| fs.next_flow_step_id)
-                        };
-
-                        if prev_flow_step_next_flow_step_id.is_some() {
-                            diverged_flows.insert(branch_flow_step.flow_id);
-                        }
-                    }
-                    (None, Some(next_flow_step_id)) => {
-                        let next_flow_step_prev_flow_step_id = if created_flow_step_ids.contains(&next_flow_step_id) {
-                            None
-                        } else {
-                            let next_flow_step = FlowStep::maybe_find_first_by_node_id_and_branch_id_and_id(
-                                branch_flow_step.node_id,
-                                branch_flow_step.original_id(),
-                                next_flow_step_id,
-                            )
-                            .execute(data.db_session())
-                            .await?;
-
-                            next_flow_step.map_or(None, |fs| fs.prev_flow_step_id)
-                        };
-
-                        if next_flow_step_prev_flow_step_id.is_some() {
-                            diverged_flows.insert(branch_flow_step.flow_id);
-                        }
-                    }
-                    (None, None) => {
-                        let maybe_first = FlowStep::maybe_find_first_by_node_id_and_branch_id_and_flow_id(
-                            branch_flow_step.node_id,
-                            branch_flow_step.original_id(),
-                            branch_flow_step.flow_id,
-                        )
-                        .execute(data.db_session())
-                        .await?;
-
-                        if maybe_first.is_some() {
-                            diverged_flows.insert(branch_flow_step.flow_id);
-                        }
-                    }
+                // check if flow step exists on same index
+                let mut maybe_orig = flow_step.clone();
+                maybe_orig.set_original_id();
+                if maybe_orig.maybe_find_by_flow_index(data.db_session()).await?.is_some() {
+                    diverged_flows.insert(flow_step.flow_id);
                 }
+            }
+
+            if diverged_flows.len() > 0 {
+                self.branch_merge
+                    .branch
+                    .conflict
+                    .get_or_insert_with(|| Conflict::default())
+                    .diverged_flows = Some(diverged_flows);
+            } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
+                conflict.diverged_flows = None;
             }
         }
 

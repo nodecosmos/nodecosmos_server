@@ -309,34 +309,10 @@ impl MergeFlowSteps {
 
     async fn insert_flow_steps(
         data: &RequestData,
-        branch: &Branch,
         merge_flow_steps: &mut Option<Vec<FlowStep>>,
     ) -> Result<(), NodecosmosError> {
         if let Some(merge_flow_steps) = merge_flow_steps {
             for merge_flow_step in merge_flow_steps {
-                // For branch-created flow_steps, surrounding flow_steps should be already in sync.
-                // We need to init them so flow_step insertion doesn't fail. Otherwise flow step may have
-                // next_flow_step_id that is present in branch but it's not created for original flow_step.
-                if let Some(prev_flow_step_id) = merge_flow_step.prev_flow_step_id {
-                    if branch
-                        .created_flow_steps
-                        .as_ref()
-                        .is_some_and(|cfs| cfs.contains(&prev_flow_step_id))
-                    {
-                        merge_flow_step.prev_flow_step(data).await?;
-                    }
-                }
-
-                if let Some(next_flow_step_id) = merge_flow_step.next_flow_step_id {
-                    if branch
-                        .created_flow_steps
-                        .as_ref()
-                        .is_some_and(|cfs| cfs.contains(&next_flow_step_id))
-                    {
-                        merge_flow_step.next_flow_step(data).await?;
-                    }
-                }
-
                 merge_flow_step.set_merge_context();
                 merge_flow_step.set_original_id();
                 merge_flow_step.insert_cb(data).execute(data.db_session()).await?;
@@ -361,8 +337,8 @@ impl MergeFlowSteps {
         Ok(())
     }
 
-    pub async fn restore_flow_steps(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, branch, &mut self.restored_flow_steps)
+    pub async fn restore_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        Self::insert_flow_steps(data, &mut self.restored_flow_steps)
             .await
             .context("Error restoring flow steps")?;
 
@@ -377,8 +353,8 @@ impl MergeFlowSteps {
         Ok(())
     }
 
-    pub async fn create_flow_steps(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        Self::insert_flow_steps(data, branch, &mut self.created_flow_steps)
+    pub async fn create_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        Self::insert_flow_steps(data, &mut self.created_flow_steps)
             .await
             .context("Error creating flow steps")?;
 
