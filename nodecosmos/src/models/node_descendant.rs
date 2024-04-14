@@ -16,23 +16,16 @@ use serde::{Deserialize, Serialize};
     "#,
 )]
 #[derive(Id, RootId, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeDescendant {
-    #[serde(rename = "rootId")]
     pub root_id: Uuid,
-
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
     #[serde(rename = "order")]
     pub order_index: Double,
 
     pub id: Uuid,
-
-    #[serde(rename = "parentId")]
     pub parent_id: Uuid,
-
     pub title: Text,
 }

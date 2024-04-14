@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     "#
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct IoCommit {
     pub input_id: Uuid,
     pub id: Uuid,

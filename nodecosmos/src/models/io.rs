@@ -30,48 +30,33 @@ use std::collections::HashSet;
     local_secondary_indexes = [main_id]
 )]
 #[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Io {
-    #[serde(rename = "rootId")]
     #[branch(original_id)]
     pub root_id: Uuid,
-
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
-
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "mainId")]
     pub main_id: Option<Uuid>,
-
-    #[serde(rename = "flowId")]
     pub flow_id: Option<Uuid>,
 
     /// outputted by flow step
-    #[serde(rename = "flowStepId")]
     pub flow_step_id: Option<Uuid>,
 
-    #[serde(rename = "inputtedByFlowSteps")]
     pub inputted_by_flow_steps: Option<Set<Uuid>>,
-
     pub title: Option<Text>,
-
     pub unit: Option<Text>,
-
-    #[serde(rename = "dataType")]
     pub data_type: Option<Text>,
-
     pub value: Option<Text>,
-
     pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[charybdis(ignore)]

@@ -1,16 +1,16 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
-    AcceptedFlowSolution, Branch, UpdateAcceptedFlowSolutionBranch, UpdateCreatedFlowStepInputsByNodeBranch,
-    UpdateCreatedFlowStepNodesBranch, UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch,
-    UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch,
-    UpdateCreatedWorkflowInitialInputsBranch, UpdateDeletedFlowStepInputsByNodeBranch,
-    UpdateDeletedFlowStepNodesBranch, UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
-    UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
-    UpdateDeletedWorkflowInitialInputsBranch, UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch,
-    UpdateEditedDescriptionNodesBranch, UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch,
-    UpdateEditedNodeWorkflowsBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes,
-    UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
+    Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
+    UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
+    UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
+    UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
+    UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
+    UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
+    UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
+    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodeWorkflowsBranch,
+    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes, UpdateRestoredFlowStepsBranch,
+    UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
 use charybdis::batch::CharybdisModelBatch;
@@ -19,7 +19,6 @@ use charybdis::operations::Update;
 use charybdis::types::{Frozen, List, Map, Set, Uuid};
 use log::error;
 use scylla::QueryResult;
-use std::collections::HashMap;
 
 #[allow(unused)]
 pub enum BranchUpdate {
@@ -39,7 +38,6 @@ pub enum BranchUpdate {
     RestoreFlow(Uuid),
     EditFlowTitle(Uuid),
     EditFlowDescription(Uuid),
-    AcceptFlowSolution(Uuid, AcceptedFlowSolution),
     CreateFlowStep(Uuid),
     DeleteFlowStep(Uuid),
     UndoDeleteFlowStep(Uuid),
@@ -249,19 +247,6 @@ impl Branch {
                 .push_edited_description_flows(&vec![id])
                 .execute(data.db_session())
                 .await;
-            }
-            BranchUpdate::AcceptFlowSolution(id, solution) => {
-                let mut branch = UpdateAcceptedFlowSolutionBranch::find_by_id(branch_id)
-                    .execute(data.db_session())
-                    .await?;
-
-                branch
-                    .accepted_flow_solutions
-                    .get_or_insert_with(HashMap::new)
-                    .insert(id, solution.to_string());
-
-                res = branch.update().execute(data.db_session()).await;
-                check_conflicts = true
             }
             BranchUpdate::CreateFlowStep(id) => {
                 res = UpdateCreatedFlowStepsBranch {

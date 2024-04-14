@@ -51,41 +51,24 @@ pub enum CommentObject {
     clustering_keys = [id],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CommentThread {
-    #[serde(rename = "objectId")]
     pub object_id: Uuid,
-
-    #[serde(rename = "id", default)]
+    #[serde(default)]
     pub id: Uuid,
-
-    #[serde(rename = "authorId")]
     pub author_id: Option<Uuid>,
-
-    #[serde(rename = "author")]
     pub author: Option<Profile>,
-
-    #[serde(rename = "objectType")]
     pub object_type: Text,
-
-    #[serde(rename = "objectNodeId")]
     pub object_node_id: Option<Uuid>,
-
-    #[serde(rename = "threadType")]
     pub thread_type: Text,
-
-    #[serde(rename = "threadNodeId")]
     pub thread_node_id: Option<Uuid>,
-
-    #[serde(rename = "lineNumber")]
     pub line_number: Option<Int>,
-
-    #[serde(rename = "lineContent")]
     pub line_content: Option<Text>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
 

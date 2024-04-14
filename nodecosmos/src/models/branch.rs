@@ -28,12 +28,6 @@ impl BranchStatus {
     }
 }
 
-#[derive(Eq, PartialEq, Deserialize, strum_macros::Display, strum_macros::EnumString)]
-pub enum AcceptedFlowSolution {
-    Original,
-    Branch,
-}
-
 #[charybdis_model(
     table_name = branches,
     partition_keys = [id],
@@ -43,145 +37,68 @@ pub enum AcceptedFlowSolution {
     "#,
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub id: Uuid,
-
     // where branch is created
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
-
-    #[serde(rename = "rootId")]
     pub root_id: Uuid,
-
     pub title: Option<Text>,
     pub description: Option<Text>,
 
     #[serde(default = "BranchStatus::default")]
     pub status: Option<Text>,
-
-    #[serde(rename = "ownerId")]
     pub owner_id: Uuid,
-
     pub owner: Option<Frozen<Profile>>,
-
-    #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
-
-    #[serde(rename = "isPublic")]
     pub is_public: Boolean,
-
-    #[serde(rename = "isContributionRequest")]
     pub is_contribution_request: Option<Boolean>,
-
     // nodes
-    #[serde(default, rename = "createdNodes")]
     pub created_nodes: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "restoredNodes")]
     pub restored_nodes: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedNodes")]
     pub deleted_nodes: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedTitleNodes")]
     pub edited_title_nodes: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedDescriptionNodes")]
     pub edited_description_nodes: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "reorderedNodes")]
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
-
-    #[serde(default, rename = "editedWorkflowNodes")]
     pub edited_workflow_nodes: Option<Set<Uuid>>,
-
     /// node_id -> initial_input_ids
-    #[serde(default, rename = "createdWorkflowInitialInputs")]
     pub created_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
-
     /// node_id -> initial_input_ids
-    #[serde(default, rename = "deletedWorkflowInitialInputs")]
     pub deleted_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
-
     // flows
-    #[serde(default, rename = "createdFlows")]
     pub created_flows: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedFlows")]
     pub deleted_flows: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "restoredFlows")]
     pub restored_flows: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedTitleFlows")]
+    pub kept_flow_steps: Option<Set<Uuid>>,
     pub edited_title_flows: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedDescriptionFlows")]
     pub edited_description_flows: Option<Set<Uuid>>,
 
-    // flow_id -> AcceptedFlowSolution
-    #[serde(rename = "acceptedFlowSolutions")]
-    pub accepted_flow_solutions: Option<Frozen<Map<Uuid, Text>>>,
-
     // flow steps
-    #[serde(default, rename = "createdFlowSteps")]
     pub created_flow_steps: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedFlowSteps")]
     pub deleted_flow_steps: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "restoredFlowSteps")]
     pub restored_flow_steps: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedDescriptionFlowSteps")]
     pub edited_description_flow_steps: Option<Set<Uuid>>,
-
     /// flow_step_id -> node_id
-    #[serde(default, rename = "createdFlowStepNodes")]
     pub created_flow_step_nodes: Option<Map<Uuid, Frozen<Set<Uuid>>>>,
-
     /// flow_step_id -> node_id
-    #[serde(default, rename = "deletedFlowStepNodes")]
     pub deleted_flow_step_nodes: Option<Map<Uuid, Frozen<Set<Uuid>>>>,
-
     /// flow_step_id -> node_id -> io_id
-    #[serde(default, rename = "createdFlowStepInputsByNode")]
     pub created_flow_step_inputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
-
     /// flow_step_id -> node_id -> io_id
-    #[serde(default, rename = "deletedFlowStepInputsByNode")]
     pub deleted_flow_step_inputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
-
     /// flow_step_id -> node_id -> io_id
-    #[serde(default, rename = "createdFlowStepOutputsByNode")]
     pub created_flow_step_outputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
-
     /// flow_step_id -> node_id -> io_id
-    #[serde(default, rename = "deletedFlowStepOutputsByNode")]
     pub deleted_flow_step_outputs_by_node: Option<Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>>,
 
     // ios
-    #[serde(default, rename = "createdIos")]
     pub created_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "deletedIos")]
     pub deleted_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "restoredIos")]
     pub restored_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedTitleIos")]
     pub edited_title_ios: Option<Set<Uuid>>,
-
-    #[serde(default, rename = "editedDescriptionIos")]
     pub edited_description_ios: Option<Set<Uuid>>,
-
     pub conflict: Option<Frozen<Conflict>>,
-
-    #[serde(rename = "descriptionChangeByObject")]
     pub description_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
-
-    #[serde(rename = "titleChangeByObject")]
     pub title_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
 
     #[serde(skip)]
@@ -302,8 +219,6 @@ partial_branch!(UpdateRestoredFlowsBranch, id, restored_flows);
 partial_branch!(UpdateEditedFlowTitleBranch, id, edited_title_flows);
 
 partial_branch!(UpdateEditedFlowDescriptionBranch, id, edited_description_flows);
-
-partial_branch!(UpdateAcceptedFlowSolutionBranch, id, accepted_flow_solutions);
 
 partial_branch!(UpdateCreatedFlowStepsBranch, id, created_flow_steps);
 

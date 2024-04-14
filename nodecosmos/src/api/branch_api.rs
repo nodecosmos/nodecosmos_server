@@ -1,7 +1,7 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::{AcceptedFlowSolution, Branch};
+use crate::models::branch::Branch;
 use crate::models::traits::{Authorization, Reload};
 use actix_web::{put, web, HttpResponse};
 use charybdis::types::Uuid;
@@ -116,36 +116,6 @@ pub async fn undo_delete_flow(data: RequestData, params: web::Json<BranchFlowPar
     branch.auth_update(&data).await?;
 
     Branch::update(&data, params.branch_id, BranchUpdate::UndoDeleteFlow(params.flow_id)).await?;
-
-    branch.reload(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(branch))
-}
-
-#[derive(Deserialize)]
-pub struct BranchFlowSolutionParams {
-    #[serde(rename = "branchId")]
-    pub branch_id: Uuid,
-
-    #[serde(rename = "nodeId")]
-    pub flow_id: Uuid,
-
-    pub solution: AcceptedFlowSolution,
-}
-
-#[put("/accept_flow_solution")]
-pub async fn accept_flow_solution(data: RequestData, params: web::Json<BranchFlowSolutionParams>) -> Response {
-    let params = params.into_inner();
-    let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
-
-    branch.auth_update(&data).await?;
-
-    Branch::update(
-        &data,
-        params.branch_id,
-        BranchUpdate::AcceptFlowSolution(params.flow_id, params.solution),
-    )
-    .await?;
 
     branch.reload(data.db_session()).await?;
 

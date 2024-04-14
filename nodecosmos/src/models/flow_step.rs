@@ -30,39 +30,29 @@ use std::collections::HashMap;
     local_secondary_indexes = [id]
 )]
 #[derive(Branchable, Id, FlowId, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct FlowStep {
-    #[serde(rename = "nodeId")]
     #[branch(original_id)]
     pub node_id: Uuid,
 
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "flowId")]
     pub flow_id: Uuid,
 
-    #[serde(default, rename = "flowIndex")]
+    #[serde(default)]
     pub flow_index: Double,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "rootId")]
     pub root_id: Uuid,
-
-    #[serde(rename = "nodeIds")]
     pub node_ids: Option<List<Uuid>>,
-
-    #[serde(rename = "inputIdsByNodeId")]
     pub input_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
-
-    #[serde(rename = "outputIdsByNodeId")]
     pub output_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[charybdis(ignore)]

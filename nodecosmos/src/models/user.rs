@@ -25,6 +25,7 @@ const BCRYPT_COST: u32 = 6;
     global_secondary_indexes = [username, email],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
     #[serde(default)]
     pub id: Uuid,
@@ -32,33 +33,23 @@ pub struct User {
     pub username: Text,
     pub email: Text,
     pub password: Text,
-
-    #[serde(rename = "firstName")]
     pub first_name: Text,
-
-    #[serde(rename = "lastName")]
     pub last_name: Text,
-
     pub bio: Option<Text>,
-
     pub address: Option<Address>,
-
-    #[serde(rename = "profileImage")]
     pub profile_image_filename: Option<Text>,
-
-    #[serde(rename = "profileImageURL")]
     pub profile_image_url: Option<Text>,
 
-    #[serde(rename = "isConfirmed", default)]
+    #[serde(default)]
     pub is_confirmed: Boolean,
 
-    #[serde(rename = "isBlocked", default)]
+    #[serde(default)]
     pub is_blocked: Boolean,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
 

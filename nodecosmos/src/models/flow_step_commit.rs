@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     "#
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct FlowStepCommits {
     pub flow_step_id: Uuid,
     pub id: Uuid,

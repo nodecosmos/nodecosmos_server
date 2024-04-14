@@ -14,16 +14,11 @@ use serde::{Deserialize, Serialize};
     "#
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeTreePositionCommit {
     pub id: Uuid,
-
-    #[serde(rename = "versionedNodeId")]
     pub order_index: Double,
-
-    #[serde(rename = "versionedAncestorsId")]
     pub parent_id: Option<Uuid>,
-
-    #[serde(rename = "versionedAncestorsId")]
     pub ancestor_ids: Option<Set<Uuid>>,
 }
 

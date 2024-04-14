@@ -24,20 +24,15 @@ use std::collections::HashSet;
     local_secondary_indexes = [id]
 )]
 #[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Flow {
-    #[serde(rename = "nodeId")]
     #[branch(original_id)]
     pub node_id: Uuid,
-
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
     // vertical index
-    #[serde(rename = "verticalIndex")]
     pub vertical_index: Double,
-
     // start index is not conflicting, flows can start at same index
-    #[serde(rename = "startIndex")]
     pub start_index: Int,
 
     #[serde(default = "Uuid::new_v4")]
@@ -45,10 +40,10 @@ pub struct Flow {
 
     pub title: Text,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[charybdis(ignore)]

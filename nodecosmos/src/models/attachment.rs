@@ -19,11 +19,9 @@ const MAX_IMAGE_WIDTH: u32 = 852;
     static_columns = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Attachment {
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
-
-    #[serde(rename = "objectId")]
     pub object_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
@@ -31,14 +29,12 @@ pub struct Attachment {
 
     pub key: Text,
     pub url: Option<Text>,
-
-    #[serde(rename = "userId")]
     pub user_id: Option<Uuid>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
 

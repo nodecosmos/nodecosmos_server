@@ -28,27 +28,24 @@ pub enum LikeObjectType {
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Like {
-    #[serde(rename = "objectId")]
     #[branch(original_id)]
     pub object_id: Uuid,
 
-    #[serde(default, rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(default, rename = "objectType")]
     pub object_type: Text,
 
-    #[serde(default, rename = "userId")]
     pub user_id: Uuid,
 
-    #[serde(default, rename = "username")]
+    #[serde(default)]
     pub username: Text,
 
-    #[serde(default, rename = "createdAt")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(default, rename = "updatedAt")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[serde(skip)]

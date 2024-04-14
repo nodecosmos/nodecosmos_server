@@ -25,43 +25,25 @@ use serde::{Deserialize, Serialize};
     "#
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeCommit {
-    #[serde(default, rename = "nodeId")]
+    #[serde(default)]
     pub node_id: Uuid,
 
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     pub id: Uuid,
-
-    #[serde(rename = "prevVersionId")]
     pub prev_commit_id: Option<Uuid>,
-
-    #[serde(rename = "prevVersionBranchId")]
     pub prev_commit_branch_id: Option<Uuid>,
-
-    #[serde(rename = "userId")]
     pub user_id: Option<Uuid>,
-
-    #[serde(rename = "nodeTitle")]
     pub node_title: Text,
-
-    #[serde(rename = "nodeCreatedAt")]
     pub node_created_at: Timestamp,
-
-    #[serde(rename = "descriptionCommitId")]
     pub description_commit_id: Option<Uuid>,
-
-    #[serde(rename = "nodeTreePositionCommitId")]
     pub node_tree_position_commit_id: Uuid,
-
-    #[serde(rename = "nodeDescendantsCommitId")]
     pub node_descendants_commit_id: Option<Uuid>,
-
-    #[serde(rename = "workflowCommitId")]
     pub workflow_commit_id: Option<Uuid>,
 }
 

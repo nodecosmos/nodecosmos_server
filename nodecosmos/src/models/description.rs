@@ -24,28 +24,20 @@ use yrs::{Doc, GetString, Transact, Update};
     clustering_keys = [branch_id]
 )]
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Description {
-    #[serde(rename = "objectId")]
     #[branch(original_id)]
     pub object_id: Uuid,
 
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
-
-    #[serde(rename = "objectType")]
     pub object_type: Text,
-
-    #[serde(rename = "shortDescription")]
     pub short_description: Option<Text>,
-
     pub html: Option<Text>,
     pub markdown: Option<Text>,
     pub base64: Option<Text>,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
 

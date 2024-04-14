@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
     "#
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkflowCommit {
     pub id: Uuid,
     pub branch_id: Uuid,

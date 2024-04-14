@@ -19,27 +19,25 @@ use serde::{Deserialize, Serialize};
     local_secondary_indexes = [],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Comment {
-    #[serde(rename = "objectId", default)]
+    #[serde(default)]
     pub object_id: Uuid,
 
-    #[serde(rename = "threadId", default)]
+    #[serde(default)]
     pub thread_id: Uuid,
 
     #[serde(default)]
     pub id: Uuid,
 
     pub content: Text,
-
-    #[serde(rename = "authorId")]
     pub author_id: Option<Uuid>,
-
     pub author: Option<Frozen<Profile>>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[charybdis(ignore)]

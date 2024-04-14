@@ -18,6 +18,7 @@ use std::collections::HashMap;
     "#
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeDescendantsCommit {
     pub id: Uuid,
     pub node_id: Uuid,

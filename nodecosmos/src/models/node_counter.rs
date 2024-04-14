@@ -15,17 +15,11 @@ use serde::{Deserialize, Serialize};
     global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeCounter {
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "id")]
     pub id: Uuid,
-
-    #[serde(rename = "likeCount")]
     pub like_count: Option<Counter>,
-
-    #[serde(rename = "descendantsCount")]
     pub descendants_count: Option<Counter>,
 }
 

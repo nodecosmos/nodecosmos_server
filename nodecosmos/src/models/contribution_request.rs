@@ -48,29 +48,27 @@ impl fmt::Display for ContributionRequestStatus {
     global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ContributionRequest {
-    #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
-    #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
-
     pub title: Option<Text>,
     pub description: Option<Text>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[serde(default = "ContributionRequestStatus::default")]
     pub status: Option<Text>,
 
-    #[serde(default, rename = "ownerId")]
+    #[serde(default)]
     pub owner_id: Uuid,
 
     pub owner: Option<Frozen<Profile>>,

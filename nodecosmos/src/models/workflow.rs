@@ -31,26 +31,20 @@ use serde::{Deserialize, Serialize};
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Workflow {
-    #[serde(rename = "nodeId")]
     #[branch(original_id)]
     pub node_id: Uuid,
 
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
-    #[serde(rename = "rootId")]
     pub root_id: Uuid,
-
     pub title: Option<Text>,
-
-    #[serde(rename = "initialInputIds")]
     pub initial_input_ids: Option<List<Uuid>>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
 

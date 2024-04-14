@@ -26,64 +26,48 @@ use scylla::statement::Consistency;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
-/// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all partial models
-/// if they have `auth_branch` field.
+/// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all
+/// partial models if they have `auth_branch` field.
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [id],
     clustering_keys = [branch_id],
 )]
 #[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Node {
     #[serde(default)]
     #[branch(original_id)]
     pub id: Uuid,
 
-    // `self.branch_id` is equal to `self.id` for the main node's branch
-    #[serde(default, rename = "branchId")]
+    #[serde(default)]
     pub branch_id: Uuid,
 
-    #[serde(default, rename = "rootId")]
+    #[serde(default)]
     pub root_id: Uuid,
 
-    #[serde(rename = "isPublic", default)]
+    #[serde(default)]
     pub is_public: Boolean,
 
-    #[serde(rename = "isRoot")]
     pub is_root: Boolean,
-
-    #[serde(rename = "order", default)]
     pub order_index: Double,
-
     pub title: Text,
-
-    #[serde(rename = "parentId")]
     pub parent_id: Option<Uuid>,
-
-    #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Set<Uuid>>,
-
-    #[serde(rename = "ownerId")]
     pub owner_id: Option<Uuid>,
-
     pub owner: Option<Frozen<Profile>>,
-
-    #[serde(rename = "editorIds")]
     pub editor_ids: Option<Set<Uuid>>,
 
-    #[serde(rename = "likesCount", default)]
+    #[serde(default)]
     pub like_count: Int,
 
-    #[serde(rename = "coverImageKey")]
     pub cover_image_filename: Option<Text>,
-
-    #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<Text>,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
-    #[serde(rename = "updatedAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 
     #[charybdis(ignore)]
