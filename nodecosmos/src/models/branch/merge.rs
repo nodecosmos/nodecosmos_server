@@ -258,7 +258,7 @@ impl BranchMerge {
                 MergeStep::AcceptFlowSolutions => (),
                 MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
                 MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
-                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &mut self.branch).await?,
                 MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data, &self.branch).await?,
                 MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
                 MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data, &self.branch).await?,
@@ -385,15 +385,17 @@ impl Branch {
 
         Ok(())
     }
-    pub async fn check_conflicts(self, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let merge = BranchMerge::new(data, self)
-            .await
-            .map_err(|e| e.inner)?
-            .check_conflicts(data)
-            .await
-            .map_err(|e| e.inner)?;
+    pub async fn check_conflicts(self, data: &RequestData) -> Result<Self, MergeError> {
+        let merge = BranchMerge::new(data, self).await?.check_conflicts(data).await?;
 
-        merge.branch.update().execute(data.db_session()).await?;
+        let res = merge.branch.update().execute(data.db_session()).await;
+
+        if let Err(e) = res {
+            return Err(MergeError {
+                inner: NodecosmosError::from(e),
+                branch: merge.branch,
+            });
+        }
 
         Ok(merge.branch)
     }

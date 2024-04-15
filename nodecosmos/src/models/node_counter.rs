@@ -1,13 +1,14 @@
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, UpdateWithCallbacks};
+use charybdis::operations::Find;
 use charybdis::types::{Counter, Uuid};
+use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
-use crate::models::node::UpdateLikesCountNode;
+use crate::models::traits::{ElasticDocument, UpdateLikesCountNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
@@ -15,11 +16,14 @@ use crate::models::node::UpdateLikesCountNode;
     clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Branchable, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeCounter {
     pub branch_id: Uuid,
+
+    #[branch(original_id)]
     pub id: Uuid,
+
     pub like_count: Option<Counter>,
     pub descendants_count: Option<Counter>,
 }
@@ -36,14 +40,16 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        let mut node = UpdateLikesCountNode {
-            id,
-            branch_id,
-            like_count: lc as i32,
-            updated_at: chrono::Utc::now(),
-        };
+        let is_original = id == branch_id;
 
-        node.update_cb(data).execute(data.db_session()).await?;
+        if is_original {
+            UpdateLikesCountNodeElasticIdx {
+                id,
+                likes_count: lc as i32,
+            }
+            .update_elastic_document(data.elastic_client())
+            .await;
+        }
 
         Ok(lc)
     }
@@ -59,14 +65,16 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        let mut node = UpdateLikesCountNode {
-            id,
-            branch_id,
-            like_count: lc as i32,
-            updated_at: chrono::Utc::now(),
-        };
+        let is_original = id == branch_id;
 
-        node.update_cb(data).execute(data.db_session()).await?;
+        if is_original {
+            UpdateLikesCountNodeElasticIdx {
+                id,
+                likes_count: lc as i32,
+            }
+            .update_elastic_document(data.elastic_client())
+            .await;
+        }
 
         Ok(lc)
     }

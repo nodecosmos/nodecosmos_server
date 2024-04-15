@@ -1,5 +1,4 @@
 use charybdis::model::Model;
-use charybdis::options::Consistency;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Set, Uuid};
 use futures::TryFutureExt;
@@ -35,7 +34,6 @@ macro_rules! impl_find_branched_or_original {
                 let is_original = id == branch_id;
                 if is_original {
                     return Self::find_by_id_and_branch_id(id, id)
-                        .consistency(Consistency::One)
                         .execute(db_session)
                         .await
                         .map_err(NodecosmosError::from);

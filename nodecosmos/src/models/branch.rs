@@ -110,6 +110,18 @@ pub struct Branch {
 }
 
 impl Branch {
+    pub async fn contains_created_node(
+        db_session: &CachingSession,
+        id: Uuid,
+        node_id: Uuid,
+    ) -> Result<bool, NodecosmosError> {
+        let branch = UpdateCreatedNodesBranch::find_by_id(id).execute(db_session).await?;
+
+        Ok(branch
+            .created_nodes
+            .map_or(false, |created_nodes| created_nodes.contains(&node_id)))
+    }
+
     pub async fn node(&self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
         if let Some(node) = self.node.get() {
             return Ok(node);

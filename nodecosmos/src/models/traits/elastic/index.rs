@@ -6,7 +6,7 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::models::node::{Node, UpdateCoverImageNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode};
+use crate::models::node::{Node, UpdateCoverImageNode, UpdateOwnerNode, UpdateTitleNode};
 use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 
 pub trait ElasticIndex {
@@ -226,11 +226,19 @@ pub struct UpdateNodeDescriptionElasticIdx {
     pub description: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UpdateLikesCountNodeElasticIdx {
+    pub id: Uuid,
+
+    #[serde(rename = "likesCount")]
+    pub likes_count: i32,
+}
+
 // node
 impl_elastic_index!(UpdateNodeDescriptionElasticIdx, Node);
 impl_elastic_index!(UpdateTitleNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
-impl_elastic_index!(UpdateLikesCountNode, Node);
+impl_elastic_index!(UpdateLikesCountNodeElasticIdx, Node);
 impl_elastic_index!(UpdateOwnerNode, Node);
 // user
 impl_elastic_index!(UpdateUser, User);

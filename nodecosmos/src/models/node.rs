@@ -3,7 +3,7 @@ use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
 use charybdis::operations::Find;
-use charybdis::types::{Boolean, Double, Frozen, Int, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +50,7 @@ pub struct Node {
     #[serde(default)]
     pub is_public: Boolean,
 
+    #[serde(default)]
     pub is_root: Boolean,
 
     #[serde(default)]
@@ -61,10 +62,6 @@ pub struct Node {
     pub owner_id: Option<Uuid>,
     pub owner: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
-
-    #[serde(default)]
-    pub like_count: Int,
-
     pub cover_image_filename: Option<Text>,
     pub cover_image_url: Option<Text>,
 
@@ -147,6 +144,15 @@ impl Callbacks for Node {
 }
 
 impl Node {
+    pub async fn is_original_deleted(db_session: &CachingSession, id: Uuid) -> Result<bool, NodecosmosError> {
+        let is_none = PkNode::maybe_find_first_by_id_and_branch_id(id, id)
+            .execute(db_session)
+            .await?
+            .is_none();
+
+        Ok(is_none)
+    }
+
     pub async fn find_by_ids_and_branch_id(
         db_session: &CachingSession,
         ids: &Set<Uuid>,
@@ -306,8 +312,6 @@ partial_node!(
 
 partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
 
-partial_node!(UpdateLikesCountNode, id, branch_id, like_count, updated_at);
-
 partial_node!(
     UpdateCoverImageNode,
     id,
@@ -317,30 +321,19 @@ partial_node!(
     updated_at
 );
 
-macro_rules! impl_node_updated_at_with_elastic_ext_cb {
-    ($struct_name:ident) => {
-        impl charybdis::callbacks::Callbacks for $struct_name {
-            type Extension = crate::api::data::RequestData;
-            type Error = crate::errors::NodecosmosError;
+impl Callbacks for UpdateCoverImageNode {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
 
-            async fn after_update(
-                &mut self,
-                _db_session: &CachingSession,
-                data: &Self::Extension,
-            ) -> Result<(), NodecosmosError> {
-                use crate::models::traits::ElasticDocument;
+    async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        use crate::models::traits::ElasticDocument;
 
-                if self.id != self.branch_id {
-                    return Ok(());
-                }
-
-                self.update_elastic_document(data.elastic_client()).await;
-
-                Ok(())
-            }
+        if self.id != self.branch_id {
+            return Ok(());
         }
-    };
-}
 
-impl_node_updated_at_with_elastic_ext_cb!(UpdateLikesCountNode);
-impl_node_updated_at_with_elastic_ext_cb!(UpdateCoverImageNode);
+        self.update_elastic_document(data.elastic_client()).await;
+
+        Ok(())
+    }
+}

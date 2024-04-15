@@ -37,8 +37,10 @@ pub struct Like {
 
     pub branch_id: Uuid,
 
+    #[serde(default)]
     pub object_type: Text,
 
+    #[serde(default)]
     pub user_id: Uuid,
 
     #[serde(default)]
@@ -49,19 +51,15 @@ pub struct Like {
 
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub like_count: Option<i64>,
 }
 
 impl Callbacks for Like {
     type Extension = RequestData;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.set_defaults(data);
         self.validate_not_liked(db_session).await?;
-        self.set_defaults();
 
         Ok(())
     }
@@ -71,7 +69,7 @@ impl Callbacks for Like {
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.update_model_like_count(&data, true).await.unwrap();
+            self_clone.increment_like_count(&data).await;
         });
 
         Ok(())
@@ -82,7 +80,7 @@ impl Callbacks for Like {
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.update_model_like_count(&data, false).await.unwrap();
+            self_clone.decrement_like_count(&data).await;
         });
 
         Ok(())
@@ -91,15 +89,9 @@ impl Callbacks for Like {
 
 impl Like {
     pub async fn like_count(&mut self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
-        if let Some(c) = self.like_count {
-            return Ok(c);
-        }
-
         match LikeObjectType::from(self.object_type.parse()?) {
             LikeObjectType::Node => {
                 let lc = NodeCounter::like_count(db_session, self.object_id, self.branch_id).await?;
-
-                self.like_count = Some(lc);
 
                 Ok(lc)
             }

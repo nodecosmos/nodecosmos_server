@@ -443,11 +443,15 @@ impl Branch {
         let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
 
         if check_conflicts {
-            branch = branch.check_conflicts(data).await.map_err(|err| {
-                error!("{}", err);
-
-                err
-            })?;
+            println!("Checking conflicts");
+            match branch.check_conflicts(data).await {
+                Ok(res) => {
+                    branch = res;
+                }
+                Err(err) => {
+                    branch = err.branch;
+                }
+            }
         }
 
         Ok(branch)

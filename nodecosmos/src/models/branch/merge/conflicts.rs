@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use anyhow::Context;
 use charybdis::operations::Update;
@@ -52,7 +52,10 @@ impl<'a> MergeConflicts<'a> {
         let conflict_deleted_ancestor_ids = original_ancestor_ids
             .iter()
             .filter_map(|id| {
-                if original_ancestor_ids_set.contains(id) {
+                if original_ancestor_ids_set.contains(id)
+                    || restored_node_ids.contains(id)
+                    || deleted_node_ids.contains(id)
+                {
                     None
                 } else {
                     Some(*id)
@@ -60,30 +63,20 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if conflict_deleted_ancestor_ids.is_empty() {
-            if let Some(conflict) = &mut branch.conflict {
-                conflict.deleted_ancestors = None;
-            }
-
-            return Ok(());
+        if conflict_deleted_ancestor_ids.len() > 0 {
+            branch
+                .conflict
+                .get_or_insert_with(|| Conflict::default())
+                .deleted_ancestors
+                .get_or_insert_with(|| Set::new())
+                .extend(conflict_deleted_ancestor_ids);
         }
-
-        let conflict = branch.conflict.get_or_insert_with(|| Conflict::default());
-
-        conflict.deleted_ancestors = match &conflict.deleted_ancestors {
-            Some(deleted_ancestors) => {
-                let mut deleted_ancestors = deleted_ancestors.clone();
-                deleted_ancestors.extend(conflict_deleted_ancestor_ids);
-
-                Some(deleted_ancestors)
-            }
-            None => Some(conflict_deleted_ancestor_ids),
-        };
 
         Ok(())
     }
 
     pub async fn run_check(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.reset_conflicts();
         self.extract_created_nodes_conflicts(data).await?;
         self.extract_deleted_edited_nodes(data).await?;
         self.extract_deleted_edited_flows(data).await?;
@@ -99,7 +92,7 @@ impl<'a> MergeConflicts<'a> {
                 && conflict.deleted_edited_flows.is_none()
                 && conflict.deleted_edited_flow_steps.is_none()
                 && conflict.deleted_edited_ios.is_none()
-                && conflict.conflicting_indexes_by_flow.is_none()
+                && conflict.conflicting_flow_steps.is_none()
             {
                 conflict.status = ConflictStatus::Resolved.to_string();
                 branch
@@ -119,6 +112,10 @@ impl<'a> MergeConflicts<'a> {
         }
 
         Ok(())
+    }
+
+    fn reset_conflicts(&mut self) {
+        self.branch_merge.branch.conflict = None;
     }
 
     async fn extract_created_nodes_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -144,8 +141,6 @@ impl<'a> MergeConflicts<'a> {
         let mut edited_node_ids = self.branch_merge.branch.edited_workflow_nodes.ref_cloned();
 
         edited_node_ids.extend(edited_description_nodes);
-
-        let mut deleted_edited_nodes = HashSet::new();
 
         let original_edited_node_ids = edited_node_ids
             .iter()
@@ -175,7 +170,7 @@ impl<'a> MergeConflicts<'a> {
             .await?
             .pluck_id_set();
 
-        let deleted_edited_desc_nodes = original_edited_node_ids
+        let deleted_edited_nodes = original_edited_node_ids
             .iter()
             .filter_map(|id| {
                 if original_nodes_ids.contains(id) {
@@ -186,16 +181,12 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        deleted_edited_nodes.extend(deleted_edited_desc_nodes);
-
         if deleted_edited_nodes.len() > 0 {
             self.branch_merge
                 .branch
                 .conflict
                 .get_or_insert_with(|| Conflict::default())
                 .deleted_edited_nodes = Some(deleted_edited_nodes);
-        } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-            conflict.deleted_edited_nodes = None;
         }
 
         Ok(())
@@ -256,8 +247,6 @@ impl<'a> MergeConflicts<'a> {
                     .conflict
                     .get_or_insert_with(|| Conflict::default())
                     .deleted_edited_flows = Some(conflict_deleted_edited_flows);
-            } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-                conflict.deleted_edited_flows = None;
             }
         }
 
@@ -319,8 +308,6 @@ impl<'a> MergeConflicts<'a> {
                     .conflict
                     .get_or_insert_with(|| Conflict::default())
                     .deleted_edited_flow_steps = Some(conflict_deleted_edited_flow_steps);
-            } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-                conflict.deleted_edited_flow_steps = None;
             }
         }
 
@@ -338,7 +325,7 @@ impl<'a> MergeConflicts<'a> {
             .chain_opt_ref(&self.branch_merge.flow_steps.restored_flow_steps);
 
         if let Some(created_flow_steps) = created_flow_steps {
-            let mut conflicting_indexes_by_flow = HashMap::new();
+            let mut conflicting_flow_steps = HashSet::new();
 
             for flow_step in created_flow_steps {
                 if created_flow_ids.is_some_and(|ids| ids.contains(&flow_step.flow_id))
@@ -352,21 +339,16 @@ impl<'a> MergeConflicts<'a> {
                 maybe_orig.set_original_id();
 
                 if maybe_orig.maybe_find_by_flow_index(data.db_session()).await?.is_some() {
-                    conflicting_indexes_by_flow
-                        .entry(flow_step.flow_id)
-                        .or_insert_with(|| Set::new())
-                        .insert(flow_step.flow_id);
+                    conflicting_flow_steps.insert(flow_step.id);
                 }
             }
 
-            if conflicting_indexes_by_flow.len() > 0 {
+            if conflicting_flow_steps.len() > 0 {
                 self.branch_merge
                     .branch
                     .conflict
                     .get_or_insert_with(|| Conflict::default())
-                    .conflicting_indexes_by_flow = Some(conflicting_indexes_by_flow);
-            } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-                conflict.conflicting_indexes_by_flow = None;
+                    .conflicting_flow_steps = Some(conflicting_flow_steps);
             }
         }
 
@@ -416,8 +398,6 @@ impl<'a> MergeConflicts<'a> {
                 .conflict
                 .get_or_insert_with(|| Conflict::default())
                 .deleted_edited_ios = Some(conflict_deleted_edited_ios);
-        } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-            conflict.deleted_edited_ios = None;
         }
 
         Ok(())

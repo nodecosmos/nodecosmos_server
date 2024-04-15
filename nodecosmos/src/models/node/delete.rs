@@ -29,6 +29,12 @@ impl Node {
     pub async fn delete_related_data(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
             NodeDelete::new(self, &data).run().await?;
+        } else {
+            if Branch::contains_created_node(data.db_session(), self.branch_id, self.id).await?
+                || Self::is_original_deleted(data.db_session(), self.id).await?
+            {
+                NodeDelete::new(self, &data).run().await?;
+            }
         }
 
         Ok(())

@@ -11,8 +11,11 @@ use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::node_counter::NodeCounter;
 
 impl Like {
-    pub fn set_defaults(&mut self) {
+    pub fn set_defaults(&mut self, data: &RequestData) {
         let now = Utc::now();
+
+        self.user_id = data.current_user.id;
+        self.username = data.current_user.username.clone();
 
         if self.branch_id == Uuid::default() {
             self.branch_id = self.object_id;
@@ -43,22 +46,29 @@ impl Like {
         Ok(())
     }
 
-    pub async fn update_model_like_count(
-        &mut self,
-        data: &RequestData,
-        increment: bool,
-    ) -> Result<(), NodecosmosError> {
-        match LikeObjectType::from(self.object_type.parse()?) {
-            LikeObjectType::Node => {
-                if increment {
-                    NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
-                } else {
-                    NodeCounter::decrement_like(data, self.object_id, self.branch_id).await?;
-                }
-
-                Ok(())
+    pub async fn increment_like_count(&mut self, data: &RequestData) {
+        match self.object_type.parse() {
+            Ok(LikeObjectType::Node) => {
+                let _ = NodeCounter::increment_like(data, self.object_id, self.branch_id)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error incrementing like count: {:?}", e);
+                    });
             }
-            _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string()).into()),
+            _ => log::error!("Like Object type not supported"),
+        }
+    }
+
+    pub async fn decrement_like_count(&mut self, data: &RequestData) {
+        match self.object_type.parse() {
+            Ok(LikeObjectType::Node) => {
+                let _ = NodeCounter::decrement_like(data, self.object_id, self.branch_id)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error decrementing like count: {:?}", e);
+                    });
+            }
+            _ => log::error!("Like Object type not supported"),
         }
     }
 }
