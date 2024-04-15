@@ -1,11 +1,13 @@
-use crate::errors::NodecosmosError;
-use crate::models::node_commit::NodeCommit;
-use crate::models::traits::{FlowId, FlowStepId, Id, MaybeFlowId, MaybeFlowStepId};
+use std::collections::HashSet;
+
 use charybdis::model::BaseModel;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::Uuid;
 use futures::StreamExt;
-use std::collections::HashSet;
+
+use crate::errors::NodecosmosError;
+use crate::models::node_commit::NodeCommit;
+use crate::models::traits::{FlowId, FlowStepId, Id, MaybeFlowId, MaybeFlowStepId};
 
 pub trait Pluck {
     fn pluck_id(&self) -> Vec<Uuid>;

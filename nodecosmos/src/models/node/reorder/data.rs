@@ -1,16 +1,16 @@
+use charybdis::operations::Find;
+use charybdis::types::{Set, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::node::{Descendants, FindBranched, Parent};
-use crate::models::traits::RefCloned;
-use crate::models::traits::{Branchable, Pluck};
-use charybdis::operations::Find;
-use charybdis::types::{Set, Uuid};
-use scylla::statement::Consistency;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
+use crate::models::traits::{Branchable, FindOrInsertBranched, Pluck};
+use crate::models::traits::{Descendants, Parent};
+use crate::models::traits::{FindBranchedOrOriginal, RefCloned};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ReorderData {
@@ -49,9 +49,9 @@ impl ReorderData {
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         return if params.is_branched() {
-            node.branch_descendants(&db_session, Some(Consistency::Quorum)).await
+            node.branch_descendants(&db_session).await
         } else {
-            node.descendants(&db_session, Some(Consistency::Quorum))
+            node.descendants(&db_session)
                 .await?
                 .try_collect()
                 .await
@@ -96,12 +96,10 @@ impl ReorderData {
         params: &ReorderParams,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
         if params.is_branched() {
-            tree_root
-                .branch_descendants(&db_session, Some(Consistency::Quorum))
-                .await
+            tree_root.branch_descendants(&db_session).await
         } else {
             tree_root
-                .descendants(&db_session, Some(Consistency::Quorum))
+                .descendants(&db_session)
                 .await?
                 .try_collect()
                 .await
@@ -115,9 +113,7 @@ impl ReorderData {
         branch_id: Uuid,
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
         if let Some(id) = id {
-            let node =
-                GetStructureNode::find_branched_or_original(&db_session, id, branch_id, Some(Consistency::Quorum))
-                    .await?;
+            let node = GetStructureNode::find_branched_or_original(&db_session, id, branch_id).await?;
 
             return Ok(Some(node));
         }
@@ -185,7 +181,7 @@ impl ReorderData {
     }
 
     pub async fn from_params(params: &ReorderParams, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, Some(Consistency::Quorum)).await?;
+        let node = Node::find_or_insert_branched(data, params.id, params.branch_id).await?;
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 

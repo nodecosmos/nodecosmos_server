@@ -1,17 +1,19 @@
-use crate::errors::NodecosmosError;
+use std::collections::HashMap;
+
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Map, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use crate::errors::NodecosmosError;
 
 #[charybdis_model(
     table_name = node_descendants_commits,
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
-        compression = { 
+        compression = {
             'sstable_compression': 'DeflateCompressor',
             'chunk_length_in_kb': '64kb'
         }

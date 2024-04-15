@@ -1,13 +1,3 @@
-use crate::api::request::current_user::OptCurrentUser;
-use crate::api::request::data::RequestData;
-use crate::api::types::{ActionObject, ActionTypes, Response};
-use crate::app::App;
-use crate::models::node::reorder::ReorderParams;
-use crate::models::node::search::{NodeSearch, NodeSearchQuery};
-use crate::models::node::*;
-use crate::models::traits::node::{Descendants, FindBranched};
-use crate::models::traits::{Authorization, Branchable};
-use crate::resources::resource_locker::ResourceLocker;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
@@ -15,6 +5,17 @@ use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWith
 use charybdis::types::Uuid;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream;
+
+use crate::api::request::current_user::OptCurrentUser;
+use crate::api::request::data::RequestData;
+use crate::api::types::{ActionObject, ActionTypes, Response};
+use crate::app::App;
+use crate::models::node::reorder::ReorderParams;
+use crate::models::node::search::{NodeSearch, NodeSearchQuery};
+use crate::models::node::*;
+use crate::models::traits::Descendants;
+use crate::models::traits::{Authorization, Branchable};
+use crate::resources::resource_locker::ResourceLocker;
 
 #[get("")]
 pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) -> Response {
@@ -30,7 +31,7 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 
     node.auth_view(&app, opt_cu).await?;
 
-    let descendants = node.descendants(&app.db_session, None).await?.try_collect().await?;
+    let descendants = node.descendants(&app.db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -48,7 +49,7 @@ pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode
 
     node.auth_view(&app, opt_cu).await?;
 
-    let descendants = node.branch_descendants(&app.db_session, None).await?;
+    let descendants = node.branch_descendants(&app.db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "node": node,
@@ -100,8 +101,6 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
         )
         .await?;
 
-    node.find_branched(data.db_session()).await?;
-
     node.update_cb(&data).execute(data.db_session()).await?;
 
     data.resource_locker()
@@ -129,8 +128,6 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
             ResourceLocker::ONE_HOUR,
         )
         .await?;
-
-    node.find_branched(data.db_session()).await?;
 
     node.delete_cb(&data).execute(data.db_session()).await?;
 

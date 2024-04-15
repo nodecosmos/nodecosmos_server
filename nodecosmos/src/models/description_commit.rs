@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
-        compression = { 
+        compression = {
             'sstable_compression': 'DeflateCompressor'
         }
     "#,

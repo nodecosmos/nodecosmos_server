@@ -1,11 +1,12 @@
+use actix_multipart::Multipart;
+use charybdis::operations::UpdateWithCallbacks;
+use futures::StreamExt;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCoverImageNode;
 use crate::models::traits::s3::S3;
 use crate::models::utils::Image;
-use actix_multipart::Multipart;
-use charybdis::operations::UpdateWithCallbacks;
-use futures::StreamExt;
 
 const IMG_WIDTH: u32 = 850;
 const IMG_HEIGHT: u32 = 375;

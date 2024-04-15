@@ -1,3 +1,7 @@
+use charybdis::batch::ModelBatch;
+use elasticsearch::Elasticsearch;
+use log::error;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
@@ -8,9 +12,6 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::traits::ElasticDocument;
-use charybdis::batch::ModelBatch;
-use elasticsearch::Elasticsearch;
-use log::error;
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
@@ -24,7 +25,7 @@ impl UpdateTitleNode {
                     branch_id: self.branchise_id(*ancestor_id),
                     node_id: *ancestor_id,
                     id: self.id,
-                    parent_id: self.parent_id.unwrap(), // we must have parent_id as we have ancestor_ids
+                    parent_id: self.parent_id.expect("Parent id is should be set"),
                     title: self.title.clone(),
                     order_index: self.order_index,
                 };

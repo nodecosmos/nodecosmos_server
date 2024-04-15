@@ -4,14 +4,16 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::description::Description;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, ElasticDocument, ObjectType, UpdateNodeDescriptionElasticIdx};
+use crate::models::traits::{
+    Branchable, ElasticDocument, FindOrInsertBranched, ObjectType, UpdateNodeDescriptionElasticIdx,
+};
 
 impl Description {
     pub async fn handle_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             match ObjectType::from(self.object_type.parse()?) {
                 ObjectType::Node => {
-                    Node::find_or_insert_branched(data, self.object_id, self.branch_id, None).await?;
+                    Node::find_or_insert_branched(data, self.object_id, self.branch_id).await?;
 
                     Branch::update(&data, self.branch_id, BranchUpdate::EditNodeDescription(self.object_id)).await?;
                 }

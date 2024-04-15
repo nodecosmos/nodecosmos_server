@@ -1,13 +1,15 @@
-use crate::resources::description_ws_pool::DescriptionWsPool;
-use crate::resources::resource_locker::ResourceLocker;
-use crate::resources::sse_broadcast::SseBroadcast;
+use std::time::Duration;
+
 use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
-use std::time::Duration;
 use toml::Value;
+
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 
 /// Resource's should be alive during application runtime.
 /// It's usually related to external services like db clients,

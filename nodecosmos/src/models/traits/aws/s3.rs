@@ -1,11 +1,13 @@
+use std::time::Duration;
+
+use aws_sdk_s3::{presigning::PresigningConfig, primitives::ByteStream};
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::attachment::Attachment;
 use crate::models::node::UpdateCoverImageNode;
 use crate::models::user::UpdateProfileImageUser;
-use aws_sdk_s3::{presigning::PresigningConfig, primitives::ByteStream};
-use charybdis::types::Uuid;
-use std::time::Duration;
 
 pub trait S3 {
     fn s3_key(&self) -> &String;

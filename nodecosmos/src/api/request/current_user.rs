@@ -1,12 +1,14 @@
-use crate::errors::NodecosmosError;
-use crate::models::user::{CurrentUser, User};
+use std::future::{ready, Ready};
+
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
 use log::error;
 use scylla::CachingSession;
 use serde_json::json;
-use std::future::{ready, Ready};
+
+use crate::errors::NodecosmosError;
+use crate::models::user::{CurrentUser, User};
 
 impl FromRequest for CurrentUser {
     type Error = NodecosmosError;

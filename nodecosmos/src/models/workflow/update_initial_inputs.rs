@@ -1,9 +1,10 @@
+use std::collections::HashMap;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::workflow::UpdateInitialInputsWorkflow;
-use std::collections::HashMap;
 
 impl UpdateInitialInputsWorkflow {
     pub async fn update_branch(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

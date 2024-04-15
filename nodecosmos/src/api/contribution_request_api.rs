@@ -1,3 +1,10 @@
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::model::AsNative;
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
+use charybdis::types::Uuid;
+use scylla::CachingSession;
+use serde_json::json;
+
 use crate::api::data::RequestData;
 use crate::api::types::{ActionTypes, Response};
 use crate::errors::NodecosmosError;
@@ -7,12 +14,6 @@ use crate::models::contribution_request::{
 };
 use crate::models::traits::Authorization;
 use crate::resources::resource_locker::ResourceLocker;
-use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
-use charybdis::types::Uuid;
-use scylla::CachingSession;
-use serde_json::json;
 
 #[get("/{node_id}")]
 pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, node_id: web::Path<Uuid>) -> Response {

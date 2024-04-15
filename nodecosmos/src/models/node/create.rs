@@ -1,3 +1,11 @@
+use charybdis::batch::ModelBatch;
+use charybdis::operations::{Find, Insert};
+use charybdis::types::{Set, Uuid};
+use elasticsearch::Elasticsearch;
+use futures::{stream, StreamExt, TryFutureExt};
+use log::error;
+use scylla::CachingSession;
+
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
@@ -6,19 +14,12 @@ use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::node::Parent;
 use crate::models::traits::ModelContext;
+use crate::models::traits::Parent;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::{Find, Insert};
-use charybdis::types::{Set, Uuid};
-use elasticsearch::Elasticsearch;
-use futures::{stream, StreamExt, TryFutureExt};
-use log::error;
-use scylla::CachingSession;
 
 impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

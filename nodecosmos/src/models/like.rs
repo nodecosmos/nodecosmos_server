@@ -1,16 +1,18 @@
-mod create;
-pub mod likeable;
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::types::{Text, Timestamp, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::node_counter::NodeCounter;
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::types::{Text, Timestamp, Uuid};
-use nodecosmos_macros::Branchable;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
+
+mod create;
+pub mod likeable;
 
 // CQL limitation is to have counters in a separate table
 // https://docs.datastax.com/en/cql-oss/3.3/cql/cql_using/useCounters.html

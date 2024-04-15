@@ -1,11 +1,12 @@
+use actix_web::web;
+use charybdis::types::Uuid;
+
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
-use actix_web::web;
-use charybdis::types::Uuid;
 
 /// We use auth node so we query only fields that are needed for authorization.
 impl AuthNode {

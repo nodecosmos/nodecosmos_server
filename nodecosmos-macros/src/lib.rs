@@ -94,7 +94,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl crate::models::traits::node::Parent for #name {
+        impl crate::models::traits::Parent for #name {
             async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
                     if self.is_branched() {
@@ -151,9 +151,9 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl crate::models::traits::authorization::AuthorizationFields for #name {
+        impl crate::models::traits::AuthorizationFields for #name {
             fn is_public(&self) -> bool {
-                use crate::models::traits::authorization::AuthorizationFields;
+                use crate::models::traits::AuthorizationFields;
 
                 if self.is_original() {
                     return self.is_public;
@@ -170,7 +170,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             }
 
             fn is_frozen(&self) -> bool {
-                use crate::models::traits::authorization::AuthorizationFields;
+                use crate::models::traits::AuthorizationFields;
 
                 if self.is_branched() {
                     return match &self.auth_branch {
@@ -241,7 +241,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             }
 
             async fn auth_creation(&mut self, data: &crate::api::data::RequestData) -> Result<(), NodecosmosError> {
-                use crate::models::traits::node::Parent;
+                use crate::models::traits::Parent;
 
                 if self.id != Uuid::default() {
                     return Err(NodecosmosError::Unauthorized(serde_json::json!({

@@ -1,6 +1,3 @@
-use crate::api::data::RequestData;
-use crate::api::types::ActionTypes;
-use crate::errors::NodecosmosError;
 use actix_web::web;
 use actix_web::web::Bytes;
 use charybdis::model::BaseModel;
@@ -10,6 +7,10 @@ use dashmap::DashMap;
 use log::error;
 use serde::Serialize;
 use tokio::sync::broadcast;
+
+use crate::api::data::RequestData;
+use crate::api::types::ActionTypes;
+use crate::errors::NodecosmosError;
 
 pub struct SseBroadcast {
     node_senders: DashMap<Uuid, broadcast::Sender<Bytes>>,

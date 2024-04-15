@@ -1,17 +1,19 @@
-pub mod merge;
-pub mod update;
+use std::cell::OnceCell;
+
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
+use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::traits::{Id, ObjectId, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
-use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
-use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::cell::OnceCell;
+
+pub mod merge;
+pub mod update;
 
 #[derive(Copy, Clone, strum_macros::Display, strum_macros::EnumString)]
 pub enum BranchStatus {

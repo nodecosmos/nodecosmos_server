@@ -1,5 +1,14 @@
-pub mod create;
-mod update_title;
+use std::collections::HashSet;
+
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::DeleteWithCallbacks;
+use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
+use futures::StreamExt;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::{Branchable, Id};
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
@@ -7,15 +16,9 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::Branchable;
 use crate::models::traits::{Context, ModelContext};
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::operations::DeleteWithCallbacks;
-use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
-use futures::StreamExt;
-use nodecosmos_macros::{Branchable, Id};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+pub mod create;
+mod update_title;
 
 #[charybdis_model(
     table_name = flows,

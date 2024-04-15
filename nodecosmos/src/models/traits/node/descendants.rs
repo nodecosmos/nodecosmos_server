@@ -1,23 +1,19 @@
+use std::collections::HashSet;
+
+use charybdis::stream::CharybdisModelStream;
+use scylla::CachingSession;
+
 use crate::errors::NodecosmosError;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use charybdis::options::Consistency;
-use charybdis::stream::CharybdisModelStream;
-use scylla::CachingSession;
-use std::collections::HashSet;
 
 pub trait Descendants {
     async fn descendants(
         &self,
         db_session: &CachingSession,
-        consistency: Option<Consistency>,
     ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError>;
 
-    async fn branch_descendants(
-        &self,
-        db_session: &CachingSession,
-        consistency: Option<Consistency>,
-    ) -> Result<Vec<NodeDescendant>, NodecosmosError>;
+    async fn branch_descendants(&self, db_session: &CachingSession) -> Result<Vec<NodeDescendant>, NodecosmosError>;
 }
 
 macro_rules! impl_descendants {
@@ -26,16 +22,11 @@ macro_rules! impl_descendants {
             async fn descendants(
                 &self,
                 db_session: &CachingSession,
-                consistency: Option<Consistency>,
             ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-                let mut q =
-                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id);
-
-                if let Some(consistency) = consistency {
-                    q = q.consistency(consistency)
-                }
-
-                let descendants = q.execute(db_session).await?;
+                let descendants =
+                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+                        .execute(db_session)
+                        .await?;
 
                 Ok(descendants)
             }
@@ -43,20 +34,19 @@ macro_rules! impl_descendants {
             async fn branch_descendants(
                 &self,
                 db_session: &CachingSession,
-                consistency: Option<Consistency>,
             ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-                let mut original_q =
-                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id);
-                let mut branched_q =
-                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id);
-
-                if let Some(consistency) = consistency {
-                    original_q = original_q.consistency(consistency);
-                    branched_q = branched_q.consistency(consistency);
-                }
-
-                let original = original_q.execute(db_session).await?.try_collect().await?;
-                let branched = branched_q.execute(db_session).await?.try_collect().await?;
+                let original =
+                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
+                        .execute(db_session)
+                        .await?
+                        .try_collect()
+                        .await?;
+                let branched =
+                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
+                        .execute(db_session)
+                        .await?
+                        .try_collect()
+                        .await?;
 
                 let mut branched_ids = HashSet::with_capacity(branched.len());
                 let mut descendants = Vec::with_capacity(original.len() + branched.len());

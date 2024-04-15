@@ -1,9 +1,10 @@
+use charybdis::types::{Set, Uuid};
+
 use crate::models::branch::{AuthBranch, Branch, BranchStatus};
 use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
 use crate::models::user::User;
-use charybdis::types::{Set, Uuid};
 
 /// AuthorizationFields for nodes is implemented with the `NodeAuthorization` derive macro.
 pub trait AuthorizationFields {

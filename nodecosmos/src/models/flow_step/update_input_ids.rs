@@ -1,3 +1,11 @@
+use std::collections::{HashMap, HashSet};
+
+use anyhow::Context;
+use charybdis::batch::ModelBatch;
+use charybdis::model::AsNative;
+use charybdis::operations::Find;
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
@@ -5,12 +13,6 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateInputIdsFlowStep;
 use crate::models::io::Io;
 use crate::models::traits::{Branchable, HashMapVecToSet};
-use anyhow::Context;
-use charybdis::batch::ModelBatch;
-use charybdis::model::AsNative;
-use charybdis::operations::Find;
-use charybdis::types::Uuid;
-use std::collections::{HashMap, HashSet};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {

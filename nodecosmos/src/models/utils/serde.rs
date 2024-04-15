@@ -1,6 +1,7 @@
+use std::fmt;
+
 use serde::de::{self, Deserializer, Visitor};
 use serde::Deserialize;
-use std::fmt;
 
 /// Allow optional fields to be None, but require them to be provided within JSON
 #[allow(unused)]

@@ -1,12 +1,13 @@
-use crate::errors::NodecosmosError;
-use crate::models::node::Node;
-use crate::models::traits::ElasticIndex;
-use crate::models::udts::Profile;
 use charybdis::types::{BigInt, Timestamp};
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use yrs::Uuid;
+
+use crate::errors::NodecosmosError;
+use crate::models::node::Node;
+use crate::models::traits::ElasticIndex;
+use crate::models::udts::Profile;
 
 const PAGE_SIZE: i16 = 10;
 

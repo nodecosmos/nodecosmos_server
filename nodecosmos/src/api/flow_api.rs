@@ -1,9 +1,10 @@
+use actix_web::{delete, post, put, web, HttpResponse};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::node::AuthNode;
-use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 
 #[post("")]
 pub async fn create_flow(data: RequestData, mut flow: web::Json<Flow>) -> Response {

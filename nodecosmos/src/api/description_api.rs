@@ -1,3 +1,9 @@
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web_actors::ws::WsResponseBuilder;
+use charybdis::operations::InsertWithCallbacks;
+use charybdis::types::Uuid;
+use serde::Deserialize;
+
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
@@ -7,11 +13,6 @@ use crate::models::description::{BaseDescription, Description};
 use crate::models::node::AuthNode;
 use crate::models::traits::Branchable;
 use crate::resources::description_ws_pool::DescriptionWsConnection;
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
-use actix_web_actors::ws::WsResponseBuilder;
-use charybdis::operations::InsertWithCallbacks;
-use charybdis::types::Uuid;
-use serde::Deserialize;
 
 #[get("/{nodeId}/{objectId}/{objectType}/{branchId}")]
 pub async fn get_description(

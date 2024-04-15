@@ -1,12 +1,14 @@
+use std::collections::HashMap;
+
+use charybdis::operations::Update;
+use charybdis::types::Uuid;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::traits::{Branchable, Merge};
 use crate::models::workflow::UpdateInitialInputsWorkflow;
-use charybdis::operations::Update;
-use charybdis::types::Uuid;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct MergeWorkflows {

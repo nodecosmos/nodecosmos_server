@@ -1,10 +1,5 @@
-pub mod update_profile_image;
+use std::sync::Arc;
 
-pub use super::udts::Address;
-use crate::api::data::RequestData;
-use crate::app::App;
-use crate::errors::NodecosmosError;
-use crate::models::traits::{ElasticDocument, SanitizeDescription};
 use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -14,7 +9,15 @@ use colored::Colorize;
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+
+use crate::api::data::RequestData;
+use crate::app::App;
+use crate::errors::NodecosmosError;
+use crate::models::traits::{ElasticDocument, SanitizeDescription};
+
+pub use super::udts::Address;
+
+pub mod update_profile_image;
 
 const BCRYPT_COST: u32 = 6;
 

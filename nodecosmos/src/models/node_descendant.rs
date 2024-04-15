@@ -1,7 +1,8 @@
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Text, Uuid};
-use nodecosmos_macros::{Id, RootId};
 use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::{Id, RootId};
 
 #[charybdis_model(
     table_name = node_descendants,
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [branch_id, node_id, order_index, id],
     table_options = r#"
         gc_grace_seconds = 432000 AND
-        compression = { 
+        compression = {
             'sstable_compression': 'LZ4Compressor',
             'chunk_length_in_kb': '64kb'
         }

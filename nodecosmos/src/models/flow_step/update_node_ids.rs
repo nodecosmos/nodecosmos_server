@@ -1,3 +1,8 @@
+use std::collections::{HashMap, HashSet};
+
+use charybdis::model::AsNative;
+use charybdis::operations::DeleteWithCallbacks;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
@@ -5,9 +10,6 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateNodeIdsFlowStep;
 use crate::models::io::Io;
 use crate::models::traits::{RefCloned, ToHashSet};
-use charybdis::model::AsNative;
-use charybdis::operations::DeleteWithCallbacks;
-use std::collections::{HashMap, HashSet};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(

@@ -1,6 +1,13 @@
-pub mod data;
-mod recovery;
-mod validator;
+use charybdis::batch::ModelBatch;
+use charybdis::operations::{execute, Update};
+use charybdis::options::Consistency;
+use charybdis::types::{Double, Uuid};
+use log::error;
+use scylla::CachingSession;
+use serde::Deserialize;
+
+use nodecosmos_macros::Branchable;
+pub use recovery::Recovery;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
@@ -13,15 +20,10 @@ use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::{execute, Update};
-use charybdis::options::Consistency;
-use charybdis::types::{Double, Uuid};
-use log::error;
-use nodecosmos_macros::Branchable;
-pub use recovery::Recovery;
-use scylla::CachingSession;
-use serde::Deserialize;
+
+pub mod data;
+mod recovery;
+mod validator;
 
 // TODO: update to use SAGA similar to `BranchMerge` so we avoid reading whole tree for recovery
 #[derive(Deserialize, Branchable)]

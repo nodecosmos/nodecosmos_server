@@ -1,8 +1,3 @@
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::comment::{find_first_pk_comment, PkComment};
-use crate::models::contribution_request::ContributionRequest;
-use crate::models::udts::Profile;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
@@ -10,6 +5,12 @@ use charybdis::types::{Int, Text, Timestamp, Uuid};
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::comment::{find_first_pk_comment, PkComment};
+use crate::models::contribution_request::ContributionRequest;
+use crate::models::udts::Profile;
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ThreadObjectType {
@@ -84,7 +85,7 @@ impl CommentThread {
                         Ok(CommentObject::ContributionRequest(contribution_request))
                     }
                     None => Err(NodecosmosError::NotFound("[object] node_id is empty".to_string())),
-                }
+                };
             }
             _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
         }

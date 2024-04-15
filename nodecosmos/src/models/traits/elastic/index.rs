@@ -1,5 +1,3 @@
-use crate::models::node::{Node, UpdateCoverImageNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode};
-use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesExistsParts, IndicesPutMappingParts};
@@ -7,6 +5,9 @@ use elasticsearch::Elasticsearch;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::models::node::{Node, UpdateCoverImageNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode};
+use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 
 pub trait ElasticIndex {
     const ELASTIC_IDX_NAME: &'static str;

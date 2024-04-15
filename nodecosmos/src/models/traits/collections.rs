@@ -1,5 +1,6 @@
-use charybdis::types::Uuid;
 use std::collections::{HashMap, HashSet};
+
+use charybdis::types::Uuid;
 
 pub trait ToHashSet<T> {
     fn to_hash_set(self) -> HashSet<T>;

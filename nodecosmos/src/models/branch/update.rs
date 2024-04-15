@@ -1,3 +1,10 @@
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::errors::CharybdisError;
+use charybdis::operations::Update;
+use charybdis::types::{Frozen, List, Map, Set, Uuid};
+use log::error;
+use scylla::QueryResult;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
@@ -13,12 +20,6 @@ use crate::models::branch::{
     UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
-use charybdis::batch::CharybdisModelBatch;
-use charybdis::errors::CharybdisError;
-use charybdis::operations::Update;
-use charybdis::types::{Frozen, List, Map, Set, Uuid};
-use log::error;
-use scylla::QueryResult;
 
 #[allow(unused)]
 pub enum BranchUpdate {
@@ -59,7 +60,7 @@ pub enum BranchUpdate {
 }
 
 impl Branch {
-    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
+    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<Self, NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
         let mut check_conflicts = false;
 
@@ -439,17 +440,16 @@ impl Branch {
             error!("Failed to update branch: {}", err)
         }
 
+        let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
+
         if check_conflicts {
-            let _ = Branch::find_by_id(branch_id)
-                .execute(data.db_session())
-                .await?
-                .check_conflicts(data)
-                .await
-                .map_err(|err| {
-                    error!("{}", err);
-                });
+            branch = branch.check_conflicts(data).await.map_err(|err| {
+                error!("{}", err);
+
+                err
+            })?;
         }
 
-        Ok(())
+        Ok(branch)
     }
 }

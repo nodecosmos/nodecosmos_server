@@ -1,10 +1,11 @@
+use actix_web::{delete, post, put, web, HttpResponse};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
-use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 
 #[post("")]
 pub async fn create_io(data: RequestData, mut input_output: web::Json<Io>) -> Response {

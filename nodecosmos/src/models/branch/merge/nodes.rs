@@ -1,3 +1,12 @@
+use std::collections::HashMap;
+
+use anyhow::Context;
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::{Frozen, List, Uuid};
+use log::error;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
@@ -8,13 +17,6 @@ use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode}
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
-use anyhow::Context;
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::{Frozen, List, Uuid};
-use log::error;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct MergeNodes {

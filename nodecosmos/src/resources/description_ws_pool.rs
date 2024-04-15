@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
 use actix::prelude::*;
 use actix_web_actors::ws;
 use charybdis::types::Uuid;
 use dashmap::DashMap;
 use log::error;
-use std::sync::Arc;
 
 type RoomId = Uuid;
 

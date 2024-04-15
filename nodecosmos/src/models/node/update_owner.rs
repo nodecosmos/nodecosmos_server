@@ -1,3 +1,8 @@
+use charybdis::batch::ModelBatch;
+use charybdis::types::Uuid;
+use futures::StreamExt;
+use log::error;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
@@ -5,10 +10,6 @@ use crate::models::node::UpdateOwnerNode;
 use crate::models::traits::ElasticDocument;
 use crate::models::udts::Profile;
 use crate::models::user::User;
-use charybdis::batch::ModelBatch;
-use charybdis::types::Uuid;
-use futures::StreamExt;
-use log::error;
 
 impl UpdateOwnerNode {
     fn init(nodes_by_owner: &NodesByOwner, owner: Profile) -> Self {

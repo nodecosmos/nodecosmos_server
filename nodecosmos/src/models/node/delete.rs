@@ -1,3 +1,13 @@
+use std::collections::HashMap;
+
+use charybdis::batch::ModelBatch;
+use charybdis::operations::Delete;
+use charybdis::types::Uuid;
+use elasticsearch::Elasticsearch;
+use futures::{StreamExt, TryFutureExt};
+use log::error;
+use scylla::CachingSession;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
@@ -10,18 +20,10 @@ use crate::models::node::{Node, PrimaryKeyNode};
 use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::node::Descendants;
+use crate::models::traits::Descendants;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument, Pluck};
 use crate::models::workflow::DeleteWorkflow;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::Delete;
-use charybdis::types::Uuid;
-use elasticsearch::Elasticsearch;
-use futures::{StreamExt, TryFutureExt};
-use log::error;
-use scylla::CachingSession;
-use std::collections::HashMap;
 
 impl Node {
     pub async fn delete_related_data(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -46,7 +48,7 @@ impl Node {
         if self.is_branched() {
             let mut node_ids = vec![self.id];
             let descendant_ids = self
-                .descendants(data.db_session(), None)
+                .descendants(data.db_session())
                 .await?
                 .try_collect()
                 .await?
@@ -111,7 +113,7 @@ impl<'a> NodeDelete<'a> {
     }
 
     async fn populate_delete_data(&mut self) -> Result<(), NodecosmosError> {
-        let mut descendants = self.node.descendants(self.db_session, None).await?;
+        let mut descendants = self.node.descendants(self.db_session).await?;
 
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;

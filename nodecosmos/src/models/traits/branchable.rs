@@ -1,5 +1,6 @@
-use crate::models::node::reorder::data::ReorderData;
 use charybdis::types::Uuid;
+
+use crate::models::node::reorder::data::ReorderData;
 
 /// Branching records follows simple rule:
 /// - Original model has the same id and branch_id

@@ -1,12 +1,14 @@
+use std::collections::{HashMap, HashSet};
+
+use charybdis::model::AsNative;
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateOutputIdsFlowStep;
 use crate::models::traits::HashMapVecToSet;
-use charybdis::model::AsNative;
-use charybdis::types::Uuid;
-use std::collections::{HashMap, HashSet};
 
 impl UpdateOutputIdsFlowStep {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {

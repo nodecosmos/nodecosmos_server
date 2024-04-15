@@ -1,25 +1,27 @@
-mod create;
-mod delete;
-mod update_title;
+use std::collections::HashSet;
+
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Insert;
+use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
+use futures::StreamExt;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
-use crate::models::traits::node::FindBranched;
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context, ModelContext};
 use crate::models::udts::Property;
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::operations::Insert;
-use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
-use futures::StreamExt;
-use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+mod create;
+mod delete;
+mod update_title;
 
 /// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node.
 /// Original Ios are the ones where `branch_id` == `root_id`.
@@ -168,7 +170,7 @@ impl Io {
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
-            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id, None).await?;
+            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id).await?;
             self.node = Some(node);
         }
 

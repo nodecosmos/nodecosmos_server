@@ -1,9 +1,8 @@
-mod conflicts;
-mod flow_steps;
-mod flows;
-mod ios;
-mod nodes;
-mod workflows;
+use std::fs::create_dir_all;
+
+use charybdis::operations::Update;
+use log::{error, warn};
+use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
@@ -18,10 +17,13 @@ use crate::models::branch::{Branch, BranchStatus};
 use crate::models::traits::Branchable;
 use crate::models::udts::ConflictStatus;
 use crate::models::utils::file::read_file_names;
-use charybdis::operations::Update;
-use log::{error, warn};
-use serde::{Deserialize, Serialize};
-use std::fs::create_dir_all;
+
+mod conflicts;
+mod flow_steps;
+mod flows;
+mod ios;
+mod nodes;
+mod workflows;
 
 const RECOVERY_DATA_DIR: &str = "tmp/merge-recovery";
 const RECOVER_FILE_PREFIX: &str = "merge_recovery_data";

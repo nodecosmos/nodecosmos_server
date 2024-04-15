@@ -1,3 +1,6 @@
+use charybdis::operations::{Find, Insert};
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
@@ -7,8 +10,6 @@ use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
-use charybdis::operations::{Find, Insert};
-use charybdis::types::Uuid;
 
 impl FlowStep {
     pub fn set_defaults(&mut self) {

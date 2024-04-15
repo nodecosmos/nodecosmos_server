@@ -1,10 +1,6 @@
-use crate::api::current_user::get_current_user;
-use crate::app::App;
-use crate::errors::NodecosmosError;
-use crate::models::user::CurrentUser;
-use crate::resources::description_ws_pool::DescriptionWsPool;
-use crate::resources::resource_locker::ResourceLocker;
-use crate::resources::sse_broadcast::SseBroadcast;
+use std::future::{ready, Ready};
+use std::sync::Arc;
+
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
@@ -12,8 +8,14 @@ use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde_json::json;
-use std::future::{ready, Ready};
-use std::sync::Arc;
+
+use crate::api::current_user::get_current_user;
+use crate::app::App;
+use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 
 /// It contains the data that is required by node API endpoints and node callbacks.
 #[derive(Clone)]

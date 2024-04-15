@@ -1,3 +1,21 @@
+use anyhow::Context;
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::model::AsNative;
+use charybdis::operations::Find;
+use charybdis::types::{Boolean, Double, Frozen, Int, Set, Text, Timestamp, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
+
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::branch::AuthBranch;
+use crate::models::traits::{Branchable, FindBranchedOrOriginal};
+use crate::models::traits::{Context as Ctx, ModelContext};
+use crate::models::udts::Profile;
+
 mod auth;
 mod create;
 mod delete;
@@ -8,23 +26,6 @@ pub mod update_cover_image;
 mod update_owner;
 mod update_title;
 
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::branch::AuthBranch;
-use crate::models::traits::Branchable;
-use crate::models::traits::{Context as Ctx, ModelContext};
-use crate::models::udts::Profile;
-use anyhow::Context;
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::model::AsNative;
-use charybdis::operations::Find;
-use charybdis::types::{Boolean, Double, Frozen, Int, Set, Text, Timestamp, Uuid};
-use futures::TryFutureExt;
-use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
-use scylla::statement::Consistency;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
 /// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all
 /// partial models if they have `auth_branch` field.
@@ -121,6 +122,8 @@ impl Callbacks for Node {
     }
 
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        *self = Node::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+
         self.delete_related_data(data).await?;
         self.preserve_branch_ancestors(data).await?;
         self.preserve_branch_descendants(data).await?;
@@ -144,43 +147,6 @@ impl Callbacks for Node {
 }
 
 impl Node {
-    pub async fn find_or_insert_branched(
-        data: &RequestData,
-        id: Uuid,
-        branch_id: Uuid,
-        consistency: Option<Consistency>,
-    ) -> Result<Self, NodecosmosError> {
-        use charybdis::operations::InsertWithCallbacks;
-
-        let pk = &(id, branch_id);
-        let mut node_q = Self::maybe_find_by_primary_key_value(pk);
-
-        if let Some(consistency) = consistency {
-            node_q = node_q.consistency(consistency);
-        }
-
-        let node = node_q.execute(data.db_session()).await?;
-
-        return match node {
-            Some(node) => Ok(node),
-            None => {
-                let mut node = Self::find_by_primary_key_value(&(id, id))
-                    .execute(data.db_session())
-                    .await?;
-
-                node.set_branched_init_context();
-                node.branch_id = branch_id;
-
-                node.insert_cb(data)
-                    .execute(data.db_session())
-                    .map_err(|err| NodecosmosError::from(err))
-                    .await?;
-
-                Ok(node)
-            }
-        };
-    }
-
     pub async fn find_by_ids_and_branch_id(
         db_session: &CachingSession,
         ids: &Set<Uuid>,
@@ -299,6 +265,12 @@ impl Callbacks for UpdateTitleNode {
             self.as_native().create_branched_if_not_exist(data).await?;
             self.update_branch(&data).await?;
         }
+
+        let current = Self::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+        self.root_id = current.root_id;
+        self.ancestor_ids = current.ancestor_ids;
+        self.order_index = current.order_index;
+        self.parent_id = current.parent_id;
 
         self.update_title_for_ancestors(data).await?;
 

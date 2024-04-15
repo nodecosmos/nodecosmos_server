@@ -1,10 +1,12 @@
-use crate::errors::NodecosmosError;
-use crate::models::traits::{Id, ObjectId};
+use std::collections::HashMap;
+
 use charybdis::model::Model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::Uuid;
 use futures::StreamExt;
-use std::collections::HashMap;
+
+use crate::errors::NodecosmosError;
+use crate::models::traits::{Id, ObjectId};
 
 pub trait GroupById<T: Model + Id> {
     async fn group_by_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError>;

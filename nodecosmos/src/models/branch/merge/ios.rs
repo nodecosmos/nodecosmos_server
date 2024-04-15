@@ -1,3 +1,11 @@
+use std::collections::HashMap;
+
+use anyhow::Context;
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::Uuid;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
@@ -6,12 +14,6 @@ use crate::models::io::{find_update_title_io, Io, UpdateTitleIo};
 use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::TextChange;
-use anyhow::Context;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::Uuid;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct MergeIos {

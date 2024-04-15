@@ -1,3 +1,9 @@
+use std::collections::{HashMap, HashSet};
+
+use anyhow::Context;
+use charybdis::operations::Update;
+use charybdis::types::{Set, Uuid};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::merge::BranchMerge;
@@ -9,10 +15,6 @@ use crate::models::node::PkNode;
 use crate::models::traits::{Branchable, ChainOptRef, PluckFromStream, RefCloned};
 use crate::models::traits::{FindForBranchMerge, MaybePluckFlowId, MaybePluckFlowStepId, Pluck, PluckFlowId};
 use crate::models::udts::{Conflict, ConflictStatus};
-use anyhow::Context;
-use charybdis::operations::Update;
-use charybdis::types::{Set, Uuid};
-use std::collections::{HashMap, HashSet};
 
 pub struct MergeConflicts<'a> {
     branch_merge: &'a mut BranchMerge,

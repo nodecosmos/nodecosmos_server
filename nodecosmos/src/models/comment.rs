@@ -1,16 +1,17 @@
-mod create;
-
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::comment_thread::CommentThread;
-use crate::models::traits::SanitizeDescription;
-use crate::models::udts::Profile;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Text, Timestamp, Uuid};
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::comment_thread::CommentThread;
+use crate::models::traits::SanitizeDescription;
+use crate::models::udts::Profile;
+
+mod create;
 
 #[charybdis_model(
     table_name = comments,

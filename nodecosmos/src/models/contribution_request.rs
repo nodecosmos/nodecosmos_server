@@ -1,5 +1,11 @@
-pub mod create;
-pub mod update;
+use std::fmt;
+
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Delete;
+use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
@@ -7,13 +13,9 @@ use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::udts::Profile;
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::operations::Delete;
-use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::fmt;
+
+pub mod create;
+pub mod update;
 
 pub enum ContributionRequestStatus {
     WorkInProgress,

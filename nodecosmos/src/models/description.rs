@@ -1,10 +1,3 @@
-mod save;
-
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::traits::Branchable;
-use crate::models::traits::SanitizeDescription;
-use crate::models::utils::DescriptionXmlParser;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use charybdis::callbacks::Callbacks;
@@ -12,11 +5,20 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
-use nodecosmos_macros::{Branchable, ObjectId};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
+
+use nodecosmos_macros::{Branchable, ObjectId};
+
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::traits::Branchable;
+use crate::models::traits::SanitizeDescription;
+use crate::models::utils::DescriptionXmlParser;
+
+mod save;
 
 #[charybdis_model(
     table_name = description,

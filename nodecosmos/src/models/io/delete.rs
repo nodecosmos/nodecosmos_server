@@ -1,10 +1,11 @@
+use scylla::CachingSession;
+
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::workflow::Workflow;
-use scylla::CachingSession;
 
 impl Io {
     pub async fn pull_from_initial_input_ids(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {

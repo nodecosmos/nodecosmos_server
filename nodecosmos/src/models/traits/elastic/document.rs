@@ -1,4 +1,3 @@
-use crate::models::traits::ElasticIndex;
 use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::http::response::Response;
@@ -6,6 +5,8 @@ use elasticsearch::{BulkOperation, BulkOperations, BulkParts, DeleteParts, Elast
 use log::error;
 use serde::Serialize;
 use serde_json::json;
+
+use crate::models::traits::ElasticIndex;
 
 #[derive(strum_macros::Display, strum_macros::EnumString)]
 pub enum ElasticDocumentOp {

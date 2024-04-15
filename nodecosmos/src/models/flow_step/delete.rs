@@ -1,10 +1,11 @@
+use charybdis::operations::{DeleteWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::traits::{Branchable, ModelContext};
-use charybdis::operations::{DeleteWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::Uuid;
 
 impl FlowStep {
     pub async fn pull_output_id(&mut self, data: &RequestData, output_id: Uuid) -> Result<(), NodecosmosError> {

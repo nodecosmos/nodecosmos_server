@@ -1,14 +1,15 @@
+use actix_web::{App as ActixWebApp, HttpServer, web};
+use actix_web::middleware::Logger;
+
+use api::*;
+use app::App;
+
 mod api;
 mod app;
 mod constants;
 mod errors;
 mod models;
 mod resources;
-
-use actix_web::middleware::Logger;
-use actix_web::{web, App as ActixWebApp, HttpServer};
-use api::*;
-use app::App;
 
 #[tokio::main]
 async fn main() {
@@ -106,6 +107,7 @@ async fn main() {
             )
             .service(
                 web::scope("branches")
+                    .service(reload_branch)
                     .service(restore_node)
                     .service(undo_delete_node)
                     .service(restore_io)

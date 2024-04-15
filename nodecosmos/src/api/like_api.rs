@@ -1,12 +1,13 @@
+use actix_web::{delete, get, post, web, HttpResponse};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks};
+use scylla::CachingSession;
+use serde_json::json;
+
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::like::Like;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
-use actix_web::{delete, get, post, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks};
-use scylla::CachingSession;
-use serde_json::json;
 
 #[get("/{objectId}/{branchId}")]
 pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {

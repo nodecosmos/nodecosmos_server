@@ -1,7 +1,8 @@
-use crate::errors::NodecosmosError;
 use quick_xml::events::{BytesText, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
+
+use crate::errors::NodecosmosError;
 
 enum ProseMirrorXmlTag {
     Heading,

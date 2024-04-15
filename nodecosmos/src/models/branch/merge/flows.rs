@@ -1,3 +1,11 @@
+use std::collections::HashMap;
+
+use anyhow::Context;
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::Uuid;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
@@ -6,12 +14,6 @@ use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId, ObjectType};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
-use anyhow::Context;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::Uuid;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct MergeFlows {

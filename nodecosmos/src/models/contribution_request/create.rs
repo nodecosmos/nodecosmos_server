@@ -1,11 +1,12 @@
+use charybdis::operations::{Insert, InsertWithCallbacks};
+use charybdis::types::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::traits::ModelContext;
 use crate::models::udts::Profile;
-use charybdis::operations::{Insert, InsertWithCallbacks};
-use charybdis::types::Uuid;
 
 impl ContributionRequest {
     pub fn set_defaults(&mut self, data: &RequestData) {

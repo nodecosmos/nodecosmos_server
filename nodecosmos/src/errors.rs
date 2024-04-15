@@ -1,10 +1,11 @@
+use std::error::Error;
+use std::fmt;
+
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use charybdis::errors::CharybdisError;
 use log::{error, warn};
 use serde_json::json;
-use std::error::Error;
-use std::fmt;
 
 #[derive(Debug)]
 pub enum RedisError {

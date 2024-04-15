@@ -1,3 +1,6 @@
+use charybdis::types::Uuid;
+use log::error;
+
 use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
@@ -5,8 +8,6 @@ use crate::models::comment::Comment;
 use crate::models::traits::SanitizeDescription;
 use crate::models::udts::Profile;
 use crate::resources::sse_broadcast::ModelEvent;
-use charybdis::types::Uuid;
-use log::error;
 
 impl Comment {
     pub async fn set_default_values(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

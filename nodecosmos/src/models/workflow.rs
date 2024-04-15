@@ -1,15 +1,17 @@
-mod update_initial_inputs;
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::types::{List, Text, Timestamp, Uuid};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
+use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::traits::{Branchable, Merge};
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::types::{List, Text, Timestamp, Uuid};
-use nodecosmos_macros::Branchable;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
+
+mod update_initial_inputs;
 
 /// ### Workflow structure
 /// - Each `Workflow` has multiple `Flows`

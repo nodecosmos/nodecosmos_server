@@ -1,12 +1,13 @@
+use charybdis::batch::ModelBatch;
+use charybdis::model::AsNative;
+use scylla::CachingSession;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::io::UpdateTitleIo;
 use crate::models::traits::Branchable;
-use charybdis::batch::ModelBatch;
-use charybdis::model::AsNative;
-use scylla::CachingSession;
 
 impl UpdateTitleIo {
     pub async fn update_ios_titles_by_main_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {

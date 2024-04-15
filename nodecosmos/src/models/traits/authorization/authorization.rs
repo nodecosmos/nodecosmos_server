@@ -1,3 +1,8 @@
+use actix_web::web;
+use charybdis::operations::Find;
+use scylla::CachingSession;
+use serde_json::json;
+
 use crate::api::data::RequestData;
 use crate::api::request::current_user::OptCurrentUser;
 use crate::app::App;
@@ -8,10 +13,6 @@ use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::traits::AuthorizationFields;
 use crate::models::user::User;
-use actix_web::web;
-use charybdis::operations::Find;
-use scylla::CachingSession;
-use serde_json::json;
 
 /// Authorization for nodes is implemented with the `NodeAuthorization` derive macro.
 pub trait Authorization: AuthorizationFields {

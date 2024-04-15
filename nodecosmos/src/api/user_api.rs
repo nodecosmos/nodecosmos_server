@@ -1,10 +1,3 @@
-use crate::api::current_user::{refresh_current_user, set_current_user, OptCurrentUser};
-use crate::api::data::RequestData;
-use crate::api::types::Response;
-use crate::errors::NodecosmosError;
-use crate::models::traits::Authorization;
-use crate::models::user::{GetUser, UpdateBioUser, UpdateProfileImageUser, User};
-use crate::App;
 use actix_multipart::Multipart;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
@@ -14,6 +7,14 @@ use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
+
+use crate::api::current_user::{refresh_current_user, set_current_user, OptCurrentUser};
+use crate::api::data::RequestData;
+use crate::api::types::Response;
+use crate::errors::NodecosmosError;
+use crate::models::traits::Authorization;
+use crate::models::user::{GetUser, UpdateBioUser, UpdateProfileImageUser, User};
+use crate::App;
 
 #[derive(Deserialize)]
 pub struct LoginForm {

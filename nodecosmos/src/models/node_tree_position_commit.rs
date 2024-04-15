@@ -1,14 +1,15 @@
-use crate::models::node::Node;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Set, Uuid};
 use serde::{Deserialize, Serialize};
+
+use crate::models::node::Node;
 
 #[charybdis_model(
     table_name = node_tree_position_commits,
     partition_keys = [id],
     clustering_keys = [],
     table_options = r#"
-        compression = { 
+        compression = {
             'sstable_compression': 'DeflateCompressor'
         }
     "#

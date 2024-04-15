@@ -1,10 +1,3 @@
-pub mod create;
-pub mod reorder;
-
-use crate::constants::MAX_PARALLEL_REQUESTS;
-use crate::errors::NodecosmosError;
-use crate::models::node_descendants_commit::NodeDescendantsCommit;
-use crate::models::node_tree_position_commit::NodeTreePositionCommit;
 use charybdis::errors::CharybdisError;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
@@ -12,13 +5,21 @@ use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
+use crate::constants::MAX_PARALLEL_REQUESTS;
+use crate::errors::NodecosmosError;
+use crate::models::node_descendants_commit::NodeDescendantsCommit;
+use crate::models::node_tree_position_commit::NodeTreePositionCommit;
+
+pub mod create;
+pub mod reorder;
+
 #[charybdis_model(
     table_name = node_commits,
     partition_keys = [node_id, branch_id],
     clustering_keys = [created_at, id],
     table_options = r#"
         CLUSTERING ORDER BY (created_at DESC) AND
-        COMPRESSION = { 
+        COMPRESSION = {
             'sstable_compression': 'DeflateCompressor',
             'chunk_length_in_kb': 64
         }
