@@ -9,8 +9,8 @@ use crate::models::branch::{
     UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
     UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
     UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodeWorkflowsBranch,
-    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateReorderedNodes, UpdateRestoredFlowStepsBranch,
-    UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
+    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch, UpdateReorderedNodes,
+    UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
 use charybdis::batch::CharybdisModelBatch;
@@ -42,6 +42,7 @@ pub enum BranchUpdate {
     DeleteFlowStep(Uuid),
     UndoDeleteFlowStep(Uuid),
     RestoreFlowStep(Uuid),
+    KeepFlowStep(Uuid),
     CreatedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
     DeletedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
     CreatedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
@@ -292,6 +293,17 @@ impl Branch {
                     .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::KeepFlowStep(id) => {
+                res = UpdateKeptFlowStepsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_kept_flow_steps(&vec![id])
+                .execute(data.db_session())
+                .await;
 
                 check_conflicts = true;
             }

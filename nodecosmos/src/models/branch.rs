@@ -69,7 +69,6 @@ pub struct Branch {
     pub created_flows: Option<Set<Uuid>>,
     pub deleted_flows: Option<Set<Uuid>>,
     pub restored_flows: Option<Set<Uuid>>,
-    pub kept_flow_steps: Option<Set<Uuid>>,
     pub edited_title_flows: Option<Set<Uuid>>,
     pub edited_description_flows: Option<Set<Uuid>>,
 
@@ -77,6 +76,8 @@ pub struct Branch {
     pub created_flow_steps: Option<Set<Uuid>>,
     pub deleted_flow_steps: Option<Set<Uuid>>,
     pub restored_flow_steps: Option<Set<Uuid>>,
+    /// Conflicting Flow Steps that were kept
+    pub kept_flow_steps: Option<Set<Uuid>>,
     pub edited_description_flow_steps: Option<Set<Uuid>>,
     /// flow_step_id -> node_id
     pub created_flow_step_nodes: Option<Map<Uuid, Frozen<Set<Uuid>>>>,
@@ -231,6 +232,8 @@ partial_branch!(
 );
 
 partial_branch!(UpdateRestoredFlowStepsBranch, id, restored_flow_steps);
+
+partial_branch!(UpdateKeptFlowStepsBranch, id, kept_flow_steps);
 
 partial_branch!(UpdateCreatedFlowStepNodesBranch, id, created_flow_step_nodes);
 

@@ -9,10 +9,9 @@ use serde::{Deserialize, Serialize};
     clustering_keys=[id, branch_id]
 )]
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct NodesByOwner {
     pub owner_id: Uuid,
-
     pub id: Uuid,
-
     pub branch_id: Uuid,
 }

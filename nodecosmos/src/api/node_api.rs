@@ -87,7 +87,6 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
 #[put("/title")]
 pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestData) -> Response {
     let mut node = node.into_inner();
-    let updated_title = node.title.clone();
 
     node.auth_update(&data).await?;
 
@@ -102,8 +101,6 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
         .await?;
 
     node.find_branched(data.db_session()).await?;
-
-    node.title = updated_title;
 
     node.update_cb(&data).execute(data.db_session()).await?;
 
@@ -150,11 +147,9 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node {
-        id: params.id,
-        branch_id: params.branch_id,
-        ..Default::default()
-    };
+    let mut node = Node::find_by_id_and_branch_id(params.id, params.branch_id)
+        .execute(data.db_session())
+        .await?;
 
     node.auth_update(&data).await?;
 

@@ -15,11 +15,9 @@ pub enum PropDataTypes {
 
 #[derive(Serialize, Deserialize, Default)]
 #[charybdis_udt_model(type_name = property)]
+#[serde(rename_all = "camelCase")]
 pub struct Property {
     pub title: Text,
-
-    #[serde(rename = "dataType")]
     pub data_type: Text,
-
     pub value: Text,
 }

@@ -11,17 +11,12 @@ pub enum ProfileType {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[charybdis_udt_model(type_name = profile)]
+#[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub id: Uuid,
-
-    #[serde(rename = "profileType")]
     pub profile_type: Text, // user or organization
-
     pub name: Text,
-
     pub username: Option<Text>,
-
-    #[serde(rename = "profileImageURL")]
     pub profile_image_url: Option<Text>,
 }
 

@@ -113,6 +113,7 @@ async fn main() {
                     .service(restore_flow)
                     .service(undo_delete_flow)
                     .service(restore_flow_step)
+                    .service(keep_flow_step)
                     .service(undo_delete_flow_step),
             )
             .service(

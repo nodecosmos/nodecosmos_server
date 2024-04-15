@@ -50,7 +50,10 @@ pub struct Node {
     pub is_public: Boolean,
 
     pub is_root: Boolean,
+
+    #[serde(default)]
     pub order_index: Double,
+
     pub title: Text,
     pub parent_id: Option<Uuid>,
     pub ancestor_ids: Option<Set<Uuid>>,
@@ -294,16 +297,15 @@ impl Callbacks for UpdateTitleNode {
     async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             self.as_native().create_branched_if_not_exist(data).await?;
+            self.update_branch(&data).await?;
         }
 
-        self.update_branch(&data).await?;
+        self.update_title_for_ancestors(data).await?;
 
         Ok(())
     }
 
     async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        self.update_title_for_ancestors(data).await?;
-
         let self_clone = self.clone();
         let data = data.clone();
 

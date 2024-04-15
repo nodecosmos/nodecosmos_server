@@ -12,7 +12,7 @@ use crate::models::udts::{Conflict, ConflictStatus};
 use anyhow::Context;
 use charybdis::operations::Update;
 use charybdis::types::{Set, Uuid};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub struct MergeConflicts<'a> {
     branch_merge: &'a mut BranchMerge,
@@ -97,7 +97,7 @@ impl<'a> MergeConflicts<'a> {
                 && conflict.deleted_edited_flows.is_none()
                 && conflict.deleted_edited_flow_steps.is_none()
                 && conflict.deleted_edited_ios.is_none()
-                && conflict.diverged_flows.is_none()
+                && conflict.conflicting_indexes_by_flow.is_none()
             {
                 conflict.status = ConflictStatus::Resolved.to_string();
                 branch
@@ -325,11 +325,10 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    /// Diverged flows are flows that have created_flow_steps whose prev_flow_step's next_flow_step is not the same as
-    /// created_flow_step's next_flow_step_id on original flow. User is then given option to choose which flow to keep.
-    /// TODO: check if prev or next is deleted in the branch
+    /// Check if flow steps are diverged - if we have multiple flow steps within the same flow with the same index
     async fn extract_diverged_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let created_flow_ids = self.branch_merge.branch.created_flows.as_ref();
+        let kept_flow_step_ids = self.branch_merge.branch.kept_flow_steps.as_ref();
         let created_flow_steps = self
             .branch_merge
             .flow_steps
@@ -337,11 +336,11 @@ impl<'a> MergeConflicts<'a> {
             .chain_opt_ref(&self.branch_merge.flow_steps.restored_flow_steps);
 
         if let Some(created_flow_steps) = created_flow_steps {
-            let mut diverged_flows = HashSet::new();
+            let mut conflicting_indexes_by_flow = HashMap::new();
 
             for flow_step in created_flow_steps {
-                if diverged_flows.contains(&flow_step.flow_id)
-                    || created_flow_ids.is_some_and(|ids| ids.contains(&flow_step.flow_id))
+                if created_flow_ids.is_some_and(|ids| ids.contains(&flow_step.flow_id))
+                    || kept_flow_step_ids.is_some_and(|ids| ids.contains(&flow_step.id))
                 {
                     continue;
                 }
@@ -349,19 +348,23 @@ impl<'a> MergeConflicts<'a> {
                 // check if flow step exists on same index
                 let mut maybe_orig = flow_step.clone();
                 maybe_orig.set_original_id();
+
                 if maybe_orig.maybe_find_by_flow_index(data.db_session()).await?.is_some() {
-                    diverged_flows.insert(flow_step.flow_id);
+                    conflicting_indexes_by_flow
+                        .entry(flow_step.flow_id)
+                        .or_insert_with(|| Set::new())
+                        .insert(flow_step.flow_id);
                 }
             }
 
-            if diverged_flows.len() > 0 {
+            if conflicting_indexes_by_flow.len() > 0 {
                 self.branch_merge
                     .branch
                     .conflict
                     .get_or_insert_with(|| Conflict::default())
-                    .diverged_flows = Some(diverged_flows);
+                    .conflicting_indexes_by_flow = Some(conflicting_indexes_by_flow);
             } else if let Some(conflict) = &mut self.branch_merge.branch.conflict {
-                conflict.diverged_flows = None;
+                conflict.conflicting_indexes_by_flow = None;
             }
         }
 

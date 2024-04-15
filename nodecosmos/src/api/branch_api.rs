@@ -150,6 +150,20 @@ pub async fn restore_flow_step(data: RequestData, params: web::Json<BranchFlowSt
     Ok(HttpResponse::Ok().json(branch))
 }
 
+#[put("/keep_flow_step")]
+pub async fn keep_flow_step(data: RequestData, params: web::Json<BranchFlowStepParams>) -> Response {
+    let params = params.into_inner();
+    let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
+
+    branch.auth_update(&data).await?;
+
+    Branch::update(&data, params.branch_id, BranchUpdate::KeepFlowStep(params.flow_step_id)).await?;
+
+    branch.reload(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().json(branch))
+}
+
 #[put("/undo_delete_flow_step")]
 pub async fn undo_delete_flow_step(data: RequestData, params: web::Json<BranchFlowStepParams>) -> Response {
     let params = params.into_inner();

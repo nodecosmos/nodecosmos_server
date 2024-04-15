@@ -69,13 +69,19 @@ impl Callbacks for Description {
     }
 
     async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.update_elastic_index(data).await?;
+        let _ = self.update_elastic_index(data).await.map_err(|e| {
+            log::error!("[after_insert] Failed to update elastic index: {:?}", e);
+            e
+        });
 
         Ok(())
     }
 
     async fn after_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        self.update_elastic_index(data).await?;
+        let _ = self.update_elastic_index(data).await.map_err(|e| {
+            log::error!("[after_update] Failed to update elastic index: {:?}", e);
+            e
+        });
 
         Ok(())
     }

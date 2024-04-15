@@ -15,14 +15,14 @@ use log::error;
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
     pub async fn update_title_for_ancestors(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(ancestor_ids) = self.ancestor_ids.clone() {
+        if let Some(ancestor_ids) = &self.ancestor_ids {
             let mut node_descendants = Vec::with_capacity(ancestor_ids.len());
 
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
                     root_id: self.root_id,
-                    branch_id: self.branchise_id(ancestor_id),
-                    node_id: ancestor_id,
+                    branch_id: self.branchise_id(*ancestor_id),
+                    node_id: *ancestor_id,
                     id: self.id,
                     parent_id: self.parent_id.unwrap(), // we must have parent_id as we have ancestor_ids
                     title: self.title.clone(),
