@@ -338,7 +338,7 @@ impl<'a> MergeConflicts<'a> {
                 let mut maybe_orig = flow_step.clone();
                 maybe_orig.set_original_id();
 
-                if maybe_orig.maybe_find_by_flow_index(data.db_session()).await?.is_some() {
+                if maybe_orig.maybe_find_by_index(data.db_session()).await?.is_some() {
                     conflicting_flow_steps.insert(flow_step.id);
                 }
             }

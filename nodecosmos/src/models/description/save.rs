@@ -24,7 +24,12 @@ impl Description {
                     Branch::update(&data, self.branch_id, BranchUpdate::EditIoDescription(self.object_id)).await?;
                 }
                 ObjectType::FlowStep => {
-                    Branch::update(&data, self.branch_id, BranchUpdate::EditFlowDescription(self.object_id)).await?;
+                    Branch::update(
+                        &data,
+                        self.branch_id,
+                        BranchUpdate::EditFlowStepDescription(self.object_id),
+                    )
+                    .await?;
                 }
                 _ => {}
             }

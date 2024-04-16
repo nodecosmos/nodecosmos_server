@@ -1091,6 +1091,7 @@ dependencies = [
  "num-bigint 0.4.4",
  "num-integer",
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -1263,6 +1264,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "charybdis"
 version = "0.4.14"
 dependencies = [
+ "bigdecimal",
  "charybdis_macros",
  "chrono",
  "colored",

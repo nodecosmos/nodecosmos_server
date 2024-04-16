@@ -1,4 +1,4 @@
-use actix_web::{delete, post, put, web, HttpResponse};
+use actix_web::{post, put, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 
 use crate::api::data::RequestData;
@@ -57,8 +57,8 @@ pub async fn update_flow_step_inputs(data: RequestData, mut flow_step: web::Json
     Ok(HttpResponse::Ok().json(flow_step))
 }
 
-#[delete("{rootId}/{nodeId}/{branchId}/{flowId}/{flowIndex}/{id}")]
-pub async fn delete_flow_step(data: RequestData, mut flow_step: web::Path<FlowStep>) -> Response {
+#[post("/delete")]
+pub async fn delete_flow_step(data: RequestData, mut flow_step: web::Json<FlowStep>) -> Response {
     AuthNode::auth_update(&data, flow_step.node_id, flow_step.branch_id).await?;
 
     data.resource_locker()

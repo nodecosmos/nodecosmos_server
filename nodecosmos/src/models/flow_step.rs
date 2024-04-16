@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
-use charybdis::types::{Double, Frozen, List, Map, Set, Timestamp, Uuid};
+use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ pub struct FlowStep {
     pub flow_id: Uuid,
 
     #[serde(default)]
-    pub flow_index: Double,
+    pub flow_index: Decimal,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -184,12 +184,9 @@ impl FlowStep {
         Ok(flow_steps)
     }
 
-    pub async fn maybe_find_by_flow_index(
-        &self,
-        db_session: &CachingSession,
-    ) -> Result<Option<FlowStep>, NodecosmosError> {
+    pub async fn maybe_find_by_index(&self, db_session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
         let q = find_flow_step_query!("node_id = ? AND branch_id = ? AND flow_id = ? AND flow_index = ? LIMIT 1");
-        let fs = FlowStep::maybe_find_first(q, (self.node_id, self.branch_id, self.flow_id, self.flow_index))
+        let fs = FlowStep::maybe_find_first(q, (self.node_id, self.branch_id, self.flow_id, self.flow_index.clone()))
             .execute(db_session)
             .await?;
 

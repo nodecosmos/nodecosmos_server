@@ -28,7 +28,7 @@ impl FlowStep {
                 node_id: self.node_id,
                 branch_id: self.original_id(),
                 flow_id: self.flow_id,
-                flow_index: self.flow_index,
+                flow_index: self.flow_index.clone(),
                 id: self.id,
                 ..Default::default()
             }
@@ -47,10 +47,10 @@ impl FlowStep {
     }
 
     pub async fn validate_no_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.maybe_find_by_flow_index(data.db_session()).await?.is_some() {
+        if self.maybe_find_by_index(data.db_session()).await?.is_some() {
             return Err(NodecosmosError::Conflict(format!(
                 "Flow Step on given index {} already exists",
-                self.flow_index.to_string()
+                self.flow_index
             )));
         }
 

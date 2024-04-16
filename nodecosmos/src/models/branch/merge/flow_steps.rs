@@ -355,6 +355,7 @@ impl MergeFlowSteps {
             for flow_step in flow_steps {
                 if kept_flow_steps.is_some_and(|kfs| kfs.contains(&flow_step.id)) {
                     flow_step.flow_index.increment_fraction();
+                    println!("{}", flow_step.flow_index);
                 }
 
                 flow_step.set_merge_context();

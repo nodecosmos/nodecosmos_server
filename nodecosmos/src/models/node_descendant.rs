@@ -22,10 +22,7 @@ pub struct NodeDescendant {
     pub root_id: Uuid,
     pub branch_id: Uuid,
     pub node_id: Uuid,
-
-    #[serde(rename = "order")]
     pub order_index: Double,
-
     pub id: Uuid,
     pub parent_id: Uuid,
     pub title: Text,

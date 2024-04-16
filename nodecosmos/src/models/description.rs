@@ -28,11 +28,12 @@ mod save;
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Description {
-    #[branch(original_id)]
     pub object_id: Uuid,
-
     pub branch_id: Uuid,
+
+    #[branch(original_id)]
     pub node_id: Uuid,
+
     pub object_type: Text,
     pub short_description: Option<Text>,
     pub html: Option<Text>,
