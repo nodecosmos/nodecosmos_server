@@ -6,6 +6,7 @@ use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::api::current_user::OptCurrentUser;
 use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
@@ -24,7 +25,13 @@ pub struct WorkflowParams {
 }
 
 #[get("/{node_id}/{branch_id}")]
-pub async fn get_workflow(db_session: web::Data<CachingSession>, params: web::Path<WorkflowParams>) -> Response {
+pub async fn get_workflow(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    params: web::Path<WorkflowParams>,
+) -> Response {
+    AuthNode::auth_view(&db_session, &opt_cu, params.node_id, params.branch_id).await?;
+
     let params = params.into_inner();
 
     let workflow = Workflow::branched(&db_session, &params)

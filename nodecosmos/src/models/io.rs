@@ -23,8 +23,8 @@ mod create;
 mod delete;
 mod update_title;
 
-/// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node.
-/// Original Ios are the ones where `branch_id` == `root_id`.
+/// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node. Accordingly,
+/// they are branched by comparing `branch_id` to `root_id`.
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_id, branch_id],
@@ -36,7 +36,9 @@ mod update_title;
 pub struct Io {
     #[branch(original_id)]
     pub root_id: Uuid,
+
     pub node_id: Uuid,
+
     pub branch_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
@@ -122,13 +124,18 @@ impl Io {
         root_id: Uuid,
         params: &WorkflowParams,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let mut ios = Self::find_by_root_id_and_branch_id(root_id, params.branch_id)
-            .execute(db_session)
-            .await?;
-
         if params.is_original() {
-            Ok(ios.try_collect().await?)
+            let ios = Self::find_by_root_id_and_branch_id(root_id, root_id)
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
+            Ok(ios)
         } else {
+            let mut ios = Self::find_by_root_id_and_branch_id(root_id, params.branch_id)
+                .execute(db_session)
+                .await?;
+
             let mut original_ios = Self::find_by_root_id_and_branch_id(root_id, root_id)
                 .execute(db_session)
                 .await?;

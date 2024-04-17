@@ -3,6 +3,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use scylla::CachingSession;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream;
 
@@ -24,14 +25,14 @@ pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) 
 }
 
 #[get("/{id}")]
-pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurrentUser) -> Response {
+pub async fn get_node(db_session: web::Data<CachingSession>, opt_cu: OptCurrentUser, id: web::Path<Uuid>) -> Response {
     let mut node = BaseNode::find_by_id_and_branch_id(*id, *id)
-        .execute(&app.db_session)
+        .execute(&db_session)
         .await?;
 
-    node.auth_view(&app, opt_cu).await?;
+    node.auth_view(&db_session, &opt_cu).await?;
 
-    let descendants = node.descendants(&app.db_session).await?.try_collect().await?;
+    let descendants = node.descendants(&db_session).await?.try_collect().await?;
 
     Ok(HttpResponse::Ok().json({
         json!({
@@ -42,14 +43,18 @@ pub async fn get_node(app: web::Data<App>, id: web::Path<Uuid>, opt_cu: OptCurre
 }
 
 #[get("/{id}/{branchId}")]
-pub async fn get_branched_node(app: web::Data<App>, pk: web::Path<PrimaryKeyNode>, opt_cu: OptCurrentUser) -> Response {
+pub async fn get_branched_node(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    pk: web::Path<PrimaryKeyNode>,
+) -> Response {
     let mut node = BaseNode::find_by_id_and_branch_id(pk.id, pk.branch_id)
-        .execute(&app.db_session)
+        .execute(&db_session)
         .await?;
 
-    node.auth_view(&app, opt_cu).await?;
+    node.auth_view(&db_session, &opt_cu).await?;
 
-    let descendants = node.branch_descendants(&app.db_session).await?;
+    let descendants = node.branch_descendants(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "node": node,

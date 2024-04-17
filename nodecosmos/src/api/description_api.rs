@@ -2,12 +2,12 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws::WsResponseBuilder;
 use charybdis::operations::InsertWithCallbacks;
 use charybdis::types::Uuid;
+use scylla::CachingSession;
 use serde::Deserialize;
 
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::description::{BaseDescription, Description};
 use crate::models::node::AuthNode;
@@ -16,13 +16,13 @@ use crate::resources::description_ws_pool::DescriptionWsConnection;
 
 #[get("/{nodeId}/{objectId}/{objectType}/{branchId}")]
 pub async fn get_description(
-    app: web::Data<App>,
+    db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
     mut description: web::Path<BaseDescription>,
 ) -> Response {
-    AuthNode::auth_view(&app, opt_cu, description.node_id, description.branch_id).await?;
+    AuthNode::auth_view(&db_session, &opt_cu, description.node_id, description.branch_id).await?;
 
-    let description = description.find_branched(&app.db_session).await?;
+    let description = description.find_branched(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(description))
 }
@@ -71,14 +71,14 @@ pub struct OriginalPathParams {
 
 #[get("/{nodeId}/{objectId}")]
 pub async fn get_original_description(
-    app: web::Data<App>,
+    db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
     params: web::Path<OriginalPathParams>,
 ) -> Response {
-    AuthNode::auth_view(&app, opt_cu, params.node_id, params.node_id).await?;
+    AuthNode::auth_view(&db_session, &opt_cu, params.node_id, params.node_id).await?;
 
-    let description = Description::find_by_object_id_and_branch_id(params.object_id, params.object_id)
-        .execute(&app.db_session)
+    let description = Description::find_by_object_id_and_branch_id(params.object_id, params.node_id)
+        .execute(&db_session)
         .await?;
 
     Ok(HttpResponse::Ok().json(description))

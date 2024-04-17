@@ -318,6 +318,7 @@ impl<'a> MergeConflicts<'a> {
     async fn extract_diverged_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let created_flow_ids = self.branch_merge.branch.created_flows.as_ref();
         let kept_flow_step_ids = self.branch_merge.branch.kept_flow_steps.as_ref();
+        let deleted_flow_step_ids = self.branch_merge.branch.deleted_flow_steps.as_ref();
         let created_flow_steps = self
             .branch_merge
             .flow_steps
@@ -338,7 +339,10 @@ impl<'a> MergeConflicts<'a> {
                 let mut maybe_orig = flow_step.clone();
                 maybe_orig.set_original_id();
 
-                if maybe_orig.maybe_find_by_index(data.db_session()).await?.is_some() {
+                if let Some(original) = maybe_orig.maybe_find_by_index(data.db_session()).await? {
+                    if deleted_flow_step_ids.is_some_and(|ids| ids.contains(&original.id)) {
+                        continue;
+                    }
                     conflicting_flow_steps.insert(flow_step.id);
                 }
             }

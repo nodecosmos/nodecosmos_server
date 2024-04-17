@@ -216,6 +216,20 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                 };
             }
 
+            fn viewer_ids(&self) -> Option<Set<Uuid>> {
+                if self.is_original() {
+                    return self.viewer_ids.clone();
+                }
+
+                return match &self.auth_branch {
+                    Some(branch) => branch.viewer_ids.clone(),
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        None
+                    }
+                };
+            }
         }
 
         impl crate::models::traits::Authorization for #name {

@@ -1,9 +1,8 @@
-use actix_web::web;
 use charybdis::types::Uuid;
+use scylla::CachingSession;
 
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
-use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
@@ -24,8 +23,8 @@ impl AuthNode {
     }
 
     pub async fn auth_view(
-        app: &web::Data<App>,
-        opt_cu: OptCurrentUser,
+        db_session: &CachingSession,
+        opt_cu: &OptCurrentUser,
         node_id: Uuid,
         branch_id: Uuid,
     ) -> Result<(), NodecosmosError> {
@@ -35,7 +34,7 @@ impl AuthNode {
             ..Default::default()
         };
 
-        node.auth_view(app, opt_cu).await?;
+        node.auth_view(db_session, opt_cu).await?;
 
         Ok(())
     }

@@ -12,6 +12,8 @@ pub trait AuthorizationFields {
 
     fn editor_ids(&self) -> Option<Set<Uuid>>;
 
+    fn viewer_ids(&self) -> Option<Set<Uuid>>;
+
     fn is_frozen(&self) -> bool {
         false
     }
@@ -28,6 +30,10 @@ impl AuthorizationFields for Branch {
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
         self.editor_ids.clone()
+    }
+
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
+        self.viewer_ids.clone()
     }
 
     fn is_frozen(&self) -> bool {
@@ -48,6 +54,10 @@ impl AuthorizationFields for AuthBranch {
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
         self.editor_ids.clone()
+    }
+
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
+        self.viewer_ids.clone()
     }
 
     fn is_frozen(&self) -> bool {
@@ -72,6 +82,12 @@ impl AuthorizationFields for ContributionRequest {
             .map(|branch| branch.editor_ids.clone().unwrap_or_default())
     }
 
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
+        self.branch
+            .as_ref()
+            .map(|branch| branch.viewer_ids.clone().unwrap_or_default())
+    }
+
     // ATM this works fine because we only find CR before merging it, while allowing CR description
     // to be changed after merging. However, this is accidental and it works because
     // we don't query CR before other update operations.
@@ -93,6 +109,10 @@ impl AuthorizationFields for User {
     fn editor_ids(&self) -> Option<Set<Uuid>> {
         None
     }
+
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
+        None
+    }
 }
 
 impl AuthorizationFields for CommentThread {
@@ -103,6 +123,10 @@ impl AuthorizationFields for CommentThread {
     fn editor_ids(&self) -> Option<Set<Uuid>> {
         None
     }
+
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
+        None
+    }
 }
 
 impl AuthorizationFields for Comment {
@@ -111,6 +135,10 @@ impl AuthorizationFields for Comment {
     }
 
     fn editor_ids(&self) -> Option<Set<Uuid>> {
+        None
+    }
+
+    fn viewer_ids(&self) -> Option<Set<Uuid>> {
         None
     }
 }

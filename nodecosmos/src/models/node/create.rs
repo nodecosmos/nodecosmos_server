@@ -57,7 +57,8 @@ impl Node {
         self.id = Uuid::new_v4();
 
         if let Some(parent) = self.parent(db_session).await? {
-            let editor_ids = parent.editor_ids.clone().unwrap_or(Set::new());
+            let editor_ids = parent.editor_ids.clone();
+            let viewer_ids = parent.viewer_ids.clone();
             let root_id = parent.root_id;
             let is_public = parent.is_public;
             let parent_id = parent.id;
@@ -66,7 +67,8 @@ impl Node {
 
             self.root_id = root_id;
             self.parent_id = Some(parent_id);
-            self.editor_ids = Some(editor_ids);
+            self.editor_ids = editor_ids;
+            self.viewer_ids = viewer_ids;
             self.is_public = is_public;
             self.is_root = false;
             self.ancestor_ids = Some(ancestor_ids);

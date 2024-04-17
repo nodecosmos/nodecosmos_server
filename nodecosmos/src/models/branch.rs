@@ -53,6 +53,7 @@ pub struct Branch {
     pub owner_id: Uuid,
     pub owner: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
+    pub viewer_ids: Option<Set<Uuid>>,
     pub is_public: Boolean,
     pub is_contribution_request: Option<Boolean>,
     // nodes
@@ -197,7 +198,7 @@ impl Branch {
     }
 }
 
-partial_branch!(AuthBranch, id, owner_id, editor_ids, is_public, status);
+partial_branch!(AuthBranch, id, owner_id, editor_ids, viewer_ids, is_public, status);
 
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes);
 

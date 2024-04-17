@@ -219,6 +219,7 @@ impl MergeNodes {
                 merge_node.set_original_id();
                 merge_node.owner_id = branch_node.owner_id;
                 merge_node.editor_ids = branch_node.editor_ids.clone();
+                merge_node.viewer_ids = branch_node.viewer_ids.clone();
                 merge_node.insert_cb(data).execute(data.db_session()).await?;
             }
         }

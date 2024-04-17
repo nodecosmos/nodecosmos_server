@@ -25,10 +25,6 @@ pub struct RequestData {
 }
 
 impl RequestData {
-    pub fn new(app: web::Data<App>, current_user: CurrentUser) -> Self {
-        Self { app, current_user }
-    }
-
     pub fn db_session(&self) -> &CachingSession {
         &self.app.db_session
     }

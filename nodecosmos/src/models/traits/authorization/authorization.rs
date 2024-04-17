@@ -1,11 +1,9 @@
-use actix_web::web;
 use charybdis::operations::Find;
 use scylla::CachingSession;
 use serde_json::json;
 
 use crate::api::data::RequestData;
 use crate::api::request::current_user::OptCurrentUser;
-use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::comment::Comment;
@@ -14,7 +12,7 @@ use crate::models::contribution_request::ContributionRequest;
 use crate::models::traits::AuthorizationFields;
 use crate::models::user::User;
 
-/// Authorization for nodes is implemented with the `NodeAuthorization` derive macro.
+/// Authorization for nodes is implemented with the `NodeAuthorization` derive.
 pub trait Authorization: AuthorizationFields {
     async fn init_auth_info(&mut self, _db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Ok(())
@@ -22,17 +20,19 @@ pub trait Authorization: AuthorizationFields {
 
     async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError>;
 
-    async fn can_edit(&mut self, data: &RequestData) -> Result<bool, NodecosmosError> {
+    fn can_edit(&mut self, data: &RequestData) -> bool {
         if self.owner_id() == Some(data.current_user.id) {
-            return Ok(true);
+            return true;
         }
 
-        let editor_ids = self.editor_ids();
-        if editor_ids.map_or(false, |ids| ids.contains(&data.current_user.id)) {
-            return Ok(true);
+        if self
+            .editor_ids()
+            .map_or(false, |ids| ids.contains(&data.current_user.id))
+        {
+            return true;
         }
 
-        Ok(false)
+        false
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -42,7 +42,7 @@ pub trait Authorization: AuthorizationFields {
             return Err(NodecosmosError::Forbidden("This object is frozen!".to_string()));
         }
 
-        if !self.can_edit(data).await? {
+        if !self.can_edit(data) {
             return Err(NodecosmosError::Unauthorized(json!({
                 "error": "Unauthorized!",
                 "message": "You are not allowed to perform this action!"
@@ -52,20 +52,27 @@ pub trait Authorization: AuthorizationFields {
         Ok(())
     }
 
-    async fn auth_view(&mut self, app: &web::Data<App>, current_user: OptCurrentUser) -> Result<(), NodecosmosError> {
-        self.init_auth_info(&app.db_session).await?;
+    async fn auth_view(
+        &mut self,
+        db_session: &CachingSession,
+        current_user: &OptCurrentUser,
+    ) -> Result<(), NodecosmosError> {
+        self.init_auth_info(&db_session).await?;
 
         if self.is_public() {
             return Ok(());
         }
 
-        return match current_user.0 {
+        return match &current_user.0 {
             Some(current_user) => {
-                let data = RequestData::new(app.clone(), current_user);
+                if self.viewer_ids().map_or(false, |ids| ids.contains(&current_user.id)) {
+                    return Ok(());
+                }
 
-                self.auth_update(&data).await?;
-
-                Ok(())
+                Err(NodecosmosError::Unauthorized(json!({
+                    "error": "Unauthorized!",
+                    "message": "You are not allowed to perform this action!"
+                })))
             }
             None => Err(NodecosmosError::Unauthorized(json!({
                 "error": "Unauthorized!",
@@ -113,7 +120,10 @@ impl Authorization for CommentThread {
         match object {
             CommentObject::ContributionRequest(mut contribution_request) => {
                 contribution_request
-                    .auth_view(&data.app, OptCurrentUser(Option::from(data.current_user.clone())))
+                    .auth_view(
+                        data.db_session(),
+                        &OptCurrentUser(Option::from(data.current_user.clone())),
+                    )
                     .await?;
 
                 Ok(())
