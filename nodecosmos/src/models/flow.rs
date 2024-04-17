@@ -41,6 +41,7 @@ pub struct Flow {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
+    #[serde(default)]
     pub title: Text,
 
     #[serde(default = "chrono::Utc::now")]
