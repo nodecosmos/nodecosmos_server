@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Delete;
 use charybdis::types::Uuid;
-use elasticsearch::Elasticsearch;
 use futures::{StreamExt, TryFutureExt};
 use log::error;
-use scylla::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::attachment::Attachment;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
+use crate::models::description::Description;
 use crate::models::flow::DeleteFlow;
 use crate::models::flow_step::DeleteFlowStep;
 use crate::models::io::DeleteIo;
@@ -74,8 +74,7 @@ type Children = Vec<(Id, OrderIndex)>;
 type ChildrenByParentId = HashMap<Uuid, Children>;
 
 pub struct NodeDelete<'a> {
-    db_session: &'a CachingSession,
-    elastic_client: &'a Elasticsearch,
+    data: &'a RequestData,
     node: &'a Node,
     node_ids_to_delete: Vec<Uuid>,
     children_by_parent_id: ChildrenByParentId,
@@ -84,8 +83,7 @@ pub struct NodeDelete<'a> {
 impl<'a> NodeDelete<'a> {
     pub fn new(node: &'a Node, data: &'a RequestData) -> NodeDelete<'a> {
         Self {
-            db_session: &data.app.db_session,
-            elastic_client: &data.app.elastic_client,
+            data,
             node,
             node_ids_to_delete: vec![node.id],
             children_by_parent_id: ChildrenByParentId::new(),
@@ -113,13 +111,18 @@ impl<'a> NodeDelete<'a> {
             return err;
         })?;
 
+        self.delete_attachments().await.map_err(|err| {
+            error!("delete_attachments: {}", err);
+            return err;
+        })?;
+
         self.delete_elastic_data().await;
 
         Ok(())
     }
 
     async fn populate_delete_data(&mut self) -> Result<(), NodecosmosError> {
-        let mut descendants = self.node.descendants(self.db_session).await?;
+        let mut descendants = self.node.descendants(self.data.db_session()).await?;
 
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
@@ -146,7 +149,7 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 }
                 .delete_by_partition_key()
-                .execute(self.db_session)
+                .execute(self.data.db_session())
                 .await?;
 
                 DeleteFlow {
@@ -154,7 +157,7 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 }
                 .delete_by_partition_key()
-                .execute(self.db_session)
+                .execute(self.data.db_session())
                 .await?;
 
                 DeleteFlowStep {
@@ -162,7 +165,7 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 }
                 .delete_by_partition_key()
-                .execute(self.db_session)
+                .execute(self.data.db_session())
                 .await?;
 
                 DeleteIo {
@@ -170,7 +173,7 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 }
                 .delete_by_partition_key()
-                .execute(self.db_session)
+                .execute(self.data.db_session())
                 .await?;
 
                 Like {
@@ -178,15 +181,23 @@ impl<'a> NodeDelete<'a> {
                     ..Default::default()
                 }
                 .delete_by_partition_key()
-                .execute(self.db_session)
+                .execute(self.data.db_session())
+                .await?;
+
+                Description {
+                    object_id: *id,
+                    ..Default::default()
+                }
+                .delete_by_partition_key()
+                .execute(self.data.db_session())
                 .await?;
 
                 PrimaryKeyNode {
                     id: *id,
-                    branch_id: self.node.branchise_id(*id),
+                    ..Default::default()
                 }
-                .delete()
-                .execute(self.db_session)
+                .delete_by_partition_key()
+                .execute(self.data.db_session())
                 .await?;
             }
         }
@@ -207,13 +218,19 @@ impl<'a> NodeDelete<'a> {
                 });
             }
 
-            batch.execute(self.db_session).await.map_err(|err| {
+            batch.execute(self.data.db_session()).await.map_err(|err| {
                 return NodecosmosError::InternalServerError(format!(
                     "NodeDelete::delete_related_data: batch.execute: {}",
                     err
                 ));
             })?;
         }
+
+        Ok(())
+    }
+
+    pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
+        Attachment::delete_by_node_ids(self.data, self.node_ids_to_delete.clone()).await?;
 
         Ok(())
     }
@@ -267,7 +284,7 @@ impl<'a> NodeDelete<'a> {
                             delete_stack.push(*child_id);
                         }
 
-                        batch.execute(self.db_session).await.map_err(|err| {
+                        batch.execute(self.data.db_session()).await.map_err(|err| {
                             return NodecosmosError::InternalServerError(format!(
                                 "NodeDelete::delete_descendants: batch.execute: {}",
                                 err
@@ -292,7 +309,7 @@ impl<'a> NodeDelete<'a> {
             ..Default::default()
         }
         .delete_by_partition_key()
-        .execute(self.db_session)
+        .execute(self.data.db_session())
         .await?;
 
         return Ok(());
@@ -300,7 +317,7 @@ impl<'a> NodeDelete<'a> {
 
     async fn delete_elastic_data(&self) {
         if self.node.is_original() {
-            Node::bulk_delete_elastic_documents(self.elastic_client, &self.node_ids_to_delete).await;
+            Node::bulk_delete_elastic_documents(self.data.elastic_client(), &self.node_ids_to_delete).await;
         }
     }
 }

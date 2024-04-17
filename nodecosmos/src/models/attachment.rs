@@ -1,4 +1,5 @@
 use actix_multipart::Multipart;
+use charybdis::batch::ModelBatch;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
@@ -38,6 +39,8 @@ pub struct Attachment {
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
 }
+
+impl_default_callbacks!(Attachment);
 
 impl Attachment {
     pub async fn create_image(
@@ -82,6 +85,24 @@ impl Attachment {
             "No image found in multipart request".to_string(),
         ))
     }
-}
 
-impl_default_callbacks!(Attachment);
+    pub async fn delete_by_node_ids(data: &RequestData, node_ids: Vec<Uuid>) -> Result<(), NodecosmosError> {
+        let attachments = find_attachment!("node_id IN ?", (node_ids,))
+            .execute(data.db_session())
+            .await?
+            .try_collect()
+            .await?;
+        let data = data.clone();
+
+        tokio::spawn(async move {
+            Self::delete_s3_objects(&data, &attachments).await;
+
+            let _ = Attachment::batch()
+                .chunked_delete_by_partition_key(data.db_session(), &attachments, 100)
+                .await
+                .map_err(|e| log::error!("Error deleting attachments: {}", e));
+        });
+
+        Ok(())
+    }
+}

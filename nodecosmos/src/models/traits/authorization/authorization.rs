@@ -65,7 +65,9 @@ pub trait Authorization: AuthorizationFields {
 
         return match &current_user.0 {
             Some(current_user) => {
-                if self.viewer_ids().map_or(false, |ids| ids.contains(&current_user.id)) {
+                if self.owner_id() == Some(current_user.id)
+                    || self.viewer_ids().map_or(false, |ids| ids.contains(&current_user.id))
+                {
                     return Ok(());
                 }
 
