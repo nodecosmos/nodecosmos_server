@@ -31,7 +31,7 @@ impl Io {
             if let Some(maybe_original) = maybe_original.as_mut() {
                 maybe_original.branch_id = self.branch_id;
 
-                maybe_original.insert().execute(data.db_session()).await?;
+                maybe_original.insert_if_not_exists().execute(data.db_session()).await?;
             }
         }
 

@@ -12,8 +12,8 @@ use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::PkNode;
-use crate::models::traits::{Branchable, ChainOptRef, PluckFromStream, RefCloned};
-use crate::models::traits::{FindForBranchMerge, MaybePluckFlowId, MaybePluckFlowStepId, Pluck, PluckFlowId};
+use crate::models::traits::{Branchable, ChainOptRef, FlowId, PluckFromStream, RefCloned};
+use crate::models::traits::{FindForBranchMerge, MaybePluckFlowStepId, Pluck};
 use crate::models::udts::{Conflict, ConflictStatus};
 
 pub struct MergeConflicts<'a> {
@@ -197,22 +197,36 @@ impl<'a> MergeConflicts<'a> {
         let restored_flow_ids = self.branch_merge.branch.restored_flows.ref_cloned();
         let deleted_flow_ids = self.branch_merge.branch.deleted_flows.ref_cloned();
         let mut edited_flow_ids = self.branch_merge.branch.edited_description_flows.ref_cloned();
-        edited_flow_ids.extend(self.branch_merge.flow_steps.created_flow_steps.pluck_flow_id());
-        edited_flow_ids.extend(self.branch_merge.flow_steps.restored_flow_steps.pluck_flow_id());
-        edited_flow_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_flow_id());
-        edited_flow_ids.extend(
-            self.branch_merge
-                .flow_steps
-                .created_fs_inputs_flow_steps
-                .pluck_flow_id(),
-        );
-        edited_flow_ids.extend(
-            self.branch_merge
-                .flow_steps
-                .created_fs_outputs_flow_steps
-                .pluck_flow_id(),
-        );
-        edited_flow_ids.extend(self.branch_merge.ios.created_ios.maybe_pluck_flow_id());
+
+        if let Some(flow_steps) = self
+            .branch_merge
+            .flow_steps
+            .branched_created_fs_nodes_flow_steps
+            .as_ref()
+        {
+            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
+            edited_flow_ids.extend(flow_ids);
+        }
+
+        if let Some(flow_steps) = self
+            .branch_merge
+            .flow_steps
+            .branched_created_fs_outputs_flow_steps
+            .as_ref()
+        {
+            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
+            edited_flow_ids.extend(flow_ids);
+        }
+
+        if let Some(flow_steps) = self
+            .branch_merge
+            .flow_steps
+            .branched_created_fs_inputs_flow_steps
+            .as_ref()
+        {
+            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
+            edited_flow_ids.extend(flow_ids);
+        }
 
         let original_edited_flow_ids = edited_flow_ids
             .iter()

@@ -22,10 +22,13 @@ pub struct MergeFlowSteps {
     pub deleted_flow_steps: Option<Vec<FlowStep>>,
     pub edited_flow_step_descriptions: Option<Vec<Description>>,
     pub created_fs_nodes_flow_steps: Option<Vec<UpdateNodeIdsFlowStep>>,
+    pub branched_created_fs_nodes_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_nodes_flow_steps: Option<Vec<UpdateNodeIdsFlowStep>>,
     pub created_fs_inputs_flow_steps: Option<Vec<UpdateInputIdsFlowStep>>,
+    pub branched_created_fs_inputs_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_inputs_flow_steps: Option<Vec<UpdateInputIdsFlowStep>>,
     pub created_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
+    pub branched_created_fs_outputs_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
     pub original_flow_step_descriptions: Option<HashMap<Uuid, Description>>,
     // Delta fields that are calculated during merge
@@ -169,6 +172,28 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
+    pub async fn branched_created_fs_nodes_flow_steps(
+        branch: &Branch,
+        db_session: &CachingSession,
+    ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(created_flow_step_nodes)) =
+            (&branch.edited_workflow_nodes, &branch.created_flow_step_nodes)
+        {
+            let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                branch.id,
+                &flow_step_ids,
+            )
+            .await?;
+
+            return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
+        }
+
+        Ok(None)
+    }
+
     // Returns original flow steps
     pub async fn deleted_fs_nodes_flow_steps(
         branch: &Branch,
@@ -206,6 +231,28 @@ impl MergeFlowSteps {
                     .await?;
 
             return Ok(Some(flow_steps));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn branched_created_fs_inputs_flow_steps(
+        branch: &Branch,
+        db_session: &CachingSession,
+    ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(created_flow_step_inputs_by_node)) =
+            (&branch.edited_workflow_nodes, &branch.created_flow_step_inputs_by_node)
+        {
+            let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                branch.id,
+                &flow_step_ids,
+            )
+            .await?;
+
+            return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
 
         Ok(None)
@@ -253,6 +300,28 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
+    pub async fn branched_created_fs_outputs_flow_steps(
+        branch: &Branch,
+        db_session: &CachingSession,
+    ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
+        if let (Some(edited_workflow_node_ids), Some(created_flow_step_outputs_by_node)) =
+            (&branch.edited_workflow_nodes, &branch.created_flow_step_outputs_by_node)
+        {
+            let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
+                db_session,
+                edited_workflow_node_ids,
+                branch.id,
+                &flow_step_ids,
+            )
+            .await?;
+
+            return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
+        }
+
+        Ok(None)
+    }
+
     // Returns original flow steps
     pub async fn deleted_fs_outputs_flow_steps(
         branch: &Branch,
@@ -281,10 +350,16 @@ impl MergeFlowSteps {
         let edited_flow_step_descriptions = Self::edited_flow_step_descriptions(&branch, data.db_session()).await?;
         let original_flow_step_descriptions = Self::original_flow_step_descriptions(data.db_session(), &branch).await?;
         let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
+        let branched_created_fs_nodes_flow_steps =
+            Self::branched_created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
         let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&branch, data.db_session()).await?;
         let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
+        let branched_created_fs_inputs_flow_steps =
+            Self::branched_created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
         let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&branch, data.db_session()).await?;
         let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
+        let branched_created_fs_outputs_flow_steps =
+            Self::branched_created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
         let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&branch, data.db_session()).await?;
 
         Ok(Self {
@@ -294,10 +369,13 @@ impl MergeFlowSteps {
             edited_flow_step_descriptions,
             original_flow_step_descriptions,
             created_fs_nodes_flow_steps,
+            branched_created_fs_nodes_flow_steps,
             deleted_fs_nodes_flow_steps,
             created_fs_inputs_flow_steps,
+            branched_created_fs_inputs_flow_steps,
             deleted_fs_inputs_flow_steps,
             created_fs_outputs_flow_steps,
+            branched_created_fs_outputs_flow_steps,
             deleted_fs_outputs_flow_steps,
             // Delta fields
             added_node_ids_by_flow_step: None,
@@ -410,46 +488,42 @@ impl MergeFlowSteps {
         Ok(())
     }
 
-    pub async fn create_flow_step_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
+    pub async fn create_flow_step_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(created_fs_nodes_flow_steps) = &mut self.created_fs_nodes_flow_steps {
             for original_flow_step in created_fs_nodes_flow_steps {
-                let branched = UpdateNodeIdsFlowStep::find_first_by_node_id_and_branch_id_and_id(
-                    original_flow_step.node_id,
-                    branch.id,
-                    original_flow_step.id,
-                )
-                .execute(data.db_session())
-                .await
-                .map_err(|e| {
-                    log::error!("Error finding branched flow step node: {:?}", e);
-                    e
-                })?;
+                let branch_fs = self
+                    .branched_created_fs_nodes_flow_steps
+                    .as_ref()
+                    .and_then(|m| m.get(&original_flow_step.id));
 
-                // Calculate added delta so we don't add nodes that may be already added outside of the current branch.
-                let mut added_delta = vec![];
-                if let Some(node_ids) = branched.node_ids.as_ref() {
-                    node_ids.iter().for_each(|node_id| {
-                        if let Some(original_node_ids) = original_flow_step.node_ids.as_ref() {
-                            if !original_node_ids.contains(node_id) {
-                                added_delta.push(*node_id);
+                if let Some(branch_fs) = branch_fs {
+                    // Calculate added delta so we don't add nodes that may be already added outside of the current branch.
+                    let mut added_delta = vec![];
+
+                    if let Some(node_ids) = branch_fs.node_ids.as_ref() {
+                        node_ids.iter().for_each(|node_id| {
+                            if let Some(original_node_ids) = original_flow_step.node_ids.as_ref() {
+                                if !original_node_ids.contains(node_id) {
+                                    added_delta.push(*node_id);
+                                }
                             }
-                        }
-                    });
-                };
+                        });
+                    };
 
-                // run update
-                original_flow_step.append_nodes(&added_delta);
-                original_flow_step.set_merge_context();
-                original_flow_step
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Error creating flow step nodes")?;
+                    // run update
+                    original_flow_step.append_nodes(&added_delta);
+                    original_flow_step.set_merge_context();
+                    original_flow_step
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Error creating flow step nodes")?;
 
-                // save added delta for undo
-                self.added_node_ids_by_flow_step
-                    .get_or_insert_with(HashMap::default)
-                    .insert(original_flow_step.id, added_delta);
+                    // save added delta for undo
+                    self.added_node_ids_by_flow_step
+                        .get_or_insert_with(HashMap::default)
+                        .insert(original_flow_step.id, added_delta);
+                }
             }
         }
 
@@ -554,57 +628,52 @@ impl MergeFlowSteps {
     pub async fn create_inputs(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(created_fs_inputs_flow_steps) = &mut self.created_fs_inputs_flow_steps {
             for original_flow_step in created_fs_inputs_flow_steps {
-                let branched = UpdateInputIdsFlowStep::find_first_by_node_id_and_branch_id_and_id(
-                    original_flow_step.node_id,
-                    branch.id,
-                    original_flow_step.id,
-                )
-                .execute(data.db_session())
-                .await
-                .map_err(|e| {
-                    log::error!("Error finding branched flow step input: {:?}", e);
-                    e
-                })?;
+                let branched_fs = self
+                    .branched_created_fs_inputs_flow_steps
+                    .as_ref()
+                    .and_then(|m| m.get(&original_flow_step.id));
 
-                // Calculate added delta so we don't add inputs that may be already added outside of the current branch.
-                let mut added_inputs_delta = HashMap::default();
-                if let Some(input_ids_by_node_id) = branched.input_ids_by_node_id.as_ref() {
-                    input_ids_by_node_id.iter().for_each(|(node_id, input_ids)| {
-                        let original_node_inputs = original_flow_step
-                            .input_ids_by_node_id
-                            .as_ref()
-                            .and_then(|m| m.get(node_id));
+                if let Some(branched_fs) = branched_fs {
+                    // Calculate added delta so we don't add inputs that may be already added outside of the current branch.
+                    let mut added_inputs_delta = HashMap::default();
+                    if let Some(input_ids_by_node_id) = branched_fs.input_ids_by_node_id.as_ref() {
+                        input_ids_by_node_id.iter().for_each(|(node_id, input_ids)| {
+                            let original_node_inputs = original_flow_step
+                                .input_ids_by_node_id
+                                .as_ref()
+                                .and_then(|m| m.get(node_id));
 
-                        let added_delta = input_ids
-                            .into_iter()
-                            .filter_map(|input_id| {
-                                if original_node_inputs.is_none()
-                                    || !original_node_inputs.is_some_and(|inputs| inputs.contains(input_id))
-                                {
-                                    Some(*input_id)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
+                            let added_delta = input_ids
+                                .into_iter()
+                                .filter_map(|input_id| {
+                                    if original_node_inputs.is_none()
+                                        || !original_node_inputs.is_some_and(|inputs| inputs.contains(input_id))
+                                    {
+                                        Some(*input_id)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
 
-                        added_inputs_delta.insert(*node_id, added_delta);
-                    });
+                            added_inputs_delta.insert(*node_id, added_delta);
+                        });
+                    }
+
+                    // run update
+                    original_flow_step.append_inputs(&added_inputs_delta);
+                    original_flow_step.set_merge_context();
+                    original_flow_step
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Error creating inputs")?;
+
+                    // save added delta for undo
+                    self.added_input_ids_by_flow_step
+                        .get_or_insert_with(HashMap::default)
+                        .insert(original_flow_step.id, added_inputs_delta);
                 }
-
-                // run update
-                original_flow_step.append_inputs(&added_inputs_delta);
-                original_flow_step.set_merge_context();
-                original_flow_step
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Error creating inputs")?;
-
-                // save added delta for undo
-                self.added_input_ids_by_flow_step
-                    .get_or_insert_with(HashMap::default)
-                    .insert(original_flow_step.id, added_inputs_delta);
             }
         }
 
@@ -720,57 +789,53 @@ impl MergeFlowSteps {
     pub async fn create_outputs(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(created_fs_outputs_flow_steps) = &mut self.created_fs_outputs_flow_steps {
             for original_flow_step in created_fs_outputs_flow_steps {
-                let branched = UpdateOutputIdsFlowStep::find_first_by_node_id_and_branch_id_and_id(
-                    original_flow_step.node_id,
-                    branch.id,
-                    original_flow_step.id,
-                )
-                .execute(data.db_session())
-                .await
-                .map_err(|e| {
-                    log::error!("Error finding branched flow step output: {:?}", e);
-                    e
-                })?;
+                let branched_fs = self
+                    .branched_created_fs_outputs_flow_steps
+                    .as_ref()
+                    .and_then(|m| m.get(&original_flow_step.id));
 
                 // Calculate added delta so we don't add outputs that may be already added outside of the current branch.
-                let mut added_outputs_delta = HashMap::default();
-                if let Some(output_ids_by_node_id) = branched.output_ids_by_node_id.as_ref() {
-                    output_ids_by_node_id.iter().for_each(|(node_id, output_ids)| {
-                        let original_node_outputs = original_flow_step
-                            .output_ids_by_node_id
-                            .as_ref()
-                            .and_then(|m| m.get(node_id));
 
-                        let added_delta = output_ids
-                            .into_iter()
-                            .filter_map(|output_id| {
-                                if original_node_outputs.is_none()
-                                    || !original_node_outputs.is_some_and(|outputs| outputs.contains(output_id))
-                                {
-                                    Some(*output_id)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
+                if let Some(branched_fs) = branched_fs {
+                    let mut added_outputs_delta = HashMap::default();
+                    if let Some(output_ids_by_node_id) = branched_fs.output_ids_by_node_id.as_ref() {
+                        output_ids_by_node_id.iter().for_each(|(node_id, output_ids)| {
+                            let original_node_outputs = original_flow_step
+                                .output_ids_by_node_id
+                                .as_ref()
+                                .and_then(|m| m.get(node_id));
 
-                        added_outputs_delta.insert(*node_id, added_delta);
-                    });
+                            let added_delta = output_ids
+                                .into_iter()
+                                .filter_map(|output_id| {
+                                    if original_node_outputs.is_none()
+                                        || !original_node_outputs.is_some_and(|outputs| outputs.contains(output_id))
+                                    {
+                                        Some(*output_id)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+
+                            added_outputs_delta.insert(*node_id, added_delta);
+                        });
+                    }
+
+                    // run update
+                    original_flow_step.append_outputs(&added_outputs_delta);
+                    original_flow_step.set_merge_context();
+                    original_flow_step
+                        .update_cb(data)
+                        .execute(data.db_session())
+                        .await
+                        .context("Error creating outputs")?;
+
+                    // save added delta for undo
+                    self.added_output_ids_by_flow_step
+                        .get_or_insert_with(HashMap::default)
+                        .insert(original_flow_step.id, added_outputs_delta);
                 }
-
-                // run update
-                original_flow_step.append_outputs(&added_outputs_delta);
-                original_flow_step.set_merge_context();
-                original_flow_step
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Error creating outputs")?;
-
-                // save added delta for undo
-                self.added_output_ids_by_flow_step
-                    .get_or_insert_with(HashMap::default)
-                    .insert(original_flow_step.id, added_outputs_delta);
             }
         }
 
