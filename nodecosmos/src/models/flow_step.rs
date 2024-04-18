@@ -186,7 +186,7 @@ impl FlowStep {
 
     pub async fn maybe_find_by_index(&self, db_session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
         let q = find_flow_step_query!("node_id = ? AND branch_id = ? AND flow_id = ? AND flow_index = ? LIMIT 1");
-        let fs = FlowStep::maybe_find_first(q, (self.node_id, self.branch_id, self.flow_id, self.flow_index.clone()))
+        let fs = FlowStep::maybe_find_first(q, (&self.node_id, &self.branch_id, &self.flow_id, &self.flow_index))
             .execute(db_session)
             .await?;
 

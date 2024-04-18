@@ -197,6 +197,8 @@ impl<'a> MergeConflicts<'a> {
         let restored_flow_ids = self.branch_merge.branch.restored_flows.ref_cloned();
         let deleted_flow_ids = self.branch_merge.branch.deleted_flows.ref_cloned();
         let mut edited_flow_ids = self.branch_merge.branch.edited_description_flows.ref_cloned();
+        edited_flow_ids.extend(self.branch_merge.flow_steps.created_flow_steps.pluck_flow_id());
+        edited_flow_ids.extend(self.branch_merge.flow_steps.restored_flow_steps.pluck_flow_id());
         edited_flow_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_flow_id());
         edited_flow_ids.extend(
             self.branch_merge

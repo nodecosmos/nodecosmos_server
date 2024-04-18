@@ -29,15 +29,17 @@ pub async fn login(
     db_session: web::Data<CachingSession>,
     login_form: web::Json<LoginForm>,
 ) -> Response {
-    let mut user = User {
-        username: login_form.username_or_email.clone(),
-        email: login_form.username_or_email.clone(),
-        ..Default::default()
-    };
+    let user;
 
-    if let Some(user_by_username) = user.find_by_username(&db_session).await {
+    if let Some(user_by_username) = User::maybe_find_first_by_username(login_form.username_or_email.clone())
+        .execute(&db_session)
+        .await?
+    {
         user = user_by_username;
-    } else if let Some(user_by_email) = user.find_by_email(&db_session).await {
+    } else if let Some(user_by_email) = User::maybe_find_first_by_username(login_form.username_or_email.clone())
+        .execute(&db_session)
+        .await?
+    {
         user = user_by_email;
     } else {
         return Err(NodecosmosError::NotFound("Not found".to_string()));
@@ -75,7 +77,9 @@ pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>
 
 #[get("/{username}/username")]
 pub async fn get_user_by_username(db_session: web::Data<CachingSession>, username: web::Path<String>) -> Response {
-    let user = GetUser::find_by_username(&db_session, &username).await?;
+    let user = GetUser::find_first_by_username(username.into_inner())
+        .execute(&db_session)
+        .await?;
 
     Ok(HttpResponse::Ok().json(user))
 }

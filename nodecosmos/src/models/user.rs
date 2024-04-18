@@ -84,29 +84,23 @@ impl Callbacks for User {
 }
 
 impl User {
-    pub async fn find_by_username(&self, db_session: &CachingSession) -> Option<User> {
-        find_first_user!("username = ?", (&self.username,))
-            .execute(db_session)
-            .await
-            .ok()
-    }
-
-    pub async fn find_by_email(&self, db_session: &CachingSession) -> Option<User> {
-        find_first_user!("email = ?", (&self.email,))
-            .execute(db_session)
-            .await
-            .ok()
-    }
-
     pub async fn check_existing_user(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if self.find_by_username(db_session).await.is_some() {
+        if Self::maybe_find_first_by_username(self.username.clone())
+            .execute(db_session)
+            .await?
+            .is_some()
+        {
             return Err(NodecosmosError::ValidationError((
                 "username".to_string(),
                 "is taken".to_string(),
             )));
         }
 
-        if self.find_by_email(db_session).await.is_some() {
+        if Self::maybe_find_first_by_email(self.email.clone())
+            .execute(db_session)
+            .await?
+            .is_some()
+        {
             return Err(NodecosmosError::ValidationError((
                 "email".to_string(),
                 "is taken".to_string(),
@@ -192,15 +186,6 @@ partial_user!(
     is_confirmed,
     is_blocked
 );
-
-impl GetUser {
-    pub async fn find_by_username(db_session: &CachingSession, username: &String) -> Result<GetUser, NodecosmosError> {
-        find_first_get_user!("username = ?", (username,))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-}
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 

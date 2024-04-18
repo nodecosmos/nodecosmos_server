@@ -6,12 +6,16 @@ pub trait IncrementFraction {
     fn increment_fraction(&mut self) -> &mut Self;
 }
 
-// Not the most optimal, but keeps precision considering that f64 is not a precise type
+// TODO: update this to utilize the Decimal type without converting to string
 impl IncrementFraction for Decimal {
     fn increment_fraction(&mut self) -> &mut Self {
         // Determine the number of decimal places in the number
         let num_str = self.to_string();
-        // parse last digit as u8, increment it, and convert back to string
+        // if it's whole number increment by 0.1
+        if !num_str.contains('.') {
+            *self = Decimal::from_str(&(num_str + ".1")).expect("Failed to parse new number");
+            return self;
+        }
         let last_digit = num_str.chars().last().unwrap().to_digit(10).unwrap();
         let new_last_digit = last_digit + 1;
         let new_num_str = num_str
