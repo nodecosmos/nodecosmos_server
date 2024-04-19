@@ -12,9 +12,11 @@ use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::PkNode;
-use crate::models::traits::{Branchable, ChainOptRef, FlowId, PluckFromStream, RefCloned};
+use crate::models::traits::{
+    Branchable, ChainOptRef, FlowId, MaybePluckFlowId, PluckFlowId, PluckFromStream, RefCloned,
+};
 use crate::models::traits::{FindForBranchMerge, MaybePluckFlowStepId, Pluck};
-use crate::models::udts::{Conflict, ConflictStatus};
+use crate::models::udts::Conflict;
 
 pub struct MergeConflicts<'a> {
     branch_merge: &'a mut BranchMerge,
@@ -81,34 +83,18 @@ impl<'a> MergeConflicts<'a> {
         self.extract_deleted_edited_nodes(data).await?;
         self.extract_deleted_edited_flows(data).await?;
         self.extract_deleted_edited_flow_steps(data).await?;
-        self.extract_diverged_flows(data).await?;
+        self.extract_conflicting_flow_steps(data).await?;
         self.extract_deleted_ios(data).await?;
 
         let branch = &mut self.branch_merge.branch;
 
-        if let Some(conflict) = branch.conflict.as_mut() {
-            if conflict.deleted_ancestors.is_none()
-                && conflict.deleted_edited_nodes.is_none()
-                && conflict.deleted_edited_flows.is_none()
-                && conflict.deleted_edited_flow_steps.is_none()
-                && conflict.deleted_edited_ios.is_none()
-                && conflict.conflicting_flow_steps.is_none()
-            {
-                conflict.status = ConflictStatus::Resolved.to_string();
-                branch
-                    .update()
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update branch with new conflicts")?;
-            } else {
-                conflict.status = ConflictStatus::Pending.to_string();
-                branch
-                    .update()
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update branch with resolve")?;
-                return Err(NodecosmosError::Conflict("Conflict detected".to_string()));
-            }
+        if branch.conflict.as_mut().is_some() {
+            branch
+                .update()
+                .execute(data.db_session())
+                .await
+                .context("Failed to update branch with resolve")?;
+            return Err(NodecosmosError::Conflict("Conflict detected".to_string()));
         }
 
         Ok(())
@@ -193,45 +179,78 @@ impl<'a> MergeConflicts<'a> {
     }
 
     async fn extract_deleted_edited_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_flow_ids = self.branch_merge.branch.created_flows.ref_cloned();
-        let restored_flow_ids = self.branch_merge.branch.restored_flows.ref_cloned();
-        let deleted_flow_ids = self.branch_merge.branch.deleted_flows.ref_cloned();
         let mut edited_flow_ids = self.branch_merge.branch.edited_description_flows.ref_cloned();
 
-        if let Some(flow_steps) = self
-            .branch_merge
+        self.branch_merge
+            .flow_steps
+            .created_flow_steps
+            .as_ref()
+            .map(|flow_steps| {
+                edited_flow_ids.extend(flow_steps.pluck_flow_id());
+            });
+
+        self.branch_merge
+            .flow_steps
+            .restored_flow_steps
+            .as_ref()
+            .map(|flow_steps| {
+                edited_flow_ids.extend(flow_steps.pluck_flow_id());
+            });
+
+        self.branch_merge
             .flow_steps
             .branched_created_fs_nodes_flow_steps
             .as_ref()
-        {
-            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
-            edited_flow_ids.extend(flow_ids);
-        }
+            .map(|flow_steps| {
+                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
+            });
 
-        if let Some(flow_steps) = self
-            .branch_merge
+        self.branch_merge
             .flow_steps
             .branched_created_fs_outputs_flow_steps
             .as_ref()
-        {
-            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
-            edited_flow_ids.extend(flow_ids);
-        }
+            .map(|flow_steps| {
+                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
+            });
 
-        if let Some(flow_steps) = self
-            .branch_merge
+        self.branch_merge
             .flow_steps
             .branched_created_fs_inputs_flow_steps
             .as_ref()
-        {
-            let flow_ids: HashSet<Uuid> = flow_steps.values().map(|item| item.flow_id()).collect();
-            edited_flow_ids.extend(flow_ids);
-        }
+            .map(|flow_steps| {
+                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
+            });
+
+        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
+            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
+        });
+
+        self.branch_merge.ios.restored_ios.as_ref().map(|ios| {
+            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
+        });
 
         let original_edited_flow_ids = edited_flow_ids
             .iter()
             .filter_map(|id| {
-                if created_flow_ids.contains(id) || deleted_flow_ids.contains(id) || restored_flow_ids.contains(id) {
+                if self
+                    .branch_merge
+                    .branch
+                    .created_flows
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(id))
+                    || self
+                        .branch_merge
+                        .branch
+                        .deleted_flows
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(id))
+                    || self
+                        .branch_merge
+                        .branch
+                        .restored_flows
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(id))
+                {
                     None
                 } else {
                     Some(*id)
@@ -270,10 +289,24 @@ impl<'a> MergeConflicts<'a> {
     }
 
     async fn extract_deleted_edited_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_flow_step_ids = self.branch_merge.branch.created_flow_steps.ref_cloned();
-        let restored_flow_step_ids = self.branch_merge.branch.restored_flow_steps.ref_cloned();
-        let deleted_flow_step_ids = self.branch_merge.branch.deleted_flow_steps.ref_cloned();
         let mut edited_flow_step_ids = self.branch_merge.branch.edited_description_flow_steps.ref_cloned();
+
+        self.branch_merge
+            .flow_steps
+            .branched_created_fs_nodes_flow_steps
+            .as_ref()
+            .map(|flow_steps| {
+                edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id));
+            });
+
+        self.branch_merge
+            .flow_steps
+            .branched_created_fs_outputs_flow_steps
+            .as_ref()
+            .map(|flow_steps| {
+                edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id));
+            });
+
         edited_flow_step_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_id_set());
         edited_flow_step_ids.extend(
             self.branch_merge
@@ -286,9 +319,24 @@ impl<'a> MergeConflicts<'a> {
         let original_edited_flow_step_ids = edited_flow_step_ids
             .iter()
             .filter_map(|id| {
-                if created_flow_step_ids.contains(id)
-                    || deleted_flow_step_ids.contains(id)
-                    || restored_flow_step_ids.contains(id)
+                if self
+                    .branch_merge
+                    .branch
+                    .created_flow_steps
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(id))
+                    || self
+                        .branch_merge
+                        .branch
+                        .deleted_flow_steps
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(id))
+                    || self
+                        .branch_merge
+                        .branch
+                        .restored_flow_steps
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(id))
                 {
                     None
                 } else {
@@ -331,10 +379,7 @@ impl<'a> MergeConflicts<'a> {
     }
 
     /// Check if flow steps are diverged - if we have multiple flow steps within the same flow with the same index
-    async fn extract_diverged_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_flow_ids = self.branch_merge.branch.created_flows.as_ref();
-        let kept_flow_step_ids = self.branch_merge.branch.kept_flow_steps.as_ref();
-        let deleted_flow_step_ids = self.branch_merge.branch.deleted_flow_steps.as_ref();
+    async fn extract_conflicting_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let created_flow_steps = self
             .branch_merge
             .flow_steps
@@ -345,18 +390,34 @@ impl<'a> MergeConflicts<'a> {
             let mut conflicting_flow_steps = HashSet::new();
 
             for flow_step in created_flow_steps {
-                if created_flow_ids.is_some_and(|ids| ids.contains(&flow_step.flow_id))
-                    || kept_flow_step_ids.is_some_and(|ids| ids.contains(&flow_step.id))
+                if self
+                    .branch_merge
+                    .branch
+                    .created_flows
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(&flow_step.flow_id))
+                    || self
+                        .branch_merge
+                        .branch
+                        .kept_flow_steps
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(&flow_step.id))
                 {
                     continue;
                 }
 
-                // check if flow step exists on same index
+                // check if original flow step with same index exists
                 let mut maybe_orig = flow_step.clone();
                 maybe_orig.set_original_id();
 
                 if let Some(original) = maybe_orig.maybe_find_by_index(data.db_session()).await? {
-                    if deleted_flow_step_ids.is_some_and(|ids| ids.contains(&original.id)) {
+                    if self
+                        .branch_merge
+                        .branch
+                        .deleted_flow_steps
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(&original.id))
+                    {
                         continue;
                     }
                     conflicting_flow_steps.insert(flow_step.id);

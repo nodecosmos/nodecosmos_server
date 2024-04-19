@@ -17,7 +17,7 @@ use crate::models::udts::TextChange;
 
 #[derive(Serialize, Deserialize)]
 pub struct MergeIos {
-    restored_ios: Option<Vec<Io>>,
+    pub restored_ios: Option<Vec<Io>>,
     pub created_ios: Option<Vec<Io>>,
     deleted_ios: Option<Vec<Io>>,
     edited_title_ios: Option<Vec<UpdateTitleIo>>,

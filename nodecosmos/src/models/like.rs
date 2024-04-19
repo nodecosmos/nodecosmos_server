@@ -37,7 +37,6 @@ pub struct Like {
 
     pub branch_id: Uuid,
 
-    #[serde(default)]
     pub object_type: Text,
 
     #[serde(default)]

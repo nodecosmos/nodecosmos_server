@@ -10,9 +10,9 @@ use crate::models::user::User;
 pub trait AuthorizationFields {
     fn owner_id(&self) -> Option<Uuid>;
 
-    fn editor_ids(&self) -> Option<Set<Uuid>>;
+    fn editor_ids(&self) -> &Option<Set<Uuid>>;
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>>;
+    fn viewer_ids(&self) -> &Option<Set<Uuid>>;
 
     fn is_frozen(&self) -> bool {
         false
@@ -28,12 +28,12 @@ impl AuthorizationFields for Branch {
         Some(self.owner_id)
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        self.editor_ids.clone()
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        &self.editor_ids
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        self.viewer_ids.clone()
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &self.viewer_ids
     }
 
     fn is_frozen(&self) -> bool {
@@ -52,12 +52,12 @@ impl AuthorizationFields for AuthBranch {
         Some(self.owner_id)
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        self.editor_ids.clone()
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        &self.editor_ids
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        self.viewer_ids.clone()
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &self.viewer_ids
     }
 
     fn is_frozen(&self) -> bool {
@@ -76,16 +76,12 @@ impl AuthorizationFields for ContributionRequest {
         self.branch.as_ref().map(|branch| branch.owner_id)
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        self.branch
-            .as_ref()
-            .map(|branch| branch.editor_ids.clone().unwrap_or_default())
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        self.branch.as_ref().map_or(&None, |branch| &branch.editor_ids)
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        self.branch
-            .as_ref()
-            .map(|branch| branch.viewer_ids.clone().unwrap_or_default())
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        self.branch.as_ref().map_or(&None, |branch| &branch.viewer_ids)
     }
 
     // ATM this works fine because we only find CR before merging it, while allowing CR description
@@ -106,12 +102,12 @@ impl AuthorizationFields for User {
         Some(self.id)
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 }
 
@@ -120,12 +116,12 @@ impl AuthorizationFields for CommentThread {
         self.author_id
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 }
 
@@ -134,11 +130,11 @@ impl AuthorizationFields for Comment {
         self.author_id
     }
 
-    fn editor_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 
-    fn viewer_ids(&self) -> Option<Set<Uuid>> {
-        None
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &None
     }
 }

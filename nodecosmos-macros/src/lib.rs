@@ -33,8 +33,6 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
     };
     let struct_name = parsed_struct.ident;
 
-    // Example of manually parsing attributes
-
     // Iterate over fields to find the one with `original_id`
     let original_id_fields = match parsed_struct.data {
         darling::ast::Data::Struct(fields) => fields
@@ -201,32 +199,32 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                 };
             }
 
-            fn editor_ids(&self) -> Option<Set<Uuid>> {
+            fn editor_ids(&self) -> &Option<Set<Uuid>> {
                 if self.is_original() {
-                    return self.editor_ids.clone();
+                    return &self.editor_ids;
                 }
 
                 return match &self.auth_branch {
-                    Some(branch) => branch.editor_ids.clone(),
+                    Some(branch) => &branch.editor_ids,
                     None => {
                         log::error!("Branched node {} has no branch!", self.id);
 
-                        None
+                        &None
                     }
                 };
             }
 
-            fn viewer_ids(&self) -> Option<Set<Uuid>> {
+            fn viewer_ids(&self) -> &Option<Set<Uuid>> {
                 if self.is_original() {
-                    return self.viewer_ids.clone();
+                    return &self.viewer_ids;
                 }
 
                 return match &self.auth_branch {
-                    Some(branch) => branch.viewer_ids.clone(),
+                    Some(branch) => &branch.viewer_ids,
                     None => {
                         log::error!("Branched node {} has no branch!", self.id);
 
-                        None
+                        &None
                     }
                 };
             }

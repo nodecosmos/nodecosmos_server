@@ -27,6 +27,7 @@ pub trait Authorization: AuthorizationFields {
 
         if self
             .editor_ids()
+            .as_ref()
             .map_or(false, |ids| ids.contains(&data.current_user.id))
         {
             return true;
@@ -66,7 +67,10 @@ pub trait Authorization: AuthorizationFields {
         return match &current_user.0 {
             Some(current_user) => {
                 if self.owner_id() == Some(current_user.id)
-                    || self.viewer_ids().map_or(false, |ids| ids.contains(&current_user.id))
+                    || self
+                        .viewer_ids()
+                        .as_ref()
+                        .map_or(false, |ids| ids.contains(&current_user.id))
                 {
                     return Ok(());
                 }

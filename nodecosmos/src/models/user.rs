@@ -173,7 +173,7 @@ impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
 
 partial_user!(
-    GetUser,
+    ShowUser,
     id,
     username,
     bio,

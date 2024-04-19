@@ -6,7 +6,6 @@ use charybdis::types::Uuid;
 use futures::StreamExt;
 
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::FlowStep;
 use crate::models::node_commit::NodeCommit;
 use crate::models::traits::{FlowId, FlowStepId, Id, MaybeFlowId, MaybeFlowStepId};
 

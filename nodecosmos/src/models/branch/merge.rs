@@ -15,7 +15,6 @@ use crate::models::branch::merge::nodes::MergeNodes;
 use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
 use crate::models::traits::Branchable;
-use crate::models::udts::ConflictStatus;
 use crate::models::utils::file::read_file_names;
 
 mod conflicts;
@@ -259,11 +258,11 @@ impl BranchMerge {
                 MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
                 MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
                 MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &mut self.branch).await?,
-                MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data, &self.branch).await?,
+                MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data).await?,
                 MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
-                MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data, &self.branch).await?,
+                MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data).await?,
                 MergeStep::DeleteFlowStepInputs => self.flow_steps.delete_inputs(data, &self.branch).await?,
-                MergeStep::CreateFlowStepOutputs => self.flow_steps.create_outputs(data, &self.branch).await?,
+                MergeStep::CreateFlowStepOutputs => self.flow_steps.create_outputs(data).await?,
                 MergeStep::DeleteFlowStepOutputs => self.flow_steps.delete_outputs(data, &self.branch).await?,
                 MergeStep::UpdateFlowStepsDescription => {
                     self.flow_steps.update_description(data, &mut self.branch).await?
@@ -377,10 +376,8 @@ impl Branch {
     }
 
     pub async fn validate_no_existing_conflicts(&mut self) -> Result<(), NodecosmosError> {
-        if let Some(conflicts) = &self.conflict {
-            if conflicts.status == ConflictStatus::Pending.to_string() {
-                return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
-            }
+        if self.conflict.is_some() {
+            return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
         }
 
         Ok(())

@@ -24,7 +24,7 @@ impl Io {
 
     pub async fn pull_from_flow_steps_inputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(flow_step_ids) = &self.inputted_by_flow_steps {
-            let flow_steps = FlowStep::find_by_node_id_and_branch_id_and_ids(
+            let mut flow_steps = FlowStep::find_by_node_id_and_branch_id_and_ids(
                 data.db_session(),
                 self.node_id,
                 self.branch_id,
@@ -32,11 +32,10 @@ impl Io {
             )
             .await?;
 
-            for flow_step in &mut flow_steps.chunks(MAX_PARALLEL_REQUESTS) {
-                let mut flow_step = flow_step.to_vec();
+            for flow_step_chunks in &mut flow_steps.chunks_mut(MAX_PARALLEL_REQUESTS) {
                 let mut futures = vec![];
 
-                for flow_step in &mut flow_step {
+                for flow_step in flow_step_chunks {
                     let future = flow_step.pull_input_id(data, self.id);
 
                     futures.push(future);

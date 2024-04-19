@@ -9,12 +9,9 @@ use crate::models::like::Like;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
 
-#[get("/{objectId}/{branchId}")]
-pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<Like>) -> Response {
-    let like_count = match like.find_by_primary_key().execute(&db_session).await.ok() {
-        Some(mut like) => like.like_count(&db_session).await?,
-        None => 0,
-    };
+#[get("/{objectId}/{branchId}/{object_type}")]
+pub async fn get_like_count(db_session: web::Data<CachingSession>, mut like: web::Path<Like>) -> Response {
+    let like_count = like.like_count(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "id": like.object_id,

@@ -142,65 +142,69 @@ impl<'a> NodeDelete<'a> {
 
     /// Here we delete workflows, flows, flow_steps, ios, likes, like_counts for node and its descendants.
     pub async fn delete_related_data(&mut self) -> Result<(), NodecosmosError> {
-        for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
-            for id in node_ids_chunk {
-                DeleteWorkflow {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
+        let mut delete_workflows: Vec<DeleteWorkflow> = vec![];
+        let mut delete_flows: Vec<DeleteFlow> = vec![];
+        let mut delete_flow_steps: Vec<DeleteFlowStep> = vec![];
+        let mut delete_ios: Vec<DeleteIo> = vec![];
+        let mut delete_likes: Vec<Like> = vec![];
+        let mut delete_descriptions: Vec<Description> = vec![];
+        let mut delete_pk_nodes: Vec<PrimaryKeyNode> = vec![];
 
-                DeleteFlow {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
+        for id in self.node_ids_to_delete.iter() {
+            delete_workflows.push(DeleteWorkflow {
+                node_id: *id,
+                ..Default::default()
+            });
+            delete_flows.push(DeleteFlow {
+                node_id: *id,
+                ..Default::default()
+            });
+            delete_flow_steps.push(DeleteFlowStep {
+                node_id: *id,
+                ..Default::default()
+            });
+            delete_ios.push(DeleteIo {
+                node_id: *id,
+                ..Default::default()
+            });
 
-                DeleteFlowStep {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
+            delete_likes.push(Like {
+                object_id: *id,
+                ..Default::default()
+            });
 
-                DeleteIo {
-                    node_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
+            delete_descriptions.push(Description {
+                object_id: *id,
+                ..Default::default()
+            });
 
-                Like {
-                    object_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
-
-                Description {
-                    object_id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
-
-                PrimaryKeyNode {
-                    id: *id,
-                    ..Default::default()
-                }
-                .delete_by_partition_key()
-                .execute(self.data.db_session())
-                .await?;
-            }
+            delete_pk_nodes.push(PrimaryKeyNode {
+                id: *id,
+                ..Default::default()
+            });
         }
+
+        DeleteWorkflow::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_workflows, 100)
+            .await?;
+        DeleteFlow::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_flows, 100)
+            .await?;
+        DeleteFlowStep::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_flow_steps, 100)
+            .await?;
+        DeleteIo::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_ios, 100)
+            .await?;
+        Like::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_likes, 100)
+            .await?;
+        Description::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_descriptions, 100)
+            .await?;
+        PrimaryKeyNode::unlogged_batch()
+            .chunked_delete_by_partition_key(self.data.db_session(), &delete_pk_nodes, 100)
+            .await?;
 
         Ok(())
     }

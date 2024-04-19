@@ -625,7 +625,7 @@ impl MergeFlowSteps {
         Ok(())
     }
 
-    pub async fn create_inputs(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
+    pub async fn create_inputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(created_fs_inputs_flow_steps) = &mut self.created_fs_inputs_flow_steps {
             for original_flow_step in created_fs_inputs_flow_steps {
                 let branched_fs = self
@@ -786,7 +786,7 @@ impl MergeFlowSteps {
         Ok(())
     }
 
-    pub async fn create_outputs(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
+    pub async fn create_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(created_fs_outputs_flow_steps) = &mut self.created_fs_outputs_flow_steps {
             for original_flow_step in created_fs_outputs_flow_steps {
                 let branched_fs = self

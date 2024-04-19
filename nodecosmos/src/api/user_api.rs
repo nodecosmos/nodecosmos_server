@@ -13,7 +13,7 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::traits::Authorization;
-use crate::models::user::{GetUser, UpdateBioUser, UpdateProfileImageUser, User};
+use crate::models::user::{ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
 use crate::App;
 
 #[derive(Deserialize)]
@@ -70,14 +70,14 @@ pub async fn logout(client_session: Session) -> Response {
 
 #[get("/{id}")]
 pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
-    let user = GetUser::find_by_id(*id).execute(&db_session).await?;
+    let user = ShowUser::find_by_id(*id).execute(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(user))
 }
 
 #[get("/{username}/username")]
 pub async fn get_user_by_username(db_session: web::Data<CachingSession>, username: web::Path<String>) -> Response {
-    let user = GetUser::find_first_by_username(username.into_inner())
+    let user = ShowUser::find_first_by_username(username.into_inner())
         .execute(&db_session)
         .await?;
 
