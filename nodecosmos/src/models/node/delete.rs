@@ -153,39 +153,46 @@ impl<'a> NodeDelete<'a> {
         for id in self.node_ids_to_delete.iter() {
             delete_workflows.push(DeleteWorkflow {
                 node_id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
             delete_flows.push(DeleteFlow {
                 node_id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
             delete_flow_steps.push(DeleteFlowStep {
                 node_id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
             delete_ios.push(DeleteIo {
-                node_id: *id,
+                root_id: self.node.root_id,
+                branch_id: *id,
                 ..Default::default()
             });
 
             delete_likes.push(Like {
                 object_id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
 
             delete_descriptions.push(Description {
                 object_id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
 
             delete_pk_nodes.push(PrimaryKeyNode {
                 id: *id,
+                branch_id: *id,
                 ..Default::default()
             });
         }
 
         DeleteWorkflow::unlogged_batch()
-            .chunked_delete_by_partition_key(self.data.db_session(), &delete_workflows, 100)
+            .chunked_delete(self.data.db_session(), &delete_workflows, 100)
             .await?;
         DeleteFlow::unlogged_batch()
             .chunked_delete_by_partition_key(self.data.db_session(), &delete_flows, 100)
@@ -200,10 +207,10 @@ impl<'a> NodeDelete<'a> {
             .chunked_delete_by_partition_key(self.data.db_session(), &delete_likes, 100)
             .await?;
         Description::unlogged_batch()
-            .chunked_delete_by_partition_key(self.data.db_session(), &delete_descriptions, 100)
+            .chunked_delete(self.data.db_session(), &delete_descriptions, 100)
             .await?;
         PrimaryKeyNode::unlogged_batch()
-            .chunked_delete_by_partition_key(self.data.db_session(), &delete_pk_nodes, 100)
+            .chunked_delete(self.data.db_session(), &delete_pk_nodes, 100)
             .await?;
 
         Ok(())

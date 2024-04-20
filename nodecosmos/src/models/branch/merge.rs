@@ -8,6 +8,7 @@ use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 use crate::models::branch::merge::conflicts::MergeConflicts;
+use crate::models::branch::merge::descriptions::MergeDescriptions;
 use crate::models::branch::merge::flow_steps::MergeFlowSteps;
 use crate::models::branch::merge::flows::MergeFlows;
 use crate::models::branch::merge::ios::MergeIos;
@@ -18,6 +19,7 @@ use crate::models::traits::Branchable;
 use crate::models::utils::file::read_file_names;
 
 mod conflicts;
+mod descriptions;
 mod flow_steps;
 mod flows;
 mod ios;
@@ -40,30 +42,28 @@ pub enum MergeStep {
     DeleteNodes = 3,
     ReorderNodes = 4,
     UpdateNodesTitles = 5,
-    UpdateNodesDescription = 6,
-    UpdateWorkflowInitialInputs = 7,
-    RestoreFlows = 8,
-    CreateFlows = 9,
-    DeleteFlows = 10,
-    UpdateFlowsTitles = 11,
-    UpdateFlowsDescription = 12,
-    AcceptFlowSolutions = 13,
-    DeleteFlowSteps = 14,
-    RestoreFlowSteps = 15,
-    CreateFlowSteps = 16,
-    CreateFlowStepNodes = 17,
-    DeleteFlowStepNodes = 18,
-    CreateFlowStepInputs = 19,
-    DeleteFlowStepInputs = 20,
-    CreateFlowStepOutputs = 21,
-    DeleteFlowStepOutputs = 22,
-    UpdateFlowStepsDescription = 23,
-    RestoreIos = 24,
-    CreateIos = 25,
-    DeleteIos = 26,
-    UpdateIoTitles = 27,
-    UpdateIosDescription = 28,
-    Finish = 29,
+    UpdateWorkflowInitialInputs = 6,
+    RestoreFlows = 7,
+    CreateFlows = 8,
+    DeleteFlows = 9,
+    UpdateFlowsTitles = 10,
+    AcceptFlowSolutions = 11,
+    DeleteFlowSteps = 12,
+    RestoreFlowSteps = 13,
+    CreateFlowSteps = 14,
+    CreateFlowStepNodes = 15,
+    DeleteFlowStepNodes = 16,
+    CreateFlowStepInputs = 17,
+    DeleteFlowStepInputs = 18,
+    CreateFlowStepOutputs = 19,
+    DeleteFlowStepOutputs = 20,
+    RestoreIos = 21,
+    CreateIos = 22,
+    DeleteIos = 23,
+    UpdateIoTitles = 24,
+    UpdateDescriptions = 25,
+    DeleteDescriptions = 26,
+    Finish = 27,
 }
 
 impl MergeStep {
@@ -85,30 +85,28 @@ impl From<u8> for MergeStep {
             3 => MergeStep::DeleteNodes,
             4 => MergeStep::ReorderNodes,
             5 => MergeStep::UpdateNodesTitles,
-            6 => MergeStep::UpdateNodesDescription,
-            7 => MergeStep::UpdateWorkflowInitialInputs,
-            8 => MergeStep::RestoreFlows,
-            9 => MergeStep::CreateFlows,
-            10 => MergeStep::DeleteFlows,
-            11 => MergeStep::UpdateFlowsTitles,
-            12 => MergeStep::UpdateFlowsDescription,
-            13 => MergeStep::AcceptFlowSolutions,
-            14 => MergeStep::DeleteFlowSteps,
-            15 => MergeStep::RestoreFlowSteps,
-            16 => MergeStep::CreateFlowSteps,
-            17 => MergeStep::CreateFlowStepNodes,
-            18 => MergeStep::DeleteFlowStepNodes,
-            19 => MergeStep::CreateFlowStepInputs,
-            20 => MergeStep::DeleteFlowStepInputs,
-            21 => MergeStep::CreateFlowStepOutputs,
-            22 => MergeStep::DeleteFlowStepOutputs,
-            23 => MergeStep::UpdateFlowStepsDescription,
-            24 => MergeStep::RestoreIos,
-            25 => MergeStep::CreateIos,
-            26 => MergeStep::DeleteIos,
-            27 => MergeStep::UpdateIoTitles,
-            28 => MergeStep::UpdateIosDescription,
-            29 => MergeStep::Finish,
+            6 => MergeStep::UpdateWorkflowInitialInputs,
+            7 => MergeStep::RestoreFlows,
+            8 => MergeStep::CreateFlows,
+            9 => MergeStep::DeleteFlows,
+            10 => MergeStep::UpdateFlowsTitles,
+            11 => MergeStep::AcceptFlowSolutions,
+            12 => MergeStep::DeleteFlowSteps,
+            13 => MergeStep::RestoreFlowSteps,
+            14 => MergeStep::CreateFlowSteps,
+            15 => MergeStep::CreateFlowStepNodes,
+            16 => MergeStep::DeleteFlowStepNodes,
+            17 => MergeStep::CreateFlowStepInputs,
+            18 => MergeStep::DeleteFlowStepInputs,
+            19 => MergeStep::CreateFlowStepOutputs,
+            20 => MergeStep::DeleteFlowStepOutputs,
+            21 => MergeStep::RestoreIos,
+            22 => MergeStep::CreateIos,
+            23 => MergeStep::DeleteIos,
+            24 => MergeStep::UpdateIoTitles,
+            25 => MergeStep::UpdateDescriptions,
+            26 => MergeStep::DeleteDescriptions,
+            27 => MergeStep::Finish,
             _ => panic!("Invalid merge step value: {}", value),
         }
     }
@@ -126,6 +124,7 @@ pub struct BranchMerge {
     flows: MergeFlows,
     flow_steps: MergeFlowSteps,
     ios: MergeIos,
+    descriptions: MergeDescriptions,
 }
 
 impl BranchMerge {
@@ -152,6 +151,13 @@ impl BranchMerge {
             branch: branch.clone(),
         })?;
 
+        let descriptions = MergeDescriptions::new(data.db_session(), &branch)
+            .await
+            .map_err(|e| MergeError {
+                inner: e,
+                branch: branch.clone(),
+            })?;
+
         Ok(BranchMerge {
             branch,
             merge_step: MergeStep::Start,
@@ -160,6 +166,7 @@ impl BranchMerge {
             ios,
             flows,
             flow_steps,
+            descriptions,
         })
     }
 
@@ -247,13 +254,11 @@ impl BranchMerge {
                 MergeStep::DeleteNodes => self.nodes.delete_nodes(data).await?,
                 MergeStep::ReorderNodes => self.nodes.reorder_nodes(data).await?,
                 MergeStep::UpdateNodesTitles => self.nodes.update_title(data, &mut self.branch).await?,
-                MergeStep::UpdateNodesDescription => self.nodes.update_description(data, &mut self.branch).await?,
                 MergeStep::UpdateWorkflowInitialInputs => self.workflows.update_initial_inputs(data).await?,
                 MergeStep::RestoreFlows => self.flows.restore_flows(data).await?,
                 MergeStep::CreateFlows => self.flows.create_flows(data).await?,
                 MergeStep::DeleteFlows => self.flows.delete_flows(data).await?,
                 MergeStep::UpdateFlowsTitles => self.flows.update_title(data, &mut self.branch).await?,
-                MergeStep::UpdateFlowsDescription => self.flows.update_description(data, &mut self.branch).await?,
                 MergeStep::AcceptFlowSolutions => (),
                 MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
                 MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
@@ -264,14 +269,12 @@ impl BranchMerge {
                 MergeStep::DeleteFlowStepInputs => self.flow_steps.delete_inputs(data, &self.branch).await?,
                 MergeStep::CreateFlowStepOutputs => self.flow_steps.create_outputs(data).await?,
                 MergeStep::DeleteFlowStepOutputs => self.flow_steps.delete_outputs(data, &self.branch).await?,
-                MergeStep::UpdateFlowStepsDescription => {
-                    self.flow_steps.update_description(data, &mut self.branch).await?
-                }
                 MergeStep::RestoreIos => self.ios.restore_ios(data).await?,
                 MergeStep::CreateIos => self.ios.create_ios(data).await?,
                 MergeStep::DeleteIos => self.ios.delete_ios(data).await?,
                 MergeStep::UpdateIoTitles => self.ios.update_title(data, &mut self.branch).await?,
-                MergeStep::UpdateIosDescription => self.ios.update_description(data, &mut self.branch).await?,
+                MergeStep::UpdateDescriptions => self.descriptions.update_descriptions(data, &mut self.branch).await?,
+                MergeStep::DeleteDescriptions => self.descriptions.delete_descriptions(data).await?,
                 MergeStep::Finish => (),
             }
 
@@ -291,13 +294,11 @@ impl BranchMerge {
                 MergeStep::DeleteNodes => self.nodes.undo_restore_nodes(data).await?,
                 MergeStep::ReorderNodes => self.nodes.undo_reorder_nodes(data).await?,
                 MergeStep::UpdateNodesTitles => self.nodes.undo_update_title(data).await?,
-                MergeStep::UpdateNodesDescription => self.nodes.undo_update_description(data).await?,
                 MergeStep::UpdateWorkflowInitialInputs => self.workflows.undo_update_initial_inputs(data).await?,
                 MergeStep::RestoreFlows => self.flows.undo_create_flows(data).await?,
                 MergeStep::CreateFlows => self.flows.undo_delete_flows(data).await?,
                 MergeStep::DeleteFlows => self.flows.undo_restore_flows(data).await?,
                 MergeStep::UpdateFlowsTitles => self.flows.undo_update_title(data).await?,
-                MergeStep::UpdateFlowsDescription => self.flows.undo_update_description(data).await?,
                 MergeStep::AcceptFlowSolutions => (),
                 MergeStep::DeleteFlowSteps => self.flow_steps.undo_restore_flow_steps(data).await?,
                 MergeStep::RestoreFlowSteps => self.flow_steps.undo_create_flow_steps(data).await?,
@@ -308,12 +309,12 @@ impl BranchMerge {
                 MergeStep::DeleteFlowStepInputs => self.flow_steps.undo_create_inputs(data).await?,
                 MergeStep::CreateFlowStepOutputs => self.flow_steps.undo_delete_outputs(data).await?,
                 MergeStep::DeleteFlowStepOutputs => self.flow_steps.undo_create_outputs(data).await?,
-                MergeStep::UpdateFlowStepsDescription => self.flow_steps.undo_update_description(data).await?,
                 MergeStep::RestoreIos => self.ios.undo_create_ios(data).await?,
                 MergeStep::CreateIos => self.ios.undo_delete_ios(data).await?,
                 MergeStep::DeleteIos => self.ios.undo_restore_ios(data).await?,
                 MergeStep::UpdateIoTitles => self.ios.undo_update_title(data).await?,
-                MergeStep::UpdateIosDescription => self.ios.undo_update_description(data).await?,
+                MergeStep::UpdateDescriptions => self.descriptions.undo_update_description(data).await?,
+                MergeStep::DeleteDescriptions => self.descriptions.undo_delete_descriptions(data).await?,
                 MergeStep::Finish => (),
             }
 
@@ -338,7 +339,7 @@ impl BranchMerge {
 
     fn serialize_and_store_to_disk(&self) {
         // serialize branch_merge and store to disk
-        let serialized = serde_json::to_string(self).unwrap();
+        let serialized = serde_json::to_string(self).expect("Failed to serialize branch merge data");
         let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.branch.id);
         let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
         let res = std::fs::write(path.clone(), serialized);

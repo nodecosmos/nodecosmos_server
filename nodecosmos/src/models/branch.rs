@@ -1,4 +1,5 @@
 use std::cell::OnceCell;
+use std::collections::HashSet;
 
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
-use crate::models::traits::{Id, ObjectId, ObjectType};
+use crate::models::traits::{Id, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 
@@ -139,6 +140,50 @@ impl Branch {
         Ok(self.node.get().expect("Just set node, so it must be present"))
     }
 
+    pub fn all_edited_description_ids(&self) -> HashSet<Uuid> {
+        let mut edited_object_ids = HashSet::new();
+
+        if let Some(edited_description_nodes) = &self.edited_description_nodes {
+            edited_object_ids.extend(edited_description_nodes.iter());
+        }
+
+        if let Some(edited_description_flows) = &self.edited_description_flows {
+            edited_object_ids.extend(edited_description_flows.iter());
+        }
+
+        if let Some(edited_description_flow_steps) = &self.edited_description_flow_steps {
+            edited_object_ids.extend(edited_description_flow_steps.iter());
+        }
+
+        if let Some(edited_description_ios) = &self.edited_description_ios {
+            edited_object_ids.extend(edited_description_ios.iter());
+        }
+
+        edited_object_ids
+    }
+
+    pub fn all_deleted_object_ids(&self) -> HashSet<Uuid> {
+        let mut deleted_object_ids = HashSet::new();
+
+        if let Some(deleted_nodes) = &self.deleted_nodes {
+            deleted_object_ids.extend(deleted_nodes.iter());
+        }
+
+        if let Some(deleted_flows) = &self.deleted_flows {
+            deleted_object_ids.extend(deleted_flows.iter());
+        }
+
+        if let Some(deleted_flow_steps) = &self.deleted_flow_steps {
+            deleted_object_ids.extend(deleted_flow_steps.iter());
+        }
+
+        if let Some(deleted_ios) = &self.deleted_ios {
+            deleted_object_ids.extend(deleted_ios.iter());
+        }
+
+        deleted_object_ids
+    }
+
     fn created_ids(&self, object_type: ObjectType) -> &Option<Set<Uuid>> {
         match object_type {
             ObjectType::Node => &self.created_nodes,
@@ -157,25 +202,6 @@ impl Branch {
             ObjectType::Io => &self.deleted_ios,
             ObjectType::Workflow => &None,
         }
-    }
-
-    // records that are not created or deleted in the branch
-    fn map_original_objects<'a, O: ObjectId + 'a>(
-        &'a self,
-        object_type: ObjectType,
-        objects: Vec<O>,
-    ) -> impl Iterator<Item = O> + 'a {
-        let created_ids = self.created_ids(object_type);
-        let deleted_ids = self.deleted_ids(object_type);
-
-        objects.into_iter().filter(|object| {
-            !created_ids
-                .as_ref()
-                .map_or(false, |created_ids| created_ids.contains(&object.object_id()))
-                && !deleted_ids
-                    .as_ref()
-                    .map_or(false, |deleted_ids| deleted_ids.contains(&object.object_id()))
-        })
     }
 
     // records that are not created or deleted in the branch

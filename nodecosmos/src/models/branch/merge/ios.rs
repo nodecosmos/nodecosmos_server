@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description};
 use crate::models::io::{find_update_title_io, Io, UpdateTitleIo};
-use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
+use crate::models::traits::{Branchable, GroupById, Pluck};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::TextChange;
 
@@ -21,9 +20,7 @@ pub struct MergeIos {
     pub created_ios: Option<Vec<Io>>,
     deleted_ios: Option<Vec<Io>>,
     edited_title_ios: Option<Vec<UpdateTitleIo>>,
-    edited_io_descriptions: Option<Vec<Description>>,
     original_title_ios: Option<HashMap<Uuid, UpdateTitleIo>>,
-    original_io_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl MergeIos {
@@ -93,26 +90,6 @@ impl MergeIos {
         Ok(None)
     }
 
-    pub async fn edited_io_descriptions(
-        branch: &Branch,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
-        if let Some(edited_description_ios) = &branch.edited_description_ios {
-            let descriptions =
-                find_description!("branch_id = ? AND object_id IN ?", (branch.id, edited_description_ios))
-                    .execute(db_session)
-                    .await?
-                    .try_collect()
-                    .await?;
-
-            return Ok(Some(
-                branch.map_original_objects(ObjectType::Io, descriptions).collect(),
-            ));
-        }
-
-        Ok(None)
-    }
-
     async fn original_title_ios(
         db_session: &CachingSession,
         branch: &Branch,
@@ -133,40 +110,19 @@ impl MergeIos {
         Ok(None)
     }
 
-    async fn original_ios_description(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_description_ios {
-            let ios_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(db_session)
-                .await?
-                .group_by_object_id()
-                .await?;
-
-            return Ok(Some(ios_by_id));
-        }
-
-        Ok(None)
-    }
-
     pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_ios = Self::restored_ios(branch, data.db_session()).await?;
         let created_ios = Self::created_ios(branch, data.db_session()).await?;
         let deleted_ios = Self::deleted_ios(branch, data.db_session()).await?;
         let edited_title_ios = Self::edited_title_ios(branch, data.db_session()).await?;
-        let edited_io_descriptions = Self::edited_io_descriptions(branch, data.db_session()).await?;
         let original_title_ios = Self::original_title_ios(data.db_session(), &branch).await?;
-        let original_io_descriptions = Self::original_ios_description(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_ios,
             created_ios,
             deleted_ios,
             edited_title_ios,
-            edited_io_descriptions,
             original_title_ios,
-            original_io_descriptions,
         })
     }
 
@@ -304,64 +260,6 @@ impl MergeIos {
                     .execute(data.db_session())
                     .await
                     .context("Failed to undo update io title")?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        if let Some(edited_io_descriptions) = self.edited_io_descriptions.as_mut() {
-            for edited_io_description in edited_io_descriptions {
-                let object_id = edited_io_description.object_id;
-                let mut text_change = TextChange::new();
-
-                if let Some(original) = self
-                    .original_io_descriptions
-                    .as_mut()
-                    .map_or(None, |original| original.get_mut(&object_id))
-                {
-                    // skip if description is the same
-                    if original.html == edited_io_description.html {
-                        continue;
-                    }
-
-                    // assign old before updating the io
-                    text_change.assign_old(original.markdown.clone());
-                }
-
-                edited_io_description.set_original_id();
-
-                // description merge is handled within before_insert callback
-                edited_io_description
-                    .insert_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update io description")?;
-
-                // assign new after updating the io
-                text_change.assign_new(edited_io_description.markdown.clone());
-
-                branch
-                    .description_change_by_object
-                    .get_or_insert_with(HashMap::default)
-                    .insert(object_id, text_change);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_ios_description) = &mut self.original_io_descriptions {
-            for original_io_description in original_ios_description.values_mut() {
-                // description merge is handled within before_insert callback, so we use update to revert as
-                // it will not trigger merge logic
-                original_io_description
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to undo update io description")?;
             }
         }
 

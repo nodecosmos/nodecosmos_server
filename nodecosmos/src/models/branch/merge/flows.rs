@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description};
 use crate::models::flow::{Flow, UpdateTitleFlow};
-use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, GroupByObjectId, ObjectType};
+use crate::models::traits::{Branchable, FindForBranchMerge, GroupById, ObjectType};
 use crate::models::traits::{ModelContext, PluckFromStream};
 use crate::models::udts::TextChange;
 
@@ -21,9 +20,7 @@ pub struct MergeFlows {
     created_flows: Option<Vec<Flow>>,
     deleted_flows: Option<Vec<Flow>>,
     edited_title_flows: Option<Vec<UpdateTitleFlow>>,
-    edited_flow_descriptions: Option<Vec<Description>>,
     original_title_flows: Option<HashMap<Uuid, UpdateTitleFlow>>,
-    original_flow_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl MergeFlows {
@@ -35,23 +32,6 @@ impl MergeFlows {
             let ios_by_id = UpdateTitleFlow::find_original_by_ids(db_session, edited_wf_node_ids, ids)
                 .await?
                 .group_by_id()
-                .await?;
-
-            return Ok(Some(ios_by_id));
-        }
-
-        Ok(None)
-    }
-
-    async fn original_flow_descriptions(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_description_flows {
-            let ios_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(db_session)
-                .await?
-                .group_by_object_id()
                 .await?;
 
             return Ok(Some(ios_by_id));
@@ -151,45 +131,19 @@ impl MergeFlows {
         Ok(None)
     }
 
-    pub async fn edited_flow_descriptions(
-        branch: &Branch,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
-        if let Some(edited_description_flow_ids) = &branch.edited_description_flows {
-            let descriptions = find_description!(
-                "branch_id = ? AND object_id IN ?",
-                (branch.id, edited_description_flow_ids)
-            )
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-            return Ok(Some(
-                branch.map_original_objects(ObjectType::Flow, descriptions).collect(),
-            ));
-        }
-
-        Ok(None)
-    }
-
     pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_flows = Self::restored_flows(&branch, data.db_session()).await?;
         let created_flows = Self::created_flows(&branch, data.db_session()).await?;
         let deleted_flows = Self::deleted_flows(&branch, data.db_session()).await?;
         let edited_title_flows = Self::edited_title_flows(&branch, data.db_session()).await?;
-        let edited_flow_descriptions = Self::edited_flow_descriptions(&branch, data.db_session()).await?;
         let original_title_flows = Self::original_title_flows(data.db_session(), &branch).await?;
-        let original_flow_descriptions = Self::original_flow_descriptions(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_flows,
             created_flows,
             deleted_flows,
             edited_title_flows,
-            edited_flow_descriptions,
             original_title_flows,
-            original_flow_descriptions,
         })
     }
 
@@ -327,64 +281,6 @@ impl MergeFlows {
                     .execute(data.db_session())
                     .await
                     .context("Failed to undo update flow title")?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        if let Some(edited_flow_descriptions) = self.edited_flow_descriptions.as_mut() {
-            for edited_flow_description in edited_flow_descriptions {
-                let object_id = edited_flow_description.object_id;
-                let mut text_change = TextChange::new();
-
-                if let Some(original) = self
-                    .original_flow_descriptions
-                    .as_mut()
-                    .map_or(None, |original| original.get_mut(&object_id))
-                {
-                    // skip if description is the same
-                    if original.html == edited_flow_description.html {
-                        continue;
-                    }
-
-                    // assign old before updating the flow
-                    text_change.assign_old(original.markdown.clone());
-                }
-
-                edited_flow_description.set_original_id();
-
-                // description merge is handled within before_insert callback
-                edited_flow_description
-                    .insert_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update flow description")?;
-
-                // assign new after updating the flow
-                text_change.assign_new(edited_flow_description.markdown.clone());
-
-                branch
-                    .description_change_by_object
-                    .get_or_insert_with(HashMap::default)
-                    .insert(object_id, text_change);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_flow_descriptions) = &mut self.original_flow_descriptions {
-            for original_flow_description in original_flow_descriptions.values_mut() {
-                // description merge is handled within before_insert callback, so we use update to revert as
-                // it will not trigger merge logic
-                original_flow_description
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to undo update flow description")?;
             }
         }
 

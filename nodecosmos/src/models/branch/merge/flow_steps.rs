@@ -9,18 +9,15 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description};
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
-use crate::models::traits::{Branchable, FindForBranchMerge, GroupByObjectId, IncrementFraction, ObjectType, Reload};
+use crate::models::traits::{Branchable, FindForBranchMerge, IncrementFraction, Reload};
 use crate::models::traits::{ModelContext, PluckFromStream};
-use crate::models::udts::TextChange;
 
 #[derive(Serialize, Deserialize)]
 pub struct MergeFlowSteps {
     pub restored_flow_steps: Option<Vec<FlowStep>>,
     pub created_flow_steps: Option<Vec<FlowStep>>,
     pub deleted_flow_steps: Option<Vec<FlowStep>>,
-    pub edited_flow_step_descriptions: Option<Vec<Description>>,
     pub created_fs_nodes_flow_steps: Option<Vec<UpdateNodeIdsFlowStep>>,
     pub branched_created_fs_nodes_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_nodes_flow_steps: Option<Vec<UpdateNodeIdsFlowStep>>,
@@ -30,7 +27,6 @@ pub struct MergeFlowSteps {
     pub created_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
     pub branched_created_fs_outputs_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
-    pub original_flow_step_descriptions: Option<HashMap<Uuid, Description>>,
     // Delta fields that are calculated during merge
     pub added_node_ids_by_flow_step: Option<HashMap<Uuid, Vec<Uuid>>>,
     pub removed_node_ids_by_flow_step: Option<HashMap<Uuid, Vec<Uuid>>>,
@@ -41,47 +37,6 @@ pub struct MergeFlowSteps {
 }
 
 impl MergeFlowSteps {
-    async fn original_flow_step_descriptions(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_description_flow_steps {
-            let ios_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(db_session)
-                .await?
-                .group_by_object_id()
-                .await?;
-
-            return Ok(Some(ios_by_id));
-        }
-
-        Ok(None)
-    }
-
-    pub async fn edited_flow_step_descriptions(
-        branch: &Branch,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
-        if let Some(edited_description_flow_step_ids) = &branch.edited_description_flow_steps {
-            let descriptions = find_description!(
-                "branch_id = ? AND object_id IN ?",
-                (branch.id, edited_description_flow_step_ids)
-            )
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-            return Ok(Some(
-                branch
-                    .map_original_objects(ObjectType::FlowStep, descriptions)
-                    .collect(),
-            ));
-        }
-
-        Ok(None)
-    }
-
     pub async fn restored_flow_steps(
         branch: &Branch,
         db_session: &CachingSession,
@@ -347,8 +302,6 @@ impl MergeFlowSteps {
         let restored_flow_steps = Self::restored_flow_steps(&branch, data.db_session()).await?;
         let created_flow_steps = Self::created_flow_steps(&branch, data.db_session()).await?;
         let deleted_flow_steps = Self::deleted_flow_steps(&branch, data.db_session()).await?;
-        let edited_flow_step_descriptions = Self::edited_flow_step_descriptions(&branch, data.db_session()).await?;
-        let original_flow_step_descriptions = Self::original_flow_step_descriptions(data.db_session(), &branch).await?;
         let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
         let branched_created_fs_nodes_flow_steps =
             Self::branched_created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
@@ -366,8 +319,6 @@ impl MergeFlowSteps {
             restored_flow_steps,
             created_flow_steps,
             deleted_flow_steps,
-            edited_flow_step_descriptions,
-            original_flow_step_descriptions,
             created_fs_nodes_flow_steps,
             branched_created_fs_nodes_flow_steps,
             deleted_fs_nodes_flow_steps,
@@ -942,64 +893,6 @@ impl MergeFlowSteps {
                         .await
                         .context("Error undoing delete outputs")?;
                 }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        if let Some(edited_flow_step_descriptions) = self.edited_flow_step_descriptions.as_mut() {
-            for edited_flow_step_description in edited_flow_step_descriptions {
-                let object_id = edited_flow_step_description.object_id;
-                let mut text_change = TextChange::new();
-
-                if let Some(original) = self
-                    .original_flow_step_descriptions
-                    .as_mut()
-                    .map_or(None, |original| original.get_mut(&object_id))
-                {
-                    // skip if description is the same
-                    if original.html == edited_flow_step_description.html {
-                        continue;
-                    }
-
-                    // assign old before updating the flow_step
-                    text_change.assign_old(original.markdown.clone());
-                }
-
-                edited_flow_step_description.set_original_id();
-
-                // description merge is handled within before_insert callback
-                edited_flow_step_description
-                    .insert_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update flow_step description")?;
-
-                // assign new after updating the flow_step
-                text_change.assign_new(edited_flow_step_description.markdown.clone());
-
-                branch
-                    .description_change_by_object
-                    .get_or_insert_with(HashMap::default)
-                    .insert(object_id, text_change);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_flow_step_descriptions) = &mut self.original_flow_step_descriptions {
-            for original_flow_step_description in original_flow_step_descriptions.values_mut() {
-                // description merge is handled within before_insert callback, so we use update to revert as
-                // it will not trigger merge logic
-                original_flow_step_description
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Error undoing update flow step description")?;
             }
         }
 

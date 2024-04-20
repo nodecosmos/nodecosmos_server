@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description};
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::traits::{Branchable, GroupById, GroupByObjectId, Pluck};
+use crate::models::node_descendant::NodeDescendant;
+use crate::models::traits::{Branchable, GroupById, Pluck};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
 
@@ -25,9 +25,7 @@ pub struct MergeNodes {
     pub deleted_nodes: Option<Vec<Node>>,
     reordered_nodes_data: Option<Vec<BranchReorderData>>,
     edited_title_nodes: Option<Vec<UpdateTitleNode>>,
-    edited_node_descriptions: Option<Vec<Description>>,
     original_title_nodes: Option<HashMap<Uuid, UpdateTitleNode>>,
-    original_node_descriptions: Option<HashMap<Uuid, Description>>,
 }
 
 impl MergeNodes {
@@ -71,7 +69,12 @@ impl MergeNodes {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
-            let mut deleted_nodes = Node::find_by_ids(db_session, deleted_node_ids).await?;
+            let mut deleted_node_ids = deleted_node_ids.clone();
+            let descendant_node_ids = NodeDescendant::find_by_node_ids(db_session, branch.root_id, &deleted_node_ids)
+                .await?
+                .pluck_id_set();
+            deleted_node_ids.extend(descendant_node_ids);
+            let mut deleted_nodes = Node::find_by_ids(db_session, &deleted_node_ids).await?;
 
             deleted_nodes.sort_by_depth();
 
@@ -128,28 +131,6 @@ impl MergeNodes {
         Ok(None)
     }
 
-    pub async fn edited_node_descriptions(
-        branch: &Branch,
-        db_session: &CachingSession,
-    ) -> Result<Option<Vec<Description>>, NodecosmosError> {
-        if let Some(edited_description_nodes) = &branch.edited_description_nodes {
-            let descriptions = find_description!(
-                "branch_id = ? AND object_id IN ?",
-                (branch.id, edited_description_nodes)
-            )
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-            return Ok(Some(
-                branch.map_original_objects(ObjectType::Node, descriptions).collect(),
-            ));
-        }
-
-        Ok(None)
-    }
-
     async fn original_title_nodes(
         db_session: &CachingSession,
         branch: &Branch,
@@ -167,32 +148,13 @@ impl MergeNodes {
         Ok(None)
     }
 
-    async fn original_nodes_description(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, Description>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_description_nodes {
-            let nodes_by_id = find_description!("object_id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(db_session)
-                .await?
-                .group_by_object_id()
-                .await?;
-
-            return Ok(Some(nodes_by_id));
-        }
-
-        Ok(None)
-    }
-
     pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
         let restored_nodes = Self::restored_nodes(&branch, data.db_session()).await?;
         let created_nodes = Self::created_nodes(&branch, data.db_session()).await?;
         let deleted_nodes = Self::deleted_nodes(&branch, data.db_session()).await?;
         let reordered_nodes_data = Self::reordered_nodes_data(&branch);
         let edited_title_nodes = Self::edited_title_nodes(&branch, data.db_session()).await?;
-        let edited_node_descriptions = Self::edited_node_descriptions(&branch, data.db_session()).await?;
         let original_title_nodes = Self::original_title_nodes(data.db_session(), &branch).await?;
-        let original_node_descriptions = Self::original_nodes_description(data.db_session(), &branch).await?;
 
         Ok(Self {
             restored_nodes,
@@ -200,9 +162,7 @@ impl MergeNodes {
             deleted_nodes,
             reordered_nodes_data,
             edited_title_nodes,
-            edited_node_descriptions,
             original_title_nodes,
-            original_node_descriptions,
         })
     }
 
@@ -235,6 +195,9 @@ impl MergeNodes {
             for merge_node in merge_nodes {
                 merge_node.set_merge_context();
                 merge_node.set_original_id();
+
+                println!("branch_id: {}", merge_node.branch_id);
+
                 merge_node.delete_cb(data).execute(data.db_session()).await?;
             }
         }
@@ -301,23 +264,13 @@ impl MergeNodes {
 
     pub async fn undo_delete_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(deleted_nodes) = &mut self.deleted_nodes {
-            let deleted_node_ids = deleted_nodes.clone().pluck_id_set();
-
             for deleted_node in deleted_nodes {
-                if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
-                    if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
-                        // skip deletion of node if it has an ancestor that is also deleted as
-                        // it will be removed in the callback
-                        continue;
-                    }
-
-                    deleted_node.set_merge_context();
-                    deleted_node
-                        .insert_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Failed to insert node")?;
-                }
+                deleted_node.set_merge_context();
+                deleted_node
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .context("Failed to insert node")?;
             }
         }
 
@@ -435,64 +388,6 @@ impl MergeNodes {
         if let Some(original_title_nodes) = &mut self.original_title_nodes {
             for original_title_node in original_title_nodes.values_mut() {
                 original_title_node.update_cb(data).execute(data.db_session()).await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_description(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
-        if let Some(edited_node_descriptions) = self.edited_node_descriptions.as_mut() {
-            for edited_node_description in edited_node_descriptions {
-                let object_id = edited_node_description.object_id;
-                let mut text_change = TextChange::new();
-
-                if let Some(original) = self
-                    .original_node_descriptions
-                    .as_mut()
-                    .map_or(None, |original| original.get_mut(&object_id))
-                {
-                    // skip if description is the same
-                    if original.html == edited_node_description.html {
-                        continue;
-                    }
-
-                    // assign old before updating the node
-                    text_change.assign_old(original.markdown.clone());
-                }
-
-                edited_node_description.set_original_id();
-
-                // description merge is handled within before_insert callback
-                edited_node_description
-                    .insert_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update node description")?;
-
-                // assign new after updating the node
-                text_change.assign_new(edited_node_description.markdown.clone());
-
-                branch
-                    .description_change_by_object
-                    .get_or_insert_with(HashMap::default)
-                    .insert(object_id, text_change);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_update_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_nodes_description) = &mut self.original_node_descriptions {
-            for original_node_description in original_nodes_description.values_mut() {
-                // description merge is handled within before_insert callback, so we use update to revert as
-                // it will not trigger merge logic
-                original_node_description
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await
-                    .context("Failed to update node description")?;
             }
         }
 
