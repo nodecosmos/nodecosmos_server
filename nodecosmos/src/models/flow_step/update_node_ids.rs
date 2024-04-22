@@ -9,7 +9,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::UpdateNodeIdsFlowStep;
 use crate::models::io::Io;
-use crate::models::traits::{RefCloned, ToHashSet};
+use crate::models::traits::{ModelContext, RefCloned, ToHashSet};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(
@@ -34,6 +34,7 @@ impl UpdateNodeIdsFlowStep {
                             ..Default::default()
                         };
 
+                        output.set_parent_delete_context();
                         output.delete_cb(data).execute(data.db_session()).await?;
                     }
                 }

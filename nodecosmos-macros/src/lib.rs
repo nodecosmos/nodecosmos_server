@@ -358,6 +358,32 @@ pub fn object_id_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+#[proc_macro_derive(NodeId)]
+pub fn node_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let node_id = input.struct_fields().iter().find(|field| {
+        return match field.ident {
+            Some(ref ident) => ident == "node_id",
+            None => false,
+        };
+    });
+
+    if node_id.is_none() {
+        panic!("Struct must have `node_id` field to derive NodeId");
+    }
+
+    let expanded = quote! {
+        impl crate::models::traits::NodeId for #name {
+            fn node_id(&self) -> Uuid {
+                self.node_id
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 #[proc_macro_derive(FlowId)]
 pub fn pluck_flow_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

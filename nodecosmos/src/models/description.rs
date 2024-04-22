@@ -132,6 +132,8 @@ impl Description {
         transaction.apply_update(update);
 
         let xml_str = &xml.get_string(&transaction);
+        println!("xml_str: {:?}", xml_str);
+
         let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
         let html = prose_doc.html;
         let markdown = prose_doc.markdown;

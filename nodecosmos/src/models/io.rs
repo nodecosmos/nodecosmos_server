@@ -13,7 +13,6 @@ use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::FlowStep;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context, ModelContext};
@@ -64,10 +63,6 @@ pub struct Io {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub flow_step: Option<FlowStep>,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
     pub node: Option<Node>,
 
     #[charybdis(ignore)]
@@ -84,28 +79,26 @@ impl Callbacks for Io {
             self.validate_root_id(db_session).await?;
             self.set_defaults();
             self.copy_vals_from_main(db_session).await?;
-            self.update_branch_with_creation(data).await?;
         }
 
-        if self.is_default_context() || self.is_branched_init_context() {
-            self.preserve_branch_node(data).await?;
-            self.preserve_branch_flow_step(data).await?;
-        }
+        self.preserve_branch_node(data).await?;
+        self.preserve_branch_flow_step(data).await?;
+        self.update_branch_with_creation(data).await?;
 
         Ok(())
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_default_context() {
+        *self = Io::find_branched_or_original(data.db_session(), self.root_id, self.branch_id, self.id).await?;
+
+        if !self.is_parent_delete_context() {
             self.pull_from_initial_input_ids(db_session).await?;
             self.pull_form_flow_step_outputs(data).await?;
-            self.preserve_branch_flow_step(data).await?;
+            self.pull_from_flow_steps_inputs(data).await?;
         }
 
-        if !self.is_merge_context() {
-            self.pull_from_flow_steps_inputs(data).await?;
-            self.update_branch_with_deletion(data).await?;
-        }
+        self.preserve_branch_flow_step(data).await?;
+        self.update_branch_with_deletion(data).await?;
 
         Ok(())
     }
@@ -196,6 +189,29 @@ impl Io {
         }
     }
 
+    pub async fn find_branched_or_original(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<Io, NodecosmosError> {
+        let io = Self::maybe_find_first_by_root_id_and_branch_id_and_id(root_id, branch_id, id)
+            .execute(db_session)
+            .await?;
+
+        if let Some(io) = io {
+            Ok(io)
+        } else {
+            let mut io = Self::find_first_by_root_id_and_branch_id_and_id(root_id, root_id, id)
+                .execute(db_session)
+                .await?;
+
+            io.branch_id = branch_id;
+
+            Ok(io)
+        }
+    }
+
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
             let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id).await?;
@@ -203,20 +219,6 @@ impl Io {
         }
 
         Ok(self.node.as_mut().expect("Node should be initialized"))
-    }
-
-    pub async fn flow_step(&mut self, db_session: &CachingSession) -> Result<&mut Option<FlowStep>, NodecosmosError> {
-        if let Some(flow_step_id) = self.flow_step_id {
-            if self.flow_step.is_none() {
-                let flow_step =
-                    FlowStep::find_first_by_node_id_and_branch_id_and_id(self.node_id, self.branch_id, flow_step_id)
-                        .execute(db_session)
-                        .await?;
-                self.flow_step = Some(flow_step);
-            }
-        }
-
-        Ok(&mut self.flow_step)
     }
 
     /// Main `Io` refers to Io from which we copy values so users don't have to redefine complete IO.

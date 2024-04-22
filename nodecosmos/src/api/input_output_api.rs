@@ -1,5 +1,5 @@
 use actix_web::{delete, post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 
 use crate::api::data::RequestData;
 use crate::api::types::Response;
@@ -34,9 +34,7 @@ pub async fn update_io_title(data: RequestData, mut input_output: web::Json<Upda
 }
 
 #[delete("/{rootId}/{nodeId}/{branchId}/{id}")]
-pub async fn delete_io(data: RequestData, input_output: web::Path<Io>) -> Response {
-    let mut input_output = input_output.find_by_primary_key().execute(data.db_session()).await?;
-
+pub async fn delete_io(data: RequestData, mut input_output: web::Path<Io>) -> Response {
     if input_output.is_original() {
         AuthNode::auth_update(&data, input_output.node_id, input_output.node_id).await?;
     } else {
@@ -45,5 +43,5 @@ pub async fn delete_io(data: RequestData, input_output: web::Path<Io>) -> Respon
 
     input_output.delete_cb(&data).execute(data.db_session()).await?;
 
-    Ok(HttpResponse::Ok().json(input_output))
+    Ok(HttpResponse::Ok().json(input_output.into_inner()))
 }

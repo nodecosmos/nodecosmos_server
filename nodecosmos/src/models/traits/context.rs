@@ -36,6 +36,10 @@ pub trait ModelContext {
         self.context_ref() == &Context::Merge
     }
 
+    /// When we update some branched record, we need to preserve parent object references into the branch,
+    /// so change would be visible to the user.
+    /// E.g. if we create Contribution Request, and we add Io to the FlowStep, we need to preserve FlowStep, Flow,
+    /// and node references on the branch.
     fn is_branched_init_context(&self) -> bool {
         self.context_ref() == &Context::BranchedInit
     }

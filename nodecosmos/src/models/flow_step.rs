@@ -8,7 +8,7 @@ use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use nodecosmos_macros::{Branchable, FlowId, Id};
+use nodecosmos_macros::{Branchable, FlowId, Id, NodeId};
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
@@ -33,7 +33,7 @@ mod update_output_ids;
     clustering_keys = [flow_id, step_index, id],
     local_secondary_indexes = [id]
 )]
-#[derive(Branchable, Id, FlowId, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, Id, NodeId, FlowId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowStep {
     #[branch(original_id)]
@@ -224,8 +224,6 @@ impl FlowStep {
                         node_id: self.node_id,
                         id: output_id,
                         flow_step_id: Some(id),
-                        flow_step: Some(self.clone()),
-
                         ..Default::default()
                     };
 
@@ -312,13 +310,15 @@ impl Callbacks for UpdateNodeIdsFlowStep {
             flow_step.preserve_flow_step_outputs(data).await?;
         }
 
-        let current = self.find_by_primary_key().execute(data.db_session()).await?;
-        self.output_ids_by_node_id = current.output_ids_by_node_id;
-        self.input_ids_by_node_id = current.input_ids_by_node_id;
+        if self.is_original() {
+            let current = self.find_by_primary_key().execute(data.db_session()).await?;
+            self.output_ids_by_node_id = current.output_ids_by_node_id;
+            self.input_ids_by_node_id = current.input_ids_by_node_id;
 
-        self.delete_output_records_from_removed_nodes(data).await?;
-        self.remove_output_references_from_removed_nodes().await?;
-        self.remove_input_references_from_removed_nodes().await?;
+            self.delete_output_records_from_removed_nodes(data).await?;
+            self.remove_output_references_from_removed_nodes().await?;
+            self.remove_input_references_from_removed_nodes().await?;
+        }
 
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;

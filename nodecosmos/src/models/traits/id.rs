@@ -15,6 +15,11 @@ pub trait ObjectId {
     fn object_id(&self) -> Uuid;
 }
 
+/// implemented by #[derive(NodeId)]
+pub trait NodeId {
+    fn node_id(&self) -> Uuid;
+}
+
 /// implemented by #[derive(FlowId)]
 pub trait FlowId {
     fn flow_id(&self) -> Uuid;

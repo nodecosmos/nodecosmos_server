@@ -46,7 +46,6 @@ impl FlowStep {
                     node_id: self.node_id,
                     id: output_id,
                     flow_step_id: Some(id),
-                    flow_step: Some(self.clone()),
 
                     ..Default::default()
                 };

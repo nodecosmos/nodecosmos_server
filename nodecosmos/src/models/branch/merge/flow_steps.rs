@@ -10,7 +10,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
-use crate::models::traits::{Branchable, FindForBranchMerge, IncrementFraction, Reload};
+use crate::models::traits::{Branchable, FindForBranchMerge, FlowId, Id, IncrementFraction, NodeId, Reload};
 use crate::models::traits::{ModelContext, PluckFromStream};
 
 #[derive(Serialize, Deserialize)]
@@ -106,6 +106,42 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
+    fn filter_out_deleted_flow_steps<FsType>(branch: &Branch, flow_steps: Vec<FsType>) -> Vec<FsType>
+    where
+        FsType: FlowId + NodeId + Id,
+    {
+        flow_steps
+            .into_iter()
+            .filter(|flow_step| {
+                if branch
+                    .deleted_nodes
+                    .as_ref()
+                    .is_some_and(|dfs| dfs.contains(&flow_step.node_id()))
+                {
+                    return false;
+                }
+
+                if branch
+                    .deleted_flows
+                    .as_ref()
+                    .is_some_and(|dfs| dfs.contains(&flow_step.flow_id()))
+                {
+                    return false;
+                }
+
+                if branch
+                    .deleted_flow_steps
+                    .as_ref()
+                    .is_some_and(|dfs| dfs.contains(&flow_step.id()))
+                {
+                    return false;
+                }
+
+                true
+            })
+            .collect()
+    }
+
     // Returns original flow steps
     pub async fn created_fs_nodes_flow_steps(
         branch: &Branch,
@@ -121,7 +157,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)
@@ -164,7 +200,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)
@@ -185,7 +221,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)
@@ -228,7 +264,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)
@@ -249,7 +285,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)
@@ -292,7 +328,7 @@ impl MergeFlowSteps {
                     .try_collect()
                     .await?;
 
-            return Ok(Some(flow_steps));
+            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
         }
 
         Ok(None)

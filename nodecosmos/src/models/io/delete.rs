@@ -5,6 +5,7 @@ use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
+use crate::models::traits::FindOrInsertBranched;
 use crate::models::workflow::Workflow;
 
 impl Io {
@@ -50,10 +51,10 @@ impl Io {
 
     pub async fn pull_form_flow_step_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let id = self.id;
-        let flow_step = self.flow_step(data.db_session()).await?;
 
-        if let Some(flow_step) = &mut flow_step.as_mut() {
-            flow_step.pull_output_id(data, id).await?;
+        if let Some(flow_step_id) = self.flow_step_id {
+            let mut fs = FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
+            fs.pull_output_id(data, id).await?;
         }
 
         Ok(())

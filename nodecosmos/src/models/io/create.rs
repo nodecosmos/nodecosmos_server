@@ -125,9 +125,6 @@ impl Io {
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            if let Some(flow_step_id) = self.flow_step_id {
-                FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
-            }
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
         }

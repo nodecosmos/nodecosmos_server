@@ -71,7 +71,9 @@ impl Callbacks for Flow {
             self.preserve_branch_node(data).await?;
         }
 
-        self.calculate_vertical_idx(data).await?;
+        if !self.is_branched_init_context() {
+            self.calculate_vertical_idx(data).await?;
+        }
 
         Ok(())
     }
@@ -80,11 +82,13 @@ impl Callbacks for Flow {
         self.update_branch_with_deletion(data).await?;
         self.preserve_branch_node(data).await?;
 
-        let flow_steps = self.flow_steps(db_session).await?;
+        if self.is_original() {
+            let flow_steps = self.flow_steps(db_session).await?;
 
-        for mut flow_step in flow_steps {
-            flow_step.set_parent_delete_context();
-            flow_step.delete_cb(data).execute(db_session).await?;
+            for mut flow_step in flow_steps {
+                flow_step.set_parent_delete_context();
+                flow_step.delete_cb(data).execute(db_session).await?;
+            }
         }
 
         Ok(())
