@@ -493,7 +493,8 @@ impl MergeFlowSteps {
                     .and_then(|m| m.get(&original_flow_step.id));
 
                 if let Some(branch_fs) = branch_fs {
-                    // Calculate added delta so we don't add nodes that may be already added outside of the current branch.
+                    // Calculate added delta so we don't add nodes that may be already added outside
+                    // of the current branch.
                     let mut added_delta = vec![];
 
                     if let Some(node_ids) = branch_fs.node_ids.as_ref() {
