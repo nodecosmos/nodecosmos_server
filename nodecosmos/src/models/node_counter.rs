@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
-use crate::models::traits::{ElasticDocument, UpdateLikesCountNodeElasticIdx};
+use crate::models::traits::{ElasticDocument, UpdateLikeCountNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
@@ -43,7 +43,7 @@ impl Likeable for NodeCounter {
         let is_original = id == branch_id;
 
         if is_original {
-            UpdateLikesCountNodeElasticIdx {
+            UpdateLikeCountNodeElasticIdx {
                 id,
                 likes_count: lc as i32,
             }
@@ -68,7 +68,7 @@ impl Likeable for NodeCounter {
         let is_original = id == branch_id;
 
         if is_original {
-            UpdateLikesCountNodeElasticIdx {
+            UpdateLikeCountNodeElasticIdx {
                 id,
                 likes_count: lc as i32,
             }

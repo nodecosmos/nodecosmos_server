@@ -32,6 +32,7 @@ pub trait S3: Sized {
             .put_object()
             .key(self.s3_key())
             .bucket(data.s3_bucket());
+
         let body = ByteStream::from(bytes);
 
         put_object

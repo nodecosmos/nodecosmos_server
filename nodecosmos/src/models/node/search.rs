@@ -12,38 +12,21 @@ use crate::models::udts::Profile;
 const PAGE_SIZE: i16 = 10;
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IndexNode {
     pub id: Uuid,
-
-    #[serde(rename = "rootId")]
     pub root_id: Uuid,
-
-    #[serde(rename = "ancestorIds")]
     pub ancestor_ids: Option<Vec<Uuid>>,
-
-    #[serde(rename = "ownerId")]
     pub owner_id: Uuid,
-
     pub title: String,
-
-    #[serde(rename = "shortDescription")]
     pub short_description: Option<String>,
-
     pub description: Option<String>,
-
-    #[serde(rename = "likesCount")]
     pub like_count: Option<BigInt>,
-
-    #[serde(rename = "coverImageURL")]
     pub cover_image_url: Option<String>,
-
-    #[serde(rename = "isRoot")]
     pub is_root: bool,
-
-    #[serde(rename = "isPublic")]
     pub is_public: bool,
 
-    #[serde(rename = "createdAt", default = "chrono::Utc::now")]
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     pub owner: Profile,
@@ -108,7 +91,7 @@ impl<'a> NodeSearch<'a> {
             },
             "sort": [
                 { "isRoot": { "order": "desc" } },
-                { "likesCount": { "order": "desc" } },
+                { "likeCount": { "order": "desc" } },
                 {
                     "_script": {
                         "type": "number",
@@ -136,7 +119,7 @@ impl<'a> NodeSearch<'a> {
             data["sort"] = json!([
                 { "_score": { "order": "desc" } },
                 { "isRoot": { "order": "desc" } },
-                { "likesCount": { "order": "desc" } },
+                { "likeCount": { "order": "desc" } },
                 { "createdAt": { "order": "desc" } }
             ]);
         }
