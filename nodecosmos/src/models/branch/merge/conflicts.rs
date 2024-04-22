@@ -378,7 +378,7 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    /// Check if flow steps are diverged - if we have multiple flow steps within the same flow with the same index
+    /// Check if flow steps are diverged - if we flow steps within the same flow with the same step_index
     async fn extract_conflicting_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let created_flow_steps = self
             .branch_merge

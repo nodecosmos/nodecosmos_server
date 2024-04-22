@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{Delete, DeleteWithCallbacks, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -150,9 +150,32 @@ impl MergeFlows {
     async fn insert_flows(data: &RequestData, merge_flows: &mut Option<Vec<Flow>>) -> Result<(), NodecosmosError> {
         if let Some(merge_flows) = merge_flows {
             for merge_flow in merge_flows {
+                let branch_id = merge_flow.branch_id;
+                let current_vertical_index = merge_flow.vertical_index;
+
                 merge_flow.set_merge_context();
                 merge_flow.set_original_id();
                 merge_flow.insert_cb(data).execute(data.db_session()).await?;
+
+                let new_vertical_index = merge_flow.vertical_index;
+
+                // update vertical index on branch.
+                if current_vertical_index != new_vertical_index {
+                    // as we can not update clustering keys,
+                    // we need to delete and insert again with new vertical index
+                    merge_flow.branch_id = branch_id;
+
+                    // delete branched with old vertical index
+                    merge_flow.vertical_index = current_vertical_index;
+                    merge_flow.delete().execute(data.db_session()).await?;
+
+                    // insert branched with new vertical index
+                    merge_flow.vertical_index = new_vertical_index;
+                    merge_flow.insert().execute(data.db_session()).await?;
+
+                    // restore original id in case of undo
+                    merge_flow.set_original_id();
+                }
             }
         }
 

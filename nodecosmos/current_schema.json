@@ -1412,7 +1412,7 @@
           false
         ],
         [
-          "flow_index",
+          "step_index",
           "decimal",
           false
         ],
@@ -1455,7 +1455,7 @@
       "field_names": [
         "id",
         "created_at",
-        "flow_index",
+        "step_index",
         "branch_id",
         "node_id",
         "node_ids",
@@ -1470,7 +1470,7 @@
         "created_at": "timestamp",
         "output_ids_by_node_id": "frozen<map<uuid, frozen<list<uuid>>>>",
         "branch_id": "uuid",
-        "flow_index": "decimal",
+        "step_index": "decimal",
         "updated_at": "timestamp",
         "id": "uuid",
         "root_id": "uuid",
@@ -1487,7 +1487,7 @@
       ],
       "clustering_keys": [
         "flow_id",
-        "flow_index",
+        "step_index",
         "id"
       ],
       "static_columns": [],
@@ -2443,7 +2443,7 @@
           false
         ],
         [
-          "flow_index",
+          "step_index",
           "decimal",
           false
         ],
@@ -2461,7 +2461,7 @@
       "field_names": [
         "flow_id",
         "node_id",
-        "flow_index",
+        "step_index",
         "branch_id",
         "id"
       ],
@@ -2469,7 +2469,7 @@
         "branch_id": "uuid",
         "id": "uuid",
         "flow_id": "uuid",
-        "flow_index": "decimal",
+        "step_index": "decimal",
         "node_id": "uuid"
       },
       "type_name": "",
@@ -2481,7 +2481,7 @@
       ],
       "clustering_keys": [
         "flow_id",
-        "flow_index",
+        "step_index",
         "id"
       ],
       "static_columns": [],

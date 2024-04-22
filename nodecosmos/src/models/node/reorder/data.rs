@@ -181,7 +181,7 @@ impl ReorderData {
     }
 
     pub async fn from_params(params: &ReorderParams, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let node = Node::find_or_insert_branched(data, params.id, params.branch_id).await?;
+        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, params.id).await?;
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 

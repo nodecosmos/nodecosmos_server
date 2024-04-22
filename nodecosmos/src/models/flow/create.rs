@@ -1,6 +1,7 @@
 use charybdis::operations::{Find, Insert};
 
 use crate::api::data::RequestData;
+use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -9,6 +10,21 @@ use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindOrInsertBranched};
 
 impl Flow {
+    pub async fn calculate_vertical_idx(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let flows = Flow::branched(
+            data.db_session(),
+            &WorkflowParams {
+                node_id: self.node_id,
+                branch_id: self.branch_id,
+            },
+        )
+        .await?;
+
+        self.vertical_index = flows.len() as f64;
+
+        Ok(())
+    }
+
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut maybe_original = Flow {
@@ -31,7 +47,7 @@ impl Flow {
 
     pub async fn preserve_branch_node(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Node::find_or_insert_branched(data, self.node_id, self.branch_id).await?;
+            Node::find_or_insert_branched(data, self.node_id, self.branch_id, self.node_id).await?;
         }
 
         Ok(())

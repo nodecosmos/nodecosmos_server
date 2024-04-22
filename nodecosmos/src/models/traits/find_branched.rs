@@ -5,7 +5,6 @@ use futures::TryFutureExt;
 use scylla::CachingSession;
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::flow::{find_flow, find_update_title_flow, Flow, UpdateTitleFlow};
 use crate::models::flow_step::{
@@ -61,11 +60,21 @@ impl_find_branched_or_original!(GetStructureNode);
 impl_find_branched_or_original!(UpdateTitleNode);
 
 pub trait FindOrInsertBranched: Model {
-    async fn find_or_insert_branched(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<Self, NodecosmosError>;
+    async fn find_or_insert_branched(
+        data: &RequestData,
+        node_id: Uuid,
+        branch_id: Uuid,
+        object_id: Uuid,
+    ) -> Result<Self, NodecosmosError>;
 }
 
 impl FindOrInsertBranched for Node {
-    async fn find_or_insert_branched(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<Self, NodecosmosError> {
+    async fn find_or_insert_branched(
+        data: &RequestData,
+        id: Uuid,
+        branch_id: Uuid,
+        _object_id: Uuid,
+    ) -> Result<Self, NodecosmosError> {
         use charybdis::operations::{Find, InsertWithCallbacks};
 
         let pk = &(id, branch_id);
@@ -94,46 +103,38 @@ impl FindOrInsertBranched for Node {
     }
 }
 
-pub trait FindOrInsertBranchedFromParams: Model {
-    async fn find_or_insert_branched(
-        data: &RequestData,
-        params: &WorkflowParams,
-        id: Uuid,
-    ) -> Result<Self, NodecosmosError>;
-}
-
 macro_rules! find_or_insert_branched {
     ($struct:ident) => {
-        impl FindOrInsertBranchedFromParams for $struct {
+        impl FindOrInsertBranched for $struct {
             async fn find_or_insert_branched(
                 data: &RequestData,
-                params: &WorkflowParams,
+                node_id: charybdis::types::Uuid,
+                branch_id: charybdis::types::Uuid,
                 id: charybdis::types::Uuid,
             ) -> Result<Self, NodecosmosError> {
-                use crate::models::traits::Branchable;
                 use crate::models::traits::ModelContext;
                 use charybdis::operations::InsertWithCallbacks;
 
-                if params.is_original() {
-                    return Self::find_first_by_node_id_and_branch_id_and_id(params.node_id, params.branch_id, id)
+                let is_original = id == branch_id;
+
+                if is_original {
+                    return Self::find_first_by_node_id_and_branch_id_and_id(node_id, branch_id, id)
                         .execute(data.db_session())
                         .await
                         .map_err(NodecosmosError::from);
                 } else {
-                    let maybe_branched =
-                        Self::maybe_find_first_by_node_id_and_branch_id_and_id(params.node_id, params.branch_id, id)
-                            .execute(data.db_session())
-                            .await?;
+                    let maybe_branched = Self::maybe_find_first_by_node_id_and_branch_id_and_id(node_id, branch_id, id)
+                        .execute(data.db_session())
+                        .await?;
 
                     if let Some(branched) = maybe_branched {
                         Ok(branched)
                     } else {
-                        let mut new_branched =
-                            Self::find_first_by_node_id_and_branch_id_and_id(params.node_id, params.node_id, id)
-                                .execute(data.db_session())
-                                .await?;
+                        let mut new_branched = Self::find_first_by_node_id_and_branch_id_and_id(node_id, node_id, id)
+                            .execute(data.db_session())
+                            .await?;
 
-                        new_branched.branch_id = params.branch_id;
+                        new_branched.branch_id = branch_id;
                         new_branched.set_branched_init_context();
 
                         new_branched.insert_cb(data).execute(data.db_session()).await?;

@@ -1262,7 +1262,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "charybdis"
-version = "0.4.17"
+version = "0.4.18"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "0.4.17"
+version = "0.4.18"
 dependencies = [
  "charybdis_parser",
  "darling 0.20.8",
@@ -1290,7 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "0.4.17"
+version = "0.4.18"
 dependencies = [
  "colored",
  "darling 0.20.8",
@@ -4905,9 +4905,9 @@ checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
 
 [[package]]
 name = "yrs"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4058d69bbbc97181d53d9d093a4b892001b84601f2fc4e27f48c8862bc8b369"
+checksum = "27a994dea827d74874cc29cf7c70cf17edaa31627c6598c46314ddc8c320ee9e"
 dependencies = [
  "arc-swap",
  "atomic_refcell",

@@ -11,5 +11,7 @@ pub struct Conflict {
     pub deleted_edited_flows: Option<Frozen<Set<Uuid>>>,
     pub deleted_edited_flow_steps: Option<Frozen<Set<Uuid>>>,
     pub deleted_edited_ios: Option<Frozen<Set<Uuid>>>,
+
+    /// Flow steps with same `step_index` on original and branch
     pub conflicting_flow_steps: Option<Frozen<Set<Uuid>>>,
 }

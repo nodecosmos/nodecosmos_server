@@ -2,14 +2,13 @@ use charybdis::operations::{Find, Insert};
 use charybdis::types::Uuid;
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::traits::ModelContext;
-use crate::models::traits::{Branchable, FindOrInsertBranchedFromParams};
+use crate::models::traits::{Branchable, FindOrInsertBranched};
 
 impl FlowStep {
     pub fn set_defaults(&mut self) {
@@ -28,7 +27,7 @@ impl FlowStep {
                 node_id: self.node_id,
                 branch_id: self.original_id(),
                 flow_id: self.flow_id,
-                flow_index: self.flow_index.clone(),
+                step_index: self.step_index.clone(),
                 id: self.id,
                 ..Default::default()
             }
@@ -50,7 +49,7 @@ impl FlowStep {
         if self.maybe_find_by_index(data.db_session()).await?.is_some() {
             return Err(NodecosmosError::Conflict(format!(
                 "Flow Step on given index {} already exists",
-                self.flow_index
+                self.step_index
             )));
         }
 
@@ -59,15 +58,7 @@ impl FlowStep {
 
     pub async fn preserve_branch_flow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Flow::find_or_insert_branched(
-                data,
-                &WorkflowParams {
-                    node_id: self.node_id,
-                    branch_id: self.branch_id,
-                },
-                self.flow_id,
-            )
-            .await?;
+            Flow::find_or_insert_branched(data, self.node_id, self.branch_id, self.flow_id).await?;
         }
 
         Ok(())

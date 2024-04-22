@@ -23,8 +23,7 @@ mod create;
 mod delete;
 mod update_title;
 
-/// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node. Accordingly,
-/// they are branched by comparing `branch_id` to `root_id`.
+/// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node.
 #[charybdis_model(
     table_name = input_outputs,
     partition_keys = [root_id, branch_id],
@@ -45,11 +44,11 @@ pub struct Io {
     pub id: Uuid,
 
     pub main_id: Option<Uuid>,
+
     pub flow_id: Option<Uuid>,
 
     /// outputted by flow step
     pub flow_step_id: Option<Uuid>,
-
     pub inputted_by_flow_steps: Option<Set<Uuid>>,
     pub title: Option<Text>,
     pub unit: Option<Text>,
@@ -173,6 +172,28 @@ impl Io {
             .await?;
 
         Ok(ios)
+    }
+
+    pub async fn find_or_insert_branched_main(
+        data: &RequestData,
+        root_id: Uuid,
+        branch_id: Uuid,
+        main_id: Uuid,
+    ) -> Result<Io, NodecosmosError> {
+        let io = Self::maybe_find_first_by_root_id_and_branch_id_and_main_id(root_id, branch_id, main_id)
+            .execute(data.db_session())
+            .await?;
+
+        if let Some(io) = io {
+            Ok(io)
+        } else {
+            let mut io = Self::find_first_by_root_id_and_branch_id_and_main_id(root_id, root_id, main_id)
+                .execute(data.db_session())
+                .await?;
+            io.branch_id = branch_id;
+            io.insert().execute(data.db_session()).await?;
+            Ok(io)
+        }
     }
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {

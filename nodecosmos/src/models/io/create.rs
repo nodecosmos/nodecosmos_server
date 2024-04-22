@@ -12,7 +12,7 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindOrInsertBranched, FindOrInsertBranchedFromParams};
+use crate::models::traits::{Branchable, FindOrInsertBranched};
 
 impl Io {
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -98,7 +98,7 @@ impl Io {
 
     pub async fn preserve_branch_node(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Node::find_or_insert_branched(data, self.node_id, self.branch_id).await?;
+            Node::find_or_insert_branched(data, self.node_id, self.branch_id, self.node_id).await?;
         }
 
         Ok(())
@@ -107,15 +107,7 @@ impl Io {
     pub async fn preserve_branch_flow_step(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             if let Some(flow_step_id) = self.flow_step_id {
-                FlowStep::find_or_insert_branched(
-                    data,
-                    &WorkflowParams {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                    },
-                    flow_step_id,
-                )
-                .await?;
+                FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
             }
         }
 
@@ -134,15 +126,7 @@ impl Io {
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             if let Some(flow_step_id) = self.flow_step_id {
-                FlowStep::find_or_insert_branched(
-                    data,
-                    &WorkflowParams {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                    },
-                    flow_step_id,
-                )
-                .await?;
+                FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
             }
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;

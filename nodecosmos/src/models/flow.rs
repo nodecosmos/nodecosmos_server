@@ -35,6 +35,7 @@ pub struct Flow {
 
     // vertical index
     pub vertical_index: Double,
+
     // start index is not conflicting, flows can start at same index
     pub start_index: Int,
 
@@ -69,6 +70,8 @@ impl Callbacks for Flow {
         if self.is_default_context() || self.is_branched_init_context() {
             self.preserve_branch_node(data).await?;
         }
+
+        self.calculate_vertical_idx(data).await?;
 
         Ok(())
     }

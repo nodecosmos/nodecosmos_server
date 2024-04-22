@@ -38,11 +38,11 @@ mod update_title;
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     #[serde(default)]
-    #[branch(original_id)]
-    pub id: Uuid,
+    pub branch_id: Uuid,
 
     #[serde(default)]
-    pub branch_id: Uuid,
+    #[branch(original_id)]
+    pub id: Uuid,
 
     #[serde(default)]
     pub root_id: Uuid,
@@ -93,8 +93,8 @@ impl Callbacks for Node {
         if self.is_default_context() {
             self.set_defaults(db_session).await?;
             self.set_owner(data).await?;
-            self.validate_root().await?;
-            self.validate_owner().await?;
+            self.validate_root()?;
+            self.validate_owner()?;
             self.update_branch_with_creation(data)
                 .await
                 .context("Failed to update branch")?;
@@ -277,6 +277,7 @@ impl Callbacks for UpdateTitleNode {
         }
 
         let current = Self::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+
         self.root_id = current.root_id;
         self.ancestor_ids = current.ancestor_ids;
         self.order_index = current.order_index;

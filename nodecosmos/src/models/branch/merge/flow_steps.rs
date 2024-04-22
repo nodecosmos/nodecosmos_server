@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{Delete, DeleteWithCallbacks, Insert, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::{Set, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -382,9 +382,18 @@ impl MergeFlowSteps {
 
         if let Some(flow_steps) = &mut self.created_flow_steps {
             for flow_step in flow_steps {
+                // Check if flow step is kept despite having conflicts, if so, we need to increment step index, and
+                // update branch version with new step index.
                 if kept_flow_steps.is_some_and(|kfs| kfs.contains(&flow_step.id)) {
-                    flow_step.flow_index.increment_fraction();
-                    println!("{}", flow_step.flow_index);
+                    // as we can not update clustering keys,
+                    // we need to delete and insert again with new step index
+                    flow_step.delete().execute(data.db_session()).await?;
+
+                    // increment step index
+                    flow_step.step_index.increment_fraction();
+
+                    // insert branched with new step index
+                    flow_step.insert().execute(data.db_session()).await?;
                 }
 
                 flow_step.set_merge_context();

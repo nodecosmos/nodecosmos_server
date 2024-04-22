@@ -34,6 +34,9 @@ pub struct Description {
     #[branch(original_id)]
     pub node_id: Uuid,
 
+    #[serde(default)]
+    pub root_id: Uuid,
+
     pub object_type: Text,
     pub short_description: Option<Text>,
     pub html: Option<Text>,
@@ -49,6 +52,13 @@ impl Callbacks for Description {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.root_id == Uuid::default() {
+            return Err(NodecosmosError::ValidationError((
+                "Root id".to_string(),
+                "is required".to_string(),
+            )));
+        }
+
         let current = Self::maybe_find_first_by_object_id_and_branch_id(self.object_id, self.branch_id)
             .execute(session)
             .await?;
@@ -60,13 +70,13 @@ impl Callbacks for Description {
 
             *self = current;
             self.branch_id = branch_id;
+        } else {
+            self.update_branch(data).await?;
         }
 
         self.updated_at = Utc::now();
 
         self.html.sanitize()?;
-
-        self.handle_branch(data).await?;
 
         Ok(())
     }
