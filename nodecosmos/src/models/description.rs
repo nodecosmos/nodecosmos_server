@@ -2,11 +2,13 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
+use charybdis::operations::{Find, Insert};
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
@@ -14,6 +16,7 @@ use nodecosmos_macros::{Branchable, ObjectId};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::archived_description::ArchivedDescription;
 use crate::models::traits::Branchable;
 use crate::models::traits::SanitizeDescription;
 use crate::models::utils::DescriptionXmlParser;
@@ -23,7 +26,8 @@ mod save;
 #[charybdis_model(
     table_name = description,
     partition_keys = [object_id],
-    clustering_keys = [branch_id]
+    clustering_keys = [branch_id],
+    global_secondary_indexes = [node_id]
 )]
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,10 +102,37 @@ impl Callbacks for Description {
 
         Ok(())
     }
+
+    async fn after_delete(
+        &mut self,
+        db_session: &CachingSession,
+        _extension: &Self::Extension,
+    ) -> Result<(), Self::Error> {
+        let _ = ArchivedDescription::from(self.clone())
+            .insert()
+            .execute(db_session)
+            .await
+            .map_err(|e| {
+                log::error!("[after_delete] Failed to insert archived description: {:?}", e);
+                e
+            });
+
+        Ok(())
+    }
 }
 
 impl Description {
     const DESCRIPTION_ROOT: &'static str = "prosemirror";
+
+    pub async fn find_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &HashSet<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_description!("node_id IN ? ALLOW FILTERING", (node_ids,))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
 
     pub async fn merge(&mut self, other: &Self) -> Result<(), NodecosmosError> {
         let current_base64 = match &self.base64 {
@@ -132,7 +163,6 @@ impl Description {
         transaction.apply_update(update);
 
         let xml_str = &xml.get_string(&transaction);
-        println!("xml_str: {:?}", xml_str);
 
         let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
         let html = prose_doc.html;

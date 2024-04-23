@@ -2,28 +2,34 @@ use std::collections::HashMap;
 
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Delete;
-use charybdis::types::Uuid;
-use futures::{StreamExt, TryFutureExt};
+use charybdis::types::{Set, Uuid};
+use futures::StreamExt;
 use log::error;
+use scylla::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::archived_description::ArchivedDescription;
+use crate::models::archived_flow::ArchivedFlow;
+use crate::models::archived_flow_step::ArchivedFlowStep;
+use crate::models::archived_io::ArchivedIo;
+use crate::models::archived_node::ArchivedNode;
+use crate::models::archived_workflow::ArchivedWorkflow;
 use crate::models::attachment::Attachment;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::description::Description;
-use crate::models::flow::DeleteFlow;
-use crate::models::flow_step::DeleteFlowStep;
-use crate::models::io::DeleteIo;
+use crate::models::flow::{DeleteFlow, Flow};
+use crate::models::flow_step::{DeleteFlowStep, FlowStep};
+use crate::models::io::{DeleteIo, Io};
 use crate::models::like::Like;
 use crate::models::node::{Node, PrimaryKeyNode};
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Descendants;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument, Pluck};
-use crate::models::workflow::DeleteWorkflow;
+use crate::models::workflow::{DeleteWorkflow, Workflow};
 
 impl Node {
     pub async fn delete_related_data(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -38,16 +44,6 @@ impl Node {
         }
 
         Ok(())
-    }
-
-    pub async fn create_commit_for_ancestors(&self, data: &RequestData) {
-        let _ = NodeCommit::handle_deletion(data, &self)
-            .map_err(|e| {
-                error!("Node::create_commit_for_ancestors:: id {}: {:?}", self.id, e);
-
-                e
-            })
-            .await;
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -76,16 +72,19 @@ type ChildrenByParentId = HashMap<Uuid, Children>;
 pub struct NodeDelete<'a> {
     data: &'a RequestData,
     node: &'a Node,
-    node_ids_to_delete: Vec<Uuid>,
+    node_ids_to_delete: Set<Uuid>,
     children_by_parent_id: ChildrenByParentId,
 }
 
 impl<'a> NodeDelete<'a> {
     pub fn new(node: &'a Node, data: &'a RequestData) -> NodeDelete<'a> {
+        let mut node_ids_to_delete = Set::new();
+        node_ids_to_delete.insert(node.id);
+
         Self {
             data,
             node,
-            node_ids_to_delete: vec![node.id],
+            node_ids_to_delete,
             children_by_parent_id: ChildrenByParentId::new(),
         }
     }
@@ -98,6 +97,11 @@ impl<'a> NodeDelete<'a> {
 
         self.delete_descendants().await.map_err(|err| {
             error!("delete_descendants: {}", err);
+            return err;
+        })?;
+
+        self.archive_related_data(self.data.db_session()).await.map_err(|err| {
+            error!("archive_related_data: {}", err);
             return err;
         })?;
 
@@ -127,7 +131,7 @@ impl<'a> NodeDelete<'a> {
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
 
-            self.node_ids_to_delete.push(descendant.id);
+            self.node_ids_to_delete.insert(descendant.id);
 
             if !self.node.is_root {
                 self.children_by_parent_id
@@ -136,6 +140,183 @@ impl<'a> NodeDelete<'a> {
                     .push((descendant.id, descendant.order_index));
             }
         }
+
+        Ok(())
+    }
+
+    async fn archived_nodes(&mut self, db_session: &CachingSession) -> Result<Vec<ArchivedNode>, NodecosmosError> {
+        let mut nodes = if self.node.is_branched() {
+            Node::find_by_ids_and_branch_id(db_session, &self.node_ids_to_delete, self.node.branch_id).await?
+        } else {
+            Node::find_by_id(self.node.id).execute(db_session).await?
+        };
+
+        let mut archive_nodes: Vec<ArchivedNode> = vec![];
+
+        while let Some(node) = nodes.next().await {
+            let node = node?;
+
+            if node.is_branched() && self.node.is_original() {
+                continue;
+            }
+
+            archive_nodes.push(ArchivedNode::from(node));
+        }
+
+        Ok(archive_nodes)
+    }
+
+    async fn archived_workflows(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Vec<ArchivedWorkflow>, NodecosmosError> {
+        let mut workflows = if self.node.is_branched() {
+            Workflow::find_by_node_ids_and_branch_id(db_session, &self.node_ids_to_delete, self.node.branch_id).await?
+        } else {
+            Workflow::find_by_node_id(self.node.id).execute(db_session).await?
+        };
+
+        let mut archive_workflows: Vec<ArchivedWorkflow> = vec![];
+
+        while let Some(workflow) = workflows.next().await {
+            let workflow = workflow?;
+
+            if workflow.is_branched() && self.node.is_original() {
+                continue;
+            }
+
+            let archive = ArchivedWorkflow::from(workflow);
+            archive_workflows.push(archive);
+        }
+
+        Ok(archive_workflows)
+    }
+
+    async fn archived_flows(&mut self, db_session: &CachingSession) -> Result<Vec<ArchivedFlow>, NodecosmosError> {
+        let mut flows = if self.node.is_branched() {
+            Flow::find_by_node_ids_and_branch_id(db_session, &self.node_ids_to_delete, self.node.branch_id).await?
+        } else {
+            Flow::find_by_node_id_and_branch_id(self.node.id, self.node.id)
+                .execute(db_session)
+                .await?
+        };
+
+        let mut archive_flows: Vec<ArchivedFlow> = vec![];
+
+        while let Some(flow) = flows.next().await {
+            let flow = flow?;
+
+            let archive = ArchivedFlow::from(flow);
+
+            archive_flows.push(archive);
+        }
+
+        Ok(archive_flows)
+    }
+
+    async fn archived_flow_steps(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Vec<ArchivedFlowStep>, NodecosmosError> {
+        let mut flow_steps = if self.node.is_branched() {
+            FlowStep::find_by_node_ids_and_branch_id(db_session, &self.node_ids_to_delete, self.node.branch_id).await?
+        } else {
+            FlowStep::find_by_node_id_and_branch_id(self.node.id, self.node.id)
+                .execute(db_session)
+                .await?
+        };
+
+        let mut archive_flow_steps: Vec<ArchivedFlowStep> = vec![];
+
+        while let Some(flow_step) = flow_steps.next().await {
+            let flow_step = flow_step?;
+
+            let archive = ArchivedFlowStep::from(flow_step);
+
+            archive_flow_steps.push(archive);
+        }
+
+        Ok(archive_flow_steps)
+    }
+
+    async fn archived_ios(&mut self, db_session: &CachingSession) -> Result<Vec<ArchivedIo>, NodecosmosError> {
+        let mut ios = if self.node.is_branched() {
+            Io::find_by_root_id_and_branch_id(self.node.root_id, self.node.branch_id)
+                .execute(db_session)
+                .await?
+        } else {
+            Io::find_by_root_id_and_branch_id(self.node.root_id, self.node.root_id)
+                .execute(db_session)
+                .await?
+        };
+
+        let mut archive_ios: Vec<ArchivedIo> = vec![];
+
+        while let Some(io) = ios.next().await {
+            let io = io?;
+
+            if !self.node_ids_to_delete.contains(&io.node_id) {
+                continue;
+            }
+
+            let archive = ArchivedIo::from(io);
+
+            archive_ios.push(archive);
+        }
+
+        Ok(archive_ios)
+    }
+
+    async fn archived_descriptions(
+        &mut self,
+        db_session: &CachingSession,
+    ) -> Result<Vec<ArchivedDescription>, NodecosmosError> {
+        let mut descriptions = Description::find_by_node_ids(db_session, &self.node_ids_to_delete).await?;
+        let mut archive_descriptions: Vec<ArchivedDescription> = vec![];
+
+        while let Some(description) = descriptions.next().await {
+            let description = description?;
+
+            if description.is_branched() && self.node.is_original() {
+                continue;
+            }
+
+            let archive = ArchivedDescription::from(description);
+
+            archive_descriptions.push(archive);
+        }
+
+        Ok(archive_descriptions)
+    }
+
+    // here we find all related data for node and its descendants, and archive it
+    // meaning that e.g. for Node we create ArchivedNode record, for Flow we create ArchivedFlow record etc.
+    async fn archive_related_data(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        let archive_nodes = self.archived_nodes(db_session).await?;
+        let archived_workflows = self.archived_workflows(db_session).await?;
+        let archived_flows = self.archived_flows(db_session).await?;
+        let archived_flow_steps = self.archived_flow_steps(db_session).await?;
+        let archived_ios = self.archived_ios(db_session).await?;
+        let archived_descriptions = self.archived_descriptions(db_session).await?;
+
+        ArchivedNode::unlogged_batch()
+            .chunked_insert(db_session, &archive_nodes, 100)
+            .await?;
+        ArchivedWorkflow::unlogged_batch()
+            .chunked_insert(db_session, &archived_workflows, 100)
+            .await?;
+        ArchivedFlow::unlogged_batch()
+            .chunked_insert(db_session, &archived_flows, 100)
+            .await?;
+        ArchivedFlowStep::unlogged_batch()
+            .chunked_insert(db_session, &archived_flow_steps, 100)
+            .await?;
+        ArchivedIo::unlogged_batch()
+            .chunked_insert(db_session, &archived_ios, 100)
+            .await?;
+        ArchivedDescription::unlogged_batch()
+            .chunked_insert(db_session, &archived_descriptions, 100)
+            .await?;
 
         Ok(())
     }
@@ -218,7 +399,13 @@ impl<'a> NodeDelete<'a> {
 
     //  Counter and non-counter mutations cannot exist in the same batch
     pub async fn delete_counter_data(&mut self) -> Result<(), NodecosmosError> {
-        for node_ids_chunk in self.node_ids_to_delete.chunks(100) {
+        for node_ids_chunk in self
+            .node_ids_to_delete
+            .clone()
+            .into_iter()
+            .collect::<Vec<Uuid>>()
+            .chunks(100)
+        {
             let mut batch = NodeCounter::unlogged_batch();
 
             for id in node_ids_chunk {
@@ -241,7 +428,7 @@ impl<'a> NodeDelete<'a> {
     }
 
     pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
-        Attachment::delete_by_node_ids(self.data, self.node_ids_to_delete.clone()).await?;
+        Attachment::delete_by_node_ids(self.data, &self.node_ids_to_delete).await?;
 
         Ok(())
     }
@@ -328,7 +515,11 @@ impl<'a> NodeDelete<'a> {
 
     async fn delete_elastic_data(&self) {
         if self.node.is_original() {
-            Node::bulk_delete_elastic_documents(self.data.elastic_client(), &self.node_ids_to_delete).await;
+            Node::bulk_delete_elastic_documents(
+                self.data.elastic_client(),
+                &self.node_ids_to_delete.clone().into_iter().collect(),
+            )
+            .await;
         }
     }
 }

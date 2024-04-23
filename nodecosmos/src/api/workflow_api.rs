@@ -37,12 +37,15 @@ pub async fn get_workflow(
     let workflow = Workflow::branched(&db_session, &params)
         .await
         .context("Failed to get workflow")?;
+
     let flows = Flow::branched(&db_session, &params)
         .await
         .context("Failed to get flows")?;
+
     let flow_steps = FlowStep::branched(&db_session, &params)
         .await
         .context("Failed to get flow steps")?;
+
     let input_outputs = Io::branched(&db_session, workflow.root_id, &params)
         .await
         .context("Failed to get input outputs")?;

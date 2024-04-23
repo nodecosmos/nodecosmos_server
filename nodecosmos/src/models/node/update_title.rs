@@ -7,8 +7,6 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::UpdateTitleNode;
-use crate::models::node_commit::create::NodeChange;
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::traits::ElasticDocument;
@@ -56,22 +54,5 @@ impl UpdateTitleNode {
         if self.is_original() {
             self.update_elastic_document(elastic_client).await;
         }
-    }
-
-    pub async fn create_commit(&self, data: &RequestData) {
-        let changes = vec![NodeChange::Title(self.title.clone())];
-
-        let _ = NodeCommit::handle_change(
-            data.db_session(),
-            self.id,
-            self.branch_id,
-            data.current_user_id(),
-            &changes,
-            true,
-        )
-        .await
-        .map_err(|e| {
-            error!("UpdateTitleNode::create_commit {}", e);
-        });
     }
 }

@@ -34,7 +34,10 @@ impl MergeNodes {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(restored_node_ids) = &branch.restored_nodes {
-            let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, branch.id).await?;
+            let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, branch.id)
+                .await?
+                .try_collect()
+                .await?;
             let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
                 .await?
                 .pluck_id_set();
@@ -54,7 +57,10 @@ impl MergeNodes {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(created_node_ids) = &branch.created_nodes {
-            let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, branch.id).await?;
+            let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, branch.id)
+                .await?
+                .try_collect()
+                .await?;
 
             created_nodes.sort_by_depth();
 

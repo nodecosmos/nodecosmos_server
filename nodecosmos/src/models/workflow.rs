@@ -1,8 +1,10 @@
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use nodecosmos_macros::Branchable;
 
@@ -80,6 +82,17 @@ impl Workflow {
 
             Ok(branched)
         }
+    }
+
+    pub async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &HashSet<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Workflow>, NodecosmosError> {
+        find_workflow!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 

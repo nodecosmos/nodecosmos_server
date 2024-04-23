@@ -2,7 +2,6 @@ use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
-use serde_json::json;
 
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
@@ -43,10 +42,7 @@ impl Io {
         let root_id = node.root_id;
 
         if self.root_id != root_id {
-            return Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized",
-                "message": "Not authorized to add IO for this node!"
-            })));
+            return Err(NodecosmosError::Unauthorized("Not authorized to add IO for this node!"));
         }
 
         Ok(())

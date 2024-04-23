@@ -34,7 +34,7 @@ impl Error for RedisError {
 #[derive(Debug)]
 pub enum NodecosmosError {
     // 400s
-    Unauthorized(serde_json::Value),
+    Unauthorized(&'static str),
     ResourceLocked(&'static str),
     ResourceAlreadyLocked(String),
     Forbidden(String),
@@ -111,7 +111,10 @@ impl Error for NodecosmosError {
 impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
+            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(json!({
+                "status": 401,
+                "message": e
+            })),
             NodecosmosError::ValidationError((field, message)) => HttpResponse::BadRequest().json(json!({
                 "status": 403,
                 "message": {field: message}

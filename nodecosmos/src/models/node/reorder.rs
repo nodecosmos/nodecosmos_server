@@ -16,7 +16,6 @@ use crate::models::branch::Branch;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
@@ -342,12 +341,6 @@ impl Node {
 
         ReorderValidator::new(&reorder_data).validate()?;
         Reorder::new(data, &reorder_data).run().await?;
-
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            NodeCommit::handle_reorder(&data, &reorder_data).await;
-        });
 
         Ok(())
     }

@@ -5,6 +5,7 @@ use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
@@ -86,7 +87,7 @@ impl Attachment {
         ))
     }
 
-    pub async fn delete_by_node_ids(data: &RequestData, node_ids: Vec<Uuid>) -> Result<(), NodecosmosError> {
+    pub async fn delete_by_node_ids(data: &RequestData, node_ids: &HashSet<Uuid>) -> Result<(), NodecosmosError> {
         let attachments = find_attachment!("node_id IN ?", (node_ids,))
             .execute(data.db_session())
             .await?

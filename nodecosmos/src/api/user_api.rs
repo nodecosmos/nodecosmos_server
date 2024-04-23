@@ -2,18 +2,18 @@ use actix_multipart::Multipart;
 use actix_session::Session;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::api::current_user::{refresh_current_user, set_current_user, OptCurrentUser};
+use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::traits::Authorization;
-use crate::models::user::{ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
+use crate::models::user::{CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
 use crate::App;
 
 #[derive(Deserialize)]
@@ -49,17 +49,24 @@ pub async fn login(
         return Err(NodecosmosError::NotFound("Not found".to_string()));
     }
 
-    let current_user = set_current_user(&client_session, &user)?;
+    let current_user = CurrentUser::from_user(user);
+
+    set_current_user(&client_session, &current_user)?;
 
     Ok(HttpResponse::Ok().json(current_user))
 }
 
 #[get("/session/sync")]
-pub async fn sync(current_user: OptCurrentUser) -> Response {
-    match current_user.0 {
-        Some(current_user) => Ok(HttpResponse::Ok().json(current_user)),
-        None => Ok(HttpResponse::Ok().finish()),
-    }
+pub async fn sync(data: RequestData, client_session: Session) -> Response {
+    let current_user = data
+        .current_user
+        .find_by_primary_key()
+        .execute(data.db_session())
+        .await?;
+
+    set_current_user(&client_session, &current_user)?;
+
+    Ok(HttpResponse::Ok().json(current_user))
 }
 
 #[delete("/session/logout")]
@@ -88,7 +95,9 @@ pub async fn get_user_by_username(db_session: web::Data<CachingSession>, usernam
 pub async fn create_user(app: web::Data<App>, client_session: Session, mut user: web::Json<User>) -> Response {
     user.insert_cb(&app).execute(&app.db_session).await?;
 
-    let current_user = set_current_user(&client_session, &user)?;
+    let current_user = CurrentUser::from_user(user.into_inner());
+
+    set_current_user(&client_session, &current_user)?;
 
     Ok(HttpResponse::Ok().json(json!({ "message": "User created", "user": current_user })))
 }
@@ -105,10 +114,12 @@ pub async fn update_bio(data: RequestData, client_session: Session, mut user: we
 }
 
 #[delete("/{id}")]
-pub async fn delete_user(data: RequestData, mut user: web::Path<User>) -> Response {
+pub async fn delete_user(data: RequestData, mut user: web::Path<User>, client_session: Session) -> Response {
     user.auth_update(&data).await?;
 
     user.delete_cb(&data.app).execute(data.db_session()).await?;
+
+    remove_current_user(&client_session);
 
     Ok(HttpResponse::Ok().finish())
 }

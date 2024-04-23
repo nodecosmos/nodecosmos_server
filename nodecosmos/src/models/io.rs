@@ -13,6 +13,7 @@ use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
+use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context, ModelContext};
@@ -29,7 +30,7 @@ mod update_title;
     clustering_keys = [id],
     local_secondary_indexes = [main_id]
 )]
-#[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default)]
+#[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Io {
     #[branch(original_id)]
@@ -103,8 +104,17 @@ impl Callbacks for Io {
         Ok(())
     }
 
-    async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
+
+        let _ = ArchivedIo::from(self.clone())
+            .insert()
+            .execute(db_session)
+            .await
+            .map_err(|e| {
+                log::error!("[after_delete] Failed to insert archived io: {:?}", e);
+                e
+            });
 
         Ok(())
     }

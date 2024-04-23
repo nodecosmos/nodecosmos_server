@@ -7,7 +7,6 @@ use actix_web::{web, FromRequest, HttpRequest};
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
-use serde_json::json;
 
 use crate::api::current_user::get_current_user;
 use crate::app::App;
@@ -86,10 +85,7 @@ impl FromRequest for RequestData {
                 }
             }
             None => {
-                let error_response = NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized! You must be logged in to perform this action",
-                    "message": "You must be logged in to perform this action!"
-                }));
+                let error_response = NodecosmosError::Unauthorized("You must be logged in to perform this action!");
                 ready(Err(error_response))
             }
         };

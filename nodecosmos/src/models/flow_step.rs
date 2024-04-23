@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
+use charybdis::operations::{Find, Insert};
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
@@ -13,6 +14,7 @@ use nodecosmos_macros::{Branchable, FlowId, Id, NodeId};
 use crate::api::data::RequestData;
 use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
+use crate::models::archived_flow_step::ArchivedFlowStep;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::io::Io;
@@ -95,6 +97,15 @@ impl Callbacks for FlowStep {
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.create_branched_if_original_exists(data).await?;
 
+        let _ = ArchivedFlowStep::from(self.clone())
+            .insert()
+            .execute(data.db_session())
+            .await
+            .map_err(|e| {
+                log::error!("[after_delete] Failed to insert archived flow step: {:?}", e);
+                e
+            });
+
         Ok(())
     }
 }
@@ -142,6 +153,17 @@ impl FlowStep {
 
             Ok(branch_flow_steps)
         }
+    }
+
+    pub async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
+        find_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     pub async fn find_by_flow(

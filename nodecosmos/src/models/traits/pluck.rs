@@ -6,7 +6,6 @@ use charybdis::types::Uuid;
 use futures::StreamExt;
 
 use crate::errors::NodecosmosError;
-use crate::models::node_commit::NodeCommit;
 use crate::models::traits::{FlowId, FlowStepId, Id, MaybeFlowId, MaybeFlowStepId};
 
 pub trait Pluck {
@@ -74,16 +73,6 @@ impl<T: Id + BaseModel> PluckFromStream for CharybdisModelStream<T> {
         }
 
         Ok(ids)
-    }
-}
-
-pub trait VersionedNodePluck {
-    fn pluck_node_descendants_commit_id(&self) -> Vec<Uuid>;
-}
-
-impl VersionedNodePluck for Vec<NodeCommit> {
-    fn pluck_node_descendants_commit_id(&self) -> Vec<Uuid> {
-        self.iter().filter_map(|item| item.node_descendants_commit_id).collect()
     }
 }
 

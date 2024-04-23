@@ -1,6 +1,5 @@
 use charybdis::operations::Find;
 use scylla::CachingSession;
-use serde_json::json;
 
 use crate::api::data::RequestData;
 use crate::api::request::current_user::OptCurrentUser;
@@ -44,10 +43,9 @@ pub trait Authorization: AuthorizationFields {
         }
 
         if !self.can_edit(data) {
-            return Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized!",
-                "message": "You are not allowed to perform this action!"
-            })));
+            return Err(NodecosmosError::Unauthorized(
+                "You are not allowed to update this resource!",
+            ));
         }
 
         Ok(())
@@ -75,15 +73,13 @@ pub trait Authorization: AuthorizationFields {
                     return Ok(());
                 }
 
-                Err(NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized!",
-                    "message": "You are not allowed to perform this action!"
-                })))
+                Err(NodecosmosError::Unauthorized(
+                    "You are not allowed to view this resource!",
+                ))
             }
-            None => Err(NodecosmosError::Unauthorized(json!({
-                "error": "Unauthorized!",
-                "message": "You must be logged in to perform this action!"
-            }))),
+            None => Err(NodecosmosError::Unauthorized(
+                "You are not allowed to view this resource!",
+            )),
         };
     }
 }

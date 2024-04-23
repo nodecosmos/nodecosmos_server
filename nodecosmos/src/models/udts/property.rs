@@ -13,7 +13,7 @@ pub enum PropDataTypes {
     DateTime,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 #[charybdis_udt_model(type_name = property)]
 #[serde(rename_all = "camelCase")]
 pub struct Property {

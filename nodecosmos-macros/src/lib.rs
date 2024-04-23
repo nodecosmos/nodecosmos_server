@@ -256,10 +256,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                 use crate::models::traits::Parent;
 
                 if self.id != Uuid::default() {
-                    return Err(NodecosmosError::Unauthorized(serde_json::json!({
-                        "error": "Bad Request!",
-                        "message": "Cannot create node with id!"
-                    })));
+                    return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
                 }
 
                 if self.is_branched() {

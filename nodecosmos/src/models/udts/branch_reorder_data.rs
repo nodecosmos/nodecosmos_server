@@ -3,7 +3,7 @@ use charybdis::types::{Double, Uuid};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Clone)]
-#[charybdis_udt_model(type_name = BranchReorderData)]
+#[charybdis_udt_model(type_name = branchreorderdata)]
 #[serde(rename_all = "camelCase")]
 pub struct BranchReorderData {
     pub id: Uuid,

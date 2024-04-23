@@ -12,7 +12,6 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::ModelContext;
 use crate::models::traits::Parent;
@@ -216,7 +215,6 @@ impl Node {
 
                     node.append_to_ancestors(data.db_session()).await?;
                     node.maybe_create_workflow(&data).await?;
-                    node.create_commit(&data).await;
                 }
                 Err(e) => {
                     error!("Error finding non-branched node {}: {:?}", self.id, e);
@@ -305,16 +303,6 @@ impl Node {
         if self.is_original() {
             self.add_elastic_document(elastic_client).await;
         }
-    }
-
-    pub async fn create_commit(&self, data: &RequestData) {
-        let _ = NodeCommit::handle_creation(&data.db_session(), &self, data.current_user_id())
-            .map_err(|e| {
-                error!("Error creating new version for node {}: {:?}", self.id, e);
-
-                e
-            })
-            .await;
     }
 
     pub async fn create_workflow(&self, data: &RequestData) {

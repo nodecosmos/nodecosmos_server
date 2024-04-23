@@ -21,7 +21,6 @@ use crate::models::branch::{
 };
 use crate::models::udts::BranchReorderData;
 
-#[allow(unused)]
 pub enum BranchUpdate {
     CreateNode(Uuid),
     DeleteNodes(Vec<Uuid>),

@@ -203,6 +203,20 @@ partial_user!(
 );
 
 impl CurrentUser {
+    pub fn from_user(user: User) -> Self {
+        Self {
+            id: user.id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            username: user.username,
+            email: user.email,
+            profile_image_filename: user.profile_image_filename,
+            profile_image_url: user.profile_image_url,
+            is_confirmed: user.is_confirmed,
+            is_blocked: user.is_blocked,
+        }
+    }
+
     pub fn full_name(&self) -> String {
         format!("{} {}", self.first_name, self.last_name)
     }

@@ -2,7 +2,8 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::Find;
+use charybdis::operations::{Find, Insert};
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::archived_node::ArchivedNode;
 use crate::models::branch::AuthBranch;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context as Ctx, ModelContext};
@@ -112,7 +114,6 @@ impl Callbacks for Node {
 
         tokio::spawn(async move {
             self_clone.add_to_elastic(data.elastic_client()).await;
-            self_clone.create_commit(&data).await;
             self_clone.create_workflow(&data).await;
         });
 
@@ -133,12 +134,14 @@ impl Callbacks for Node {
     async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exist(&data).await?;
 
-        let self_clone = self.clone();
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            self_clone.create_commit_for_ancestors(&data).await;
-        });
+        let _ = ArchivedNode::from(self.clone())
+            .insert()
+            .execute(data.db_session())
+            .await
+            .map_err(|e| {
+                log::error!("[after_delete] Failed to insert archived node: {:?}", e);
+                e
+            });
 
         Ok(())
     }
@@ -158,11 +161,9 @@ impl Node {
         db_session: &CachingSession,
         ids: &Set<Uuid>,
         branch_id: Uuid,
-    ) -> Result<Vec<Node>, NodecosmosError> {
+    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
         let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
             .execute(db_session)
-            .await?
-            .try_collect()
             .await?;
 
         Ok(res)
@@ -294,7 +295,6 @@ impl Callbacks for UpdateTitleNode {
 
         tokio::spawn(async move {
             self_clone.update_elastic_index(data.elastic_client()).await;
-            self_clone.create_commit(&data).await;
         });
 
         Ok(())
