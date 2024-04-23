@@ -497,15 +497,21 @@ impl MergeFlowSteps {
                     // of the current branch.
                     let mut added_delta = vec![];
 
+                    println!("branch_fs.node_ids: {:?}", branch_fs.node_ids);
+
                     if let Some(node_ids) = branch_fs.node_ids.as_ref() {
                         node_ids.iter().for_each(|node_id| {
                             if let Some(original_node_ids) = original_flow_step.node_ids.as_ref() {
                                 if !original_node_ids.contains(node_id) {
                                     added_delta.push(*node_id);
                                 }
+                            } else {
+                                added_delta.push(*node_id);
                             }
                         });
                     };
+
+                    println!("added_delta: {:?}", added_delta);
 
                     // run update
                     original_flow_step.append_nodes(&added_delta);

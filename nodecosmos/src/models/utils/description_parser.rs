@@ -258,11 +258,8 @@ impl<'a> DescriptionXmlParser<'a> {
     }
 
     fn text(&mut self, event: BytesText<'a>) -> Result<(), NodecosmosError> {
-        println!("event: {:?}", event);
-
         let text = event.unescape()?;
 
-        println!("text: {:?}", text);
         self.html.push_str(&text);
 
         if self.blockquote_active {
