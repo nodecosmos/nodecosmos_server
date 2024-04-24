@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
@@ -14,7 +14,7 @@ use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::{Branchable, GroupById, Pluck};
+use crate::models::traits::{Branchable, GroupById, Pluck, PluckFromStream};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
 
@@ -78,9 +78,13 @@ impl MergeNodes {
             let mut deleted_node_ids = deleted_node_ids.clone();
             let descendant_node_ids = NodeDescendant::find_by_node_ids(db_session, branch.root_id, &deleted_node_ids)
                 .await?
-                .pluck_id_set();
+                .pluck_id_set()
+                .await?;
             deleted_node_ids.extend(descendant_node_ids);
-            let mut deleted_nodes = Node::find_by_ids(db_session, &deleted_node_ids).await?;
+            let mut deleted_nodes = Node::find_by_ids(db_session, &deleted_node_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             deleted_nodes.sort_by_depth();
 
@@ -91,9 +95,10 @@ impl MergeNodes {
     }
 
     pub fn reordered_nodes_data(branch: &Branch) -> Option<List<Frozen<BranchReorderData>>> {
-        if let Some(reordered_nodes) = branch.reordered_nodes.clone() {
+        if let Some(reordered_nodes) = branch.reordered_nodes.as_ref() {
             Some(
                 reordered_nodes
+                    .clone()
                     .into_iter()
                     .filter(|reorder_data| {
                         !branch
@@ -183,9 +188,11 @@ impl MergeNodes {
             for merge_node in merge_nodes {
                 merge_node.set_merge_context();
                 merge_node.set_original_id();
+
                 merge_node.owner_id = branch_node.owner_id;
                 merge_node.editor_ids = branch_node.editor_ids.clone();
                 merge_node.viewer_ids = branch_node.viewer_ids.clone();
+
                 merge_node.insert_cb(data).execute(data.db_session()).await?;
             }
         }
@@ -193,18 +200,27 @@ impl MergeNodes {
         Ok(())
     }
 
-    pub async fn delete_inserted_nodes(
-        data: &RequestData,
-        merge_nodes: &mut Option<Vec<Node>>,
-    ) -> Result<(), NodecosmosError> {
+    pub async fn remove_nodes(data: &RequestData, merge_nodes: &mut Option<Vec<Node>>) -> Result<(), NodecosmosError> {
         if let Some(merge_nodes) = merge_nodes {
+            let mut deleted_ids = HashSet::new();
+
             for merge_node in merge_nodes {
+                if merge_node
+                    .ancestor_ids
+                    .as_ref()
+                    .is_some_and(|ids| ids.iter().any(|id| deleted_ids.contains(id)))
+                {
+                    // skip deletion of node if it has an ancestor that is also deleted as
+                    // it will be removed in the callback
+                    continue;
+                }
+
                 merge_node.set_merge_context();
                 merge_node.set_original_id();
 
-                println!("branch_id: {}", merge_node.branch_id);
-
                 merge_node.delete_cb(data).execute(data.db_session()).await?;
+
+                deleted_ids.insert(merge_node.id);
             }
         }
 
@@ -220,7 +236,7 @@ impl MergeNodes {
     }
 
     pub async fn undo_restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_nodes(data, &mut self.restored_nodes)
+        Self::remove_nodes(data, &mut self.restored_nodes)
             .await
             .context("Failed to undo restore nodes")?;
 
@@ -236,7 +252,7 @@ impl MergeNodes {
     }
 
     pub async fn undo_create_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Self::delete_inserted_nodes(data, &mut self.created_nodes)
+        Self::remove_nodes(data, &mut self.created_nodes)
             .await
             .context("Failed to undo create nodes")?;
 
@@ -244,26 +260,9 @@ impl MergeNodes {
     }
 
     pub async fn delete_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(deleted_nodes) = &mut self.deleted_nodes {
-            let deleted_node_ids = deleted_nodes.clone().pluck_id_set();
-
-            for deleted_node in deleted_nodes {
-                if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
-                    if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
-                        // skip deletion of node if it has an ancestor that is also deleted as
-                        // it will be removed in the callback
-                        continue;
-                    }
-
-                    deleted_node.set_merge_context();
-                    deleted_node
-                        .delete_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Failed to delete node")?;
-                }
-            }
-        }
+        Self::remove_nodes(data, &mut self.deleted_nodes)
+            .await
+            .context("Failed to delete inserted nodes")?;
 
         Ok(())
     }
@@ -300,6 +299,8 @@ impl MergeNodes {
                             new_lower_sibling_id: reorder_node_data.new_lower_sibling_id,
                             new_order_index: None,
                         };
+
+                        // reorder has it's own recovery logic
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {
@@ -335,6 +336,7 @@ impl MergeNodes {
                             new_upper_sibling_id: None,
                             new_lower_sibling_id: None,
                         };
+
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {

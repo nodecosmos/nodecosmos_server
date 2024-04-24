@@ -43,6 +43,7 @@ impl UpdateCoverImageNode {
             // create attachment
             Attachment {
                 node_id: self.id,
+                branch_id: self.branch_id,
                 object_id: self.id,
                 id: Uuid::new_v4(),
                 key: self.cover_image_filename.clone().unwrap(),

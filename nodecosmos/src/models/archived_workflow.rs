@@ -28,16 +28,18 @@ pub struct ArchivedWorkflow {
     pub updated_at: Timestamp,
 }
 
-impl From<Workflow> for ArchivedWorkflow {
-    fn from(workflow: Workflow) -> Self {
+impl From<&Workflow> for ArchivedWorkflow {
+    fn from(workflow: &Workflow) -> Self {
         Self {
             node_id: workflow.node_id,
             branch_id: workflow.branch_id,
             root_id: workflow.root_id,
-            title: workflow.title,
-            initial_input_ids: workflow.initial_input_ids,
+            title: workflow.title.clone(),
+            initial_input_ids: workflow.initial_input_ids.clone(),
             created_at: workflow.created_at,
             updated_at: workflow.updated_at,
         }
     }
 }
+
+partial_archived_workflow!(PkArchivedWorkflow, node_id, branch_id);

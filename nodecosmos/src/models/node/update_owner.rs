@@ -57,7 +57,8 @@ impl UpdateOwnerNode {
             ))
         }
 
-        UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), nodes_to_update.clone()).await;
+        UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await;
+
         Self::unlogged_batch()
             .chunked_insert(data.db_session(), &nodes_to_update, 100)
             .await

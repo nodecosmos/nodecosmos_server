@@ -1,6 +1,7 @@
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
-use charybdis::types::{Counter, Uuid};
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Counter, Set, Uuid};
 use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,29 @@ pub struct NodeCounter {
 
     pub like_count: Option<Counter>,
     pub descendants_count: Option<Counter>,
+}
+
+impl NodeCounter {
+    pub async fn find_by_ids_and_branch_id(
+        db_session: &CachingSession,
+        ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
+        find_node_counter!("id IN ? AND branch_id = ?", (ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
+    pub async fn find_by_ids(
+        db_session: &CachingSession,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
+        find_node_counter!("id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
 }
 
 impl Likeable for NodeCounter {

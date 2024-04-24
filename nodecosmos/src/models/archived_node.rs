@@ -55,8 +55,8 @@ pub struct ArchivedNode {
     pub updated_at: Timestamp,
 }
 
-impl From<Node> for ArchivedNode {
-    fn from(node: Node) -> Self {
+impl From<&Node> for ArchivedNode {
+    fn from(node: &Node) -> Self {
         ArchivedNode {
             branch_id: node.branch_id,
             id: node.id,
@@ -64,17 +64,19 @@ impl From<Node> for ArchivedNode {
             is_public: node.is_public,
             is_root: node.is_root,
             order_index: node.order_index,
-            title: node.title,
+            title: node.title.clone(),
             parent_id: node.parent_id,
-            ancestor_ids: node.ancestor_ids,
+            ancestor_ids: node.ancestor_ids.clone(),
             owner_id: node.owner_id,
-            owner: node.owner,
-            editor_ids: node.editor_ids,
-            viewer_ids: node.viewer_ids,
-            cover_image_filename: node.cover_image_filename,
-            cover_image_url: node.cover_image_url,
+            owner: node.owner.clone(),
+            editor_ids: node.editor_ids.clone(),
+            viewer_ids: node.viewer_ids.clone(),
+            cover_image_filename: node.cover_image_filename.clone(),
+            cover_image_url: node.cover_image_url.clone(),
             created_at: node.created_at,
             updated_at: node.updated_at,
         }
     }
 }
+
+partial_archived_node!(PkArchiveNode, branch_id, id);

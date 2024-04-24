@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert};
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
@@ -97,7 +96,7 @@ impl Callbacks for FlowStep {
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.create_branched_if_original_exists(data).await?;
 
-        let _ = ArchivedFlowStep::from(self.clone())
+        let _ = ArchivedFlowStep::from(&*self)
             .insert()
             .execute(data.db_session())
             .await
@@ -155,17 +154,6 @@ impl FlowStep {
         }
     }
 
-    pub async fn find_by_node_ids_and_branch_id(
-        db_session: &CachingSession,
-        node_ids: &Set<Uuid>,
-        branch_id: Uuid,
-    ) -> Result<CharybdisModelStream<FlowStep>, NodecosmosError> {
-        find_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
     pub async fn find_by_flow(
         db_session: &CachingSession,
         params: &WorkflowParams,
@@ -205,15 +193,6 @@ impl FlowStep {
         .await?;
 
         Ok(flow_steps)
-    }
-
-    pub async fn maybe_find_by_index(&self, db_session: &CachingSession) -> Result<Option<FlowStep>, NodecosmosError> {
-        let q = find_flow_step_query!("node_id = ? AND branch_id = ? AND flow_id = ? AND step_index = ? LIMIT 1");
-        let fs = FlowStep::maybe_find_first(q, (&self.node_id, &self.branch_id, &self.flow_id, &self.step_index))
-            .execute(db_session)
-            .await?;
-
-        Ok(fs)
     }
 
     pub async fn maybe_find_original(
@@ -409,4 +388,38 @@ impl UpdateOutputIdsFlowStep {
     }
 }
 
-partial_flow_step!(DeleteFlowStep, node_id, branch_id, flow_id, step_index, id);
+partial_flow_step!(PkFlowStep, node_id, branch_id, flow_id, step_index, id);
+
+impl PkFlowStep {
+    pub async fn maybe_find_by_index(self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
+        let fs = PkFlowStep::maybe_find_first(
+            find_pk_flow_step_query!(
+                r#"
+                    node_id = :node_id
+                        AND branch_id = :branch_id
+                        AND flow_id = :flow_id
+                        AND step_index = :step_index
+                    LIMIT 1
+
+                "#
+            ),
+            self,
+        )
+        .execute(db_session)
+        .await?;
+
+        Ok(fs)
+    }
+}
+
+impl From<&FlowStep> for PkFlowStep {
+    fn from(fs: &FlowStep) -> Self {
+        Self {
+            node_id: fs.node_id,
+            branch_id: fs.branch_id,
+            flow_id: fs.flow_id,
+            step_index: fs.step_index.clone(),
+            id: fs.id,
+        }
+    }
+}

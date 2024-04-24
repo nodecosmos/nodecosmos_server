@@ -35,9 +35,13 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
 
     // we always return merged description as we want to keep branched description in sync with original
     if description.is_branched() {
-        let original = Description::find_by_object_id_and_branch_id(description.object_id, description.original_id())
-            .execute(data.db_session())
-            .await;
+        let original = Description::find_by_node_id_and_branch_id_and_object_id(
+            description.node_id,
+            description.original_id(),
+            description.object_id,
+        )
+        .execute(data.db_session())
+        .await;
 
         if let Ok(mut original) = original {
             match description.base64 {
@@ -77,9 +81,10 @@ pub async fn get_original_description(
 ) -> Response {
     AuthNode::auth_view(&db_session, &opt_cu, params.node_id, params.node_id).await?;
 
-    let description = Description::find_by_object_id_and_branch_id(params.object_id, params.node_id)
-        .execute(&db_session)
-        .await?;
+    let description =
+        Description::find_by_node_id_and_branch_id_and_object_id(params.node_id, params.node_id, params.object_id)
+            .execute(&db_session)
+            .await?;
 
     Ok(HttpResponse::Ok().json(description))
 }

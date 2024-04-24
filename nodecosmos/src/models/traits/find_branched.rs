@@ -6,6 +6,7 @@ use scylla::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::description::{find_description, Description};
 use crate::models::flow::{find_flow, find_update_title_flow, Flow, UpdateTitleFlow};
 use crate::models::flow_step::{
     find_flow_step, find_update_input_ids_flow_step, find_update_node_ids_flow_step, find_update_output_ids_flow_step,
@@ -151,6 +152,12 @@ find_or_insert_branched!(Flow);
 find_or_insert_branched!(FlowStep);
 
 pub trait FindForBranchMerge: Model {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError>;
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
@@ -163,25 +170,40 @@ pub trait FindForBranchMerge: Model {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError>;
+
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError>;
 }
 
 impl FindForBranchMerge for Flow {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_flow!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_flow!(
+        find_flow!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -189,34 +211,53 @@ impl FindForBranchMerge for Flow {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_flow!(
+        find_flow!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_flow!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 
 impl FindForBranchMerge for UpdateTitleFlow {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_title_flow!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_update_title_flow!(
+        find_update_title_flow!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -224,34 +265,53 @@ impl FindForBranchMerge for UpdateTitleFlow {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_update_title_flow!(
+        find_update_title_flow!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_title_flow!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 
 impl FindForBranchMerge for FlowStep {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_flow_step!(
+        find_flow_step!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -259,34 +319,53 @@ impl FindForBranchMerge for FlowStep {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_flow_step!(
+        find_flow_step!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_flow_step!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 
 impl FindForBranchMerge for UpdateInputIdsFlowStep {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_input_ids_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_update_input_ids_flow_step!(
+        find_update_input_ids_flow_step!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -294,34 +373,53 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_update_input_ids_flow_step!(
+        find_update_input_ids_flow_step!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_input_ids_flow_step!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 
 impl FindForBranchMerge for UpdateOutputIdsFlowStep {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_output_ids_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_update_output_ids_flow_step!(
+        find_update_output_ids_flow_step!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -329,34 +427,53 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_update_output_ids_flow_step!(
+        find_update_output_ids_flow_step!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_output_ids_flow_step!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }
 
 impl FindForBranchMerge for UpdateNodeIdsFlowStep {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_node_ids_flow_step!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     async fn find_by_node_ids_and_branch_id_and_ids(
         db_session: &CachingSession,
         node_ids: &Set<Uuid>,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let flows = find_update_node_ids_flow_step!(
+        find_update_node_ids_flow_step!(
             "node_id IN ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
             (node_ids, branch_id, ids)
         )
         .execute(db_session)
         .await?
         .try_collect()
-        .await?;
-
-        Ok(flows)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     async fn find_original_by_ids(
@@ -364,13 +481,76 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         node_ids: &Set<Uuid>,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        let flows = find_update_node_ids_flow_step!(
+        find_update_node_ids_flow_step!(
             "node_id IN ? AND branch_id IN ? AND id IN ? ALLOW FILTERING",
             (node_ids, node_ids, ids)
         )
         .execute(db_session)
-        .await?;
+        .await
+        .map_err(NodecosmosError::from)
+    }
 
-        Ok(flows)
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_update_node_ids_flow_step!("node_id IN ? AND branch_id IN ? ALLOW FILTERING", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+}
+
+impl FindForBranchMerge for Description {
+    async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_description!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
+    async fn find_by_node_ids_and_branch_id_and_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        branch_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        find_description!(
+            "node_id IN ? AND branch_id = ? AND object_id IN ?",
+            (node_ids, branch_id, ids)
+        )
+        .execute(db_session)
+        .await?
+        .try_collect()
+        .await
+        .map_err(NodecosmosError::from)
+    }
+
+    async fn find_original_by_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_description!(
+            "node_id IN ? AND branch_id IN ? AND object_id IN ?",
+            (node_ids, node_ids, ids)
+        )
+        .execute(db_session)
+        .await
+        .map_err(NodecosmosError::from)
+    }
+
+    async fn find_original_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_description!("node_id IN ? AND branch_id IN ?", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 }

@@ -1,8 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::description::{find_description, Description};
-use crate::models::traits::{Branchable, GroupByObjectId};
+use crate::models::description::Description;
+use crate::models::traits::{Branchable, FindForBranchMerge, GroupByObjectId};
 use crate::models::udts::TextChange;
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
@@ -24,39 +24,41 @@ impl MergeDescriptions {
         let mut deleted_descriptions = Vec::new();
         let mut original_descriptions = HashMap::new();
 
-        let edited_object_ids = branch.all_edited_description_ids();
-        let deleted_object_ids = branch.all_deleted_object_ids();
+        if let Some(node_ids) = branch.edited_workflow_nodes.as_ref() {
+            let edited_object_ids = branch.all_edited_description_ids();
+            let deleted_object_ids = branch.all_deleted_object_ids();
 
-        if edited_object_ids.len() > 0 {
-            edited_descriptions =
-                find_description!("branch_id = ? AND object_id IN ?", (branch.id, &edited_object_ids))
-                    .execute(db_session)
-                    .await?
-                    .try_collect()
-                    .await?;
-        }
+            if edited_object_ids.len() > 0 {
+                edited_descriptions = Description::find_by_node_ids_and_branch_id_and_ids(
+                    db_session,
+                    node_ids,
+                    branch.id,
+                    &edited_object_ids,
+                )
+                .await?;
+            }
 
-        if deleted_object_ids.len() > 0 {
-            deleted_descriptions =
-                find_description!("branch_id = ? AND object_id IN ?", (branch.id, &deleted_object_ids))
-                    .execute(db_session)
-                    .await?
-                    .try_collect()
-                    .await?;
-        }
+            if deleted_object_ids.len() > 0 {
+                deleted_descriptions = Description::find_by_node_ids_and_branch_id_and_ids(
+                    db_session,
+                    node_ids,
+                    branch.id,
+                    &deleted_object_ids,
+                )
+                .await?;
+            }
 
-        if edited_object_ids.len() > 0 || deleted_object_ids.len() > 0 {
-            let combined_ids = edited_object_ids
-                .union(&deleted_object_ids)
-                .cloned()
-                .collect::<HashSet<Uuid>>();
+            if edited_object_ids.len() > 0 || deleted_object_ids.len() > 0 {
+                let combined_ids = edited_object_ids
+                    .union(&deleted_object_ids)
+                    .cloned()
+                    .collect::<HashSet<Uuid>>();
 
-            original_descriptions =
-                find_description!("branch_id = ? AND object_id IN ?", (branch.root_id, &combined_ids))
-                    .execute(db_session)
+                original_descriptions = Description::find_original_by_ids(db_session, node_ids, &combined_ids)
                     .await?
                     .group_by_object_id()
                     .await?;
+            }
         }
 
         Ok(Self {

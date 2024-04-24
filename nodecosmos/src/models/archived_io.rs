@@ -1,10 +1,9 @@
 use crate::models::node::Node;
 use crate::models::traits::Context;
-use crate::models::udts::Property;
 
 use crate::models::io::Io;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Set, Text, Timestamp, Uuid};
 use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +46,6 @@ pub struct ArchivedIo {
     pub unit: Option<Text>,
     pub data_type: Option<Text>,
     pub value: Option<Text>,
-    pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -64,8 +62,8 @@ pub struct ArchivedIo {
     pub ctx: Context,
 }
 
-impl From<Io> for ArchivedIo {
-    fn from(io: Io) -> Self {
+impl From<&Io> for ArchivedIo {
+    fn from(io: &Io) -> Self {
         Self {
             root_id: io.root_id,
             node_id: io.node_id,
@@ -74,16 +72,27 @@ impl From<Io> for ArchivedIo {
             main_id: io.main_id,
             flow_id: io.flow_id,
             flow_step_id: io.flow_step_id,
-            inputted_by_flow_steps: io.inputted_by_flow_steps,
-            title: io.title,
-            unit: io.unit,
-            data_type: io.data_type,
-            value: io.value,
-            properties: io.properties,
+            inputted_by_flow_steps: io.inputted_by_flow_steps.clone(),
+            title: io.title.clone(),
+            unit: io.unit.clone(),
+            data_type: io.data_type.clone(),
+            value: io.value.clone(),
             created_at: io.created_at,
             updated_at: io.updated_at,
-            node: io.node,
+            node: io.node.clone(),
             ctx: io.ctx,
+        }
+    }
+}
+
+partial_archived_io!(PkArchivedIo, root_id, branch_id, id);
+
+impl From<&Io> for PkArchivedIo {
+    fn from(io: &Io) -> Self {
+        Self {
+            root_id: io.root_id,
+            branch_id: io.branch_id,
+            id: io.id,
         }
     }
 }

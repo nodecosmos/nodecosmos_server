@@ -2,7 +2,7 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::{Find, Insert};
+use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -12,7 +12,6 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::archived_node::ArchivedNode;
 use crate::models::branch::AuthBranch;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context as Ctx, ModelContext};
@@ -123,25 +122,16 @@ impl Callbacks for Node {
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         *self = Node::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
 
-        self.delete_related_data(data).await?;
         self.preserve_branch_ancestors(data).await?;
         self.preserve_branch_descendants(data).await?;
         self.update_branch_with_deletion(data).await?;
+        self.archive_and_delete(data).await?;
 
         Ok(())
     }
 
     async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exist(&data).await?;
-
-        let _ = ArchivedNode::from(self.clone())
-            .insert()
-            .execute(data.db_session())
-            .await
-            .map_err(|e| {
-                log::error!("[after_delete] Failed to insert archived node: {:?}", e);
-                e
-            });
 
         Ok(())
     }
@@ -169,11 +159,12 @@ impl Node {
         Ok(res)
     }
 
-    pub async fn find_by_ids(db_session: &CachingSession, ids: &Set<Uuid>) -> Result<Vec<Node>, NodecosmosError> {
+    pub async fn find_by_ids(
+        db_session: &CachingSession,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
         let res = find_node!("id IN ? AND branch_id IN ?", (ids, ids))
             .execute(db_session)
-            .await?
-            .try_collect()
             .await?;
 
         Ok(res)
@@ -183,7 +174,7 @@ impl Node {
 partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_by_ids(db_session: &CachingSession, ids: &Vec<Uuid>) -> Result<Vec<PkNode>, NodecosmosError> {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &[Uuid]) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
             .execute(db_session)
             .await?
@@ -195,7 +186,7 @@ impl PkNode {
 
     pub async fn find_by_ids_and_branch_id(
         db_session: &CachingSession,
-        ids: &Vec<Uuid>,
+        ids: &[Uuid],
         branch_id: Uuid,
     ) -> Result<Vec<PkNode>, NodecosmosError> {
         let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))

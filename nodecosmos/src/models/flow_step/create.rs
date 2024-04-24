@@ -6,7 +6,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::{FlowStep, PkFlowStep};
 use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, FindOrInsertBranched};
 
@@ -46,7 +46,11 @@ impl FlowStep {
     }
 
     pub async fn validate_no_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.maybe_find_by_index(data.db_session()).await?.is_some() {
+        if PkFlowStep::from(&*self)
+            .maybe_find_by_index(data.db_session())
+            .await?
+            .is_some()
+        {
             return Err(NodecosmosError::Conflict(format!(
                 "Flow Step on given index {} already exists",
                 self.step_index

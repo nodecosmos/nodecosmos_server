@@ -9,7 +9,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::{FlowStep, PkFlowStep};
 use crate::models::io::Io;
 use crate::models::node::PkNode;
 use crate::models::traits::{
@@ -407,10 +407,10 @@ impl<'a> MergeConflicts<'a> {
                 }
 
                 // check if original flow step with same index exists
-                let mut maybe_orig = flow_step.clone();
-                maybe_orig.set_original_id();
+                let mut pk_fs = PkFlowStep::from(flow_step);
+                pk_fs.set_original_id();
 
-                if let Some(original) = maybe_orig.maybe_find_by_index(data.db_session()).await? {
+                if let Some(original) = pk_fs.maybe_find_by_index(data.db_session()).await? {
                     if self
                         .branch_merge
                         .branch

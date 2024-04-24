@@ -1,4 +1,5 @@
 use charybdis::macros::charybdis_model;
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -41,14 +42,27 @@ impl NodeDescendant {
         db_session: &CachingSession,
         root_id: Uuid,
         node_ids: &HashSet<Uuid>,
-    ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
+    ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
         find_node_descendant!(
             "root_id = ? AND branch_id IN ? AND node_id IN ?",
             (root_id, node_ids, node_ids,)
         )
         .execute(db_session)
-        .await?
-        .try_collect()
+        .await
+        .map_err(NodecosmosError::from)
+    }
+
+    pub async fn find_by_branch_id_and_node_ids(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        branch_id: Uuid,
+        node_ids: &HashSet<Uuid>,
+    ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
+        find_node_descendant!(
+            "root_id = ? AND branch_id = ? AND node_id IN ?",
+            (root_id, branch_id, node_ids,)
+        )
+        .execute(db_session)
         .await
         .map_err(NodecosmosError::from)
     }

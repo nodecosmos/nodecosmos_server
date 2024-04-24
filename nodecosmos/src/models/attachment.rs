@@ -4,8 +4,8 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
 use futures::StreamExt;
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
@@ -17,7 +17,7 @@ const MAX_IMAGE_WIDTH: u32 = 852;
 
 #[charybdis_model(
     table_name = attachments,
-    partition_keys = [node_id],
+    partition_keys = [node_id, branch_id],
     clustering_keys = [object_id, id],
     static_columns = [],
 )]
@@ -25,6 +25,7 @@ const MAX_IMAGE_WIDTH: u32 = 852;
 #[serde(rename_all = "camelCase")]
 pub struct Attachment {
     pub node_id: Uuid,
+    pub branch_id: Uuid,
     pub object_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
@@ -68,6 +69,7 @@ impl Attachment {
 
             let mut attachment = Attachment::new();
             attachment.node_id = params.node_id;
+            attachment.branch_id = params.branch_id;
             attachment.object_id = params.object_id;
             attachment.user_id = Some(data.current_user.id);
 
@@ -87,19 +89,45 @@ impl Attachment {
         ))
     }
 
-    pub async fn delete_by_node_ids(data: &RequestData, node_ids: &HashSet<Uuid>) -> Result<(), NodecosmosError> {
-        let attachments = find_attachment!("node_id IN ?", (node_ids,))
-            .execute(data.db_session())
+    pub async fn find_by_node_ids(
+        db_session: &CachingSession,
+        ids: &[Uuid],
+    ) -> Result<Vec<Attachment>, NodecosmosError> {
+        find_attachment!("node_id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
             .await?
             .try_collect()
-            .await?;
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
+    pub async fn find_by_node_ids_and_branch_id(
+        db_session: &CachingSession,
+        ids: &[Uuid],
+        branch_id: Uuid,
+    ) -> Result<Vec<Attachment>, NodecosmosError> {
+        find_attachment!("node_id = ? AND branch_id = ?", (ids, branch_id))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
+    }
+}
+
+pub trait AttachmentsDelete {
+    fn delete_all(self, data: &RequestData) -> Result<(), NodecosmosError>;
+}
+
+impl AttachmentsDelete for Vec<Attachment> {
+    fn delete_all(self, data: &RequestData) -> Result<(), NodecosmosError> {
         let data = data.clone();
 
         tokio::spawn(async move {
-            Self::delete_s3_objects(&data, &attachments).await;
+            Attachment::delete_s3_objects(&data, &self).await;
 
             let _ = Attachment::batch()
-                .chunked_delete_by_partition_key(data.db_session(), &attachments, 100)
+                .chunked_delete_by_partition_key(data.db_session(), &self, 100)
                 .await
                 .map_err(|e| log::error!("Error deleting attachments: {}", e));
         });

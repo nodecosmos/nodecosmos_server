@@ -14,12 +14,14 @@ pub enum ElasticDocumentOp {
     Update,
     Delete,
     BulkUpdate,
+    BulkInsert,
     BulkDelete,
 }
 
 pub trait ElasticDocument<T: ElasticIndex + Serialize> {
-    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: Vec<T>);
-    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &Vec<Uuid>);
+    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]);
+    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]);
+    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]);
 
     async fn handle_response_error(response: Response, op: ElasticDocumentOp) {
         let status_code = response.status_code();
@@ -45,7 +47,39 @@ pub trait ElasticDocument<T: ElasticIndex + Serialize> {
 }
 
 impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
-    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: Vec<T>) {
+    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]) {
+        let mut ops = BulkOperations::new();
+
+        for model in models {
+            let op = BulkOperation::index(model);
+            let _ = ops.push(op).map_err(|_| {
+                error!(
+                    "Failed to add insert operation to bulk request! Index: {}, Id: {}",
+                    T::ELASTIC_IDX_NAME,
+                    model.index_id()
+                )
+            });
+        }
+
+        let bulk_response = client
+            .bulk(BulkParts::Index(T::ELASTIC_IDX_NAME))
+            .body(vec![ops])
+            .send()
+            .await;
+
+        match bulk_response {
+            Ok(bulk_response) => Self::handle_response_error(bulk_response, ElasticDocumentOp::BulkInsert).await,
+            Err(e) => {
+                error!(
+                    "Failed to send bulk insert request! Index: {}, \nResponse: {:?}",
+                    T::ELASTIC_IDX_NAME,
+                    e
+                );
+            }
+        }
+    }
+
+    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]) {
         let mut ops = BulkOperations::new();
 
         for model in models {
@@ -83,7 +117,7 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
         }
     }
 
-    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &Vec<Uuid>) {
+    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]) {
         let mut ops = BulkOperations::new();
 
         for id in ids {

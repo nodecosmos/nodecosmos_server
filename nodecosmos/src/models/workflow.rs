@@ -84,6 +84,16 @@ impl Workflow {
         }
     }
 
+    pub async fn find_by_node_ids(
+        db_session: &CachingSession,
+        node_ids: &HashSet<Uuid>,
+    ) -> Result<CharybdisModelStream<Workflow>, NodecosmosError> {
+        find_workflow!("node_id IN ? AND branch_id IN ?", (node_ids, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
     pub async fn find_by_node_ids_and_branch_id(
         db_session: &CachingSession,
         node_ids: &HashSet<Uuid>,

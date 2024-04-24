@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 /// don't duplicate data for each ancestor.
 #[charybdis_model(
     table_name = archived_flow_steps,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [node_id, branch_id],
+    clustering_keys = [flow_id, step_index, id],
     table_options = r#"
         compression = {
             'sstable_compression': 'SnappyCompressor',
@@ -45,20 +45,34 @@ pub struct ArchivedFlowStep {
     pub updated_at: Timestamp,
 }
 
-impl From<FlowStep> for ArchivedFlowStep {
-    fn from(flow_step: FlowStep) -> Self {
+impl From<&FlowStep> for ArchivedFlowStep {
+    fn from(flow_step: &FlowStep) -> Self {
         Self {
             node_id: flow_step.node_id,
             branch_id: flow_step.branch_id,
             flow_id: flow_step.flow_id,
-            step_index: flow_step.step_index,
+            step_index: flow_step.step_index.clone(),
             id: flow_step.id,
             root_id: flow_step.root_id,
-            node_ids: flow_step.node_ids,
-            input_ids_by_node_id: flow_step.input_ids_by_node_id,
-            output_ids_by_node_id: flow_step.output_ids_by_node_id,
+            node_ids: flow_step.node_ids.clone(),
+            input_ids_by_node_id: flow_step.input_ids_by_node_id.clone(),
+            output_ids_by_node_id: flow_step.output_ids_by_node_id.clone(),
             created_at: flow_step.created_at,
             updated_at: flow_step.updated_at,
+        }
+    }
+}
+
+partial_archived_flow_step!(PkArchivedFlowStep, id, branch_id, node_id, flow_id, step_index);
+
+impl From<&FlowStep> for PkArchivedFlowStep {
+    fn from(flow_step: &FlowStep) -> Self {
+        Self {
+            id: flow_step.id,
+            branch_id: flow_step.branch_id,
+            node_id: flow_step.node_id,
+            flow_id: flow_step.flow_id,
+            step_index: flow_step.step_index.clone(),
         }
     }
 }

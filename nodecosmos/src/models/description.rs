@@ -3,12 +3,10 @@ use base64::Engine;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert};
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
@@ -25,18 +23,18 @@ mod save;
 
 #[charybdis_model(
     table_name = description,
-    partition_keys = [object_id],
-    clustering_keys = [branch_id],
-    global_secondary_indexes = [node_id]
+    partition_keys = [node_id, branch_id],
+    clustering_keys = [object_id],
+    global_secondary_indexes = []
 )]
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Description {
-    pub object_id: Uuid,
-    pub branch_id: Uuid,
-
     #[branch(original_id)]
     pub node_id: Uuid,
+
+    pub branch_id: Uuid,
+    pub object_id: Uuid,
 
     #[serde(default)]
     pub root_id: Uuid,
@@ -63,9 +61,10 @@ impl Callbacks for Description {
             )));
         }
 
-        let current = Self::maybe_find_first_by_object_id_and_branch_id(self.object_id, self.branch_id)
-            .execute(session)
-            .await?;
+        let current =
+            Self::maybe_find_first_by_node_id_and_branch_id_and_object_id(self.node_id, self.branch_id, self.object_id)
+                .execute(session)
+                .await?;
 
         if let Some(mut current) = current {
             let branch_id = self.branch_id;
@@ -108,7 +107,7 @@ impl Callbacks for Description {
         db_session: &CachingSession,
         _extension: &Self::Extension,
     ) -> Result<(), Self::Error> {
-        let _ = ArchivedDescription::from(self.clone())
+        let _ = ArchivedDescription::from(&*self)
             .insert()
             .execute(db_session)
             .await
@@ -123,16 +122,6 @@ impl Callbacks for Description {
 
 impl Description {
     const DESCRIPTION_ROOT: &'static str = "prosemirror";
-
-    pub async fn find_by_node_ids(
-        db_session: &CachingSession,
-        node_ids: &HashSet<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_description!("node_id IN ? ALLOW FILTERING", (node_ids,))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
 
     pub async fn merge(&mut self, other: &Self) -> Result<(), NodecosmosError> {
         let current_base64 = match &self.base64 {
@@ -185,10 +174,11 @@ macro_rules! find_branched {
             pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<&mut Self, NodecosmosError> {
                 use anyhow::Context;
 
-                let branch_self = Self::maybe_find_by_primary_key_value(&(self.object_id, self.branch_id))
-                    .execute(db_session)
-                    .await
-                    .context("Failed to find branched description")?;
+                let branch_self =
+                    Self::maybe_find_by_primary_key_value(&(self.node_id, self.branch_id, self.object_id))
+                        .execute(db_session)
+                        .await
+                        .context("Failed to find branched description")?;
 
                 match branch_self {
                     Some(branch_self) => {
@@ -197,7 +187,7 @@ macro_rules! find_branched {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value(&(self.object_id, self.original_id()))
+                        *self = Self::find_by_primary_key_value(&(self.node_id, self.original_id(), self.object_id))
                             .execute(db_session)
                             .await?;
 

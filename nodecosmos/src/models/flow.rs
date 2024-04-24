@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{DeleteWithCallbacks, Insert};
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
@@ -99,7 +98,7 @@ impl Callbacks for Flow {
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.create_branched_if_original_exists(data).await?;
 
-        let _ = ArchivedFlow::from(self.clone())
+        let _ = ArchivedFlow::from(&*self)
             .insert()
             .execute(data.db_session())
             .await
@@ -152,17 +151,6 @@ impl Flow {
         }
     }
 
-    pub async fn find_by_node_ids_and_branch_id(
-        db_session: &CachingSession,
-        node_ids: &HashSet<Uuid>,
-        branch_id: Uuid,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
     pub async fn flow_steps(&self, db_session: &CachingSession) -> Result<Vec<FlowStep>, NodecosmosError> {
         let res = FlowStep::find_by_flow(
             db_session,
@@ -200,7 +188,5 @@ impl Callbacks for UpdateTitleFlow {
         Ok(())
     }
 }
-
-partial_flow!(DeleteFlow, node_id, branch_id, start_index, vertical_index, id);
 
 partial_flow!(PkFlow, node_id, branch_id, start_index, vertical_index, id);

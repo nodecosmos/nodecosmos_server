@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
-use charybdis::types::{Frozen, List, Set, Text, Timestamp, Uuid};
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,6 @@ use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal};
 use crate::models::traits::{Context, ModelContext};
-use crate::models::udts::Property;
 
 mod create;
 mod delete;
@@ -28,7 +28,7 @@ mod update_title;
     table_name = input_outputs,
     partition_keys = [root_id, branch_id],
     clustering_keys = [id],
-    local_secondary_indexes = [main_id]
+    local_secondary_indexes = [main_id, node_id]
 )]
 #[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -54,7 +54,6 @@ pub struct Io {
     pub unit: Option<Text>,
     pub data_type: Option<Text>,
     pub value: Option<Text>,
-    pub properties: Option<Frozen<List<Frozen<Property>>>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -107,7 +106,7 @@ impl Callbacks for Io {
     async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
 
-        let _ = ArchivedIo::from(self.clone())
+        let _ = ArchivedIo::from(&*self)
             .insert()
             .execute(db_session)
             .await
@@ -175,6 +174,35 @@ impl Io {
             .await?;
 
         Ok(ios)
+    }
+
+    pub async fn find_by_root_id_and_node_ids(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Io>, NodecosmosError> {
+        find_io!(
+            "root_id = ? AND branch_id = ? AND node_id IN ? ALLOW FILTERING",
+            (root_id, root_id, ids)
+        )
+        .execute(db_session)
+        .await
+        .map_err(NodecosmosError::from)
+    }
+
+    pub async fn find_by_root_id_and_branch_id_and_node_ids(
+        db_session: &CachingSession,
+        root_id: Uuid,
+        branch_id: Uuid,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Io>, NodecosmosError> {
+        find_io!(
+            "root_id = ? AND branch_id = ? AND node_id IN ? ALLOW FILTERING",
+            (root_id, branch_id, node_ids)
+        )
+        .execute(db_session)
+        .await
+        .map_err(NodecosmosError::from)
     }
 
     pub async fn find_or_insert_branched_main(

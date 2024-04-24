@@ -8,7 +8,13 @@ use serde::{Deserialize, Serialize};
     table_name = archived_flows,
     partition_keys = [node_id, branch_id],
     clustering_keys = [vertical_index, start_index, id],
-    local_secondary_indexes = [id]
+    local_secondary_indexes = [id],
+    table_options = r#"
+        compression = {
+            'sstable_compression': 'SnappyCompressor',
+            'chunk_length_in_kb': 64
+        }
+    "#
 )]
 #[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -36,17 +42,31 @@ pub struct ArchivedFlow {
     pub updated_at: Timestamp,
 }
 
-impl From<Flow> for ArchivedFlow {
-    fn from(flow: Flow) -> Self {
+impl From<&Flow> for ArchivedFlow {
+    fn from(flow: &Flow) -> Self {
         Self {
             node_id: flow.node_id,
             branch_id: flow.branch_id,
             vertical_index: flow.vertical_index,
             start_index: flow.start_index,
             id: flow.id,
-            title: flow.title,
+            title: flow.title.clone(),
             created_at: flow.created_at,
             updated_at: flow.updated_at,
+        }
+    }
+}
+
+partial_archived_flow!(PkArchivedFlow, node_id, branch_id, vertical_index, start_index, id);
+
+impl From<&Flow> for PkArchivedFlow {
+    fn from(flow: &Flow) -> Self {
+        Self {
+            node_id: flow.node_id,
+            branch_id: flow.branch_id,
+            vertical_index: flow.vertical_index,
+            start_index: flow.start_index,
+            id: flow.id,
         }
     }
 }
