@@ -590,6 +590,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c59bdb34bc650a32731b31bd8f0829cc15d24a708ee31559e0bb34f2bc320cba"
+
+[[package]]
 name = "atomic_refcell"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1262,7 +1268,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "charybdis"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -2757,6 +2763,7 @@ dependencies = [
  "mozjpeg",
  "nodecosmos-macros",
  "quick-xml",
+ "rand",
  "scylla",
  "serde",
  "serde_json",
@@ -4544,6 +4551,7 @@ version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
 dependencies = [
+ "atomic",
  "getrandom",
  "serde",
 ]

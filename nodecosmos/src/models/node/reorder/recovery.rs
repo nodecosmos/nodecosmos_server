@@ -135,7 +135,11 @@ impl<'a> Recovery<'a> {
         let now = std::time::Instant::now();
 
         NodeDescendant::unlogged_batch()
-            .chunked_insert(self.db_session, &self.reorder_data.tree_descendants, 100)
+            .chunked_insert(
+                self.db_session,
+                &self.reorder_data.tree_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("restore_tree_descendants: {}", err);
@@ -171,7 +175,12 @@ impl<'a> Recovery<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PULL_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("remove_new_ancestor_ids: {:?}", err);
@@ -192,7 +201,12 @@ impl<'a> Recovery<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PUSH_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("append_old_ancestor_ids: {:?}", err);

@@ -367,7 +367,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedNode::unlogged_batch()
-            .chunked_insert(db_session, &archive_nodes, 100)
+            .chunked_insert(db_session, &archive_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -383,7 +383,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchiveNode::unlogged_batch()
-            .chunked_delete(db_session, &archive_nodes, 100)
+            .chunked_delete(db_session, &archive_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -396,7 +396,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedWorkflow::unlogged_batch()
-            .chunked_insert(db_session, &archive_workflows, 100)
+            .chunked_insert(db_session, &archive_workflows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -412,7 +412,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchivedWorkflow::unlogged_batch()
-            .chunked_delete(db_session, &archive_workflows, 100)
+            .chunked_delete(db_session, &archive_workflows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -425,7 +425,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedFlow::unlogged_batch()
-            .chunked_insert(db_session, &archive_flows, 100)
+            .chunked_insert(db_session, &archive_flows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -438,7 +438,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchivedFlow::unlogged_batch()
-            .chunked_delete(db_session, &archive_flows, 100)
+            .chunked_delete(db_session, &archive_flows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -451,7 +451,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedFlowStep::unlogged_batch()
-            .chunked_insert(db_session, &archive_flow_steps, 100)
+            .chunked_insert(db_session, &archive_flow_steps, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -464,7 +464,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchivedFlowStep::unlogged_batch()
-            .chunked_delete(db_session, &archive_flow_steps, 100)
+            .chunked_delete(db_session, &archive_flow_steps, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -477,7 +477,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedIo::unlogged_batch()
-            .chunked_insert(db_session, &archive_ios, 100)
+            .chunked_insert(db_session, &archive_ios, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -490,7 +490,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchivedIo::unlogged_batch()
-            .chunked_delete(db_session, &archive_ios, 100)
+            .chunked_delete(db_session, &archive_ios, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
@@ -503,7 +503,11 @@ impl<'a> NodeDelete<'a> {
         }
 
         ArchivedDescription::unlogged_batch()
-            .chunked_insert(db_session, &archive_descriptions, 100)
+            .chunked_insert(
+                db_session,
+                &archive_descriptions,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
@@ -516,119 +520,163 @@ impl<'a> NodeDelete<'a> {
         }
 
         PkArchivedDescription::unlogged_batch()
-            .chunked_delete(db_session, &archive_descriptions, 100)
+            .chunked_delete(
+                db_session,
+                &archive_descriptions,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_nodes(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Node::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_nodes, 100)
+            .chunked_delete(db_session, &self.deleted_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_nodes(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Node::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_nodes, 100)
+            .chunked_insert(db_session, &self.deleted_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_descendants(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         NodeDescendant::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_descendants, 100)
+            .chunked_delete(
+                db_session,
+                &self.deleted_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_descendants(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         NodeDescendant::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_descendants, 100)
+            .chunked_insert(
+                db_session,
+                &self.deleted_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_workflows(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Workflow::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_workflows, 100)
+            .chunked_delete(
+                db_session,
+                &self.deleted_workflows,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_workflows(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Workflow::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_workflows, 100)
+            .chunked_insert(
+                db_session,
+                &self.deleted_workflows,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_flows(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Flow::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_flows, 100)
+            .chunked_delete(db_session, &self.deleted_flows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_flows(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Flow::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_flows, 100)
+            .chunked_insert(db_session, &self.deleted_flows, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_flow_steps(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         FlowStep::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_flow_steps, 100)
+            .chunked_delete(
+                db_session,
+                &self.deleted_flow_steps,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_flow_steps(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         FlowStep::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_flow_steps, 100)
+            .chunked_insert(
+                db_session,
+                &self.deleted_flow_steps,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_ios(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Io::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_ios, 100)
+            .chunked_delete(db_session, &self.deleted_ios, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_ios(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Io::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_ios, 100)
+            .chunked_insert(db_session, &self.deleted_ios, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_descriptions(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Description::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_descriptions, 100)
+            .chunked_delete(
+                db_session,
+                &self.deleted_descriptions,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_descriptions(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Description::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_descriptions, 100)
+            .chunked_insert(
+                db_session,
+                &self.deleted_descriptions,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn delete_counter_data(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         NodeCounter::unlogged_batch()
-            .chunked_delete(db_session, &self.deleted_counter_data, 100)
+            .chunked_delete(
+                db_session,
+                &self.deleted_counter_data,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
 
     async fn undo_delete_counter_data(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         NodeCounter::unlogged_batch()
-            .chunked_insert(db_session, &self.deleted_counter_data, 100)
+            .chunked_insert(
+                db_session,
+                &self.deleted_counter_data,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(NodecosmosError::from)
     }
@@ -647,7 +695,7 @@ impl<'a> NodeDelete<'a> {
         }
 
         let _ = Like::unlogged_batch()
-            .chunked_delete_by_partition_key(db_session, &deleted_likes, 100)
+            .chunked_delete_by_partition_key(db_session, &deleted_likes, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|e| log::error!("Error deleting likes: {:?}", e));
 

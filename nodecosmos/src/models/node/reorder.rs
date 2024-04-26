@@ -139,7 +139,11 @@ impl<'a> Reorder<'a> {
 
         NodeDescendant::unlogged_delete_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
+            .chunked_delete(
+                &self.db_session,
+                &descendants_to_delete,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("remove_node_from_removed_ancestors: {:?}", err);
@@ -169,7 +173,11 @@ impl<'a> Reorder<'a> {
 
         NodeDescendant::unlogged_delete_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
+            .chunked_delete(
+                &self.db_session,
+                &descendants_to_delete,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
@@ -198,7 +206,11 @@ impl<'a> Reorder<'a> {
 
         NodeDescendant::unlogged_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_insert(&self.db_session, &descendants_to_add, 100)
+            .chunked_insert(
+                &self.db_session,
+                &descendants_to_add,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("add_node_to_new_ancestors: {:?}", err);
@@ -229,7 +241,7 @@ impl<'a> Reorder<'a> {
 
         NodeDescendant::unlogged_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_insert(&self.db_session, &descendants, 100)
+            .chunked_insert(&self.db_session, &descendants, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
                 error!("insert_node_descendants_to_added_ancestors: {:?}", err);
@@ -264,7 +276,12 @@ impl<'a> Reorder<'a> {
 
         Node::unlogged_statement_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PULL_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("pull_removed_ancestors_from_descendants: {:?}", err);
@@ -304,7 +321,12 @@ impl<'a> Reorder<'a> {
 
         Node::unlogged_statement_batch()
             .consistency(Consistency::EachQuorum)
-            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PUSH_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("push_added_ancestors_to_descendants: {:?}", err);

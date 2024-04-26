@@ -395,15 +395,15 @@ impl PkFlowStep {
         let fs = PkFlowStep::maybe_find_first(
             find_pk_flow_step_query!(
                 r#"
-                    node_id = :node_id
-                        AND branch_id = :branch_id
-                        AND flow_id = :flow_id
-                        AND step_index = :step_index
+                    node_id = ?
+                        AND branch_id = ?
+                        AND flow_id = ?
+                        AND step_index = ?
                     LIMIT 1
 
                 "#
             ),
-            self,
+            (self.node_id, self.branch_id, self.flow_id, self.step_index),
         )
         .execute(db_session)
         .await?;

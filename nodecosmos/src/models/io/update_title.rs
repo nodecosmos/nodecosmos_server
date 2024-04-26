@@ -30,7 +30,7 @@ impl UpdateTitleIo {
             }
 
             UpdateTitleIo::batch()
-                .chunked_update(db_session, &batch_ios, 100)
+                .chunked_update(db_session, &batch_ios, crate::constants::BATCH_CHUNK_SIZE)
                 .await?;
         }
 

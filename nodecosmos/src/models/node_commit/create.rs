@@ -199,11 +199,15 @@ impl NodeCommit {
         }
 
         NodeDescendantsCommit::unlogged_batch()
-            .chunked_insert(db_session, &new_v_node_descendants, 100)
+            .chunked_insert(
+                db_session,
+                &new_v_node_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await?;
 
         NodeCommit::unlogged_batch()
-            .chunked_insert(db_session, &new_v_nodes, 100)
+            .chunked_insert(db_session, &new_v_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await?;
 
         Ok(())
@@ -254,11 +258,15 @@ impl NodeCommit {
         }
 
         NodeDescendantsCommit::unlogged_batch()
-            .chunked_insert(db_session, &new_v_node_descendants, 100)
+            .chunked_insert(
+                db_session,
+                &new_v_node_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await?;
 
         NodeCommit::unlogged_batch()
-            .chunked_insert(db_session, &new_v_nodes, 100)
+            .chunked_insert(db_session, &new_v_nodes, crate::constants::BATCH_CHUNK_SIZE)
             .await?;
 
         Ok(())

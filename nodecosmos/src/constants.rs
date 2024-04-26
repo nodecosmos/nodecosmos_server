@@ -1,1 +1,2 @@
-pub const MAX_PARALLEL_REQUESTS: usize = 25; // let's determine this number by testing
+pub const MAX_PARALLEL_REQUESTS: usize = 25;
+pub const BATCH_CHUNK_SIZE: usize = 100;

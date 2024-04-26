@@ -127,7 +127,7 @@ impl AttachmentsDelete for Vec<Attachment> {
             Attachment::delete_s3_objects(&data, &self).await;
 
             let _ = Attachment::batch()
-                .chunked_delete_by_partition_key(data.db_session(), &self, 100)
+                .chunked_delete_by_partition_key(data.db_session(), &self, crate::constants::BATCH_CHUNK_SIZE)
                 .await
                 .map_err(|e| log::error!("Error deleting attachments: {}", e));
         });

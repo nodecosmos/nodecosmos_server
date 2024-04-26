@@ -60,7 +60,11 @@ impl UpdateOwnerNode {
         UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await;
 
         Self::unlogged_batch()
-            .chunked_insert(data.db_session(), &nodes_to_update, 100)
+            .chunked_insert(
+                data.db_session(),
+                &nodes_to_update,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|e| {
                 error!("[run::chunked_insert] {}", e);

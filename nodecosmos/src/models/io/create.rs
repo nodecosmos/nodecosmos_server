@@ -86,7 +86,7 @@ impl Io {
         .collect();
 
         Io::unlogged_batch()
-            .chunked_insert_if_not_exist(db_session, &branched, 100)
+            .chunked_insert_if_not_exist(db_session, &branched, crate::constants::BATCH_CHUNK_SIZE)
             .await?;
 
         Ok(())

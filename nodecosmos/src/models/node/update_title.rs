@@ -32,7 +32,11 @@ impl UpdateTitleNode {
             }
 
             if let Err(e) = NodeDescendant::batch()
-                .chunked_update(data.db_session(), &node_descendants, 100)
+                .chunked_update(
+                    data.db_session(),
+                    &node_descendants,
+                    crate::constants::MAX_PARALLEL_REQUESTS,
+                )
                 .await
             {
                 error!(":chunked_update: {}", e);

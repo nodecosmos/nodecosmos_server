@@ -14,8 +14,7 @@ use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
-
-pub use super::udts::Address;
+use crate::models::udts::Address;
 
 pub mod update_profile_image;
 

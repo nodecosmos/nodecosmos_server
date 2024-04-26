@@ -2,7 +2,7 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::Find;
+use charybdis::operations::{Delete, Find};
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -103,6 +103,8 @@ impl Callbacks for Node {
 
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
+
+        self.delete_by_partition_key().execute(db_session).await?;
 
         Ok(())
     }

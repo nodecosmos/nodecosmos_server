@@ -37,6 +37,7 @@ macro_rules! impl_descendants {
             ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
                 let original =
                     NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
+                        .page_size(5)
                         .execute(db_session)
                         .await?
                         .try_collect()
