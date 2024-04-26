@@ -1,11 +1,14 @@
+use actix_multipart::Multipart;
+use charybdis::operations::{InsertWithCallbacks, UpdateWithCallbacks};
+use futures::StreamExt;
+use uuid::Uuid;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::attachment::Attachment;
 use crate::models::node::UpdateCoverImageNode;
 use crate::models::traits::s3::S3;
 use crate::models::utils::Image;
-use actix_multipart::Multipart;
-use charybdis::operations::UpdateWithCallbacks;
-use futures::StreamExt;
 
 const IMG_WIDTH: u32 = 850;
 const IMG_HEIGHT: u32 = 375;
@@ -36,6 +39,21 @@ impl UpdateCoverImageNode {
             self.upload_s3_object(data, compressed).await?;
 
             self.update_cb(data).execute(data.db_session()).await?;
+
+            // create attachment
+            Attachment {
+                node_id: self.id,
+                branch_id: self.branch_id,
+                object_id: self.id,
+                id: Uuid::new_v4(),
+                key: self.cover_image_filename.clone().unwrap(),
+                url: self.cover_image_url.clone(),
+                user_id: Some(data.current_user.id),
+                ..Default::default()
+            }
+            .insert_cb(&None)
+            .execute(data.db_session())
+            .await?;
 
             return Ok(());
         }

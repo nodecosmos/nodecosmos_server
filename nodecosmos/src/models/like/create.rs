@@ -1,34 +1,38 @@
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::like::likeable::Likeable;
-use crate::models::like::{Like, ObjectType};
-use crate::models::materialized_views::likes_by_user::LikesByUser;
-use crate::models::node_counter::NodeCounter;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 use chrono::Utc;
 use scylla::CachingSession;
 
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::like::likeable::Likeable;
+use crate::models::like::{Like, LikeObjectType};
+use crate::models::materialized_views::likes_by_user::LikesByUser;
+use crate::models::node_counter::NodeCounter;
+
 impl Like {
-    pub fn set_defaults(&mut self) {
+    pub fn set_defaults(&mut self, data: &RequestData) {
         let now = Utc::now();
+
+        self.user_id = data.current_user.id;
+        self.username = data.current_user.username.clone();
 
         if self.branch_id == Uuid::default() {
             self.branch_id = self.object_id;
         }
 
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
+        self.created_at = now;
+        self.updated_at = now;
     }
 
-    pub async fn validate_not_liked(&self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn validate_not_liked(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let existing_like = LikesByUser {
             user_id: self.user_id,
             object_id: self.object_id,
             branch_id: self.branch_id,
         }
         .find_by_primary_key()
-        .execute(session)
+        .execute(db_session)
         .await
         .ok();
 
@@ -42,23 +46,29 @@ impl Like {
         Ok(())
     }
 
-    pub async fn update_model_like_count(
-        &mut self,
-        _: &CachingSession,
-        data: &RequestData,
-        increment: bool,
-    ) -> Result<(), NodecosmosError> {
-        match ObjectType::from_string(self.object_type.as_str()) {
-            Some(ObjectType::Node) => {
-                if increment {
-                    NodeCounter::increment_like(data, self.object_id, self.branch_id).await?;
-                } else {
-                    NodeCounter::decrement_like(data, self.object_id, self.branch_id).await?;
-                }
-
-                Ok(())
+    pub async fn increment_like_count(&mut self, data: &RequestData) {
+        match self.object_type.parse() {
+            Ok(LikeObjectType::Node) => {
+                let _ = NodeCounter::increment_like(data, self.object_id, self.branch_id)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error incrementing like count: {:?}", e);
+                    });
             }
-            _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string()).into()),
+            _ => log::error!("Like Object type not supported"),
+        }
+    }
+
+    pub async fn decrement_like_count(&mut self, data: &RequestData) {
+        match self.object_type.parse() {
+            Ok(LikeObjectType::Node) => {
+                let _ = NodeCounter::decrement_like(data, self.object_id, self.branch_id)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error decrementing like count: {:?}", e);
+                    });
+            }
+            _ => log::error!("Like Object type not supported"),
         }
     }
 }

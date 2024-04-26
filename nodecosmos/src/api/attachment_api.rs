@@ -1,8 +1,3 @@
-use crate::api::data::RequestData;
-use crate::api::types::Response;
-use crate::models::attachment::Attachment;
-use crate::models::node::AuthNode;
-use crate::models::traits::s3::S3;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
 use charybdis::operations::InsertWithCallbacks;
@@ -10,13 +5,20 @@ use charybdis::types::Uuid;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::api::data::RequestData;
+use crate::api::types::Response;
+use crate::models::attachment::Attachment;
+use crate::models::node::AuthNode;
+use crate::models::traits::s3::S3;
+
 #[derive(Deserialize)]
 pub struct ImageAttachmentParams {
     pub node_id: Uuid,
+    pub branch_id: Uuid,
     pub object_id: Uuid,
 }
 
-#[post("/{node_id}/{object_id}/upload_image")]
+#[post("/{node_id}/{branch_id}/{object_id}/upload_image")]
 pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: RequestData, payload: Multipart) -> Response {
     AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
 

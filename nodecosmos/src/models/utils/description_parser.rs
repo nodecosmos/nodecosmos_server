@@ -1,7 +1,8 @@
-use crate::errors::NodecosmosError;
 use quick_xml::events::{BytesText, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
+
+use crate::errors::NodecosmosError;
 
 enum ProseMirrorXmlTag {
     Heading,
@@ -19,7 +20,6 @@ enum ProseMirrorXmlTag {
     Link,
     HardBreak,
     Html,
-    Empty,
 }
 
 impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
@@ -43,7 +43,7 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
             QName(b"link") => ProseMirrorXmlTag::Link,
             QName(b"hardBreak") => ProseMirrorXmlTag::HardBreak,
             QName(b"html") => ProseMirrorXmlTag::Html,
-            _ => ProseMirrorXmlTag::Empty,
+            _ => panic!("Unknown tag"),
         }
     }
 }
@@ -68,8 +68,7 @@ impl<'a> DescriptionXmlParser<'a> {
     const ELLIPSIS: &'static str = "...";
 
     pub fn new(xml: &'a str) -> Self {
-        let mut reader = Reader::from_str(xml);
-        reader.trim_text(true);
+        let reader = Reader::from_str(xml);
 
         Self {
             html: String::new(),
@@ -105,7 +104,6 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Link => self.open_link(&e),
                     ProseMirrorXmlTag::HardBreak => self.open_hard_break(),
                     ProseMirrorXmlTag::Html => (),
-                    ProseMirrorXmlTag::Empty => (),
                 },
                 Ok(Event::Text(e)) => self.text(e)?,
                 Ok(Event::End(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
@@ -124,7 +122,6 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Link => self.close_link(),
                     ProseMirrorXmlTag::HardBreak => (),
                     ProseMirrorXmlTag::Html => (),
-                    ProseMirrorXmlTag::Empty => (),
                 },
                 Ok(Event::Eof) => {
                     break;

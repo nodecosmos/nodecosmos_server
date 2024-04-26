@@ -1,12 +1,13 @@
-use crate::errors::NodecosmosError;
-use crate::models::user::{CurrentUser, User};
+use std::future::{ready, Ready};
+
 use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
 use log::error;
 use scylla::CachingSession;
-use serde_json::json;
-use std::future::{ready, Ready};
+
+use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
 
 impl FromRequest for CurrentUser {
     type Error = NodecosmosError;
@@ -17,10 +18,7 @@ impl FromRequest for CurrentUser {
         match get_current_user(&client_session) {
             Some(user) => ready(Ok(user)),
             None => {
-                let error_response = NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized!",
-                    "message": "You must be logged in to perform this action!"
-                }));
+                let error_response = NodecosmosError::Unauthorized("You must be logged in to perform this action!");
                 ready(Err(error_response))
             }
         }
@@ -42,26 +40,18 @@ impl FromRequest for OptCurrentUser {
     }
 }
 
-pub fn set_current_user(client_session: &Session, user: &User) -> Result<CurrentUser, NodecosmosError> {
-    let current_user = CurrentUser {
-        id: user.id,
-        first_name: user.first_name.clone(),
-        last_name: user.last_name.clone(),
-        username: user.username.clone(),
-        email: user.email.clone(),
-        is_confirmed: user.is_confirmed,
-        is_blocked: user.is_blocked,
-        profile_image_filename: user.profile_image_filename.clone(),
-        profile_image_url: user.profile_image_url.clone(),
-    };
-
+pub fn set_current_user(client_session: &Session, current_user: &CurrentUser) -> Result<(), NodecosmosError> {
     client_session.insert("current_user", &current_user).map_err(|e| {
         error!("Could not set current user. {}", e);
 
         NodecosmosError::ClientSessionError("Could not set current user.".to_string())
     })?;
 
-    Ok(current_user)
+    Ok(())
+}
+
+pub fn remove_current_user(client_session: &Session) {
+    client_session.remove("current_user");
 }
 
 pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
@@ -84,17 +74,14 @@ pub fn get_current_user(client_session: &Session) -> Option<CurrentUser> {
 pub async fn refresh_current_user(
     client_session: &Session,
     db_session: &CachingSession,
-) -> Result<CurrentUser, NodecosmosError> {
+) -> Result<(), NodecosmosError> {
     let current_user = get_current_user(&client_session);
 
     match current_user {
         Some(user) => {
-            let user = User::find_by_id(user.id).execute(&db_session).await?;
+            let user = CurrentUser::find_by_id(user.id).execute(&db_session).await?;
             set_current_user(&client_session, &user)
         }
-        None => Err(NodecosmosError::Unauthorized(json!({
-            "error": "Unauthorized!",
-            "message": "You must be logged in to perform this action!"
-        }))),
+        None => Err(NodecosmosError::InternalServerError("Failed to find user".to_string())),
     }
 }

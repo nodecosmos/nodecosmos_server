@@ -1,31 +1,17 @@
 use charybdis::macros::charybdis_udt_model;
-use charybdis::types::{Frozen, Set, Text, Uuid};
+use charybdis::types::{Frozen, Set, Uuid};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
-#[derive(Eq, PartialEq)]
-pub enum ConflictStatus {
-    Pending,
-    Resolved,
-}
-
-impl fmt::Display for ConflictStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConflictStatus::Pending => write!(f, "Pending"),
-            ConflictStatus::Resolved => write!(f, "Resolved"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Default, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Eq, PartialEq, Clone)]
 #[charybdis_udt_model(type_name = conflict)]
+#[serde(rename_all = "camelCase")]
 pub struct Conflict {
-    pub status: Text,
-
-    #[serde(rename = "deletedAncestors")]
     pub deleted_ancestors: Option<Frozen<Set<Uuid>>>,
-
-    #[serde(rename = "deletedEditedNodes")]
     pub deleted_edited_nodes: Option<Frozen<Set<Uuid>>>,
+    pub deleted_edited_flows: Option<Frozen<Set<Uuid>>>,
+    pub deleted_edited_flow_steps: Option<Frozen<Set<Uuid>>>,
+    pub deleted_edited_ios: Option<Frozen<Set<Uuid>>>,
+
+    /// Flow steps with same `step_index` on original and branch
+    pub conflicting_flow_steps: Option<Frozen<Set<Uuid>>>,
 }

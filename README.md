@@ -1,5 +1,3 @@
-paping---
-
 1) **Install related services with docker compose**
    ```shell
    docker-compose up
@@ -32,27 +30,36 @@ paping---
 ## Resources-Actions-Segmentation-Models
 
 * ### Resources (`resources/`)
-  They represent data structures that are alive during program runtime. They are usually related to external services
+  They represent data structures that are alive during program runtime. They are usually related to
+  external services
   sessions: e.g. `ScyllaDb`, `Redis`, `ElasticSearch`, etc. But it can also be app specific e.g.
   `SseBroadcast`, `Locker`, `DescriptionWsPool`, etc.
 * ### Actions (`api/`)
   They represent entry point of the request. They are responsible for parsing request or triggering
-  model or model-segment specific logic and returning the response.
-  E.g. `update_node_description`, `update_user_profile_image`, etc.
-* ### Segmentation
-  This is the process of dividing models into segments required by action. In Charybdis we can make use
-  of `partial<model>` that returns same things as base model but for subset of model fields. Each segment is
-  responsible for a specific task. E.g. `UpdateDescriptionNode`, `UpdateProfileImageUser`. One benefit of segmentation
-  is to reduce need for full model read before update. Instead we can read only data required for authorization and
-  update this fields without reading model beforehand. Another benefit of segmentation is that we can have same traits
-  implemented for same model but for different segments. E.g. `S3` trait for `UpdateProfileImageUser`
+  model or
+  model-segment specific logic and returning the response.
+  E.g. `update_node_description`, `update_user_profile_image`,
+  etc.
+* ### Segmentation (`models/<model>/partial_<model>`)
+  This is the process of dividing models into segments required by action. In Charybdis we can make
+  use
+  of `partial<model>` that returns same things as base model but for subset of model fields. Each
+  segment is
+  responsible for a specific task. E.g. `UpdateDescriptionNode`, `UpdateProfileImageUser`. One
+  benefit of segmentation
+  is to reduce need for full model read before update. Instead we can read only data required for
+  authorization and
+  update this fields without reading model beforehand. Another advantage of segmentation is that we
+  can have same traits
+  implemented for same model but for different segments. E.g. `S3` trait
+  for `UpdateProfileImageUser`
   and `UpdateCoverImageUser`.
 * ### Models (`models/`)
-  They represent data structures that are used to model core application data and implement the business logic. If
-  business logic is reusable, it should utilize traits (`models/traits`). And accordingly the traits should be
-  implemented by model or the segment. E.g. In case same model has multiple s3 related
-  fields `cover_image`, `profile_image` we can have a separate trait for `partial_<model_name>` and implement `S3` trait
-  in it.
+  ORM layer that is used to store core application logic. Each model is table in db. If logic is
+  reusable, it should
+  utilize traits (`models/traits`). If logic is reusable within single model but for it's partials,
+  we should
+  define it in `models/traits/<model>`.
    ```rust
    #[charybdis_model(
      table_name = users,
@@ -86,3 +93,14 @@ paping---
     }
    
    ```
+
+### Note:
+
+Looks like tokio has excessive stack usage in debug
+builds. `https://github.com/tokio-rs/tokio/issues/2055` In order to avoid stack overflow, we need to
+increase the stack size. This can be done by setting `RUST_MIN_STACK` environment variable. For
+example, to set the stack size to 8MB, you can run the following command:
+
+```shell
+RUST_MIN_STACK=8388608 cargo run
+```

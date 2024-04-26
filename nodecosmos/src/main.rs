@@ -1,15 +1,15 @@
+use actix_web::{App as ActixWebApp, HttpServer, web};
+use actix_web::middleware::Logger;
+
+use api::*;
+use app::App;
+
 mod api;
 mod app;
 mod constants;
 mod errors;
 mod models;
 mod resources;
-mod utils;
-
-use actix_web::middleware::Logger;
-use actix_web::{web, App as ActixWebApp, HttpServer};
-use api::*;
-use app::App;
 
 #[tokio::main]
 async fn main() {
@@ -17,19 +17,18 @@ async fn main() {
     let port = app.port();
 
     app.init().await;
-
-    // web data
     let app_web_data = web::Data::new(app);
-    let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
 
     HttpServer::new(move || {
+        // web data
+        let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
+
         ActixWebApp::new()
             .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .wrap(app_web_data.cors())
             .wrap(app_web_data.session_middleware())
             .app_data(app_web_data.clone())
             .app_data(db_session_web_data.clone())
-            .service(web::scope("/ws").service(description_ws))
             .service(
                 web::scope("/users")
                     .service(get_user)
@@ -50,11 +49,7 @@ async fn main() {
                     .service(get_branched_node)
                     .service(create_node)
                     .service(update_node_title)
-                    .service(update_node_description)
                     .service(delete_node)
-                    .service(get_original_node_description_base64)
-                    .service(get_node_description)
-                    .service(get_node_description_base64)
                     .service(reorder_nodes)
                     .service(upload_cover_image)
                     .service(delete_cover_image)
@@ -70,17 +65,13 @@ async fn main() {
             .service(
                 web::scope("/workflows")
                     .service(get_workflow)
-                    .service(create_workflow)
                     .service(update_initial_inputs)
-                    .service(update_workflow_title)
-                    .service(delete_workflow),
+                    .service(update_workflow_title),
             )
             .service(
                 web::scope("/flows")
                     .service(create_flow)
-                    .service(get_flow_description)
                     .service(update_flow_title)
-                    .service(update_flow_description)
                     .service(delete_flow),
             )
             .service(
@@ -89,15 +80,12 @@ async fn main() {
                     .service(update_flow_step_nodes)
                     .service(update_flow_step_inputs)
                     .service(update_flow_step_outputs)
-                    .service(update_flow_step_description)
                     .service(delete_flow_step),
             )
             .service(
                 web::scope("input_outputs")
                     .service(create_io)
-                    .service(get_io_description)
                     .service(update_io_title)
-                    .service(update_io_description)
                     .service(delete_io),
             )
             .service(
@@ -117,7 +105,19 @@ async fn main() {
                     .service(get_presigned_url)
                     .service(create_attachment),
             )
-            .service(web::scope("branches").service(restore_node).service(undo_delete_node))
+            .service(
+                web::scope("branches")
+                    .service(reload_branch)
+                    .service(restore_node)
+                    .service(undo_delete_node)
+                    .service(restore_io)
+                    .service(undo_delete_io)
+                    .service(restore_flow)
+                    .service(undo_delete_flow)
+                    .service(restore_flow_step)
+                    .service(keep_flow_step)
+                    .service(undo_delete_flow_step),
+            )
             .service(
                 web::scope("comments")
                     .service(get_comments)
@@ -126,10 +126,18 @@ async fn main() {
                     .service(update_comment_content)
                     .service(delete_comment),
             )
+            .service(
+                web::scope("descriptions")
+                    .service(get_description)
+                    .service(get_base64_description)
+                    .service(get_original_description)
+                    .service(save_description),
+            )
+            .service(web::scope("ws").service(description_ws))
     })
     .bind(("0.0.0.0", port))
     .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
     .run()
     .await
-    .unwrap_or_else(|e| panic!("Could not run server to port {}.\n{}", port, e));
+    .unwrap_or_else(|e| panic!("Could not run server to port {}.\n{}", port, e))
 }

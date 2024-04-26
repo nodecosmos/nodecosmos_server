@@ -1,21 +1,46 @@
-use crate::errors::NodecosmosError;
-use crate::models::node::{IndexNode, Node};
-use crate::models::traits::ElasticIndex;
+use charybdis::types::{BigInt, Timestamp};
 use elasticsearch::{Elasticsearch, SearchParts};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use yrs::Uuid;
+
+use crate::errors::NodecosmosError;
+use crate::models::node::Node;
+use crate::models::traits::ElasticIndex;
+use crate::models::udts::Profile;
 
 const PAGE_SIZE: i16 = 10;
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexNode {
+    pub id: Uuid,
+    pub root_id: Uuid,
+    pub ancestor_ids: Option<Vec<Uuid>>,
+    pub owner_id: Uuid,
+    pub title: String,
+    pub short_description: Option<String>,
+    pub description: Option<String>,
+    pub like_count: Option<BigInt>,
+    pub cover_image_url: Option<String>,
+    pub is_root: bool,
+    pub is_public: bool,
+
+    #[serde(default = "chrono::Utc::now")]
+    pub created_at: Timestamp,
+
+    pub owner: Profile,
+}
 
 #[derive(Deserialize)]
 pub struct NodeSearchQuery {
     q: Option<String>,
 
-    #[serde(default = "default_to_0")]
+    #[serde(default = "default_to_opt_0")]
     page: i16,
 }
 
-pub fn default_to_0() -> i16 {
+pub fn default_to_opt_0() -> i16 {
     0
 }
 
@@ -60,13 +85,13 @@ impl<'a> NodeSearch<'a> {
             "query": {
                 "bool": {
                     "must": [
-                        { "term": { "isPublic": true } }
+                        { "term": { "isPublic": true } } // Only public nodes
                     ]
                 }
             },
             "sort": [
                 { "isRoot": { "order": "desc" } },
-                { "likesCount": { "order": "desc" } },
+                { "likeCount": { "order": "desc" } },
                 {
                     "_script": {
                         "type": "number",
@@ -86,13 +111,15 @@ impl<'a> NodeSearch<'a> {
         if let Some(term) = &self.node_search_query.q {
             data["query"]["bool"]["should"] = json!([
                 { "match": { "title": { "query": &term, "boost": 2 } } },
-                { "match": { "description": &term } }
+                { "match": { "description": &term } },
+                { "match": { "owner.name": &term } },
+                { "match": { "owner.username": &term } },
             ]);
             data["query"]["bool"]["minimum_should_match"] = json!(1);
             data["sort"] = json!([
                 { "_score": { "order": "desc" } },
                 { "isRoot": { "order": "desc" } },
-                { "likesCount": { "order": "desc" } },
+                { "likeCount": { "order": "desc" } },
                 { "createdAt": { "order": "desc" } }
             ]);
         }

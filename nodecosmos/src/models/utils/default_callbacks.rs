@@ -24,8 +24,8 @@ macro_rules! created_at_cb_fn {
             let now = chrono::Utc::now();
 
             self.id = charybdis::types::Uuid::new_v4();
-            self.created_at = Some(now);
-            self.updated_at = Some(now);
+            self.created_at = now;
+            self.updated_at = now;
 
             Ok(())
         }
@@ -52,7 +52,7 @@ macro_rules! updated_at_cb_fn {
             _session: &charybdis::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
-            self.updated_at = Some(chrono::Utc::now());
+            self.updated_at = chrono::Utc::now();
 
             Ok(())
         }
@@ -81,7 +81,7 @@ macro_rules! sanitize_description_cb_fn {
         ) -> Result<(), NodecosmosError> {
             use crate::models::traits::SanitizeDescription;
 
-            self.updated_at = Some(chrono::Utc::now());
+            self.updated_at = chrono::Utc::now();
 
             self.description.sanitize()?;
 

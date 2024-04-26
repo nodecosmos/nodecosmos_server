@@ -1,12 +1,11 @@
-use actix_web::http::StatusCode;
-use actix_web::web::Bytes;
-use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
-use charybdis::errors::CharybdisError;
-use log::error;
-use serde_json::json;
 use std::error::Error;
 use std::fmt;
-use tokio::sync::broadcast::error::SendError;
+
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
+use charybdis::errors::CharybdisError;
+use log::{error, warn};
+use serde_json::json;
 
 #[derive(Debug)]
 pub enum RedisError {
@@ -35,7 +34,7 @@ impl Error for RedisError {
 #[derive(Debug)]
 pub enum NodecosmosError {
     // 400s
-    Unauthorized(serde_json::Value),
+    Unauthorized(&'static str),
     ResourceLocked(&'static str),
     ResourceAlreadyLocked(String),
     Forbidden(String),
@@ -51,23 +50,23 @@ pub enum NodecosmosError {
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
     RedisError(RedisError),
-    ActixError(actix_web::Error),
     LockerError(String),
     DecodeError(base64::DecodeError),
     YjsError(yrs::encoding::read::Error),
-    MergeError(String),
+    FatalDeleteError(String),
     FatalMergeError(String),
     InternalServerError(String),
     QuickXmlError(quick_xml::Error),
-    BroadcastError(SendError<Bytes>),
+    BroadcastError(String),
+    ParseError(strum::ParseError),
 }
 
 impl fmt::Display for NodecosmosError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NodecosmosError::Unauthorized(e) => write!(f, "Unauthorized: {}", e),
-            NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: \n{}", e),
-            NodecosmosError::ResourceAlreadyLocked(e) => write!(f, "ResourceAlreadyLocked Error: \n{}", e),
+            NodecosmosError::ResourceLocked(e) => write!(f, "ResourceLocked Error: {}", e),
+            NodecosmosError::ResourceAlreadyLocked(e) => write!(f, "ResourceAlreadyLocked Error: {}", e),
             NodecosmosError::Forbidden(e) => write!(f, "Forbidden: {}", e),
             NodecosmosError::Conflict(e) => write!(f, "Conflict: {}", e),
             NodecosmosError::UnsupportedMediaType => write!(f, "Unsupported Media Type"),
@@ -76,20 +75,20 @@ impl fmt::Display for NodecosmosError {
             }
             NodecosmosError::NotFound(e) => write!(f, "Not Found: {}", e),
             NodecosmosError::PreconditionFailed(e) => write!(f, "Precondition Failed: {}", e),
-            NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: \n{}", e),
-            NodecosmosError::ClientSessionError(e) => write!(f, "Session Error: {}", e),
-            NodecosmosError::SerdeError(e) => write!(f, "Serde Error: \n{}", e),
-            NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: \n{}", e),
-            NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: \n{}", e),
-            NodecosmosError::ActixError(e) => write!(f, "Actix Error: {}", e),
+            NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: {}", e),
+            NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
+            NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
+            NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
+            NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
             NodecosmosError::DecodeError(e) => write!(f, "Decode Error: {}", e),
             NodecosmosError::YjsError(e) => write!(f, "Yjs Error: {}", e),
-            NodecosmosError::MergeError(e) => write!(f, "Merge Error: {}", e),
+            NodecosmosError::FatalDeleteError(e) => write!(f, "Fatal Delete Error: {}", e),
             NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
             NodecosmosError::QuickXmlError(e) => write!(f, "QuickXmlError Error: {}", e),
-            NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: \n{}", e),
-            NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: \n{}", e),
+            NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: {}", e),
+            NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: {}", e),
+            NodecosmosError::ParseError(e) => write!(f, "ParseError: {}", e),
         }
     }
 }
@@ -102,10 +101,10 @@ impl Error for NodecosmosError {
             NodecosmosError::ElasticError(e) => Some(e),
             NodecosmosError::ResourceLocked(_) => None,
             NodecosmosError::RedisError(e) => Some(e),
-            NodecosmosError::ActixError(e) => Some(e),
             NodecosmosError::DecodeError(e) => Some(e),
             NodecosmosError::YjsError(e) => Some(e),
             NodecosmosError::QuickXmlError(e) => Some(e),
+            NodecosmosError::ParseError(e) => Some(e),
             _ => None,
         }
     }
@@ -114,7 +113,10 @@ impl Error for NodecosmosError {
 impl ResponseError for NodecosmosError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(e),
+            NodecosmosError::Unauthorized(e) => HttpResponse::Unauthorized().json(json!({
+                "status": 401,
+                "message": e
+            })),
             NodecosmosError::ValidationError((field, message)) => HttpResponse::BadRequest().json(json!({
                 "status": 403,
                 "message": {field: message}
@@ -141,19 +143,28 @@ impl ResponseError for NodecosmosError {
                     "message": "Unsupported Media Type"
                 })
             }),
-            NodecosmosError::ResourceLocked(e) => HttpResponseBuilder::new(StatusCode::LOCKED).json({
-                json!({
-                    "status": 423,
-                    "message": e
+            NodecosmosError::ResourceLocked(e) => {
+                warn!("{}", self.to_string());
+
+                HttpResponseBuilder::new(StatusCode::LOCKED).json({
+                    json!({
+                        "status": 423,
+                        "message": e
+                    })
                 })
-            }),
+            }
             NodecosmosError::CharybdisError(e) => match e {
-                CharybdisError::NotFoundError(e) => HttpResponse::NotFound().json(json!({
-                    "status": 404,
-                    "message": e.to_string()
-                })),
+                CharybdisError::NotFoundError(_e) => {
+                    warn!("{}", e.to_string());
+
+                    HttpResponse::NotFound().json(json!({
+                        "status": 404,
+                        "message": "Not Found"
+                    }))
+                }
                 _ => {
-                    NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string())).error_response()
+                    return NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string()))
+                        .error_response();
                 }
             },
             _ => {
@@ -161,7 +172,7 @@ impl ResponseError for NodecosmosError {
 
                 return HttpResponse::InternalServerError().json(json!({
                     "status": 500,
-                    "message": self.to_string()
+                    "message": "Internal Server Error"
                 }));
             }
         }
@@ -198,12 +209,6 @@ impl From<deadpool_redis::redis::RedisError> for NodecosmosError {
     }
 }
 
-impl From<actix_web::Error> for NodecosmosError {
-    fn from(e: actix_web::Error) -> Self {
-        NodecosmosError::ActixError(e)
-    }
-}
-
 impl<T> From<std::sync::PoisonError<T>> for NodecosmosError {
     fn from(e: std::sync::PoisonError<T>) -> Self {
         NodecosmosError::InternalServerError(e.to_string())
@@ -225,5 +230,17 @@ impl From<yrs::encoding::read::Error> for NodecosmosError {
 impl From<quick_xml::Error> for NodecosmosError {
     fn from(e: quick_xml::Error) -> Self {
         NodecosmosError::QuickXmlError(e)
+    }
+}
+
+impl From<strum::ParseError> for NodecosmosError {
+    fn from(e: strum::ParseError) -> Self {
+        NodecosmosError::ParseError(e)
+    }
+}
+
+impl From<anyhow::Error> for NodecosmosError {
+    fn from(e: anyhow::Error) -> Self {
+        NodecosmosError::InternalServerError(format!("{:?}", e))
     }
 }

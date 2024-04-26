@@ -1,7 +1,8 @@
+use charybdis::operations::UpdateWithCallbacks;
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
-use charybdis::operations::UpdateWithCallbacks;
 
 impl ContributionRequest {
     pub async fn publish(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

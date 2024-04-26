@@ -1,12 +1,13 @@
-use crate::models::node::{
-    Node, UpdateCoverImageNode, UpdateDescriptionNode, UpdateLikesCountNode, UpdateOwnerNode, UpdateTitleNode,
-};
-use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
+use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::indices::{IndicesCreateParts, IndicesExistsParts, IndicesPutMappingParts};
 use elasticsearch::Elasticsearch;
-use log::info;
+use log::{error, info};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::models::node::{Node, UpdateCoverImageNode, UpdateOwnerNode, UpdateTitleNode};
+use crate::models::user::{UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 
 pub trait ElasticIndex {
     const ELASTIC_IDX_NAME: &'static str;
@@ -73,7 +74,7 @@ impl<T: ElasticIndex> BuildIndex for T {
         });
 
         if !response.status_code().is_success() {
-            eprintln!("Failed Elasticsearch operation. Debug info: ...");
+            error!("Failed Elasticsearch operation. Debug info: ...");
 
             panic!(
                 "Failed to handle node index: {}! Response body: {}",
@@ -128,22 +129,32 @@ impl ElasticIndex for Node {
         json!({
             "dynamic": false,
             "properties": {
-                "ancestorIds": {
+                "id": { "type": "keyword", "index": false },
+                "rootId": { "type": "keyword", "index": false },
+                 "ancestorIds": {
                     "type": "keyword",
                     "index": false
                 },
-                "rootId": { "type": "keyword", "index": false },
-                "id": { "type": "keyword", "index": false },
+                "ownerId": { "type": "keyword", "index": false },
                 "title": { "type": "text", "analyzer": "english" },
                 "shortDescription": { "type": "text", "index": false  },
                 "description": {
                     "type": "text",
                     "analyzer": "english_with_html_strip",
                 },
+                "likeCount": { "type": "integer" },
                 "isRoot": { "type": "boolean" },
                 "isPublic": { "type": "boolean" },
                 "createdAt": { "type": "date" },
-                "likesCount": { "type": "integer" }
+                "coverImageUrl": { "type": "text", "index": false },
+                "owner": {
+                    "properties": {
+                        "id": { "type": "keyword", "index": false },
+                        "name": { "type": "text" },
+                        "username": { "type": "keyword" },
+                        "profileImageURL": { "type": "text", "index": false },
+                    }
+                },
             }
         })
     }
@@ -205,11 +216,29 @@ macro_rules! impl_elastic_index {
     };
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UpdateNodeDescriptionElasticIdx {
+    pub id: Uuid,
+
+    #[serde(rename = "shortDescription")]
+    pub short_description: String,
+
+    pub description: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateLikeCountNodeElasticIdx {
+    pub id: Uuid,
+
+    #[serde(rename = "likeCount")]
+    pub likes_count: i32,
+}
+
 // node
+impl_elastic_index!(UpdateNodeDescriptionElasticIdx, Node);
 impl_elastic_index!(UpdateTitleNode, Node);
-impl_elastic_index!(UpdateDescriptionNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
-impl_elastic_index!(UpdateLikesCountNode, Node);
+impl_elastic_index!(UpdateLikeCountNodeElasticIdx, Node);
 impl_elastic_index!(UpdateOwnerNode, Node);
 // user
 impl_elastic_index!(UpdateUser, User);

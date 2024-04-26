@@ -1,12 +1,15 @@
+use charybdis::macros::charybdis_model;
+use charybdis::operations::Find;
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Counter, Set, Uuid};
+use nodecosmos_macros::Branchable;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
-use crate::models::node::UpdateLikesCountNode;
-use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, UpdateWithCallbacks};
-use charybdis::types::{Counter, Uuid};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
+use crate::models::traits::{ElasticDocument, UpdateLikeCountNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
@@ -14,19 +17,39 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [branch_id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Branchable, Default, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeCounter {
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
 
-    #[serde(rename = "id")]
+    #[branch(original_id)]
     pub id: Uuid,
 
-    #[serde(rename = "likeCount")]
     pub like_count: Option<Counter>,
-
-    #[serde(rename = "descendantsCount")]
     pub descendants_count: Option<Counter>,
+}
+
+impl NodeCounter {
+    pub async fn find_by_ids_and_branch_id(
+        db_session: &CachingSession,
+        ids: &Set<Uuid>,
+        branch_id: Uuid,
+    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
+        find_node_counter!("id IN ? AND branch_id = ?", (ids, branch_id))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
+    pub async fn find_by_ids(
+        db_session: &CachingSession,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
+        find_node_counter!("id IN ? AND branch_id IN ?", (ids, ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
 }
 
 impl Likeable for NodeCounter {
@@ -41,14 +64,16 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        let mut node = UpdateLikesCountNode {
-            id,
-            branch_id,
-            like_count: Some(lc),
-            updated_at: Some(chrono::Utc::now()),
-        };
+        let is_original = id == branch_id;
 
-        node.update_cb(data).execute(data.db_session()).await?;
+        if is_original {
+            UpdateLikeCountNodeElasticIdx {
+                id,
+                likes_count: lc as i32,
+            }
+            .update_elastic_document(data.elastic_client())
+            .await;
+        }
 
         Ok(lc)
     }
@@ -64,21 +89,23 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        let mut node = UpdateLikesCountNode {
-            id,
-            branch_id,
-            like_count: Some(lc),
-            updated_at: Some(chrono::Utc::now()),
-        };
+        let is_original = id == branch_id;
 
-        node.update_cb(data).execute(data.db_session()).await?;
+        if is_original {
+            UpdateLikeCountNodeElasticIdx {
+                id,
+                likes_count: lc as i32,
+            }
+            .update_elastic_document(data.elastic_client())
+            .await;
+        }
 
         Ok(lc)
     }
 
-    async fn like_count(session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
+    async fn like_count(db_session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
         let res = Self::find_by_primary_key_value(&(id, branch_id))
-            .execute(session)
+            .execute(db_session)
             .await
             .ok();
 

@@ -1,15 +1,18 @@
-use crate::resources::description_ws_pool::DescriptionWsPool;
-use crate::resources::resource_locker::ResourceLocker;
-use crate::resources::sse_broadcast::SseBroadcast;
+use std::time::Duration;
+
 use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
-use std::time::Duration;
 use toml::Value;
 
-/// Resource's should be alive during application runtime. It's usually related to external services like db clients,
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
+
+/// Resource's should be alive during application runtime.
+/// It's usually related to external services like db clients,
 /// redis, elastic, etc.
 pub trait Resource<'a> {
     type Cfg;
@@ -28,7 +31,7 @@ impl<'a> Resource<'a> for CachingSession {
 
         let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
 
-        let session: Session = SessionBuilder::new()
+        let db_session: Session = SessionBuilder::new()
             .known_nodes(&known_nodes)
             .connection_timeout(Duration::from_secs(3))
             .use_keyspace(keyspace, false)
@@ -36,7 +39,7 @@ impl<'a> Resource<'a> for CachingSession {
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
 
-        CachingSession::from(session, 1000)
+        CachingSession::from(db_session, 1000)
     }
 }
 

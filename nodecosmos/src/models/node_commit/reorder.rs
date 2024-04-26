@@ -1,17 +1,19 @@
+use std::collections::HashMap;
+
+use charybdis::types::Uuid;
+use futures::TryFutureExt;
+use log::error;
+use scylla::CachingSession;
+
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node_commit::create::{NewDescendantCommitById, NodeChange, TreePositionChange};
 use crate::models::node_commit::NodeCommit;
-use charybdis::types::Uuid;
-use futures::TryFutureExt;
-use log::error;
-use scylla::CachingSession;
-use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct ReorderCommit<'a> {
-    session: &'a CachingSession,
+    db_session: &'a CachingSession,
     current_user_id: Uuid,
     node_id: Uuid,
     branch_id: Uuid,
@@ -24,9 +26,13 @@ pub struct ReorderCommit<'a> {
 }
 
 impl<'a> ReorderCommit<'a> {
-    pub fn from_reorder_data(session: &'a CachingSession, current_user_id: Uuid, reorder_data: &ReorderData) -> Self {
+    pub fn from_reorder_data(
+        db_session: &'a CachingSession,
+        current_user_id: Uuid,
+        reorder_data: &ReorderData,
+    ) -> Self {
         Self {
-            session,
+            db_session,
             current_user_id,
             node_id: reorder_data.node.id,
             branch_id: reorder_data.branch_id,
@@ -82,7 +88,7 @@ impl<'a> ReorderCommit<'a> {
 
         // if parent is changed we will create ancestors commits in the next step
         let new_node_commit = NodeCommit::handle_change(
-            &self.session,
+            &self.db_session,
             self.node_id,
             self.branch_id,
             self.current_user_id,
@@ -114,7 +120,7 @@ impl<'a> ReorderCommit<'a> {
 
             for id in id_chunk {
                 let future = NodeCommit::handle_change(
-                    &self.session,
+                    &self.db_session,
                     *id,
                     self.branch_id,
                     self.current_user_id,
@@ -151,7 +157,7 @@ impl<'a> ReorderCommit<'a> {
 
             for ancestor_id in id_chunk {
                 let f = NodeCommit::handle_change(
-                    &self.session,
+                    &self.db_session,
                     *ancestor_id,
                     self.branch_id,
                     self.current_user_id,
@@ -181,7 +187,7 @@ impl<'a> ReorderCommit<'a> {
 
             for ancestor_id in id_chunk {
                 let f = NodeCommit::handle_change(
-                    &self.session,
+                    &self.db_session,
                     *ancestor_id,
                     self.branch_id,
                     self.current_user_id,
