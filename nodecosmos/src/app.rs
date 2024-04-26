@@ -1,3 +1,17 @@
+use std::sync::Arc;
+use std::{env, fs};
+
+use actix_cors::Cors;
+use actix_session::config::PersistentSession;
+use actix_session::storage::RedisActorSessionStore;
+use actix_session::SessionMiddleware;
+use actix_web::cookie::Key;
+use actix_web::{cookie, http, web};
+use deadpool_redis::Pool;
+use elasticsearch::Elasticsearch;
+use scylla::CachingSession;
+use toml::Value;
+
 use crate::api::data::RequestData;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::node::reorder::Recovery;
@@ -8,18 +22,6 @@ use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::resource::Resource;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
-use actix_cors::Cors;
-use actix_session::config::PersistentSession;
-use actix_session::storage::RedisActorSessionStore;
-use actix_session::SessionMiddleware;
-use actix_web::cookie::Key;
-use actix_web::{cookie, http, web};
-use deadpool_redis::Pool;
-use elasticsearch::Elasticsearch;
-use scylla::CachingSession;
-use std::sync::Arc;
-use std::{env, fs};
-use toml::Value;
 
 #[derive(Clone)]
 pub struct App {

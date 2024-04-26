@@ -1,4 +1,5 @@
-use crate::errors::NodecosmosError;
 use actix_web::HttpResponse;
+
+use crate::errors::NodecosmosError;
 
 pub type Response = Result<HttpResponse, NodecosmosError>;

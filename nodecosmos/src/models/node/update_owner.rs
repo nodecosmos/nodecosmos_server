@@ -1,23 +1,24 @@
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::materialized_views::nodes_by_owner::NodesByProfile;
-use crate::models::node::UpdateOwnerNode;
-use crate::models::traits::ElasticDocument;
-use crate::models::udts::Profile;
-use crate::models::user::User;
 use charybdis::batch::ModelBatch;
 use charybdis::types::Uuid;
 use futures::StreamExt;
 use log::error;
 
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
+use crate::models::node::UpdateOwnerNode;
+use crate::models::traits::ElasticDocument;
+use crate::models::udts::Profile;
+use crate::models::user::User;
+
 impl UpdateOwnerNode {
-    fn init(nodes_by_owner: &NodesByProfile, owner: Profile) -> Self {
+    fn init(nodes_by_owner: &NodesByOwner, owner: Profile) -> Self {
         Self {
             id: nodes_by_owner.id,
             branch_id: nodes_by_owner.branch_id,
             owner_id: Some(nodes_by_owner.owner_id),
             owner: Some(owner),
-            updated_at: Some(chrono::Utc::now()),
+            updated_at: chrono::Utc::now(),
         }
     }
 
@@ -35,7 +36,7 @@ impl UpdateOwnerNode {
     }
 
     async fn run(data: &RequestData, user: User) -> Result<(), NodecosmosError> {
-        let mut nodes_by_owner = NodesByProfile::find_by_owner_id(user.id)
+        let mut nodes_by_owner = NodesByOwner::find_by_owner_id(user.id)
             .execute(data.db_session())
             .await
             .map_err(|e| {
@@ -56,9 +57,14 @@ impl UpdateOwnerNode {
             ))
         }
 
-        UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), nodes_to_update.clone()).await;
+        UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await;
+
         Self::unlogged_batch()
-            .chunked_insert(data.db_session(), &nodes_to_update, 100)
+            .chunked_insert(
+                data.db_session(),
+                &nodes_to_update,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|e| {
                 error!("[run::chunked_insert] {}", e);

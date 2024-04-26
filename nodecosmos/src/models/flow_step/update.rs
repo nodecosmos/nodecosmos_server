@@ -1,52 +1,25 @@
-use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
-use crate::models::input_output::Io;
-use crate::utils::cloned_ref::ClonedRef;
-use charybdis::operations::UpdateWithCallbacks;
-use scylla::CachingSession;
+use crate::models::traits::Merge;
 
 impl FlowStep {
-    // delete outputs models
-    pub async fn delete_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
-        let cloned_node_ids = self.node_ids.cloned_ref();
-        let id = self.id;
-        let workflow = self.workflow(session).await?;
+    pub fn merge_original_inputs(&mut self, original: &FlowStep) {
+        let mut original_inputs = original.input_ids_by_node_id.clone();
+        original_inputs.merge_unique(self.input_ids_by_node_id.clone());
 
-        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-            if let Some(workflow) = workflow.as_ref() {
-                for (node_id, output_ids) in output_ids_by_node_id.iter() {
-                    if !cloned_node_ids.contains(node_id) {
-                        Io::delete_by_ids(session, output_ids.clone(), workflow, Some(id)).await?;
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        self.input_ids_by_node_id = original_inputs;
     }
 
-    // remove outputs references
-    pub async fn remove_outputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let node_ids = self.node_ids.cloned_ref();
+    pub fn merge_original_nodes(&mut self, original: &FlowStep) {
+        let mut original_nodes = original.node_ids.clone();
+        original_nodes.merge_unique(self.node_ids.clone());
 
-        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
-            output_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
-            self.update_cb(&None).execute(session).await?;
-        }
-
-        Ok(())
+        self.node_ids = original_nodes;
     }
 
-    // remove inputs references
-    pub async fn remove_inputs_from_removed_nodes(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
-        let node_ids = self.node_ids.cloned_ref();
+    pub fn merge_original_outputs(&mut self, original: &FlowStep) {
+        let mut original_outputs = original.output_ids_by_node_id.clone();
+        original_outputs.merge_unique(self.output_ids_by_node_id.clone());
 
-        if let Some(input_ids_by_node_id) = self.input_ids_by_node_id.as_mut() {
-            input_ids_by_node_id.retain(|node_id, _| node_ids.contains(node_id));
-            self.update_cb(&None).execute(session).await?;
-        }
-
-        Ok(())
+        self.output_ids_by_node_id = original_outputs;
     }
 }

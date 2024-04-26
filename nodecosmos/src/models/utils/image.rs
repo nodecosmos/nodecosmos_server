@@ -1,5 +1,6 @@
-use crate::errors::NodecosmosError;
 use futures::StreamExt;
+
+use crate::errors::NodecosmosError;
 
 const TARGET_SIZE_IN_BYTES: usize = 30 * 1024;
 

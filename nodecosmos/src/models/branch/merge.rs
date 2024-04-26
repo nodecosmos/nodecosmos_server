@@ -1,24 +1,30 @@
+use std::fs::create_dir_all;
+
+use charybdis::operations::Update;
+use log::{error, warn};
+use serde::{Deserialize, Serialize};
+
 use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
+use crate::models::branch::merge::conflicts::MergeConflicts;
+use crate::models::branch::merge::descriptions::MergeDescriptions;
+use crate::models::branch::merge::flow_steps::MergeFlowSteps;
+use crate::models::branch::merge::flows::MergeFlows;
+use crate::models::branch::merge::ios::MergeIos;
+use crate::models::branch::merge::nodes::MergeNodes;
+use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
-use crate::models::node::context::Context;
-use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{
-    find_update_description_node, find_update_title_node, Node, UpdateDescriptionNode, UpdateTitleNode,
-};
-use crate::models::traits::{Branchable, GroupById};
-use crate::models::udts::TextChange;
-use crate::utils::cloned_ref::ClonedRef;
-use crate::utils::file::read_file_names;
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Update, UpdateWithCallbacks};
-use charybdis::options::Consistency;
-use charybdis::types::Uuid;
-use log::{error, warn};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs::create_dir_all;
+use crate::models::traits::Branchable;
+use crate::models::utils::file::read_file_names;
+
+mod conflicts;
+mod descriptions;
+mod flow_steps;
+mod flows;
+mod ios;
+mod nodes;
+mod workflows;
 
 const RECOVERY_DATA_DIR: &str = "tmp/merge-recovery";
 const RECOVER_FILE_PREFIX: &str = "merge_recovery_data";
@@ -36,8 +42,28 @@ pub enum MergeStep {
     DeleteNodes = 3,
     ReorderNodes = 4,
     UpdateNodesTitles = 5,
-    UpdateNodesDescription = 6,
-    Finish = 7,
+    UpdateWorkflowInitialInputs = 6,
+    RestoreFlows = 7,
+    CreateFlows = 8,
+    DeleteFlows = 9,
+    UpdateFlowsTitles = 10,
+    AcceptFlowSolutions = 11,
+    DeleteFlowSteps = 12,
+    RestoreFlowSteps = 13,
+    CreateFlowSteps = 14,
+    CreateFlowStepNodes = 15,
+    DeleteFlowStepNodes = 16,
+    CreateFlowStepInputs = 17,
+    DeleteFlowStepInputs = 18,
+    CreateFlowStepOutputs = 19,
+    DeleteFlowStepOutputs = 20,
+    RestoreIos = 21,
+    CreateIos = 22,
+    DeleteIos = 23,
+    UpdateIoTitles = 24,
+    UpdateDescriptions = 25,
+    DeleteDescriptions = 26,
+    Finish = 27,
 }
 
 impl MergeStep {
@@ -59,9 +85,29 @@ impl From<u8> for MergeStep {
             3 => MergeStep::DeleteNodes,
             4 => MergeStep::ReorderNodes,
             5 => MergeStep::UpdateNodesTitles,
-            6 => MergeStep::UpdateNodesDescription,
-            7 => MergeStep::Finish,
-            _ => panic!("Invalid MergeStep value: {}", value),
+            6 => MergeStep::UpdateWorkflowInitialInputs,
+            7 => MergeStep::RestoreFlows,
+            8 => MergeStep::CreateFlows,
+            9 => MergeStep::DeleteFlows,
+            10 => MergeStep::UpdateFlowsTitles,
+            11 => MergeStep::AcceptFlowSolutions,
+            12 => MergeStep::DeleteFlowSteps,
+            13 => MergeStep::RestoreFlowSteps,
+            14 => MergeStep::CreateFlowSteps,
+            15 => MergeStep::CreateFlowStepNodes,
+            16 => MergeStep::DeleteFlowStepNodes,
+            17 => MergeStep::CreateFlowStepInputs,
+            18 => MergeStep::DeleteFlowStepInputs,
+            19 => MergeStep::CreateFlowStepOutputs,
+            20 => MergeStep::DeleteFlowStepOutputs,
+            21 => MergeStep::RestoreIos,
+            22 => MergeStep::CreateIos,
+            23 => MergeStep::DeleteIos,
+            24 => MergeStep::UpdateIoTitles,
+            25 => MergeStep::UpdateDescriptions,
+            26 => MergeStep::DeleteDescriptions,
+            27 => MergeStep::Finish,
+            _ => panic!("Invalid merge step value: {}", value),
         }
     }
 }
@@ -73,86 +119,93 @@ impl From<u8> for MergeStep {
 pub struct BranchMerge {
     branch: Branch,
     merge_step: MergeStep,
-    original_title_nodes: Option<HashMap<Uuid, UpdateTitleNode>>,
-    original_description_nodes: Option<HashMap<Uuid, UpdateDescriptionNode>>,
+    nodes: MergeNodes,
+    workflows: MergeWorkflows,
+    flows: MergeFlows,
+    flow_steps: MergeFlowSteps,
+    ios: MergeIos,
+    descriptions: MergeDescriptions,
 }
 
 impl BranchMerge {
-    async fn fetch_original_title_nodes(
-        session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_node_titles {
-            let nodes_by_id = find_update_title_node!("id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(session)
-                .await?
-                .group_by_id()
-                .await?;
+    pub async fn new(data: &RequestData, branch: Branch) -> Result<Self, MergeError> {
+        let nodes = MergeNodes::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
 
-            return Ok(Some(nodes_by_id));
-        }
+        let workflows = MergeWorkflows::new(&branch);
 
-        Ok(None)
-    }
+        let ios = MergeIos::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
 
-    async fn fetch_original_description_nodes(
-        session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, UpdateDescriptionNode>>, NodecosmosError> {
-        if let Some(ids) = &branch.edited_node_descriptions {
-            let nodes_by_id = find_update_description_node!("id IN ? AND branch_id IN ?", (ids, ids))
-                .execute(session)
-                .await?
-                .group_by_id()
-                .await?;
+        let flows = MergeFlows::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
 
-            return Ok(Some(nodes_by_id));
-        }
+        let flow_steps = MergeFlowSteps::new(&branch, data).await.map_err(|e| MergeError {
+            inner: e,
+            branch: branch.clone(),
+        })?;
 
-        Ok(None)
-    }
+        let descriptions = MergeDescriptions::new(data.db_session(), &branch)
+            .await
+            .map_err(|e| MergeError {
+                inner: e,
+                branch: branch.clone(),
+            })?;
 
-    pub async fn run(branch: Branch, data: &RequestData) -> Result<Self, MergeError> {
-        let original_title_nodes = match Self::fetch_original_title_nodes(data.db_session(), &branch).await {
-            Ok(nodes) => nodes,
-            Err(e) => return Err(MergeError { inner: e, branch }), // Early return on error
-        };
-
-        let original_description_nodes = match Self::fetch_original_description_nodes(data.db_session(), &branch).await
-        {
-            Ok(nodes) => nodes,
-            Err(e) => return Err(MergeError { inner: e, branch }), // Early return on error, no issue with moved value
-        };
-
-        let mut branch_merge = BranchMerge {
+        Ok(BranchMerge {
             branch,
             merge_step: MergeStep::Start,
-            original_title_nodes,
-            original_description_nodes,
-        };
+            nodes,
+            workflows,
+            ios,
+            flows,
+            flow_steps,
+            descriptions,
+        })
+    }
 
-        match branch_merge.merge(data).await {
+    pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, MergeError> {
+        if let Err(e) = MergeConflicts::new(&mut self).run_check(data).await {
+            return Err(MergeError {
+                inner: e,
+                branch: self.branch,
+            });
+        }
+
+        Ok(self)
+    }
+
+    pub async fn run(mut self, data: &RequestData) -> Result<Self, MergeError> {
+        match self.merge(data).await {
             Ok(_) => {
-                branch_merge.branch.status = Some(BranchStatus::Merged.to_string());
-                Ok(branch_merge)
+                self.branch.status = Some(BranchStatus::Merged.to_string());
+                Ok(self)
             }
-            Err(e) => match branch_merge.recover(data).await {
+            Err(e) => match self.recover(data).await {
                 Ok(_) => {
-                    branch_merge.branch.status = Some(BranchStatus::Recovered.to_string());
+                    self.branch.status = Some(BranchStatus::Recovered.to_string());
+                    warn!("Merge::Recovered from error: {}", e);
+
                     Err(MergeError {
                         inner: e,
-                        branch: branch_merge.branch,
+                        branch: self.branch,
                     })
                 }
                 Err(recovery_err) => {
-                    branch_merge.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
+                    self.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
 
                     error!("Mere::Failed to recover: {}", recovery_err);
-                    branch_merge.serialize_and_store_to_disk();
+                    self.serialize_and_store_to_disk();
 
                     Err(MergeError {
                         inner: NodecosmosError::FatalMergeError(format!("Failed to merge and recover: {}", e)),
-                        branch: branch_merge.branch,
+                        branch: self.branch,
                     })
                 }
             },
@@ -192,17 +245,37 @@ impl BranchMerge {
         }
     }
 
-    /// Merge the branch
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step < MergeStep::Finish {
             match self.merge_step {
-                MergeStep::RestoreNodes => self.restore_nodes(data).await?,
-                MergeStep::CreateNodes => self.create_nodes(data).await?,
-                MergeStep::DeleteNodes => self.delete_nodes(data).await?,
-                MergeStep::ReorderNodes => self.reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => self.update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => self.update_nodes_description(data).await?,
-                _ => {}
+                MergeStep::Start => (),
+                MergeStep::RestoreNodes => self.nodes.restore_nodes(data, &self.branch).await?,
+                MergeStep::CreateNodes => self.nodes.create_nodes(data, &self.branch).await?,
+                MergeStep::DeleteNodes => self.nodes.delete_nodes(data).await?,
+                MergeStep::ReorderNodes => self.nodes.reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.nodes.update_title(data, &mut self.branch).await?,
+                MergeStep::UpdateWorkflowInitialInputs => self.workflows.update_initial_inputs(data).await?,
+                MergeStep::RestoreFlows => self.flows.restore_flows(data).await?,
+                MergeStep::CreateFlows => self.flows.create_flows(data).await?,
+                MergeStep::DeleteFlows => self.flows.delete_flows(data).await?,
+                MergeStep::UpdateFlowsTitles => self.flows.update_title(data, &mut self.branch).await?,
+                MergeStep::AcceptFlowSolutions => (),
+                MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
+                MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &mut self.branch).await?,
+                MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data).await?,
+                MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
+                MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data).await?,
+                MergeStep::DeleteFlowStepInputs => self.flow_steps.delete_inputs(data, &self.branch).await?,
+                MergeStep::CreateFlowStepOutputs => self.flow_steps.create_outputs(data).await?,
+                MergeStep::DeleteFlowStepOutputs => self.flow_steps.delete_outputs(data, &self.branch).await?,
+                MergeStep::RestoreIos => self.ios.restore_ios(data).await?,
+                MergeStep::CreateIos => self.ios.create_ios(data).await?,
+                MergeStep::DeleteIos => self.ios.delete_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.ios.update_title(data, &mut self.branch).await?,
+                MergeStep::UpdateDescriptions => self.descriptions.update_descriptions(data, &mut self.branch).await?,
+                MergeStep::DeleteDescriptions => self.descriptions.delete_descriptions(data).await?,
+                MergeStep::Finish => (),
             }
 
             self.merge_step.increment();
@@ -215,13 +288,34 @@ impl BranchMerge {
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step > MergeStep::Start {
             match self.merge_step {
-                MergeStep::RestoreNodes => self.undo_restore_nodes(data).await?,
-                MergeStep::CreateNodes => self.undo_create_nodes(data).await?,
-                MergeStep::DeleteNodes => self.undo_delete_nodes(data).await?,
-                MergeStep::ReorderNodes => self.undo_reorder_nodes(data).await?,
-                MergeStep::UpdateNodesTitles => self.undo_update_nodes_titles(data).await?,
-                MergeStep::UpdateNodesDescription => self.undo_update_nodes_description(data).await?,
-                _ => {}
+                MergeStep::Start => (),
+                MergeStep::RestoreNodes => self.nodes.undo_delete_nodes(data).await?,
+                MergeStep::CreateNodes => self.nodes.undo_create_nodes(data).await?,
+                MergeStep::DeleteNodes => self.nodes.undo_restore_nodes(data).await?,
+                MergeStep::ReorderNodes => self.nodes.undo_reorder_nodes(data).await?,
+                MergeStep::UpdateNodesTitles => self.nodes.undo_update_title(data).await?,
+                MergeStep::UpdateWorkflowInitialInputs => self.workflows.undo_update_initial_inputs(data).await?,
+                MergeStep::RestoreFlows => self.flows.undo_create_flows(data).await?,
+                MergeStep::CreateFlows => self.flows.undo_delete_flows(data).await?,
+                MergeStep::DeleteFlows => self.flows.undo_restore_flows(data).await?,
+                MergeStep::UpdateFlowsTitles => self.flows.undo_update_title(data).await?,
+                MergeStep::AcceptFlowSolutions => (),
+                MergeStep::DeleteFlowSteps => self.flow_steps.undo_restore_flow_steps(data).await?,
+                MergeStep::RestoreFlowSteps => self.flow_steps.undo_create_flow_steps(data).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.undo_delete_flow_steps(data).await?,
+                MergeStep::CreateFlowStepNodes => self.flow_steps.undo_delete_flow_step_nodes(data).await?,
+                MergeStep::DeleteFlowStepNodes => self.flow_steps.undo_create_flow_step_nodes(data).await?,
+                MergeStep::CreateFlowStepInputs => self.flow_steps.undo_delete_inputs(data).await?,
+                MergeStep::DeleteFlowStepInputs => self.flow_steps.undo_create_inputs(data).await?,
+                MergeStep::CreateFlowStepOutputs => self.flow_steps.undo_delete_outputs(data).await?,
+                MergeStep::DeleteFlowStepOutputs => self.flow_steps.undo_create_outputs(data).await?,
+                MergeStep::RestoreIos => self.ios.undo_create_ios(data).await?,
+                MergeStep::CreateIos => self.ios.undo_delete_ios(data).await?,
+                MergeStep::DeleteIos => self.ios.undo_restore_ios(data).await?,
+                MergeStep::UpdateIoTitles => self.ios.undo_update_title(data).await?,
+                MergeStep::UpdateDescriptions => self.descriptions.undo_update_description(data).await?,
+                MergeStep::DeleteDescriptions => self.descriptions.undo_delete_descriptions(data).await?,
+                MergeStep::Finish => (),
             }
 
             self.merge_step.decrement();
@@ -245,7 +339,7 @@ impl BranchMerge {
 
     fn serialize_and_store_to_disk(&self) {
         // serialize branch_merge and store to disk
-        let serialized = serde_json::to_string(self).unwrap();
+        let serialized = serde_json::to_string(self).expect("Failed to serialize branch merge data");
         let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.branch.id);
         let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
         let res = std::fs::write(path.clone(), serialized);
@@ -255,317 +349,6 @@ impl BranchMerge {
             Err(err) => error!("Error in saving recovery data: {}", err),
         }
     }
-
-    async fn restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let restored_nodes = self.branch.restored_nodes(data.db_session()).await?;
-
-        self.insert_nodes(data, restored_nodes).await?;
-
-        Ok(())
-    }
-
-    async fn undo_restore_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let restored_nodes = self.branch.restored_nodes(data.db_session()).await?;
-
-        self.delete_inserted_nodes(data, restored_nodes).await?;
-
-        Ok(())
-    }
-
-    async fn create_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_nodes = self.branch.created_nodes(data.db_session()).await?;
-
-        self.insert_nodes(data, created_nodes).await?;
-
-        Ok(())
-    }
-
-    async fn undo_create_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let created_nodes = self.branch.created_nodes(data.db_session()).await?;
-
-        self.delete_inserted_nodes(data, created_nodes).await?;
-
-        Ok(())
-    }
-
-    async fn insert_nodes(
-        &mut self,
-        data: &RequestData,
-        merge_nodes: Option<Vec<Node>>,
-    ) -> Result<(), NodecosmosError> {
-        let node = self.branch.node(data.db_session()).await?;
-
-        if let Some(merge_nodes) = merge_nodes {
-            for mut merge_node in merge_nodes {
-                merge_node.ctx = Context::Merge;
-                merge_node.branch_id = merge_node.id;
-                merge_node.owner_id = node.owner_id;
-                merge_node.profile_type = node.profile_type.clone();
-                merge_node.editor_ids = node.editor_ids.clone();
-                merge_node
-                    .insert_cb(data)
-                    .consistency(Consistency::All)
-                    .execute(data.db_session())
-                    .await?;
-
-                // in case its needed for description merge
-                self.original_description_nodes
-                    .get_or_insert_with(HashMap::new)
-                    .insert(merge_node.id, UpdateDescriptionNode::from(merge_node));
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn delete_inserted_nodes(
-        &mut self,
-        data: &RequestData,
-        merge_nodes: Option<Vec<Node>>,
-    ) -> Result<(), NodecosmosError> {
-        if let Some(merge_nodes) = merge_nodes {
-            for mut merge_node in merge_nodes {
-                merge_node.branch_id = merge_node.id;
-                merge_node.delete_cb(data).execute(data.db_session()).await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn delete_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
-
-        for deleted_node_id in deleted_node_ids.clone() {
-            let deleted_node = Node::find_by_id_and_branch_id(deleted_node_id, deleted_node_id)
-                .execute(data.db_session())
-                .await
-                .ok();
-
-            match deleted_node {
-                Some(mut deleted_node) => {
-                    if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
-                        if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
-                            // skip deletion of node if it has an ancestor that is also deleted as
-                            // it will be removed in the callback
-                            continue;
-                        }
-
-                        deleted_node.delete_cb(data).execute(data.db_session()).await?;
-                    }
-                }
-                None => {
-                    warn!(
-                        "Failed to find deleted node with id {} and branch id {}",
-                        deleted_node_id, deleted_node_id
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn undo_delete_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let deleted_node_ids = self.branch.deleted_nodes.cloned_ref();
-
-        for deleted_node_id in deleted_node_ids.clone() {
-            let deleted_node = Node::find_by_id_and_branch_id(deleted_node_id, deleted_node_id)
-                .execute(data.db_session())
-                .await
-                .ok();
-
-            match deleted_node {
-                Some(mut deleted_node) => {
-                    if let Some(ancestor_ids) = &deleted_node.ancestor_ids {
-                        if ancestor_ids.iter().any(|id| deleted_node_ids.contains(id)) {
-                            continue;
-                        }
-
-                        deleted_node.insert_cb(data).execute(data.db_session()).await?;
-                    }
-                }
-                None => {
-                    warn!(
-                        "Failed to find deleted node with id {} and branch id {}",
-                        deleted_node_id, deleted_node_id
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn reorder_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(reordered_nodes_data) = &self.branch.reordered_nodes_data() {
-            for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(reorder_node_data.id, reorder_node_data.id))
-                    .execute(data.db_session())
-                    .await;
-
-                match node {
-                    Ok(node) => {
-                        let reorder_params = ReorderParams {
-                            id: reorder_node_data.id,
-                            branch_id: reorder_node_data.id,
-                            new_parent_id: reorder_node_data.new_parent_id,
-                            new_upper_sibling_id: reorder_node_data.new_upper_sibling_id,
-                            new_lower_sibling_id: reorder_node_data.new_lower_sibling_id,
-                            new_order_index: None,
-                        };
-                        let res = node.reorder(data, reorder_params).await;
-
-                        if let Err(e) = res {
-                            error!("Failed to process with reorder: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to find node with id {} and branch id {}: {:?}",
-                            reorder_node_data.id, reorder_node_data.id, e
-                        )
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn undo_reorder_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(reordered_nodes_data) = &self.branch.reordered_nodes_data() {
-            for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(reorder_node_data.id, reorder_node_data.id))
-                    .execute(data.db_session())
-                    .await;
-
-                match node {
-                    Ok(node) => {
-                        let reorder_params = ReorderParams {
-                            id: reorder_node_data.id,
-                            branch_id: reorder_node_data.id,
-                            new_parent_id: reorder_node_data.old_parent_id,
-                            new_order_index: Some(reorder_node_data.old_order_index),
-                            new_upper_sibling_id: None,
-                            new_lower_sibling_id: None,
-                        };
-                        let res = node.reorder(data, reorder_params).await;
-
-                        if let Err(e) = res {
-                            error!("Failed to process with reorder: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to find node with id {} and branch id {}: {:?}",
-                            reorder_node_data.id, reorder_node_data.id, e
-                        )
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn update_nodes_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let original_title_nodes = match self.original_title_nodes.as_ref() {
-            Some(nodes) => nodes,
-            None => return Ok(()),
-        };
-
-        let edited_node_titles = match self.branch.edited_title_nodes(data.db_session()).await? {
-            Some(titles) => titles,
-            None => return Ok(()),
-        };
-
-        for mut edited_node_title in edited_node_titles {
-            if let Some(original_node) = original_title_nodes.get(&edited_node_title.id) {
-                if original_node.title != edited_node_title.title {
-                    let mut text_change = TextChange::new();
-                    text_change.assign_old(Some(original_node.title.clone()));
-                    text_change.assign_new(Some(edited_node_title.title.clone()));
-
-                    edited_node_title.branch_id = edited_node_title.id;
-                    edited_node_title.update_cb(data).execute(data.db_session()).await?;
-
-                    self.branch
-                        .push_title_change_by_object(edited_node_title.id, text_change);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn undo_update_nodes_titles(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_title_nodes) = &mut self.original_title_nodes {
-            for original_title_node in original_title_nodes.values_mut() {
-                original_title_node.update_cb(data).execute(data.db_session()).await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let edited_description_nodes = match self.branch.edited_description_nodes(data.db_session()).await? {
-            Some(nodes) => nodes,
-            None => return Ok(()),
-        };
-
-        let original_description_nodes = match &self.original_description_nodes {
-            Some(nodes) => nodes,
-            None => {
-                return Err(NodecosmosError::MergeError(format!(
-                    "Failed to find original descriptions for edited description nodes - branch_id {}",
-                    self.branch.id
-                )))
-            }
-        };
-
-        for edited_description_node in edited_description_nodes {
-            let mut original = match original_description_nodes.get(&edited_description_node.id) {
-                Some(node) => node.clone(),
-                None => {
-                    return Err(NodecosmosError::MergeError(format!(
-                        "Failed to find original description node with id {}",
-                        edited_description_node.id
-                    )))
-                }
-            };
-
-            // init text change for remembrance of diff between old and new description
-            let mut text_change = TextChange::new();
-            text_change.assign_old(original.description_markdown.clone());
-
-            // description merge is handled within before_update callback
-            original.description_base64 = edited_description_node.description_base64;
-            original.update_cb(data).execute(data.db_session()).await?;
-
-            // update text change with new description
-            text_change.assign_new(original.description_markdown);
-            self.branch
-                .push_description_change_by_object(edited_description_node.id, text_change);
-        }
-
-        Ok(())
-    }
-
-    async fn undo_update_nodes_description(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(original_description_nodes) = &mut self.original_description_nodes {
-            for original_description_node in original_description_nodes.values_mut() {
-                original_description_node.ctx = Context::MergeRecovery;
-
-                original_description_node
-                    .update_cb(data)
-                    .execute(data.db_session())
-                    .await?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl Branch {
@@ -574,11 +357,34 @@ impl Branch {
             return Err(MergeError { inner: e, branch: self });
         }
 
-        if let Err(e) = self.check_conflicts(data.db_session()).await {
-            return Err(MergeError { inner: e, branch: self });
+        let merge = BranchMerge::new(data, self)
+            .await?
+            .check_conflicts(data)
+            .await?
+            .run(data)
+            .await?;
+
+        let res = merge.branch.update().execute(data.db_session()).await;
+
+        if let Err(e) = res {
+            return Err(MergeError {
+                inner: NodecosmosError::from(e),
+                branch: merge.branch,
+            });
         }
 
-        let merge = BranchMerge::run(self, data).await?;
+        Ok(merge.branch)
+    }
+
+    pub async fn validate_no_existing_conflicts(&mut self) -> Result<(), NodecosmosError> {
+        if self.conflict.is_some() {
+            return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
+        }
+
+        Ok(())
+    }
+    pub async fn check_conflicts(self, data: &RequestData) -> Result<Self, MergeError> {
+        let merge = BranchMerge::new(data, self).await?.check_conflicts(data).await?;
 
         let res = merge.branch.update().execute(data.db_session()).await;
 

@@ -1,5 +1,6 @@
-use crate::errors::NodecosmosError;
 use ammonia::{clean, Builder};
+
+use crate::errors::NodecosmosError;
 
 pub trait SanitizeDescription {
     fn sanitize(&mut self) -> Result<(), NodecosmosError>;

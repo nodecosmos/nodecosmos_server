@@ -1,8 +1,9 @@
-use crate::api::types::ActionTypes;
-use crate::errors::NodecosmosError;
 use charybdis::types::Uuid;
 use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::{redis, Pool};
+
+use crate::api::types::ActionTypes;
+use crate::errors::NodecosmosError;
 
 const LOCK_NAMESPACE: &str = "LOCK";
 

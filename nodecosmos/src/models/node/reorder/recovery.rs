@@ -1,16 +1,18 @@
+use std::fs::create_dir_all;
+use std::path::Path;
+
+use charybdis::batch::ModelBatch;
+use charybdis::operations::Update;
+use log::{error, info, warn};
+use scylla::CachingSession;
+
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
+use crate::models::utils::file::read_file_names;
 use crate::resources::resource_locker::ResourceLocker;
-use crate::utils::file::read_file_names;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::Update;
-use log::{error, info, warn};
-use scylla::CachingSession;
-use std::fs::create_dir_all;
-use std::path::Path;
 
 pub const RECOVERY_DATA_DIR: &str = "tmp/reorder-recovery";
 pub const RECOVER_FILE_PREFIX: &str = "reorder_recovery_data";
@@ -133,7 +135,11 @@ impl<'a> Recovery<'a> {
         let now = std::time::Instant::now();
 
         NodeDescendant::unlogged_batch()
-            .chunked_insert(self.db_session, &self.reorder_data.tree_descendants.clone(), 100)
+            .chunked_insert(
+                self.db_session,
+                &self.reorder_data.tree_descendants,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("restore_tree_descendants: {}", err);
@@ -169,7 +175,12 @@ impl<'a> Recovery<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PULL_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("remove_new_ancestor_ids: {:?}", err);
@@ -190,7 +201,12 @@ impl<'a> Recovery<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .chunked_statements(
+                &self.db_session,
+                Node::PUSH_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("append_old_ancestor_ids: {:?}", err);

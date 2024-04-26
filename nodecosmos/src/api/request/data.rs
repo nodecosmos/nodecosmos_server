@@ -1,19 +1,20 @@
-use crate::api::current_user::{get_current_user, OptCurrentUser};
-use crate::app::App;
-use crate::errors::NodecosmosError;
-use crate::models::user::CurrentUser;
-use crate::resources::description_ws_pool::DescriptionWsPool;
-use crate::resources::resource_locker::ResourceLocker;
-use crate::resources::sse_broadcast::SseBroadcast;
+use std::future::{ready, Ready};
+use std::sync::Arc;
+
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
 use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
-use serde_json::json;
-use std::future::{ready, Ready};
-use std::sync::Arc;
+
+use crate::api::current_user::get_current_user;
+use crate::app::App;
+use crate::errors::NodecosmosError;
+use crate::models::user::CurrentUser;
+use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::resource_locker::ResourceLocker;
+use crate::resources::sse_broadcast::SseBroadcast;
 
 /// It contains the data that is required by node API endpoints and node callbacks.
 #[derive(Clone)]
@@ -23,10 +24,6 @@ pub struct RequestData {
 }
 
 impl RequestData {
-    pub fn new(app: web::Data<App>, current_user: CurrentUser) -> Self {
-        Self { app, current_user }
-    }
-
     pub fn db_session(&self) -> &CachingSession {
         &self.app.db_session
     }
@@ -58,10 +55,6 @@ impl RequestData {
     pub fn current_user_id(&self) -> Uuid {
         self.current_user.id
     }
-
-    pub fn opt_current_user(&self) -> OptCurrentUser {
-        OptCurrentUser(Some(self.current_user.clone()))
-    }
 }
 
 impl FromRequest for RequestData {
@@ -92,10 +85,7 @@ impl FromRequest for RequestData {
                 }
             }
             None => {
-                let error_response = NodecosmosError::Unauthorized(json!({
-                    "error": "Unauthorized! You must be logged in to perform this action",
-                    "message": "You must be logged in to perform this action!"
-                }));
+                let error_response = NodecosmosError::Unauthorized("You must be logged in to perform this action!");
                 ready(Err(error_response))
             }
         };

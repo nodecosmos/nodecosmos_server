@@ -1,6 +1,13 @@
-pub mod data;
-mod recovery;
-mod validator;
+use charybdis::batch::ModelBatch;
+use charybdis::operations::{execute, Update};
+use charybdis::options::Consistency;
+use charybdis::types::{Double, Uuid};
+use log::error;
+use scylla::CachingSession;
+use serde::Deserialize;
+
+use nodecosmos_macros::Branchable;
+pub use recovery::Recovery;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
@@ -9,24 +16,18 @@ use crate::models::branch::Branch;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::{execute, Update};
-use charybdis::options::Consistency;
-use charybdis::types::{Double, Uuid};
-use log::error;
-use nodecosmos_macros::Branchable;
-pub use recovery::Recovery;
-use scylla::CachingSession;
-use serde::Deserialize;
-use std::sync::Arc;
+
+pub mod data;
+mod recovery;
+mod validator;
 
 // TODO: update to use SAGA similar to `BranchMerge` so we avoid reading whole tree for recovery
 #[derive(Deserialize, Branchable)]
 pub struct ReorderParams {
+    #[branch(original_id)]
     pub id: Uuid,
 
     #[serde(rename = "branchId")]
@@ -52,17 +53,15 @@ pub struct Reorder<'a> {
 }
 
 impl<'a> Reorder<'a> {
-    pub async fn new(request_data: &'a RequestData, data: &'a ReorderData) -> Result<Reorder<'a>, NodecosmosError> {
-        Ok(Self {
+    pub fn new(request_data: &'a RequestData, data: &'a ReorderData) -> Reorder<'a> {
+        Self {
             db_session: request_data.db_session(),
             request_data,
             reorder_data: data,
-        })
+        }
     }
 
     pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        ReorderValidator::new(&self.reorder_data).validate()?;
-
         let res = self.execute_reorder().await;
 
         if let Err(err) = res {
@@ -115,7 +114,7 @@ impl<'a> Reorder<'a> {
 
         update_order_node
             .update()
-            .consistency(Consistency::All)
+            .consistency(Consistency::EachQuorum)
             .execute(&self.db_session)
             .await?;
 
@@ -139,8 +138,12 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::All)
-            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_delete(
+                &self.db_session,
+                &descendants_to_delete,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("remove_node_from_removed_ancestors: {:?}", err);
@@ -169,8 +172,12 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::All)
-            .chunked_delete(&self.db_session, &descendants_to_delete, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_delete(
+                &self.db_session,
+                &descendants_to_delete,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
@@ -198,8 +205,12 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::All)
-            .chunked_insert(&self.db_session, &descendants_to_add, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_insert(
+                &self.db_session,
+                &descendants_to_add,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("add_node_to_new_ancestors: {:?}", err);
@@ -229,8 +240,8 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::All)
-            .chunked_insert(&self.db_session, &descendants, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_insert(&self.db_session, &descendants, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
                 error!("insert_node_descendants_to_added_ancestors: {:?}", err);
@@ -264,8 +275,13 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::All)
-            .chunked_statements(&self.db_session, Node::PULL_ANCESTOR_IDS_QUERY, values, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_statements(
+                &self.db_session,
+                Node::PULL_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("pull_removed_ancestors_from_descendants: {:?}", err);
@@ -304,8 +320,13 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::All)
-            .chunked_statements(&self.db_session, Node::PUSH_ANCESTOR_IDS_QUERY, values, 100)
+            .consistency(Consistency::EachQuorum)
+            .chunked_statements(
+                &self.db_session,
+                Node::PUSH_ANCESTOR_IDS_QUERY,
+                values,
+                crate::constants::MAX_PARALLEL_REQUESTS,
+            )
             .await
             .map_err(|err| {
                 error!("push_added_ancestors_to_descendants: {:?}", err);
@@ -339,17 +360,9 @@ impl<'a> Reorder<'a> {
 impl Node {
     pub async fn reorder(&self, data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
         let reorder_data = ReorderData::from_params(&params, data).await?;
-        let reorder_data = Arc::new(reorder_data);
 
-        let mut reorder = Reorder::new(data, &reorder_data).await?;
-
-        reorder.run().await?;
-
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            NodeCommit::handle_reorder(&data, &reorder_data).await;
-        });
+        ReorderValidator::new(&reorder_data).validate()?;
+        Reorder::new(data, &reorder_data).run().await?;
 
         Ok(())
     }

@@ -1,24 +1,24 @@
+use charybdis::batch::ModelBatch;
+use charybdis::operations::{Find, Insert};
+use charybdis::types::{Set, Uuid};
+use elasticsearch::Elasticsearch;
+use futures::{stream, StreamExt, TryFutureExt};
+use log::error;
+use scylla::CachingSession;
+
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
-use crate::models::node_commit::NodeCommit;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::node::Parent;
+use crate::models::traits::ModelContext;
+use crate::models::traits::Parent;
+use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
 use crate::models::udts::Profile;
-use crate::utils::cloned_ref::ClonedRef;
-use charybdis::batch::ModelBatch;
-use charybdis::operations::{Find, Insert};
-use charybdis::options::Consistency;
-use charybdis::types::{Set, Uuid};
-use chrono::Utc;
-use elasticsearch::Elasticsearch;
-use futures::{stream, StreamExt, TryFutureExt};
-use log::error;
-use scylla::CachingSession;
+use crate::models::workflow::Workflow;
 
 impl Node {
     pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -27,14 +27,12 @@ impl Node {
             let owner = Profile::init_from_current_user(current_user);
 
             self.owner_id = Some(owner.id);
-            self.profile_type = Some(owner.profile_type.clone());
 
             self.owner = Some(owner);
         } else {
             if let Some(parent) = self.parent(data.db_session()).await? {
                 if let Some(owner) = parent.owner.clone() {
                     self.owner_id = Some(owner.id);
-                    self.profile_type = Some(owner.profile_type.clone());
 
                     self.owner = Some(owner);
                 } else {
@@ -54,11 +52,12 @@ impl Node {
         Ok(())
     }
 
-    pub async fn set_defaults(&mut self, session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn set_defaults(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
 
-        if let Some(parent) = self.parent(session).await? {
-            let editor_ids = parent.editor_ids.clone().unwrap_or(Set::new());
+        if let Some(parent) = self.parent(db_session).await? {
+            let editor_ids = parent.editor_ids.clone();
+            let viewer_ids = parent.viewer_ids.clone();
             let root_id = parent.root_id;
             let is_public = parent.is_public;
             let parent_id = parent.id;
@@ -67,7 +66,8 @@ impl Node {
 
             self.root_id = root_id;
             self.parent_id = Some(parent_id);
-            self.editor_ids = Some(editor_ids);
+            self.editor_ids = editor_ids;
+            self.viewer_ids = viewer_ids;
             self.is_public = is_public;
             self.is_root = false;
             self.ancestor_ids = Some(ancestor_ids);
@@ -82,15 +82,10 @@ impl Node {
             self.branch_id = self.id;
         }
 
-        let now = Utc::now();
-
-        self.created_at = Some(now);
-        self.updated_at = Some(now);
-
         Ok(())
     }
 
-    pub async fn validate_root(&mut self) -> Result<(), NodecosmosError> {
+    pub fn validate_root(&mut self) -> Result<(), NodecosmosError> {
         if self.is_root {
             if self.root_id != self.id {
                 return Err(NodecosmosError::ValidationError((
@@ -110,17 +105,10 @@ impl Node {
         Ok(())
     }
 
-    pub async fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
+    pub fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
         if self.owner_id.is_none() || self.owner.is_none() {
             return Err(NodecosmosError::ValidationError((
                 "owner_id".to_string(),
-                "must be present".to_string(),
-            )));
-        }
-
-        if self.profile_type.is_none() {
-            return Err(NodecosmosError::ValidationError((
-                "profile_type".to_string(),
                 "must be present".to_string(),
             )));
         }
@@ -147,7 +135,8 @@ impl Node {
             }
 
             if let Err(e) = NodeDescendant::batch()
-                .chunked_insert(db_session, &descendants, 100)
+                .append_inserts(&descendants)
+                .execute(db_session)
                 .await
             {
                 error!(
@@ -162,49 +151,15 @@ impl Node {
         Ok(())
     }
 
-    pub async fn remove_from_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
-            let mut descendants = Vec::with_capacity(ancestor_ids.len());
-
-            for ancestor_id in ancestor_ids {
-                let node_descendant = NodeDescendant {
-                    root_id: self.root_id,
-                    node_id: *ancestor_id,
-                    id: self.id,
-                    branch_id: self.branchise_id(*ancestor_id),
-                    order_index: self.order_index,
-                    parent_id: self.parent_id.expect("parent_id must be present"),
-                    title: self.title.clone(),
-                };
-
-                descendants.push(node_descendant);
-            }
-
-            if let Err(e) = NodeDescendant::batch()
-                .chunked_delete(db_session, &descendants, 100)
-                .await
-            {
-                error!(
-                    "[remove_from_ancestors::chunked_delete] Error for node {}: {:?}",
-                    self.id, e
-                );
-
-                return Err(NodecosmosError::from(e));
-            }
-        }
-
-        Ok(())
-    }
-
     /// When we create node within branch (Contribution Request),
     /// we need to create branched version for all ancestors,
     /// so we can preserve branch changes in case any of ancestor is deleted,
     /// and we can allow users to resolve conflicts.
-    pub async fn preserve_ancestors_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn preserve_branch_ancestors(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut futures = vec![];
 
-            for ancestor_id in self.ancestor_ids.cloned_ref() {
+            for ancestor_id in self.ancestor_ids.ref_cloned() {
                 let ancestor = Node {
                     id: ancestor_id,
                     branch_id: self.branch_id,
@@ -225,7 +180,7 @@ impl Node {
             {
                 if let Err(e) = future {
                     error!(
-                        "[preserve_ancestors_for_branch] Error preserving ancestors for branch: {:?}",
+                        "[preserve_branch_ancestors] Error preserving ancestors for branch: {:?}",
                         e
                     );
 
@@ -248,11 +203,8 @@ impl Node {
             match non_branched_res {
                 Ok(mut node) => {
                     node.branch_id = self.branch_id;
-                    let insert = node
-                        .insert()
-                        .consistency(Consistency::All)
-                        .execute(data.db_session())
-                        .await;
+                    node.set_branched_init_context();
+                    let insert = node.insert().execute(data.db_session()).await;
 
                     if let Err(e) = insert {
                         error!(
@@ -262,7 +214,7 @@ impl Node {
                     }
 
                     node.append_to_ancestors(data.db_session()).await?;
-                    node.create_new_version(&data).await;
+                    node.maybe_create_workflow(&data).await?;
                 }
                 Err(e) => {
                     error!("Error finding non-branched node {}: {:?}", self.id, e);
@@ -275,7 +227,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn preserve_descendants_for_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn preserve_branch_descendants(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             let mut descendants =
                 NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
@@ -306,7 +258,7 @@ impl Node {
             {
                 if let Err(e) = future {
                     error!(
-                        "[preserve_descendants_for_branch] Error preserving descendants for branch: {:?}",
+                        "[preserve_branch_descendants] Error preserving descendants for branch: {:?}",
                         e
                     );
 
@@ -353,28 +305,50 @@ impl Node {
         }
     }
 
-    pub async fn create_new_version(&self, data: &RequestData) {
-        let _ = NodeCommit::handle_creation(&data.db_session(), &self, data.current_user_id())
-            .map_err(|e| {
-                error!("Error creating new version for node {}: {:?}", self.id, e);
+    pub async fn create_workflow(&self, data: &RequestData) {
+        let _ = Workflow {
+            root_id: self.root_id,
+            node_id: self.id,
+            branch_id: self.branch_id,
+            title: Some(format!("{} Workflow", self.title)),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            initial_input_ids: None,
+        }
+        .insert_if_not_exists()
+        .execute(data.db_session())
+        .map_err(|e| {
+            error!("Error creating new workflow for node {}: {:?}", self.id, e);
 
-                e
-            })
-            .await;
+            e
+        })
+        .await;
     }
 
-    pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
+    pub async fn maybe_create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(self.id, self.branch_id)
+            .execute(data.db_session())
+            .await?;
+
+        if maybe_branched.is_none() {
+            Workflow {
+                root_id: self.root_id,
+                node_id: self.id,
+                branch_id: self.branch_id,
+                title: Some(format!("{} Workflow", self.title)),
+                ..Default::default()
+            }
+            .insert()
+            .execute(data.db_session())
+            .await?;
         }
 
         Ok(())
     }
 
-    #[allow(unused)]
-    pub async fn undo_update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Branch::undo_update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
+            Branch::update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
         }
 
         Ok(())

@@ -1,73 +1,67 @@
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::branch::{
-    Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepOutputsByNodeBranch,
-    UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch, UpdateCreatedIOsBranch, UpdateCreatedNodesBranch,
-    UpdateCreatedWorkflowsBranch, UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepOutputsByNodeBranch,
-    UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch, UpdateDeletedIOsBranch, UpdateDeletedNodesBranch,
-    UpdateDeletedWorkflowsBranch, UpdateEditedFlowDescriptionsBranch, UpdateEditedFlowTitlesBranch,
-    UpdateEditedIODescriptionsBranch, UpdateEditedIOTitlesBranch, UpdateEditedNodeDescriptionsBranch,
-    UpdateEditedNodeTitlesBranch, UpdateEditedWorkflowTitlesBranch, UpdateReorderedNodes, UpdateRestoredNodesBranch,
-};
-use crate::models::udts::{BranchReorderData, TextChange};
-use crate::models::utils::append_statement_or_log_fatal;
 use charybdis::batch::CharybdisModelBatch;
 use charybdis::errors::CharybdisError;
-use charybdis::operations::{Find, Update};
-use charybdis::types::{Map, Set, Uuid};
+use charybdis::operations::Update;
+use charybdis::types::{Frozen, List, Map, Set, Uuid};
 use log::error;
 use scylla::QueryResult;
 
-#[allow(unused)]
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::branch::{
+    Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
+    UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
+    UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
+    UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
+    UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
+    UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
+    UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
+    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodeWorkflowsBranch,
+    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch, UpdateReorderedNodes,
+    UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
+};
+use crate::models::udts::BranchReorderData;
+
 pub enum BranchUpdate {
     CreateNode(Uuid),
-    DeleteNode(Uuid),
-    UndoDeleteNode(Uuid),
+    DeleteNodes(Vec<Uuid>),
+    UndoDeleteNodes(Vec<Uuid>),
     RestoreNode(Uuid),
     EditNodeTitle(Uuid),
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
-    CreateWorkflow(Uuid),
-    DeleteWorkflow(Uuid),
-    EditWorkflowTitle(Uuid),
+    EditNodeWorkflow(Uuid),
+    CreatedWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
+    DeleteWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     CreateFlow(Uuid),
     DeleteFlow(Uuid),
+    UndoDeleteFlow(Uuid),
+    RestoreFlow(Uuid),
     EditFlowTitle(Uuid),
     EditFlowDescription(Uuid),
-    CreateIO(Uuid),
-    DeleteIO(Uuid),
-    EditIOTitle(Uuid),
-    EditIODescription(Uuid),
     CreateFlowStep(Uuid),
     DeleteFlowStep(Uuid),
-    AppendFlowStepInput(Uuid, Uuid),
-    RemoveFlowStepInput(Uuid, Uuid),
-    AppendFlowStepOutput(Uuid, Uuid),
-    RemoveFlowStepOutput(Uuid, Uuid),
+    UndoDeleteFlowStep(Uuid),
+    RestoreFlowStep(Uuid),
+    KeepFlowStep(Uuid),
+    CreatedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    DeletedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    CreatedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreatedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    EditFlowStepDescription(Uuid),
+    CreateIo(Uuid),
+    DeleteIo(Uuid),
+    UndoDeleteIo(Uuid),
+    RestoreIo(Uuid),
+    EditIoTitle(Uuid),
+    EditIoDescription(Uuid),
 }
 
 impl Branch {
-    async fn check_branch_conflicts(branch_id: Uuid, data: &RequestData) {
-        let data = data.clone();
-
-        tokio::spawn(async move {
-            let branch = Branch::find_by_id(branch_id).execute(data.db_session()).await;
-
-            return match branch {
-                Ok(mut branch) => {
-                    let res = branch.check_conflicts(data.db_session()).await;
-
-                    if let Err(err) = res {
-                        error!("Failed to check_conflicts: {}", err);
-                    }
-                }
-                Err(err) => error!("Failed to find branch: {}", err),
-            };
-        });
-    }
-
-    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
+    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<Self, NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
+        let mut check_conflicts = false;
 
         match update {
             BranchUpdate::CreateNode(id) => {
@@ -79,72 +73,62 @@ impl Branch {
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::DeleteNode(id) => {
-                let mut batch = CharybdisModelBatch::new();
-                let params = (vec![id], branch_id);
+            BranchUpdate::DeleteNodes(ids) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+                let params = (ids, branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY,
-                    params.clone(),
-                )?;
+                res = batch
+                    .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, &params)
+                    .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, &params)
+                    .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, &params)
+                    .append_statement(
+                        UpdateEditedNodeWorkflowsBranch::PULL_EDITED_WORKFLOW_NODES_QUERY,
+                        &params,
+                    )
+                    .execute(data.db_session())
+                    .await;
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY,
-                    params,
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                check_conflicts = true;
             }
-            BranchUpdate::UndoDeleteNode(id) => {
+            BranchUpdate::UndoDeleteNodes(ids) => {
                 res = UpdateDeletedNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .pull_deleted_nodes(&vec![id])
+                .pull_deleted_nodes(ids)
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::RestoreNode(id) => {
-                let mut batch = CharybdisModelBatch::new();
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY,
-                    params.clone(),
-                )?;
+                res = batch
+                    .append_statement(UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY, &params)
+                    .append_statement(UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
+                check_conflicts = true;
             }
             BranchUpdate::EditNodeTitle(id) => {
-                res = UpdateEditedNodeTitlesBranch {
+                res = UpdateEditedTitleNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_titles(&vec![id])
+                .push_edited_title_nodes(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditNodeDescription(id) => {
-                res = UpdateEditedNodeDescriptionsBranch {
+                res = UpdateEditedDescriptionNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_node_descriptions(&vec![id])
+                .push_edited_description_nodes(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
@@ -172,31 +156,33 @@ impl Branch {
                         return Err(err.into());
                     }
                 }
+
+                check_conflicts = true;
             }
-            BranchUpdate::CreateWorkflow(id) => {
-                res = UpdateCreatedWorkflowsBranch {
+            BranchUpdate::EditNodeWorkflow(id) => {
+                res = UpdateEditedNodeWorkflowsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_workflows(&vec![id])
+                .push_edited_workflow_nodes(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::DeleteWorkflow(id) => {
-                res = UpdateDeletedWorkflowsBranch {
+            BranchUpdate::CreatedWorkflowInitialInputs(created_workflow_initial_inputs) => {
+                res = UpdateCreatedWorkflowInitialInputsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_workflows(&vec![id])
+                .push_created_workflow_initial_inputs(created_workflow_initial_inputs)
                 .execute(data.db_session())
                 .await;
             }
-            BranchUpdate::EditWorkflowTitle(id) => {
-                res = UpdateEditedWorkflowTitlesBranch {
+            BranchUpdate::DeleteWorkflowInitialInputs(deleted_workflow_initial_inputs) => {
+                res = UpdateDeletedWorkflowInitialInputsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_workflow_titles(&vec![id])
+                .push_deleted_workflow_initial_inputs(deleted_workflow_initial_inputs)
                 .execute(data.db_session())
                 .await;
             }
@@ -210,65 +196,56 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+            }
+            BranchUpdate::UndoDeleteFlow(id) => {
                 res = UpdateDeletedFlowsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_flows(&vec![id])
+                .pull_deleted_flows(&vec![id])
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true
+            }
+            BranchUpdate::RestoreFlow(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY, &params)
+                    .append_statement(UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
             }
             BranchUpdate::EditFlowTitle(id) => {
-                res = UpdateEditedFlowTitlesBranch {
+                res = UpdateEditedFlowTitleBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_flow_titles(&vec![id])
+                .push_edited_title_flows(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
             BranchUpdate::EditFlowDescription(id) => {
-                res = UpdateEditedFlowDescriptionsBranch {
+                res = UpdateEditedFlowDescriptionBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_flow_descriptions(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::CreateIO(id) => {
-                res = UpdateCreatedIOsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_created_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteIO(id) => {
-                res = UpdateDeletedIOsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditIOTitle(id) => {
-                res = UpdateEditedIOTitlesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_edited_io_titles(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditIODescription(id) => {
-                res = UpdateEditedIODescriptionsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_edited_io_descriptions(&vec![id])
+                .push_edited_description_flows(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
@@ -282,330 +259,20 @@ impl Branch {
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
-                res = UpdateDeletedFlowStepsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_flow_steps(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::AppendFlowStepInput(node_id, io_id) => {
-                let branch = UpdateCreatedFlowStepInputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .find_by_primary_key()
-                .execute(data.db_session())
-                .await;
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
 
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .created_flow_step_inputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .insert(io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::AppendFlowStepInput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
-            }
-            BranchUpdate::RemoveFlowStepInput(node_id, io_id) => {
-                let branch = UpdateDeletedFlowStepInputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .find_by_primary_key()
-                .execute(data.db_session())
-                .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .deleted_flow_step_inputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .insert(io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::RemoveFlowStepInput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
-            }
-            BranchUpdate::AppendFlowStepOutput(node_id, io_id) => {
-                let branch = UpdateCreatedFlowStepOutputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .find_by_primary_key()
-                .execute(data.db_session())
-                .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .created_flow_step_outputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .insert(io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::AppendFlowStepOutput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
-            }
-            BranchUpdate::RemoveFlowStepOutput(node_id, io_id) => {
-                let branch = UpdateDeletedFlowStepOutputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .find_by_primary_key()
-                .execute(data.db_session())
-                .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .deleted_flow_step_outputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .insert(io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::RemoveFlowStepOutput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
-            }
-        }
-
-        if let Err(err) = res {
-            error!("Failed to update branch: {}", err)
-        }
-
-        Self::check_branch_conflicts(branch_id, data).await;
-
-        Ok(())
-    }
-
-    #[allow(unused)]
-    pub async fn undo_update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<(), NodecosmosError> {
-        let res: Result<QueryResult, CharybdisError>;
-
-        match update {
-            BranchUpdate::CreateNode(id) => {
-                res = UpdateCreatedNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_created_nodes(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteNode(id) => {
-                res = UpdateDeletedNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_deleted_nodes(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::UndoDeleteNode(id) => {
-                res = UpdateDeletedNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_nodes(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::RestoreNode(id) => {
-                let mut batch = CharybdisModelBatch::new();
                 let params = (vec![id], branch_id);
 
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                append_statement_or_log_fatal(
-                    &mut batch,
-                    UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY,
-                    params.clone(),
-                )?;
-
-                res = batch.execute(data.db_session()).await;
-            }
-            BranchUpdate::EditNodeTitle(id) => {
-                res = UpdateEditedNodeTitlesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_node_titles(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditNodeDescription(id) => {
-                res = UpdateEditedNodeDescriptionsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_node_descriptions(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::ReorderNode(reorder_data) => {
-                let branch = UpdateReorderedNodes::find_by_id(branch_id)
+                res = batch
+                    .append_statement(UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY, &params)
                     .execute(data.db_session())
                     .await;
-                match branch {
-                    Ok(mut branch) => {
-                        // filter out existing reorder nodes with same id
-                        let new_reorder_nodes = branch
-                            .reordered_nodes
-                            .unwrap_or_default()
-                            .into_iter()
-                            .filter(|node| node.id != reorder_data.id)
-                            .collect::<Vec<_>>();
 
-                        branch.reordered_nodes = Some(new_reorder_nodes);
-
-                        res = branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::ReorderNode] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
+                check_conflicts = true;
             }
-            BranchUpdate::CreateWorkflow(id) => {
-                res = UpdateCreatedWorkflowsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_created_workflows(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteWorkflow(id) => {
-                res = UpdateDeletedWorkflowsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_deleted_workflows(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditWorkflowTitle(id) => {
-                res = UpdateEditedWorkflowTitlesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_workflow_titles(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::CreateFlow(id) => {
-                res = UpdateCreatedFlowsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_created_flows(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteFlow(id) => {
-                res = UpdateDeletedFlowsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_deleted_flows(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditFlowTitle(id) => {
-                res = UpdateEditedFlowTitlesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_flow_titles(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditFlowDescription(id) => {
-                res = UpdateEditedFlowDescriptionsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_flow_descriptions(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::CreateIO(id) => {
-                res = UpdateCreatedIOsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_created_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteIO(id) => {
-                res = UpdateDeletedIOsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_deleted_ios(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditIOTitle(id) => {
-                res = UpdateEditedIOTitlesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_io_titles(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::EditIODescription(id) => {
-                res = UpdateEditedIODescriptionsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_edited_io_descriptions(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::CreateFlowStep(id) => {
-                res = UpdateCreatedFlowStepsBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .pull_created_flow_steps(&vec![id])
-                .execute(data.db_session())
-                .await;
-            }
-            BranchUpdate::DeleteFlowStep(id) => {
+            BranchUpdate::UndoDeleteFlowStep(id) => {
                 res = UpdateDeletedFlowStepsBranch {
                     id: branch_id,
                     ..Default::default()
@@ -613,139 +280,179 @@ impl Branch {
                 .pull_deleted_flow_steps(&vec![id])
                 .execute(data.db_session())
                 .await;
+
+                check_conflicts = true
             }
-            BranchUpdate::AppendFlowStepInput(node_id, io_id) => {
-                let branch = UpdateCreatedFlowStepInputsByNodeBranch {
+            BranchUpdate::RestoreFlowStep(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY, &params)
+                    .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::KeepFlowStep(id) => {
+                res = UpdateKeptFlowStepsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key()
+                .push_kept_flow_steps(&vec![id])
                 .execute(data.db_session())
                 .await;
 
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .created_flow_step_inputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .remove(&io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::AppendFlowStepInput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
+                check_conflicts = true;
             }
-            BranchUpdate::RemoveFlowStepInput(node_id, io_id) => {
-                let branch = UpdateDeletedFlowStepInputsByNodeBranch {
+            BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes) => {
+                res = UpdateCreatedFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key()
+                .push_created_flow_step_nodes(created_flow_step_nodes)
                 .execute(data.db_session())
                 .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .deleted_flow_step_inputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .remove(&io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::RemoveFlowStepInput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
             }
-            BranchUpdate::AppendFlowStepOutput(node_id, io_id) => {
-                let branch = UpdateCreatedFlowStepOutputsByNodeBranch {
+            BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
+                res = UpdateDeletedFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key()
+                .push_deleted_flow_step_nodes(deleted_flow_step_nodes)
                 .execute(data.db_session())
                 .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .created_flow_step_outputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .remove(&io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::AppendFlowStepOutput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
-                }
             }
-            BranchUpdate::RemoveFlowStepOutput(node_id, io_id) => {
-                let branch = UpdateDeletedFlowStepOutputsByNodeBranch {
+            BranchUpdate::CreatedFlowStepInputs(created_flow_step_inputs_by_node) => {
+                res = UpdateCreatedFlowStepInputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .find_by_primary_key()
+                .push_created_flow_step_inputs_by_node(created_flow_step_inputs_by_node)
                 .execute(data.db_session())
                 .await;
-
-                match branch {
-                    Ok(mut fs_branch) => {
-                        let _ = &mut fs_branch
-                            .deleted_flow_step_outputs_by_node
-                            .get_or_insert_with(Default::default)
-                            .entry(node_id)
-                            .or_insert_with(Set::default)
-                            .remove(&io_id);
-
-                        res = fs_branch.update().execute(data.db_session()).await;
-                    }
-                    Err(err) => {
-                        error!("[BranchUpdate::RemoveFlowStepOutput] Failed to find branch: {}", err);
-                        return Err(err.into());
-                    }
+            }
+            BranchUpdate::DeletedFlowStepInputs(deleted_flow_step_inputs_by_node) => {
+                res = UpdateDeletedFlowStepInputsByNodeBranch {
+                    id: branch_id,
+                    ..Default::default()
                 }
+                .push_deleted_flow_step_inputs_by_node(deleted_flow_step_inputs_by_node)
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::CreatedFlowStepOutputs(created_flow_step_outputs_by_node) => {
+                res = UpdateCreatedFlowStepOutputsByNodeBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_created_flow_step_outputs_by_node(created_flow_step_outputs_by_node)
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::DeletedFlowStepOutputs(deleted_flow_step_outputs_by_node) => {
+                res = UpdateDeletedFlowStepOutputsByNodeBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_deleted_flow_step_outputs_by_node(deleted_flow_step_outputs_by_node)
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::EditFlowStepDescription(id) => {
+                res = UpdateEditedDescriptionFlowStepsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_description_flow_steps(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::CreateIo(id) => {
+                res = UpdateCreatedIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_created_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::DeleteIo(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY, &params)
+                    .append_statement(UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY, &params)
+                    .append_statement(UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::UndoDeleteIo(id) => {
+                res = UpdateDeletedIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .pull_deleted_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::RestoreIo(id) => {
+                let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
+
+                let params = (vec![id], branch_id);
+
+                res = batch
+                    .append_statement(UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY, &params)
+                    .append_statement(UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY, &params)
+                    .execute(data.db_session())
+                    .await;
+
+                check_conflicts = true;
+            }
+            BranchUpdate::EditIoTitle(id) => {
+                res = UpdateEditedTitleIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_title_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
+            }
+            BranchUpdate::EditIoDescription(id) => {
+                res = UpdateEditedDescriptionIosBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .push_edited_description_ios(&vec![id])
+                .execute(data.db_session())
+                .await;
             }
         }
 
         if let Err(err) = res {
-            error!("Failed to undo update branch: {}", err)
+            error!("Failed to update branch: {}", err)
         }
 
-        Self::check_branch_conflicts(branch_id, data).await;
+        let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
 
-        Ok(())
-    }
-
-    pub fn push_title_change_by_object(&mut self, id: Uuid, text_change: TextChange) {
-        if let Some(title_change_by_object) = &mut self.title_change_by_object {
-            title_change_by_object.insert(id, text_change);
-        } else {
-            let mut map = Map::new();
-            map.insert(id, text_change);
-            self.title_change_by_object = Some(map);
+        if check_conflicts {
+            println!("Checking conflicts");
+            match branch.check_conflicts(data).await {
+                Ok(res) => {
+                    branch = res;
+                }
+                Err(err) => {
+                    branch = err.branch;
+                }
+            }
         }
-    }
 
-    pub fn push_description_change_by_object(&mut self, id: Uuid, text_change: TextChange) {
-        if let Some(description_change_by_object) = &mut self.description_change_by_object {
-            description_change_by_object.insert(id, text_change);
-        } else {
-            let mut map = Map::new();
-            map.insert(id, text_change);
-            self.description_change_by_object = Some(map);
-        }
+        Ok(branch)
     }
 }

@@ -1,6 +1,7 @@
+use scylla::CachingSession;
+
 use crate::errors::NodecosmosError;
 use crate::models::node::BaseNode;
-use scylla::CachingSession;
 
 /// Implemented by `NodeParent` derive  `#[derive(NodeParent)]` with exception of `BaseNode` to avoid infinite recursion
 pub trait Parent {
