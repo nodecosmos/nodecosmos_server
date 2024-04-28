@@ -24,41 +24,35 @@ impl MergeDescriptions {
         let mut deleted_descriptions = Vec::new();
         let mut original_descriptions = HashMap::new();
 
-        if let Some(node_ids) = branch.edited_workflow_nodes.as_ref() {
-            let edited_object_ids = branch.all_edited_description_ids();
-            let deleted_object_ids = branch.all_deleted_object_ids();
+        let edited_object_ids = branch.all_edited_description_ids();
+        let deleted_object_ids = branch.all_deleted_object_ids();
 
+        if edited_object_ids.len() > 0 || deleted_object_ids.len() > 0 {
             if edited_object_ids.len() > 0 {
-                edited_descriptions = Description::find_by_node_ids_and_branch_id_and_ids(
-                    db_session,
-                    node_ids,
-                    branch.id,
-                    &edited_object_ids,
-                )
-                .await?;
+                edited_descriptions = Description::find_by_branch_id_and_ids(db_session, branch.id, &edited_object_ids)
+                    .await?
+                    .try_collect()
+                    .await?;
             }
 
             if deleted_object_ids.len() > 0 {
-                deleted_descriptions = Description::find_by_node_ids_and_branch_id_and_ids(
-                    db_session,
-                    node_ids,
-                    branch.id,
-                    &deleted_object_ids,
-                )
-                .await?;
+                deleted_descriptions =
+                    Description::find_by_branch_id_and_ids(db_session, branch.id, &deleted_object_ids)
+                        .await?
+                        .try_collect()
+                        .await?;
             }
 
-            if edited_object_ids.len() > 0 || deleted_object_ids.len() > 0 {
-                let combined_ids = edited_object_ids
-                    .union(&deleted_object_ids)
-                    .cloned()
-                    .collect::<HashSet<Uuid>>();
+            let combined_ids = edited_object_ids
+                .union(&deleted_object_ids)
+                .cloned()
+                .collect::<HashSet<Uuid>>();
 
-                original_descriptions = Description::find_original_by_ids(db_session, node_ids, &combined_ids)
+            original_descriptions =
+                Description::find_by_branch_id_and_ids(db_session, branch.original_id(), &combined_ids)
                     .await?
                     .group_by_object_id()
                     .await?;
-            }
         }
 
         Ok(Self {

@@ -20,7 +20,7 @@ pub struct ImageAttachmentParams {
 
 #[post("/{node_id}/{branch_id}/{object_id}/upload_image")]
 pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: RequestData, payload: Multipart) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.node_id).await?;
 
     let attachment = Attachment::create_image(&params, &data, payload).await?;
 
@@ -29,6 +29,9 @@ pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: Reques
 
 #[derive(Deserialize)]
 pub struct AttachmentParams {
+    #[serde(rename = "branchId")]
+    branch_id: Uuid,
+
     #[serde(rename = "nodeId")]
     node_id: Uuid,
 
@@ -40,7 +43,7 @@ pub struct AttachmentParams {
 
 #[get("/presigned_url")]
 pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.node_id).await?;
 
     let url = Attachment::get_presigned_url(&data, &params.object_id, &params.filename).await?;
 
@@ -54,7 +57,7 @@ pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: Reque
 
 #[post("")]
 pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, attachment.node_id, attachment.node_id).await?;
+    AuthNode::auth_update(&data, attachment.branch_id, attachment.node_id).await?;
 
     attachment.user_id = Some(data.current_user_id());
 

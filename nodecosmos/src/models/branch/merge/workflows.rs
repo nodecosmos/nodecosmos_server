@@ -1,6 +1,6 @@
+use charybdis::operations::Update;
 use std::collections::HashMap;
 
-use charybdis::operations::Update;
 use charybdis::types::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,7 @@ impl MergeWorkflows {
 
     pub async fn update_initial_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         for (node_id, _) in &self.combined {
-            let mut workflow = UpdateInitialInputsWorkflow::find_by_node_id_and_branch_id(*node_id, self.branch_id)
+            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.branch_id, *node_id)
                 .execute(data.db_session())
                 .await?;
 
@@ -61,7 +61,7 @@ impl MergeWorkflows {
 
     pub async fn undo_update_initial_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         for (node_id, _) in &self.combined {
-            let mut workflow = UpdateInitialInputsWorkflow::find_by_node_id_and_branch_id(*node_id, self.branch_id)
+            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.branch_id, *node_id)
                 .execute(data.db_session())
                 .await?;
 

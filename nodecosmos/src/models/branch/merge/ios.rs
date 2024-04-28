@@ -30,10 +30,10 @@ impl MergeIos {
     ) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(restored_io_ids) = &branch.restored_ios {
             let mut branched_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, &restored_io_ids)
                     .await?;
             let already_restored_ids =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.root_id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, &restored_io_ids)
                     .await?
                     .pluck_id_set();
 
@@ -48,7 +48,7 @@ impl MergeIos {
     pub async fn created_ios(branch: &Branch, db_session: &CachingSession) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(created_io_ids) = &branch.created_ios {
             let created_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.id, created_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, created_io_ids)
                     .await?;
 
             return Ok(Some(created_ios));
@@ -60,7 +60,7 @@ impl MergeIos {
     pub async fn deleted_ios(branch: &Branch, db_session: &CachingSession) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(deleted_io_ids) = &branch.deleted_ios {
             let deleted_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.root_id, deleted_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, deleted_io_ids)
                     .await?;
 
             return Ok(Some(deleted_ios));
@@ -74,13 +74,7 @@ impl MergeIos {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateTitleIo>>, NodecosmosError> {
         if let Some(edited_title_ios) = &branch.edited_title_ios {
-            let ios = UpdateTitleIo::find_by_root_id_and_branch_id_and_ids(
-                db_session,
-                branch.root_id,
-                branch.id,
-                edited_title_ios,
-            )
-            .await?;
+            let ios = UpdateTitleIo::find_by_branch_id_and_ids(db_session, branch.id, edited_title_ios).await?;
 
             let ios = branch.map_original_records(ios, ObjectType::Io).collect();
 

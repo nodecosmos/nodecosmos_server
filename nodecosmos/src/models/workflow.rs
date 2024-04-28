@@ -9,9 +9,8 @@ use std::collections::HashSet;
 use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
-use crate::models::traits::{Branchable, Merge};
+use crate::models::traits::{Branchable, Merge, NodeBranchParams};
 
 mod update_initial_inputs;
 
@@ -30,8 +29,8 @@ mod update_initial_inputs;
 /// to the node table. The reason we have it here is because initially we wanted to support multiple workflows per node.
 #[charybdis_model(
     table_name = workflows,
-    partition_keys = [node_id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
@@ -53,15 +52,15 @@ pub struct Workflow {
 }
 
 impl Workflow {
-    pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Workflow, NodecosmosError> {
-        let mut original = Workflow::find_first_by_node_id_and_branch_id(params.node_id, params.node_id)
+    pub async fn branched(db_session: &CachingSession, params: &NodeBranchParams) -> Result<Workflow, NodecosmosError> {
+        let mut original = Workflow::find_by_branch_id_and_node_id(params.original_id, params.node_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(original)
         } else {
-            let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(params.node_id, params.branch_id)
+            let maybe_branched = Workflow::maybe_find_first_by_branch_id_and_node_id(params.branch_id, params.node_id)
                 .execute(db_session)
                 .await?;
 
@@ -86,20 +85,10 @@ impl Workflow {
 
     pub async fn find_by_node_ids(
         db_session: &CachingSession,
-        node_ids: &HashSet<Uuid>,
-    ) -> Result<CharybdisModelStream<Workflow>, NodecosmosError> {
-        find_workflow!("node_id IN ? AND branch_id IN ?", (node_ids, node_ids))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
-    pub async fn find_by_node_ids_and_branch_id(
-        db_session: &CachingSession,
-        node_ids: &HashSet<Uuid>,
         branch_id: Uuid,
+        node_ids: &HashSet<Uuid>,
     ) -> Result<CharybdisModelStream<Workflow>, NodecosmosError> {
-        find_workflow!("node_id IN ? AND branch_id = ?", (node_ids, branch_id))
+        find_workflow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)

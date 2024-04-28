@@ -41,22 +41,17 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(restored_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.restored_flow_steps)
-        {
+        if let Some(restored_flow_step_ids) = &branch.restored_flow_steps {
             let already_restored_ids =
-                FlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, restored_flow_step_ids)
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_step_ids)
                     .await?
                     .pluck_id_set()
                     .await?;
 
-            let mut flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                restored_flow_step_ids,
-            )
-            .await?;
+            let mut flow_steps = FlowStep::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             flow_steps.retain(|flow_step| !already_restored_ids.contains(&flow_step.id));
 
@@ -70,18 +65,14 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_steps)
-        {
-            let flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                created_flow_step_ids,
-            )
-            .await?;
-
-            return Ok(Some(flow_steps));
+        if let Some(created_flow_step_ids) = &branch.created_flow_steps {
+            return Ok(Some(
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.id, created_flow_step_ids)
+                    .await?
+                    .try_collect()
+                    .await
+                    .map_err(NodecosmosError::from)?,
+            ));
         }
 
         Ok(None)
@@ -91,16 +82,13 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_steps)
-        {
-            let flow_steps =
-                FlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_step_ids)
+        if let Some(deleted_flow_step_ids) = &branch.deleted_flow_steps {
+            return Ok(Some(
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.id, deleted_flow_step_ids)
                     .await?
                     .try_collect()
-                    .await?;
-
-            return Ok(Some(flow_steps));
+                    .await?,
+            ));
         }
 
         Ok(None)
@@ -147,12 +135,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_nodes)
-        {
+        if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
             let flow_steps =
-                UpdateNodeIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -167,17 +153,12 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_nodes)
-        {
+        if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -190,12 +171,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_nodes)
-        {
+        if let Some(deleted_flow_step_nodes) = &branch.deleted_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_nodes.keys().cloned().collect();
             let flow_steps =
-                UpdateNodeIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -211,12 +190,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_inputs_by_node)
-        {
+        if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateInputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateInputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -231,17 +208,12 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_inputs_by_node)
-        {
+        if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -254,12 +226,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_inputs_by_node)
-        {
+        if let Some(deleted_flow_step_inputs_by_node) = &branch.deleted_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_inputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateInputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateInputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -275,12 +245,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_outputs_by_node)
-        {
+        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateOutputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -295,17 +263,12 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_outputs_by_node)
-        {
+        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -318,12 +281,10 @@ impl MergeFlowSteps {
         branch: &Branch,
         db_session: &CachingSession,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_outputs_by_node)
-        {
+        if let Some(deleted_flow_step_outputs_by_node) = &branch.deleted_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_outputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateOutputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;

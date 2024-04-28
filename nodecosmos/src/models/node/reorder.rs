@@ -28,10 +28,12 @@ mod validator;
 #[derive(Deserialize, Branchable)]
 pub struct ReorderParams {
     #[branch(original_id)]
-    pub id: Uuid,
+    pub original_id: Uuid,
 
     #[serde(rename = "branchId")]
     pub branch_id: Uuid,
+
+    pub id: Uuid,
 
     #[serde(rename = "newParentId")]
     pub new_parent_id: Uuid,

@@ -13,9 +13,9 @@ use crate::models::flow_step::{FlowStep, PkFlowStep};
 use crate::models::io::Io;
 use crate::models::node::PkNode;
 use crate::models::traits::{
-    Branchable, ChainOptRef, FlowId, MaybePluckFlowId, PluckFlowId, PluckFromStream, RefCloned,
+    Branchable, ChainOptRef, FindForBranchMerge, FlowId, MaybePluckFlowId, PluckFlowId, PluckFromStream, RefCloned,
 };
-use crate::models::traits::{FindForBranchMerge, MaybePluckFlowStepId, Pluck};
+use crate::models::traits::{MaybePluckFlowStepId, Pluck};
 use crate::models::udts::Conflict;
 
 pub struct MergeConflicts<'a> {
@@ -47,7 +47,7 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Vec<Uuid>>();
 
-        let original_ancestor_ids_set = PkNode::find_by_ids(data.db_session(), &original_ancestor_ids)
+        let original_ancestor_ids_set = PkNode::find_by_ids(data.db_session(), branch.id, &original_ancestor_ids)
             .await?
             .pluck_id_set();
 
@@ -140,10 +140,10 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Vec<Uuid>>();
 
         // check ancestors of edited description nodes
-        let desc_branched_nodes = PkNode::find_by_ids_and_branch_id(
+        let desc_branched_nodes = PkNode::find_by_ids(
             data.db_session(),
-            &original_edited_node_ids,
             self.branch_merge.branch.id,
+            &original_edited_node_ids,
         )
         .await?;
 
@@ -152,9 +152,13 @@ impl<'a> MergeConflicts<'a> {
                 .await?;
         }
 
-        let original_nodes_ids = PkNode::find_by_ids(data.db_session(), &original_edited_node_ids)
-            .await?
-            .pluck_id_set();
+        let original_nodes_ids = PkNode::find_by_ids(
+            data.db_session(),
+            self.branch_merge.branch.id,
+            &original_edited_node_ids,
+        )
+        .await?
+        .pluck_id_set();
 
         let deleted_edited_nodes = original_edited_node_ids
             .iter()
@@ -259,11 +263,14 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Set<Uuid>>();
 
         if let Some(edited_workflow_node_ids) = &self.branch_merge.branch.edited_workflow_nodes {
-            let original_flow_ids_set =
-                Flow::find_original_by_ids(data.db_session(), edited_workflow_node_ids, &original_edited_flow_ids)
-                    .await?
-                    .pluck_id_set()
-                    .await?;
+            let original_flow_ids_set = Flow::find_by_branch_id_and_ids(
+                data.db_session(),
+                self.branch_merge.branch.original_id(),
+                &edited_workflow_node_ids,
+            )
+            .await?
+            .pluck_id_set()
+            .await?;
 
             let conflict_deleted_edited_flows = original_edited_flow_ids
                 .iter()
@@ -346,10 +353,10 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Set<Uuid>>();
 
         if let Some(edited_workflow_node_ids) = &self.branch_merge.branch.edited_workflow_nodes {
-            let original_flow_step_ids_set = FlowStep::find_original_by_ids(
+            let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_ids(
                 data.db_session(),
-                edited_workflow_node_ids,
-                &original_edited_flow_step_ids,
+                self.branch_merge.branch.id,
+                &edited_workflow_node_ids,
             )
             .await?
             .pluck_id_set()
@@ -453,7 +460,7 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        let original_io_ids_set = Io::find_by_root_id_and_branch_id_and_ids(
+        let original_io_ids_set = Io::find_by_branch_id_and_root_id_and_ids(
             data.db_session(),
             self.branch_merge.branch.root_id,
             self.branch_merge.branch.root_id,

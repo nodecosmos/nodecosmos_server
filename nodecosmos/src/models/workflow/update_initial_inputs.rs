@@ -4,13 +4,14 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
+use crate::models::traits::Branchable;
 use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 impl UpdateInitialInputsWorkflow {
     pub async fn update_branch(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
 
-        let original_wf = Self::maybe_find_first_by_node_id_and_branch_id(self.node_id, self.branch_id)
+        let original_wf = Self::maybe_find_first_by_branch_id_and_node_id(self.original_id(), self.node_id)
             .execute(data.db_session())
             .await?;
 

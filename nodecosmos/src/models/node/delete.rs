@@ -32,7 +32,7 @@ impl Node {
         if self.is_original() {
             NodeDelete::new(self, &data).await?.run().await?;
         } else if Branch::contains_created_node(data.db_session(), self.branch_id, self.id).await?
-            || Self::is_original_deleted(data.db_session(), self.id).await?
+            || Self::is_original_deleted(data.db_session(), self.original_id(), self.id).await?
         {
             NodeDelete::new(self, &data).await?.run().await?;
         }
@@ -140,9 +140,9 @@ impl<'a> NodeDelete<'a> {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
         let nodes = if node.is_branched() {
-            Node::find_by_ids_and_branch_id(db_session, ids, node.branch_id).await?
+            Node::find_by_ids(db_session, node.branch_id, ids).await?
         } else {
-            Node::find_by_ids(db_session, ids).await?
+            Node::find_by_ids(db_session, node.original_id(), ids).await?
         };
 
         nodes.try_collect().await.map_err(NodecosmosError::from)
@@ -153,13 +153,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        let descendants = if node.is_branched() {
-            NodeDescendant::find_by_branch_id_and_node_ids(db_session, node.root_id, node.branch_id, ids).await?
-        } else {
-            NodeDescendant::find_by_node_ids(db_session, node.root_id, ids).await?
-        };
-
-        descendants.try_collect().await.map_err(NodecosmosError::from)
+        NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_workflows(
@@ -167,13 +165,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Workflow>, NodecosmosError> {
-        let workflows = if node.is_branched() {
-            Workflow::find_by_node_ids_and_branch_id(db_session, ids, node.branch_id).await?
-        } else {
-            Workflow::find_by_node_ids(db_session, ids).await?
-        };
-
-        workflows.try_collect().await.map_err(NodecosmosError::from)
+        Workflow::find_by_node_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_flows(
@@ -181,11 +177,7 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Flow>, NodecosmosError> {
-        let flows = if node.is_branched() {
-            Flow::find_by_node_ids_and_branch_id(db_session, ids, node.branch_id).await?
-        } else {
-            Flow::find_original_by_node_ids(db_session, ids).await?
-        };
+        let flows = Flow::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
 
         flows.try_collect().await.map_err(NodecosmosError::from)
     }
@@ -195,11 +187,7 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
-        let flow_steps = if node.is_branched() {
-            FlowStep::find_by_node_ids_and_branch_id(db_session, ids, node.branch_id).await?
-        } else {
-            FlowStep::find_original_by_node_ids(db_session, ids).await?
-        };
+        let flow_steps = FlowStep::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
 
         flow_steps.try_collect().await.map_err(NodecosmosError::from)
     }
@@ -209,11 +197,7 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = if node.is_branched() {
-            Io::find_by_root_id_and_branch_id_and_node_ids(db_session, node.root_id, node.branch_id, ids).await?
-        } else {
-            Io::find_by_root_id_and_node_ids(db_session, node.root_id, ids).await?
-        };
+        let ios = Io::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
 
         ios.try_collect().await.map_err(NodecosmosError::from)
     }
@@ -223,11 +207,7 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Description>, NodecosmosError> {
-        let descriptions = if node.is_branched() {
-            Description::find_by_node_ids_and_branch_id(db_session, ids, node.branch_id).await?
-        } else {
-            Description::find_original_by_node_ids(db_session, ids).await?
-        };
+        let descriptions = Description::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
 
         descriptions.try_collect().await.map_err(NodecosmosError::from)
     }
@@ -237,13 +217,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<NodeCounter>, NodecosmosError> {
-        let counters = if node.is_branched() {
-            NodeCounter::find_by_ids_and_branch_id(db_session, ids, node.branch_id).await?
-        } else {
-            NodeCounter::find_by_ids(db_session, ids).await?
-        };
-
-        counters.try_collect().await.map_err(NodecosmosError::from)
+        NodeCounter::find_by_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     pub async fn new(node: &'a Node, data: &'a RequestData) -> Result<NodeDelete<'a>, NodecosmosError> {
@@ -722,7 +700,7 @@ impl<'a> NodeDelete<'a> {
     // not critical for delete/merge
     pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
         let attachments = if self.node.is_branched() {
-            Attachment::find_by_node_ids_and_branch_id(
+            Attachment::find_by_branch_id_and_node_ids(
                 self.data.db_session(),
                 &self.deleted_node_ids,
                 self.node.branch_id,

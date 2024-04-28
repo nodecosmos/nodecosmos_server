@@ -8,7 +8,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::{Branchable, FindOrInsertBranched, Pluck};
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, NodeBranchParams, Pluck};
 use crate::models::traits::{Descendants, Parent};
 use crate::models::traits::{FindBranchedOrOriginal, RefCloned};
 
@@ -109,16 +109,11 @@ impl ReorderData {
 
     async fn init_sibling(
         db_session: &CachingSession,
-        id: Option<Uuid>,
-        branch_id: Uuid,
+        params: NodeBranchParams,
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
-        if let Some(id) = id {
-            let node = GetStructureNode::find_branched_or_original(&db_session, id, branch_id).await?;
+        let node = GetStructureNode::find_branched_or_original(&db_session, params).await?;
 
-            return Ok(Some(node));
-        }
-
-        Ok(None)
+        return Ok(Some(node));
     }
 
     fn build_new_ancestor_ids(new_parent: &BaseNode) -> Set<Uuid> {
@@ -181,7 +176,17 @@ impl ReorderData {
     }
 
     pub async fn from_params(params: &ReorderParams, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let node = Node::find_or_insert_branched(data, params.id, params.branch_id, params.id).await?;
+        let node = Node::find_or_insert_branched(
+            data,
+            ModelBranchParams {
+                original_id: params.original_id,
+                branch_id: params.branch_id,
+                node_id: params.id,
+                id: params.id,
+            },
+        )
+        .await?;
+
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
 
@@ -194,10 +199,33 @@ impl ReorderData {
         let removed_ancestor_ids = Self::extract_removed_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
         let added_ancestor_ids = Self::extract_added_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
 
-        let new_upper_sibling =
-            Self::init_sibling(data.db_session(), params.new_upper_sibling_id, params.branch_id).await?;
-        let new_lower_sibling =
-            Self::init_sibling(data.db_session(), params.new_lower_sibling_id, params.branch_id).await?;
+        let new_upper_sibling = if let Some(id) = params.new_upper_sibling_id {
+            Self::init_sibling(
+                data.db_session(),
+                NodeBranchParams {
+                    original_id: params.original_id,
+                    branch_id: params.branch_id,
+                    node_id: id,
+                },
+            )
+            .await?
+        } else {
+            None
+        };
+
+        let new_lower_sibling = if let Some(id) = params.new_lower_sibling_id {
+            Self::init_sibling(
+                data.db_session(),
+                NodeBranchParams {
+                    original_id: params.original_id,
+                    branch_id: params.branch_id,
+                    node_id: id,
+                },
+            )
+            .await?
+        } else {
+            None
+        };
 
         let old_order_index = node.order_index;
         let new_order_index = match params.new_order_index {
