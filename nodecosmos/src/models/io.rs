@@ -12,11 +12,10 @@ use serde::{Deserialize, Serialize};
 use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal};
+use crate::models::traits::{Branchable, FindBranchedOrOriginal, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
 
 mod create;
@@ -26,8 +25,8 @@ mod update_title;
 /// Ios are grouped by `root_id`, so they are accessible to all workflows within a same root node.
 #[charybdis_model(
     table_name = input_outputs,
-    partition_keys = [root_id, branch_id],
-    clustering_keys = [id],
+    partition_keys = [branch_id],
+    clustering_keys = [root_id, id],
     local_secondary_indexes = [main_id, node_id]
 )]
 #[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default, Clone)]
@@ -89,7 +88,7 @@ impl Callbacks for Io {
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        *self = Io::find_branched_or_original(data.db_session(), self.root_id, self.branch_id, self.id).await?;
+        *self = Io::find_branched_or_original(data.db_session(), self.original_id(), self.branch_id, self.id).await?;
 
         if !self.is_parent_delete_context() {
             self.pull_from_initial_input_ids(db_session).await?;
@@ -120,24 +119,16 @@ impl Callbacks for Io {
 }
 
 impl Io {
-    pub async fn branched(
-        db_session: &CachingSession,
-        root_id: Uuid,
-        params: &WorkflowParams,
-    ) -> Result<Vec<Io>, NodecosmosError> {
-        if params.is_original() {
-            let ios = Self::find_by_root_id_and_branch_id(root_id, root_id)
-                .execute(db_session)
-                .await?
-                .try_collect()
-                .await?;
-            Ok(ios)
-        } else {
-            let mut ios = Self::find_by_root_id_and_branch_id(root_id, params.branch_id)
-                .execute(db_session)
-                .await?;
+    pub async fn branched(db_session: &CachingSession, params: &NodeBranchParams) -> Result<Vec<Io>, NodecosmosError> {
+        // root_id == params.original_id
+        let mut ios = Self::find_by_branch_id_and_root_id(params.branch_id, params.original_id)
+            .execute(db_session)
+            .await?;
 
-            let mut original_ios = Self::find_by_root_id_and_branch_id(root_id, root_id)
+        if params.is_original() {
+            Ok(ios.try_collect().await?)
+        } else {
+            let mut original_ios = Self::find_by_branch_id_and_root_id(params.original_id, params.original_id)
                 .execute(db_session)
                 .await?;
             let mut branched_ios_set = HashSet::new();
@@ -161,13 +152,13 @@ impl Io {
         }
     }
 
-    pub async fn find_by_root_id_and_branch_id_and_ids(
+    pub async fn find_by_branch_id_and_root_id_and_ids(
         db_session: &CachingSession,
-        root_id: Uuid,
         branch_id: Uuid,
+        root_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = find_io!("root_id = ? AND branch_id = ? AND id IN ?", (root_id, branch_id, ids))
+        let ios = find_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -176,49 +167,31 @@ impl Io {
         Ok(ios)
     }
 
-    pub async fn find_by_root_id_and_node_ids(
+    pub async fn find_by_branch_id_and_node_ids(
         db_session: &CachingSession,
-        root_id: Uuid,
-        ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Io>, NodecosmosError> {
-        find_io!(
-            "root_id = ? AND branch_id = ? AND node_id IN ? ALLOW FILTERING",
-            (root_id, root_id, ids)
-        )
-        .execute(db_session)
-        .await
-        .map_err(NodecosmosError::from)
-    }
-
-    pub async fn find_by_root_id_and_branch_id_and_node_ids(
-        db_session: &CachingSession,
-        root_id: Uuid,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Io>, NodecosmosError> {
-        find_io!(
-            "root_id = ? AND branch_id = ? AND node_id IN ? ALLOW FILTERING",
-            (root_id, branch_id, node_ids)
-        )
-        .execute(db_session)
-        .await
-        .map_err(NodecosmosError::from)
+        find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     pub async fn find_or_insert_branched_main(
         data: &RequestData,
-        root_id: Uuid,
+        original_id: Uuid,
         branch_id: Uuid,
         main_id: Uuid,
     ) -> Result<Io, NodecosmosError> {
-        let io = Self::maybe_find_first_by_root_id_and_branch_id_and_main_id(root_id, branch_id, main_id)
+        let io = Self::maybe_find_first_by_branch_id_and_main_id(branch_id, main_id)
             .execute(data.db_session())
             .await?;
 
         if let Some(io) = io {
             Ok(io)
         } else {
-            let mut io = Self::find_first_by_root_id_and_branch_id_and_main_id(root_id, root_id, main_id)
+            let mut io = Self::find_first_by_branch_id_and_main_id(original_id, main_id)
                 .execute(data.db_session())
                 .await?;
             io.branch_id = branch_id;
@@ -233,14 +206,14 @@ impl Io {
         branch_id: Uuid,
         id: Uuid,
     ) -> Result<Io, NodecosmosError> {
-        let io = Self::maybe_find_first_by_root_id_and_branch_id_and_id(root_id, branch_id, id)
+        let io = Self::maybe_find_first_by_branch_id_and_root_id_and_id(branch_id, root_id, id)
             .execute(db_session)
             .await?;
 
         if let Some(io) = io {
             Ok(io)
         } else {
-            let mut io = Self::find_first_by_root_id_and_branch_id_and_id(root_id, root_id, id)
+            let mut io = Self::find_first_by_branch_id_and_root_id_and_id(root_id, root_id, id)
                 .execute(db_session)
                 .await?;
 
@@ -252,7 +225,15 @@ impl Io {
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
-            let node = Node::find_branched_or_original(db_session, self.node_id, self.branch_id).await?;
+            let node = Node::find_branched_or_original(
+                db_session,
+                NodeBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                },
+            )
+            .await?;
             self.node = Some(node);
         }
 
@@ -271,7 +252,7 @@ impl Io {
 
     async fn original_main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(main_id) = self.main_id {
-            let res = Self::maybe_find_first_by_root_id_and_branch_id_and_id(self.root_id, self.original_id(), main_id)
+            let res = Self::maybe_find_first_by_branch_id_and_root_id_and_id(self.original_id(), self.root_id, main_id)
                 .execute(db_session)
                 .await?;
 
@@ -303,7 +284,7 @@ impl Io {
 
     async fn maybe_main(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
         if let Some(main_id) = self.main_id {
-            let res = Self::maybe_find_first_by_root_id_and_branch_id_and_id(self.root_id, self.branch_id, main_id)
+            let res = Self::maybe_find_first_by_branch_id_and_root_id_and_id(self.branch_id, self.root_id, main_id)
                 .execute(db_session)
                 .await?;
 
@@ -341,11 +322,10 @@ impl Callbacks for UpdateTitleIo {
 impl UpdateTitleIo {
     pub async fn ios_by_main_id(
         db_session: &CachingSession,
-        root_id: Uuid,
         branch_id: Uuid,
         main_id: Uuid,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = UpdateTitleIo::find_by_root_id_and_branch_id_and_main_id(root_id, branch_id, main_id)
+        let ios = UpdateTitleIo::find_by_branch_id_and_main_id(branch_id, main_id)
             .execute(db_session)
             .await?
             .try_collect()
@@ -354,13 +334,12 @@ impl UpdateTitleIo {
         Ok(ios)
     }
 
-    pub async fn find_by_root_id_and_branch_id_and_ids(
+    pub async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
-        root_id: Uuid,
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_title_io!("root_id = ? AND branch_id = ? AND id IN ?", (root_id, branch_id, ids))
+        let ios = find_update_title_io!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()

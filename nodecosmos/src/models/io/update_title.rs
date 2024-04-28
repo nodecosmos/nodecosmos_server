@@ -16,7 +16,7 @@ impl UpdateTitleIo {
                 self.as_native().clone_main_ios_to_branch(db_session).await?;
             }
 
-            let ios = UpdateTitleIo::ios_by_main_id(db_session, self.root_id, self.branch_id, main_id).await?;
+            let ios = UpdateTitleIo::ios_by_main_id(db_session, self.branch_id, main_id).await?;
             let mut batch_ios = Vec::with_capacity(ios.len());
 
             for mut io in ios {

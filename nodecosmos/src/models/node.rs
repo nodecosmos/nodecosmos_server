@@ -13,7 +13,7 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal};
+use crate::models::traits::{Branchable, FindBranchedOrOriginal, NodeBranchParams};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
 
@@ -28,21 +28,20 @@ mod update_owner;
 mod update_title;
 
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
-/// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all
-/// partial models if they have `auth_branch` field.
+/// So `Branchable` derive is automatically applied to all partial_node models.
 #[charybdis_model(
     table_name = nodes,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [id],
 )]
 #[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     #[serde(default)]
+    #[branch(original_id)]
     pub branch_id: Uuid,
 
     #[serde(default)]
-    #[branch(original_id)]
     pub id: Uuid,
 
     #[serde(default)]
@@ -122,7 +121,15 @@ impl Callbacks for Node {
     }
 
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        *self = Node::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+        *self = Node::find_branched_or_original(
+            data.db_session(),
+            NodeBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                node_id: self.id,
+            },
+        )
+        .await?;
 
         self.preserve_branch_ancestors(data).await?;
         self.preserve_branch_descendants(data).await?;
@@ -140,8 +147,12 @@ impl Callbacks for Node {
 }
 
 impl Node {
-    pub async fn is_original_deleted(db_session: &CachingSession, id: Uuid) -> Result<bool, NodecosmosError> {
-        let is_none = PkNode::maybe_find_first_by_id_and_branch_id(id, id)
+    pub async fn is_original_deleted(
+        db_session: &CachingSession,
+        original_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, NodecosmosError> {
+        let is_none = PkNode::maybe_find_first_by_branch_id_and_id(original_id, id)
             .execute(db_session)
             .await?
             .is_none();
@@ -149,23 +160,12 @@ impl Node {
         Ok(is_none)
     }
 
-    pub async fn find_by_ids_and_branch_id(
-        db_session: &CachingSession,
-        ids: &Set<Uuid>,
-        branch_id: Uuid,
-    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(db_session)
-            .await?;
-
-        Ok(res)
-    }
-
     pub async fn find_by_ids(
         db_session: &CachingSession,
+        branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("id IN ? AND branch_id IN ?", (ids, ids))
+        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?;
 
@@ -176,22 +176,12 @@ impl Node {
 partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_by_ids(db_session: &CachingSession, ids: &[Uuid]) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-        Ok(res)
-    }
-
-    pub async fn find_by_ids_and_branch_id(
+    pub async fn find_by_ids(
         db_session: &CachingSession,
-        ids: &[Uuid],
         branch_id: Uuid,
+        ids: &[Uuid],
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))
+        let res = find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -270,7 +260,15 @@ impl Callbacks for UpdateTitleNode {
             self.update_branch(&data).await?;
         }
 
-        let current = Self::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+        let current = Self::find_branched_or_original(
+            data.db_session(),
+            NodeBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                node_id: self.id,
+            },
+        )
+        .await?;
 
         self.root_id = current.root_id;
         self.ancestor_ids = current.ancestor_ids;

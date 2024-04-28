@@ -5,7 +5,7 @@ use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
-use crate::models::traits::FindOrInsertBranched;
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams};
 use crate::models::workflow::Workflow;
 
 impl Io {
@@ -53,7 +53,16 @@ impl Io {
         let id = self.id;
 
         if let Some(flow_step_id) = self.flow_step_id {
-            let mut fs = FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
+            let mut fs = FlowStep::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: flow_step_id,
+                },
+            )
+            .await?;
             fs.pull_output_id(data, id).await?;
         }
 

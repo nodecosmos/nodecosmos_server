@@ -20,7 +20,7 @@ pub async fn get_description(
     opt_cu: OptCurrentUser,
     mut description: web::Path<BaseDescription>,
 ) -> Response {
-    AuthNode::auth_view(&db_session, &opt_cu, description.node_id, description.branch_id).await?;
+    AuthNode::auth_view(&db_session, &opt_cu, description.branch_id, description.node_id).await?;
 
     let description = description.find_branched(&db_session).await?;
 
@@ -35,13 +35,9 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
 
     // we always return merged description as we want to keep branched description in sync with original
     if description.is_branched() {
-        let original = Description::find_by_node_id_and_branch_id_and_object_id(
-            description.node_id,
-            description.original_id(),
-            description.object_id,
-        )
-        .execute(data.db_session())
-        .await;
+        let original = Description::find_by_branch_id_and_object_id(description.original_id(), description.object_id)
+            .execute(data.db_session())
+            .await;
 
         if let Ok(mut original) = original {
             match description.base64 {
@@ -69,6 +65,9 @@ pub struct OriginalPathParams {
     #[serde(rename = "nodeId")]
     pub node_id: Uuid,
 
+    #[serde(rename = "branchId")]
+    pub branch_id: Uuid,
+
     #[serde(rename = "objectId")]
     pub object_id: Uuid,
 }
@@ -79,12 +78,11 @@ pub async fn get_original_description(
     opt_cu: OptCurrentUser,
     params: web::Path<OriginalPathParams>,
 ) -> Response {
-    AuthNode::auth_view(&db_session, &opt_cu, params.node_id, params.node_id).await?;
+    AuthNode::auth_view(&db_session, &opt_cu, params.branch_id, params.node_id).await?;
 
-    let description =
-        Description::find_by_node_id_and_branch_id_and_object_id(params.node_id, params.node_id, params.object_id)
-            .execute(&db_session)
-            .await?;
+    let description = Description::find_by_branch_id_and_object_id(params.branch_id, params.object_id)
+        .execute(&db_session)
+        .await?;
 
     Ok(HttpResponse::Ok().json(description))
 }

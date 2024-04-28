@@ -107,26 +107,13 @@ impl<'a> Recovery<'a> {
     }
 
     async fn delete_tree(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.node.is_original() {
-            NodeDescendant::delete_by_root_id(self.reorder_data.tree_root.id)
-                .execute(self.db_session)
-                .await
-                .map_err(|err| {
-                    error!("delete_by_root_id: {}", err);
-                    return err;
-                })?;
-        } else {
-            NodeDescendant::delete_by_root_id_and_branch_id(
-                self.reorder_data.tree_root.id,
-                self.reorder_data.branch_id,
-            )
+        NodeDescendant::delete_by_root_id_and_branch_id(self.reorder_data.tree_root.id, self.reorder_data.branch_id)
             .execute(self.db_session)
             .await
             .map_err(|err| {
                 error!("delete_by_root_id_and_branch_id: {}", err);
                 return err;
             })?;
-        }
 
         Ok(())
     }

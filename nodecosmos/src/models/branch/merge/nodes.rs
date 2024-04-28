@@ -34,11 +34,11 @@ impl MergeNodes {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(restored_node_ids) = &branch.restored_nodes {
-            let mut branched_nodes = Node::find_by_ids_and_branch_id(db_session, &restored_node_ids, branch.id)
+            let mut branched_nodes = Node::find_by_ids(db_session, branch.id, &restored_node_ids)
                 .await?
                 .try_collect()
                 .await?;
-            let already_restored_ids = PkNode::find_by_ids(db_session, &branched_nodes.pluck_id())
+            let already_restored_ids = PkNode::find_by_ids(db_session, branch.id, &branched_nodes.pluck_id())
                 .await?
                 .pluck_id_set();
 
@@ -57,7 +57,7 @@ impl MergeNodes {
         db_session: &CachingSession,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(created_node_ids) = &branch.created_nodes {
-            let mut created_nodes = Node::find_by_ids_and_branch_id(db_session, &created_node_ids, branch.id)
+            let mut created_nodes = Node::find_by_ids(db_session, branch.id, &created_node_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -76,12 +76,13 @@ impl MergeNodes {
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
             let mut deleted_node_ids = deleted_node_ids.clone();
-            let descendant_node_ids = NodeDescendant::find_by_node_ids(db_session, branch.root_id, &deleted_node_ids)
-                .await?
-                .pluck_id_set()
-                .await?;
+            let descendant_node_ids =
+                NodeDescendant::find_by_node_ids(db_session, branch.root_id, branch.original_id(), &deleted_node_ids)
+                    .await?
+                    .pluck_id_set()
+                    .await?;
             deleted_node_ids.extend(descendant_node_ids);
-            let mut deleted_nodes = Node::find_by_ids(db_session, &deleted_node_ids)
+            let mut deleted_nodes = Node::find_by_ids(db_session, branch.id, &deleted_node_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -292,8 +293,9 @@ impl MergeNodes {
                 match node {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
-                            id: reorder_node_data.id,
+                            original_id: node.original_id(),
                             branch_id: reorder_node_data.id,
+                            id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.new_parent_id,
                             new_upper_sibling_id: reorder_node_data.new_upper_sibling_id,
                             new_lower_sibling_id: reorder_node_data.new_lower_sibling_id,
@@ -329,8 +331,9 @@ impl MergeNodes {
                 match node {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
-                            id: reorder_node_data.id,
+                            original_id: node.original_id(),
                             branch_id: reorder_node_data.id,
+                            id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.old_parent_id,
                             new_order_index: Some(reorder_node_data.old_order_index),
                             new_upper_sibling_id: None,

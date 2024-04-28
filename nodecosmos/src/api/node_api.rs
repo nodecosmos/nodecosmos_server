@@ -4,6 +4,7 @@ use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use scylla::CachingSession;
+use serde::Deserialize;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream;
 
@@ -24,9 +25,19 @@ pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) 
     Ok(HttpResponse::Ok().json(nodes))
 }
 
-#[get("/{id}")]
-pub async fn get_node(db_session: web::Data<CachingSession>, opt_cu: OptCurrentUser, id: web::Path<Uuid>) -> Response {
-    let mut node = BaseNode::find_by_id_and_branch_id(*id, *id)
+#[derive(Deserialize)]
+pub struct Params {
+    pub original_id: Uuid,
+    pub id: Uuid,
+}
+
+#[get("/{original_id}/{id}/original")]
+pub async fn get_node(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    params: web::Path<Params>,
+) -> Response {
+    let mut node = BaseNode::find_by_branch_id_and_id(params.original_id, params.id)
         .execute(&db_session)
         .await?;
 
@@ -48,7 +59,7 @@ pub async fn get_branched_node(
     opt_cu: OptCurrentUser,
     pk: web::Path<PrimaryKeyNode>,
 ) -> Response {
-    let mut node = BaseNode::find_by_id_and_branch_id(pk.id, pk.branch_id)
+    let mut node = BaseNode::find_by_branch_id_and_id(pk.branch_id, pk.id)
         .execute(&db_session)
         .await?;
 
@@ -149,7 +160,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_by_id_and_branch_id(params.id, params.branch_id)
+    let mut node = Node::find_by_branch_id_and_id(params.branch_id, params.id)
         .execute(data.db_session())
         .await?;
 
@@ -196,7 +207,7 @@ async fn upload_cover_image(
     data: RequestData,
     payload: Multipart,
 ) -> Response {
-    AuthNode::auth_update(&data, node.id, node.branch_id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id).await?;
 
     node.update_cover_image(&data, payload).await?;
 
@@ -207,7 +218,7 @@ async fn upload_cover_image(
 
 #[delete("/{id}/{branchId}/delete_cover_image")]
 async fn delete_cover_image(mut node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, node.id, node.branch_id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id).await?;
 
     node.delete_cover_image(&data).await?;
 

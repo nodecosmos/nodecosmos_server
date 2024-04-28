@@ -13,8 +13,8 @@ use crate::models::traits::{ElasticDocument, UpdateLikeCountNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [id],
     global_secondary_indexes = []
 )]
 #[derive(Serialize, Deserialize, Branchable, Default, Debug)]
@@ -30,22 +30,12 @@ pub struct NodeCounter {
 }
 
 impl NodeCounter {
-    pub async fn find_by_ids_and_branch_id(
-        db_session: &CachingSession,
-        ids: &Set<Uuid>,
-        branch_id: Uuid,
-    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
     pub async fn find_by_ids(
         db_session: &CachingSession,
+        branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("id IN ? AND branch_id IN ?", (ids, ids))
+        find_node_counter!("branch_id = ? AND ids in ?", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)

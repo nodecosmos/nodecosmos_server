@@ -7,8 +7,8 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::flow_step::{FlowStep, PkFlowStep};
-use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, FindOrInsertBranched};
+use crate::models::traits::{ModelBranchParams, ModelContext};
 
 impl FlowStep {
     pub fn set_defaults(&mut self) {
@@ -62,7 +62,16 @@ impl FlowStep {
 
     pub async fn preserve_branch_flow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Flow::find_or_insert_branched(data, self.node_id, self.branch_id, self.flow_id).await?;
+            Flow::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.flow_id,
+                },
+            )
+            .await?;
         }
 
         Ok(())

@@ -44,8 +44,8 @@ pub enum CommitObject {
 
 #[charybdis_model(
     table_name = commits,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]

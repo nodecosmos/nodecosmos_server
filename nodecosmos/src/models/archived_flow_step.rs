@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 /// don't duplicate data for each ancestor.
 #[charybdis_model(
     table_name = archived_flow_steps,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [flow_id, step_index, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, flow_id, step_index, id],
     table_options = r#"
         compression = {
             'sstable_compression': 'SnappyCompressor',

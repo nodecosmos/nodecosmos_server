@@ -196,7 +196,7 @@ impl Node {
         let self_branched_res = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
 
         if self_branched_res.is_none() {
-            let non_branched_res = Node::find_by_id_and_branch_id(self.id, self.id)
+            let non_branched_res = Node::find_by_branch_id_and_id(self.original_id(), self.id)
                 .execute(data.db_session())
                 .await;
 
@@ -326,7 +326,7 @@ impl Node {
     }
 
     pub async fn maybe_create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let maybe_branched = Workflow::maybe_find_first_by_node_id_and_branch_id(self.id, self.branch_id)
+        let maybe_branched = Workflow::maybe_find_first_by_branch_id_and_node_id(self.branch_id, self.id)
             .execute(data.db_session())
             .await?;
 

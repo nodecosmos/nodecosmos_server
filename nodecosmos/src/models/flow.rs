@@ -11,11 +11,10 @@ use serde::{Deserialize, Serialize};
 use nodecosmos_macros::{Branchable, Id};
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow::ArchivedFlow;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
 
 pub mod create;
@@ -23,16 +22,18 @@ mod update_title;
 
 #[charybdis_model(
     table_name = flows,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [vertical_index, start_index, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, vertical_index, start_index, id],
     local_secondary_indexes = [id]
 )]
 #[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Flow {
-    #[branch(original_id)]
     pub node_id: Uuid,
     pub branch_id: Uuid,
+
+    #[branch(original_id)]
+    pub root_id: Uuid,
 
     // vertical index
     pub vertical_index: Double,
@@ -113,15 +114,18 @@ impl Callbacks for Flow {
 
 impl Flow {
     /// merges original and branched flows
-    pub async fn branched(db_session: &CachingSession, params: &WorkflowParams) -> Result<Vec<Self>, NodecosmosError> {
-        let mut flows = Self::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
+    pub async fn branched(
+        db_session: &CachingSession,
+        params: &NodeBranchParams,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let mut flows = Self::find_by_branch_id_and_node_id(params.branch_id, params.node_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(flows.try_collect().await?)
         } else {
-            let mut original_flows = Self::find_by_node_id_and_branch_id(params.node_id, params.node_id)
+            let mut original_flows = Self::find_by_branch_id_and_node_id(params.node_id, params.node_id)
                 .execute(db_session)
                 .await?;
             let mut branched_flows_set = HashSet::new();
@@ -154,7 +158,8 @@ impl Flow {
     pub async fn flow_steps(&self, db_session: &CachingSession) -> Result<Vec<FlowStep>, NodecosmosError> {
         let res = FlowStep::find_by_flow(
             db_session,
-            &WorkflowParams {
+            &NodeBranchParams {
+                original_id: self.original_id(),
                 node_id: self.node_id,
                 branch_id: self.branch_id,
             },
@@ -173,6 +178,7 @@ partial_flow!(
     start_index,
     vertical_index,
     id,
+    root_id,
     title,
     updated_at,
     ctx
@@ -189,4 +195,4 @@ impl Callbacks for UpdateTitleFlow {
     }
 }
 
-partial_flow!(PkFlow, node_id, branch_id, start_index, vertical_index, id);
+partial_flow!(PkFlow, node_id, branch_id, start_index, vertical_index, id, root_id);

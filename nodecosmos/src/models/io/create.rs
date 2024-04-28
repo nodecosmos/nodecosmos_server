@@ -4,14 +4,13 @@ use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindOrInsertBranched};
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, NodeBranchParams};
 
 impl Io {
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -74,10 +73,10 @@ impl Io {
     pub async fn clone_main_ios_to_branch(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let branched = Io::branched(
             db_session,
-            self.root_id,
-            &WorkflowParams {
-                node_id: self.node_id,
+            &NodeBranchParams {
+                original_id: self.original_id(),
                 branch_id: self.branch_id,
+                node_id: self.node_id,
             },
         )
         .await?
@@ -94,7 +93,16 @@ impl Io {
 
     pub async fn preserve_branch_node(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            Node::find_or_insert_branched(data, self.node_id, self.branch_id, self.node_id).await?;
+            Node::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.node_id,
+                },
+            )
+            .await?;
         }
 
         Ok(())
@@ -103,7 +111,16 @@ impl Io {
     pub async fn preserve_branch_flow_step(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             if let Some(flow_step_id) = self.flow_step_id {
-                FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, flow_step_id).await?;
+                FlowStep::find_or_insert_branched(
+                    data,
+                    ModelBranchParams {
+                        original_id: self.original_id(),
+                        branch_id: self.branch_id,
+                        node_id: self.node_id,
+                        id: flow_step_id,
+                    },
+                )
+                .await?;
             }
         }
 

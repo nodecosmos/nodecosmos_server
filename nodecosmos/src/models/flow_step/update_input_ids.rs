@@ -28,7 +28,7 @@ impl UpdateInputIdsFlowStep {
                 .collect();
 
             let ios =
-                Io::find_by_root_id_and_branch_id_and_ids(data.db_session(), self.root_id, self.original_id(), &io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
                     .await?
                     .into_iter()
                     .map(|mut io| {

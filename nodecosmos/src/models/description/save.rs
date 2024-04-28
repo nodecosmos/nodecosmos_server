@@ -8,25 +8,32 @@ use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::Node;
 use crate::models::traits::{
-    Branchable, ElasticDocument, FindOrInsertBranched, ObjectType, UpdateNodeDescriptionElasticIdx,
+    Branchable, ElasticDocument, FindOrInsertBranched, ModelBranchParams, ObjectType, UpdateNodeDescriptionElasticIdx,
 };
 
 impl Description {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
+            let params = ModelBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                node_id: self.node_id,
+                id: self.object_id,
+            };
+
             match ObjectType::from(self.object_type.parse()?) {
                 ObjectType::Node => {
-                    Node::find_or_insert_branched(data, self.object_id, self.branch_id, self.object_id).await?;
+                    Node::find_or_insert_branched(data, params).await?;
 
                     Branch::update(&data, self.branch_id, BranchUpdate::EditNodeDescription(self.object_id)).await?;
                 }
                 ObjectType::Flow => {
-                    Flow::find_or_insert_branched(data, self.node_id, self.branch_id, self.object_id).await?;
+                    Flow::find_or_insert_branched(data, params).await?;
 
                     Branch::update(&data, self.branch_id, BranchUpdate::EditFlowDescription(self.object_id)).await?;
                 }
                 ObjectType::FlowStep => {
-                    FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, self.object_id).await?;
+                    FlowStep::find_or_insert_branched(data, params).await?;
 
                     Branch::update(
                         &data,
@@ -36,7 +43,7 @@ impl Description {
                     .await?;
                 }
                 ObjectType::Io => {
-                    Io::find_or_insert_branched_main(data, self.node_id, self.branch_id, self.object_id).await?;
+                    Io::find_or_insert_branched_main(data, params.original_id, params.branch_id, params.id).await?;
 
                     Branch::update(&data, self.branch_id, BranchUpdate::EditIoDescription(self.object_id)).await?;
                 }

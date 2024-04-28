@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = archived_nodes,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [id],
     table_options = r#"
         compression = {
             'sstable_compression': 'SnappyCompressor',

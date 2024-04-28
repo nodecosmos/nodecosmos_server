@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use nodecosmos_macros::{Branchable, FlowId, Id, NodeId};
 
 use crate::api::data::RequestData;
-use crate::api::WorkflowParams;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge};
+use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
 
@@ -30,8 +29,8 @@ mod update_output_ids;
 
 #[charybdis_model(
     table_name = flow_steps,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [flow_id, step_index, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, flow_id, step_index, id],
     local_secondary_indexes = [id]
 )]
 #[derive(Branchable, Id, NodeId, FlowId, Serialize, Deserialize, Default, Clone)]
@@ -112,16 +111,16 @@ impl Callbacks for FlowStep {
 impl FlowStep {
     pub async fn branched(
         db_session: &CachingSession,
-        params: &WorkflowParams,
+        params: &NodeBranchParams,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
-        let flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.branch_id)
+        let flow_steps = Self::find_by_branch_id_and_node_id(params.branch_id, params.node_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(flow_steps.try_collect().await?)
         } else {
-            let mut original_flow_steps = Self::find_by_node_id_and_branch_id(params.node_id, params.node_id)
+            let mut original_flow_steps = Self::find_by_branch_id_and_node_id(params.original_id, params.node_id)
                 .execute(db_session)
                 .await?;
             let mut branch_flow_steps = flow_steps.group_by_id().await?;
@@ -156,11 +155,11 @@ impl FlowStep {
 
     pub async fn find_by_flow(
         db_session: &CachingSession,
-        params: &WorkflowParams,
+        params: &NodeBranchParams,
         flow_id: Uuid,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         if params.is_original() {
-            return FlowStep::find_by_node_id_and_branch_id_and_flow_id(params.node_id, params.branch_id, flow_id)
+            return FlowStep::find_by_branch_id_and_node_id_and_flow_id(params.branch_id, params.node_id, flow_id)
                 .execute(db_session)
                 .await?
                 .try_collect()
@@ -258,7 +257,16 @@ impl Callbacks for UpdateInputIdsFlowStep {
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, self.id).await?;
+            FlowStep::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.id,
+                },
+            )
+            .await?;
 
             self.update_branch(data).await?;
             self.preserve_branch_ios(data).await?;
@@ -306,7 +314,16 @@ impl Callbacks for UpdateNodeIdsFlowStep {
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
-            let flow_step = FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, self.id).await?;
+            let flow_step = FlowStep::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.id,
+                },
+            )
+            .await?;
 
             flow_step.preserve_flow_step_outputs(data).await?;
         }
@@ -361,7 +378,16 @@ impl Callbacks for UpdateOutputIdsFlowStep {
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branched() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            let flow_step = FlowStep::find_or_insert_branched(data, self.node_id, self.branch_id, self.id).await?;
+            let flow_step = FlowStep::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.id,
+                },
+            )
+            .await?;
 
             flow_step.preserve_flow_step_outputs(data).await?;
 

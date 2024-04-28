@@ -17,8 +17,8 @@ const MAX_IMAGE_WIDTH: u32 = 852;
 
 #[charybdis_model(
     table_name = attachments,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [object_id, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, object_id, id],
     static_columns = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
@@ -101,7 +101,7 @@ impl Attachment {
             .map_err(NodecosmosError::from)
     }
 
-    pub async fn find_by_node_ids_and_branch_id(
+    pub async fn find_by_branch_id_and_node_ids(
         db_session: &CachingSession,
         ids: &[Uuid],
         branch_id: Uuid,
