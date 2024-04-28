@@ -35,7 +35,7 @@ impl NodeCounter {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("branch_id = ? AND ids in ?", (branch_id, ids))
+        find_node_counter!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
