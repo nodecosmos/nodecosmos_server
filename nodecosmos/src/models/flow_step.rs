@@ -271,8 +271,9 @@ impl Callbacks for UpdateInputIdsFlowStep {
 
             self.update_branch(data).await?;
             self.preserve_branch_ios(data).await?;
-            self.update_ios(data).await?;
         }
+
+        self.update_ios(data).await?;
 
         Ok(())
     }
