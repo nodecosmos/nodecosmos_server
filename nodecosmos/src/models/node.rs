@@ -2,7 +2,6 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::{Delete, Find};
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -38,13 +37,13 @@ mod update_title;
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     #[serde(default)]
-    #[branch(original_id)]
     pub branch_id: Uuid,
 
     #[serde(default)]
     pub id: Uuid,
 
     #[serde(default)]
+    #[branch(original_id)]
     pub root_id: Uuid,
 
     #[serde(default)]
@@ -102,8 +101,6 @@ impl Callbacks for Node {
 
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
-
-        self.delete_by_partition_key().execute(db_session).await?;
 
         Ok(())
     }
@@ -173,7 +170,7 @@ impl Node {
     }
 }
 
-partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
+partial_node!(PkNode, branch_id, id, root_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
     pub async fn find_by_ids(
@@ -193,9 +190,9 @@ impl PkNode {
 
 partial_node!(
     BaseNode,
-    root_id,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -214,9 +211,9 @@ partial_node!(
 
 partial_node!(
     GetStructureNode,
-    root_id,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -229,12 +226,13 @@ partial_node!(
     ctx
 );
 
-partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
+partial_node!(UpdateOrderNode, branch_id, id, root_id, parent_id, order_index);
 
 partial_node!(
     UpdateTitleNode,
-    id,
     branch_id,
+    id,
+    root_id,
     order_index,
     owner_id,
     editor_ids,
@@ -243,7 +241,6 @@ partial_node!(
     ancestor_ids,
     title,
     updated_at,
-    root_id,
     parent_id,
     parent,
     auth_branch,
@@ -292,12 +289,13 @@ impl Callbacks for UpdateTitleNode {
     }
 }
 
-partial_node!(PrimaryKeyNode, id, branch_id);
+partial_node!(PrimaryKeyNode, branch_id, id, root_id);
 
 partial_node!(
     AuthNode,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -307,12 +305,13 @@ partial_node!(
     auth_branch
 );
 
-partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
+partial_node!(UpdateOwnerNode, branch_id, id, root_id, owner_id, owner, updated_at);
 
 partial_node!(
     UpdateCoverImageNode,
-    id,
     branch_id,
+    id,
+    root_id,
     cover_image_filename,
     cover_image_url,
     updated_at

@@ -1,5 +1,4 @@
 use charybdis::operations::Find;
-use charybdis::types::Uuid;
 use chrono::Utc;
 use scylla::CachingSession;
 
@@ -16,10 +15,6 @@ impl Like {
 
         self.user_id = data.current_user.id;
         self.username = data.current_user.username.clone();
-
-        if self.branch_id == Uuid::default() {
-            self.branch_id = self.object_id;
-        }
 
         self.created_at = now;
         self.updated_at = now;

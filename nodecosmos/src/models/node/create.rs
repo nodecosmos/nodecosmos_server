@@ -79,7 +79,7 @@ impl Node {
         }
 
         if self.branch_id == Uuid::default() {
-            self.branch_id = self.id;
+            self.branch_id = self.root_id;
         }
 
         Ok(())
@@ -125,7 +125,7 @@ impl Node {
                     root_id: self.root_id,
                     node_id: *ancestor_id,
                     id: self.id,
-                    branch_id: self.branchise_id(*ancestor_id),
+                    branch_id: self.branch_id,
                     order_index: self.order_index,
                     parent_id: self.parent_id.expect("parent_id must be present"),
                     title: self.title.clone(),

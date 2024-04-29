@@ -26,17 +26,6 @@ pub trait Branchable {
         self.branch_id() != self.original_id()
     }
 
-    /// Returns the branch_id if the model is branched, otherwise returns the provided id
-    /// Logic is very simple and more symbolic than functional, but it's useful for readability as
-    /// different models can be branched by different fields.
-    fn branchise_id(&self, id: Uuid) -> Uuid {
-        if self.is_original() {
-            id
-        } else {
-            self.branch_id()
-        }
-    }
-
     /// Sets the branch_id to the original_id
     fn set_original_id(&mut self);
 }

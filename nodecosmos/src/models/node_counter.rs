@@ -43,8 +43,8 @@ impl NodeCounter {
 }
 
 impl Likeable for NodeCounter {
-    async fn increment_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let lc = Self::like_count(data.db_session(), id, branch_id).await? + 1;
+    async fn increment_like(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<i64, NodecosmosError> {
+        let lc = Self::like_count(data.db_session(), branch_id, id).await? + 1;
         Self {
             id,
             branch_id,
@@ -68,8 +68,8 @@ impl Likeable for NodeCounter {
         Ok(lc)
     }
 
-    async fn decrement_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let lc = Self::like_count(data.db_session(), id, branch_id).await? - 1;
+    async fn decrement_like(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<i64, NodecosmosError> {
+        let lc = Self::like_count(data.db_session(), branch_id, id).await? - 1;
         Self {
             id,
             branch_id,
@@ -93,8 +93,8 @@ impl Likeable for NodeCounter {
         Ok(lc)
     }
 
-    async fn like_count(db_session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let res = Self::find_by_primary_key_value(&(id, branch_id))
+    async fn like_count(db_session: &CachingSession, branch_id: Uuid, id: Uuid) -> Result<i64, NodecosmosError> {
+        let res = Self::find_by_primary_key_value(&(branch_id, id))
             .execute(db_session)
             .await
             .ok();

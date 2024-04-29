@@ -26,24 +26,15 @@ mod validator;
 
 // TODO: update to use SAGA similar to `BranchMerge` so we avoid reading whole tree for recovery
 #[derive(Deserialize, Branchable)]
+#[serde(rename_all = "camelCase")]
 pub struct ReorderParams {
     #[branch(original_id)]
     pub original_id: Uuid,
-
-    #[serde(rename = "branchId")]
     pub branch_id: Uuid,
-
     pub id: Uuid,
-
-    #[serde(rename = "newParentId")]
     pub new_parent_id: Uuid,
-
-    #[serde(rename = "newUpperSiblingId")]
     pub new_upper_sibling_id: Option<Uuid>,
-
-    #[serde(rename = "newLowerSiblingId")]
     pub new_lower_sibling_id: Option<Uuid>,
-
     // we provide order_index only in context of merge recovery
     pub new_order_index: Option<Double>,
 }
@@ -110,6 +101,7 @@ impl<'a> Reorder<'a> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
             branch_id: self.reorder_data.branch_id,
+            root_id: self.reorder_data.tree_root.id,
             parent_id: Some(self.reorder_data.new_parent.id),
             order_index: self.reorder_data.new_order_index,
         };
@@ -129,7 +121,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branchise_id(ancestor_id),
+                branch_id: self.reorder_data.branch_id,
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.old_order_index,
@@ -164,7 +156,7 @@ impl<'a> Reorder<'a> {
                     root_id: self.reorder_data.tree_root.id,
                     node_id: ancestor_id,
                     id: descendant.id,
-                    branch_id: self.reorder_data.branchise_id(ancestor_id),
+                    branch_id: self.reorder_data.branch_id,
                     order_index: descendant.order_index,
                     ..Default::default()
                 };
@@ -195,7 +187,7 @@ impl<'a> Reorder<'a> {
         for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
             let descendant = NodeDescendant {
                 root_id: self.reorder_data.tree_root.id,
-                branch_id: self.reorder_data.branchise_id(ancestor_id),
+                branch_id: self.reorder_data.branch_id,
                 node_id: ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.new_order_index,
@@ -229,7 +221,7 @@ impl<'a> Reorder<'a> {
             for descendant in self.reorder_data.descendants.clone() {
                 let descendant = NodeDescendant {
                     root_id: self.reorder_data.tree_root.id,
-                    branch_id: self.reorder_data.branchise_id(ancestor_id),
+                    branch_id: self.reorder_data.branch_id,
                     node_id: ancestor_id,
                     id: descendant.id,
                     order_index: descendant.order_index,
@@ -270,7 +262,7 @@ impl<'a> Reorder<'a> {
             let val = (
                 self.reorder_data.removed_ancestor_ids.clone(),
                 descendant_id,
-                self.reorder_data.branchise_id(*descendant_id),
+                self.reorder_data.branch_id,
             );
 
             values.push(val);
@@ -315,7 +307,7 @@ impl<'a> Reorder<'a> {
             let val = (
                 self.reorder_data.added_ancestor_ids.clone(),
                 descendant_id,
-                self.reorder_data.branchise_id(*descendant_id),
+                self.reorder_data.branch_id,
             );
 
             values.push(val);

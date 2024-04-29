@@ -48,6 +48,7 @@ macro_rules! impl_descendants {
                 .await?
                 .try_collect()
                 .await?;
+
                 let branched =
                     NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
                         .execute(db_session)

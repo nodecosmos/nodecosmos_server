@@ -15,7 +15,6 @@ use crate::models::branch::merge::ios::MergeIos;
 use crate::models::branch::merge::nodes::MergeNodes;
 use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
-use crate::models::traits::Branchable;
 use crate::models::utils::file::read_file_names;
 
 mod conflicts;
@@ -328,10 +327,10 @@ impl BranchMerge {
         let node = self.branch.node(data.db_session()).await?;
 
         data.resource_locker()
-            .unlock_resource(node.root_id, node.branchise_id(node.root_id))
+            .unlock_resource(node.root_id, node.branch_id)
             .await?;
         data.resource_locker()
-            .unlock_resource_action(ActionTypes::Merge, node.root_id, node.branchise_id(node.root_id))
+            .unlock_resource_action(ActionTypes::Merge, node.root_id, node.branch_id)
             .await?;
 
         Ok(())

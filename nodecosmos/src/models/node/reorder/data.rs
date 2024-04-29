@@ -80,7 +80,7 @@ impl ReorderData {
     async fn find_tree_root(db_session: &CachingSession, node: &Node) -> Result<GetStructureNode, NodecosmosError> {
         let tree_root = GetStructureNode {
             id: node.root_id,
-            branch_id: node.branchise_id(node.root_id),
+            branch_id: node.branch_id,
             ..Default::default()
         }
         .find_by_primary_key()

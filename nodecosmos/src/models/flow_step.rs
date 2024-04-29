@@ -176,15 +176,15 @@ impl FlowStep {
         Ok(flow_steps)
     }
 
-    pub async fn find_by_node_id_and_branch_id_and_ids(
+    pub async fn find_by_branch_id_and_node_id_and_ids(
         db_session: &CachingSession,
-        node_id: Uuid,
         branch_id: Uuid,
+        node_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         let flow_steps = find_flow_step!(
-            "node_id = ? AND branch_id = ? AND id IN ? ALLOW FILTERING",
-            (node_id, branch_id, ids)
+            "branch_id = ? AND node_id = ? AND id IN ? ALLOW FILTERING",
+            (branch_id, node_id, ids)
         )
         .execute(db_session)
         .await?
@@ -220,7 +220,7 @@ impl FlowStep {
                 for output_id in output_ids {
                     let mut output = Io {
                         root_id: self.root_id,
-                        branch_id: self.branchise_id(self.root_id),
+                        branch_id: self.branch_id,
                         node_id: self.node_id,
                         id: output_id,
                         flow_step_id: Some(id),
