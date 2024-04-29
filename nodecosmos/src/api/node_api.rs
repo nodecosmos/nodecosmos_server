@@ -123,7 +123,7 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
     Ok(HttpResponse::Ok().json(node))
 }
 
-#[delete("/{id}/{branchId}")]
+#[delete("/{branchId}/{id}/{rootId}")]
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
 
@@ -190,13 +190,13 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/{id}/{branchId}/upload_cover_image")]
+#[post("/{branchId}/{id}/{rootId}/upload_cover_image")]
 async fn upload_cover_image(
     mut node: web::Path<UpdateCoverImageNode>,
     data: RequestData,
     payload: Multipart,
 ) -> Response {
-    AuthNode::auth_update(&data, node.branch_id, node.id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id, node.root_id).await?;
 
     node.update_cover_image(&data, payload).await?;
 
@@ -205,9 +205,9 @@ async fn upload_cover_image(
     })))
 }
 
-#[delete("/{id}/{branchId}/delete_cover_image")]
+#[delete("/{branchId}/{id}/{rootId}/delete_cover_image")]
 async fn delete_cover_image(mut node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, node.branch_id, node.id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id, node.root_id).await?;
 
     node.delete_cover_image(&data).await?;
 

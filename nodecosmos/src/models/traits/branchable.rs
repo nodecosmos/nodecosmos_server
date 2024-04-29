@@ -73,7 +73,7 @@ impl Branchable for ContributionRequest {
 #[derive(Branchable, Deserialize)]
 pub struct NodeBranchParams {
     #[branch(original_id)]
-    pub original_id: Uuid,
+    pub root_id: Uuid,
 
     pub branch_id: Uuid,
     pub node_id: Uuid,

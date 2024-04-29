@@ -36,11 +36,13 @@ mod update_initial_inputs;
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
-    #[branch(original_id)]
     pub node_id: Uuid,
 
     pub branch_id: Uuid,
+
+    #[branch(original_id)]
     pub root_id: Uuid,
+
     pub title: Option<Text>,
     pub initial_input_ids: Option<List<Uuid>>,
 
@@ -53,7 +55,7 @@ pub struct Workflow {
 
 impl Workflow {
     pub async fn branched(db_session: &CachingSession, params: &NodeBranchParams) -> Result<Workflow, NodecosmosError> {
-        let mut original = Workflow::find_by_branch_id_and_node_id(params.original_id, params.node_id)
+        let mut original = Workflow::find_by_branch_id_and_node_id(params.original_id(), params.node_id)
             .execute(db_session)
             .await?;
 
@@ -99,11 +101,12 @@ partial_workflow!(
     UpdateInitialInputsWorkflow,
     node_id,
     branch_id,
+    root_id,
     initial_input_ids,
     updated_at
 );
 
-partial_workflow!(GetInitialInputsWorkflow, node_id, branch_id, initial_input_ids);
+partial_workflow!(GetInitialInputsWorkflow, node_id, branch_id, root_id, initial_input_ids);
 
 impl Callbacks for UpdateInitialInputsWorkflow {
     type Extension = RequestData;
@@ -119,6 +122,6 @@ impl Callbacks for UpdateInitialInputsWorkflow {
 }
 
 // used by node deletion
-partial_workflow!(DeleteWorkflow, node_id, branch_id);
+partial_workflow!(DeleteWorkflow, node_id, branch_id, root_id);
 
-partial_workflow!(UpdateWorkflowTitle, node_id, branch_id, title, updated_at);
+partial_workflow!(UpdateWorkflowTitle, node_id, branch_id, root_id, title, updated_at);

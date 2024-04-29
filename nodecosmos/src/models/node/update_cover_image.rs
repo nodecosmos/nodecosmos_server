@@ -44,12 +44,14 @@ impl UpdateCoverImageNode {
             Attachment {
                 node_id: self.id,
                 branch_id: self.branch_id,
+                root_id: self.root_id,
                 object_id: self.id,
                 id: Uuid::new_v4(),
                 key: self.cover_image_filename.clone().unwrap(),
                 url: self.cover_image_url.clone(),
                 user_id: Some(data.current_user.id),
-                ..Default::default()
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
             }
             .insert_cb(&None)
             .execute(data.db_session())
