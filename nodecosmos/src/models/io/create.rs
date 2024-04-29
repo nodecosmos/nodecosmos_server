@@ -17,7 +17,7 @@ impl Io {
         if self.is_branched() {
             let mut maybe_original = Io {
                 root_id: self.root_id,
-                branch_id: self.root_id,
+                branch_id: self.original_id(),
                 node_id: self.node_id,
                 id: self.id,
                 ..Default::default()

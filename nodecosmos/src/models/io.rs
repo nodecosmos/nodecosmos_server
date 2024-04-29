@@ -88,7 +88,7 @@ impl Callbacks for Io {
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        *self = Io::find_branched_or_original(data.db_session(), self.original_id(), self.branch_id, self.id).await?;
+        *self = Io::find_branched_or_original(data.db_session(), self.root_id, self.branch_id, self.id).await?;
 
         self.pull_from_initial_input_ids(db_session).await?;
         self.pull_from_flow_step_outputs(data).await?;
@@ -203,20 +203,29 @@ impl Io {
         branch_id: Uuid,
         id: Uuid,
     ) -> Result<Io, NodecosmosError> {
-        let io = Self::maybe_find_first_by_branch_id_and_root_id_and_id(branch_id, root_id, id)
-            .execute(db_session)
-            .await?;
+        let is_original = branch_id == root_id;
 
-        if let Some(io) = io {
-            Ok(io)
-        } else {
-            let mut io = Self::find_first_by_branch_id_and_root_id_and_id(root_id, root_id, id)
+        if is_original {
+            let io = Self::find_first_by_branch_id_and_root_id_and_id(branch_id, root_id, id)
                 .execute(db_session)
                 .await?;
 
-            io.branch_id = branch_id;
-
             Ok(io)
+        } else {
+            let branched = Self::maybe_find_first_by_branch_id_and_root_id_and_id(branch_id, root_id, id)
+                .execute(db_session)
+                .await?;
+
+            if let Some(io) = branched {
+                Ok(io)
+            } else {
+                let mut io = Self::find_first_by_branch_id_and_root_id_and_id(root_id, root_id, id)
+                    .execute(db_session)
+                    .await?;
+                io.branch_id = branch_id;
+
+                Ok(io)
+            }
         }
     }
 
