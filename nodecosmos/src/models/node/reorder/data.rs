@@ -64,6 +64,7 @@ impl ReorderData {
             id: params.id,
             branch_id: params.branch_id,
             parent_id: Some(params.new_parent_id),
+            root_id: params.root_id,
             ..Default::default()
         };
         let new_parent = query_new_parent_node.branch_parent(&db_session).await?;
@@ -81,6 +82,7 @@ impl ReorderData {
         let tree_root = GetStructureNode {
             id: node.root_id,
             branch_id: node.branch_id,
+            root_id: node.root_id,
             ..Default::default()
         }
         .find_by_primary_key()
