@@ -92,22 +92,10 @@ impl Attachment {
 
     pub async fn find_by_node_ids(
         db_session: &CachingSession,
-        ids: &[Uuid],
-    ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("node_id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
-    pub async fn find_by_branch_id_and_node_ids(
-        db_session: &CachingSession,
-        ids: &[Uuid],
         branch_id: Uuid,
+        ids: &[Uuid],
     ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("node_id = ? AND branch_id = ?", (ids, branch_id))
+        find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
