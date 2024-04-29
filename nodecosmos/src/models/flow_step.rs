@@ -36,7 +36,6 @@ mod update_output_ids;
 #[derive(Branchable, Id, NodeId, FlowId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowStep {
-    #[branch(original_id)]
     pub node_id: Uuid,
 
     pub branch_id: Uuid,
@@ -48,7 +47,9 @@ pub struct FlowStep {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
+    #[branch(original_id)]
     pub root_id: Uuid,
+
     pub node_ids: Option<List<Uuid>>,
     pub input_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
     pub output_ids_by_node_id: Option<Frozen<Map<Uuid, Frozen<List<Uuid>>>>>,
@@ -120,7 +121,7 @@ impl FlowStep {
         if params.is_original() {
             Ok(flow_steps.try_collect().await?)
         } else {
-            let mut original_flow_steps = Self::find_by_branch_id_and_node_id(params.original_id, params.node_id)
+            let mut original_flow_steps = Self::find_by_branch_id_and_node_id(params.original_id(), params.node_id)
                 .execute(db_session)
                 .await?;
             let mut branch_flow_steps = flow_steps.group_by_id().await?;
@@ -363,6 +364,7 @@ partial_flow_step!(
     UpdateOutputIdsFlowStep,
     node_id,
     branch_id,
+    root_id,
     flow_id,
     step_index,
     id,
@@ -414,7 +416,7 @@ impl UpdateOutputIdsFlowStep {
     }
 }
 
-partial_flow_step!(PkFlowStep, node_id, branch_id, flow_id, step_index, id);
+partial_flow_step!(PkFlowStep, node_id, branch_id, root_id, flow_id, step_index, id);
 
 impl PkFlowStep {
     pub async fn maybe_find_by_index(self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
@@ -441,6 +443,7 @@ impl PkFlowStep {
 impl From<&FlowStep> for PkFlowStep {
     fn from(fs: &FlowStep) -> Self {
         Self {
+            root_id: fs.root_id,
             node_id: fs.node_id,
             branch_id: fs.branch_id,
             flow_id: fs.flow_id,

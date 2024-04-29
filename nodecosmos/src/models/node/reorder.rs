@@ -29,7 +29,7 @@ mod validator;
 #[serde(rename_all = "camelCase")]
 pub struct ReorderParams {
     #[branch(original_id)]
-    pub original_id: Uuid,
+    pub root_id: Uuid,
     pub branch_id: Uuid,
     pub id: Uuid,
     pub new_parent_id: Uuid,

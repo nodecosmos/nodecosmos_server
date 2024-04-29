@@ -294,7 +294,7 @@ impl MergeNodes {
                 match node {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
-                            original_id: node.original_id(),
+                            root_id: node.root_id,
                             branch_id: reorder_node_data.id,
                             id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.new_parent_id,
@@ -332,7 +332,7 @@ impl MergeNodes {
                 match node {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
-                            original_id: node.original_id(),
+                            root_id: node.root_id,
                             branch_id: reorder_node_data.id,
                             id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.old_parent_id,

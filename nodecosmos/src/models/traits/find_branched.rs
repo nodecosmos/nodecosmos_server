@@ -32,7 +32,7 @@ macro_rules! impl_find_branched_or_original {
                 use crate::models::traits::Branchable;
 
                 if params.is_original() {
-                    return Self::find_by_branch_id_and_id(params.original_id, params.node_id)
+                    return Self::find_by_branch_id_and_id(params.branch_id, params.node_id)
                         .execute(db_session)
                         .await
                         .map_err(NodecosmosError::from);
@@ -43,7 +43,7 @@ macro_rules! impl_find_branched_or_original {
                     {
                         Some(node) => Ok(node),
                         None => {
-                            let mut node = Self::find_by_branch_id_and_id(params.original_id, params.node_id)
+                            let mut node = Self::find_by_branch_id_and_id(params.original_id(), params.node_id)
                                 .execute(db_session)
                                 .await?;
                             node.branch_id = params.branch_id;

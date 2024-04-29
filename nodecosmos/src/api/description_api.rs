@@ -14,22 +14,29 @@ use crate::models::node::AuthNode;
 use crate::models::traits::Branchable;
 use crate::resources::description_ws_pool::DescriptionWsConnection;
 
-#[get("/{nodeId}/{objectId}/{objectType}/{branchId}")]
+#[get("/{branchId}/{objectId}/{rootId}/{objectType}/{nodeId}/base")]
 pub async fn get_description(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
     mut description: web::Path<BaseDescription>,
 ) -> Response {
-    AuthNode::auth_view(&db_session, &opt_cu, description.branch_id, description.node_id).await?;
+    AuthNode::auth_view(
+        &db_session,
+        &opt_cu,
+        description.branch_id,
+        description.node_id,
+        description.root_id,
+    )
+    .await?;
 
     let description = description.find_branched(&db_session).await?;
 
     Ok(HttpResponse::Ok().json(description))
 }
 
-#[get("/{nodeId}/{objectId}/{objectType}/{branchId}/base64")]
+#[get("/{branchId}/{objectId}/{rootId}/{objectType}/{nodeId}/base64")]
 pub async fn get_base64_description(data: RequestData, mut description: web::Path<Description>) -> Response {
-    AuthNode::auth_update(&data, description.node_id, description.branch_id).await?;
+    AuthNode::auth_update(&data, description.branch_id, description.node_id, description.root_id).await?;
 
     description.find_branched(data.db_session()).await?;
 
@@ -60,27 +67,22 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
     Ok(HttpResponse::Ok().json(description.into_inner()))
 }
 
-#[derive(Deserialize)]
-pub struct OriginalPathParams {
-    #[serde(rename = "nodeId")]
-    pub node_id: Uuid,
-
-    #[serde(rename = "branchId")]
-    pub branch_id: Uuid,
-
-    #[serde(rename = "objectId")]
-    pub object_id: Uuid,
-}
-
-#[get("/{nodeId}/{objectId}")]
+#[get("/{branchId}/{objectId}/{rootId}/{objectType}/{nodeId}/original_base64")]
 pub async fn get_original_description(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
-    params: web::Path<OriginalPathParams>,
+    description: web::Path<BaseDescription>,
 ) -> Response {
-    AuthNode::auth_view(&db_session, &opt_cu, params.branch_id, params.node_id).await?;
+    AuthNode::auth_view(
+        &db_session,
+        &opt_cu,
+        description.branch_id,
+        description.node_id,
+        description.root_id,
+    )
+    .await?;
 
-    let description = Description::find_by_branch_id_and_object_id(params.branch_id, params.object_id)
+    let description = Description::find_by_branch_id_and_object_id(description.original_id(), description.object_id)
         .execute(&db_session)
         .await?;
 
@@ -89,7 +91,7 @@ pub async fn get_original_description(
 
 #[post("")]
 pub async fn save_description(data: RequestData, mut description: web::Json<Description>) -> Response {
-    AuthNode::auth_update(&data, description.node_id, description.branch_id).await?;
+    AuthNode::auth_update(&data, description.branch_id, description.node_id, description.root_id).await?;
 
     description.insert_cb(&data).execute(data.db_session()).await?;
 
@@ -102,19 +104,20 @@ pub struct WsPathParams {
     room_id: Uuid,
     branch_id: Uuid,
     node_id: Uuid,
+    root_id: Uuid,
 }
 
 /// Websocket connection to sync description updates
 /// between attached clients.
 /// It can be used for all models that have description_base64 field.
-#[get("/descriptions/{node_id}/{branch_id}/{room_id}")]
+#[get("/descriptions/{branch_id}/{node_id}/{root_id}/{room_id}")]
 pub async fn description_ws(
     req: HttpRequest,
     stream: web::Payload,
     params: web::Path<WsPathParams>,
     data: RequestData,
 ) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.branch_id).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
 
     let ws_desc_conn = DescriptionWsConnection {
         room_id: params.room_id,

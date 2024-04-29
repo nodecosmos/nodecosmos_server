@@ -9,10 +9,16 @@ use crate::models::traits::Authorization;
 
 /// We use auth node so we query only fields that are needed for authorization.
 impl AuthNode {
-    pub async fn auth_update(data: &RequestData, branch_id: Uuid, node_id: Uuid) -> Result<(), NodecosmosError> {
+    pub async fn auth_update(
+        data: &RequestData,
+        branch_id: Uuid,
+        node_id: Uuid,
+        root_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         let mut node = AuthNode {
             branch_id,
             id: node_id,
+            root_id,
             ..Default::default()
         };
 
@@ -27,10 +33,12 @@ impl AuthNode {
         opt_cu: &OptCurrentUser,
         branch_id: Uuid,
         node_id: Uuid,
+        root_id: Uuid,
     ) -> Result<(), NodecosmosError> {
         let mut node = AuthNode {
             branch_id,
             id: node_id,
+            root_id,
             ..Default::default()
         };
 

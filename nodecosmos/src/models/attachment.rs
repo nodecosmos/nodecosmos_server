@@ -27,6 +27,7 @@ pub struct Attachment {
     pub node_id: Uuid,
     pub branch_id: Uuid,
     pub object_id: Uuid,
+    pub root_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,

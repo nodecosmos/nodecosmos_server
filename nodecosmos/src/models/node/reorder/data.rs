@@ -179,7 +179,7 @@ impl ReorderData {
         let node = Node::find_or_insert_branched(
             data,
             ModelBranchParams {
-                original_id: params.original_id,
+                original_id: params.original_id(),
                 branch_id: params.branch_id,
                 node_id: params.id,
                 id: params.id,
@@ -203,7 +203,7 @@ impl ReorderData {
             Self::init_sibling(
                 data.db_session(),
                 NodeBranchParams {
-                    original_id: params.original_id,
+                    root_id: params.root_id,
                     branch_id: params.branch_id,
                     node_id: id,
                 },
@@ -217,7 +217,7 @@ impl ReorderData {
             Self::init_sibling(
                 data.db_session(),
                 NodeBranchParams {
-                    original_id: params.original_id,
+                    root_id: params.root_id,
                     branch_id: params.branch_id,
                     node_id: id,
                 },

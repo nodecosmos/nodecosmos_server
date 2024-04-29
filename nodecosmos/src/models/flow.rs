@@ -159,7 +159,7 @@ impl Flow {
         let res = FlowStep::find_by_flow(
             db_session,
             &NodeBranchParams {
-                original_id: self.original_id(),
+                root_id: self.root_id,
                 node_id: self.node_id,
                 branch_id: self.branch_id,
             },

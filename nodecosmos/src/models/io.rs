@@ -121,14 +121,14 @@ impl Callbacks for Io {
 impl Io {
     pub async fn branched(db_session: &CachingSession, params: &NodeBranchParams) -> Result<Vec<Io>, NodecosmosError> {
         // root_id == params.original_id
-        let mut ios = Self::find_by_branch_id_and_root_id(params.branch_id, params.original_id)
+        let mut ios = Self::find_by_branch_id_and_root_id(params.branch_id, params.root_id)
             .execute(db_session)
             .await?;
 
         if params.is_original() {
             Ok(ios.try_collect().await?)
         } else {
-            let mut original_ios = Self::find_by_branch_id_and_root_id(params.original_id, params.original_id)
+            let mut original_ios = Self::find_by_branch_id_and_root_id(params.original_id(), params.root_id)
                 .execute(db_session)
                 .await?;
             let mut branched_ios_set = HashSet::new();
@@ -228,7 +228,7 @@ impl Io {
             let node = Node::find_branched_or_original(
                 db_session,
                 NodeBranchParams {
-                    original_id: self.original_id(),
+                    root_id: self.root_id,
                     branch_id: self.branch_id,
                     node_id: self.node_id,
                 },

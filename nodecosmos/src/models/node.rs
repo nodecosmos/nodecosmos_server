@@ -121,7 +121,7 @@ impl Callbacks for Node {
         *self = Node::find_branched_or_original(
             data.db_session(),
             NodeBranchParams {
-                original_id: self.original_id(),
+                root_id: self.root_id,
                 branch_id: self.branch_id,
                 node_id: self.id,
             },
@@ -260,7 +260,7 @@ impl Callbacks for UpdateTitleNode {
         let current = Self::find_branched_or_original(
             data.db_session(),
             NodeBranchParams {
-                original_id: self.original_id(),
+                root_id: self.root_id,
                 branch_id: self.branch_id,
                 node_id: self.id,
             },

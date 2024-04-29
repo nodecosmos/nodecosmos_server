@@ -13,7 +13,7 @@ impl Flow {
         let flows = Flow::branched(
             data.db_session(),
             &NodeBranchParams {
-                original_id: self.original_id(),
+                root_id: self.root_id,
                 branch_id: self.branch_id,
                 node_id: self.node_id,
             },
