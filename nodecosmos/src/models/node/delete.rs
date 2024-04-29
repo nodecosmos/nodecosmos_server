@@ -147,6 +147,7 @@ impl<'a> NodeDelete<'a> {
             .map_err(NodecosmosError::from)
     }
 
+    // TODO: append ancestors descendants to the list
     pub async fn deleted_descendants(
         db_session: &CachingSession,
         node: &Node,

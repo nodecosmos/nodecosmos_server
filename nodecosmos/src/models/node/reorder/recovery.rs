@@ -160,7 +160,7 @@ impl<'a> Recovery<'a> {
 
         for id in node_and_descendant_ids {
             let branch_id = self.reorder_data.branch_id;
-            values.push((&self.reorder_data.added_ancestor_ids, id, branch_id));
+            values.push((&self.reorder_data.added_ancestor_ids, branch_id, id));
         }
 
         Node::unlogged_statement_batch()
@@ -185,7 +185,7 @@ impl<'a> Recovery<'a> {
         let mut values = vec![];
 
         for id in node_and_descendant_ids {
-            values.push((&self.reorder_data.removed_ancestor_ids, id, self.reorder_data.branch_id));
+            values.push((&self.reorder_data.removed_ancestor_ids, self.reorder_data.branch_id, id));
         }
 
         Node::unlogged_statement_batch()
