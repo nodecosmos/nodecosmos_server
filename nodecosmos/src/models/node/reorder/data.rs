@@ -67,7 +67,7 @@ impl ReorderData {
             root_id: params.root_id,
             ..Default::default()
         };
-        let new_parent = query_new_parent_node.branch_parent(&db_session).await?;
+        let new_parent = query_new_parent_node.parent(&db_session).await?;
 
         match new_parent {
             Some(new_parent) => Ok(new_parent.clone()),
@@ -198,8 +198,13 @@ impl ReorderData {
         let old_ancestor_ids = node.ancestor_ids.ref_cloned();
         let new_ancestor_ids = Self::build_new_ancestor_ids(&new_parent);
 
+        println!("old_ancestor_ids: {:?}", &old_ancestor_ids);
+
         let removed_ancestor_ids = Self::extract_removed_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
         let added_ancestor_ids = Self::extract_added_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
+
+        println!("removed_ancestor_ids: {:?}", removed_ancestor_ids);
+        println!("added_ancestor_ids: {:?}", added_ancestor_ids);
 
         let new_upper_sibling = if let Some(id) = params.new_upper_sibling_id {
             Self::init_sibling(

@@ -1,5 +1,5 @@
 use charybdis::batch::ModelBatch;
-use charybdis::operations::{execute, Update};
+use charybdis::operations::Update;
 use charybdis::types::{Double, Uuid};
 use log::error;
 use scylla::CachingSession;
@@ -252,8 +252,8 @@ impl<'a> Reorder<'a> {
         for descendant_id in &self.reorder_data.descendant_ids {
             let val = (
                 self.reorder_data.removed_ancestor_ids.clone(),
-                descendant_id,
                 self.reorder_data.branch_id,
+                descendant_id,
             );
 
             values.push(val);
@@ -276,16 +276,11 @@ impl<'a> Reorder<'a> {
     }
 
     async fn push_added_ancestors_to_node(&mut self) -> Result<(), NodecosmosError> {
-        execute(
-            self.db_session,
-            Node::PUSH_ANCESTOR_IDS_QUERY,
-            (
-                self.reorder_data.added_ancestor_ids.clone(),
-                self.reorder_data.node.id,
-                self.reorder_data.branch_id,
-            ),
-        )
-        .await?;
+        self.reorder_data
+            .node
+            .push_ancestor_ids(&self.reorder_data.added_ancestor_ids)
+            .execute(&self.db_session)
+            .await?;
 
         Ok(())
     }
@@ -296,8 +291,8 @@ impl<'a> Reorder<'a> {
         for descendant_id in &self.reorder_data.descendant_ids {
             let val = (
                 self.reorder_data.added_ancestor_ids.clone(),
-                descendant_id,
                 self.reorder_data.branch_id,
+                descendant_id,
             );
 
             values.push(val);
