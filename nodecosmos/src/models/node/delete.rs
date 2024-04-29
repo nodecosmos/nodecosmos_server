@@ -153,11 +153,30 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, ids)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
+        let mut descendants;
+
+        if let Some(ancestor_ids) = &node.ancestor_ids {
+            let ids = ids.clone().into_iter().chain(ancestor_ids.clone()).collect();
+
+            descendants = vec![];
+
+            let mut fetched_desc =
+                NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, &ids).await?;
+
+            while let Some(desc) = fetched_desc.next().await {
+                let desc = desc?;
+                if ids.contains(&desc.id) {
+                    descendants.push(desc);
+                }
+            }
+        } else {
+            descendants = NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, ids)
+                .await?
+                .try_collect()
+                .await?;
+        }
+
+        Ok(descendants)
     }
 
     async fn deleted_workflows(
