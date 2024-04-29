@@ -10,7 +10,6 @@ use crate::errors::NodecosmosError;
 use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::Branchable;
 use crate::models::utils::file::read_file_names;
 use crate::resources::resource_locker::ResourceLocker;
 
@@ -142,6 +141,7 @@ impl<'a> Recovery<'a> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
             branch_id: self.reorder_data.branch_id,
+            root_id: self.reorder_data.tree_root.id,
             parent_id: self.reorder_data.old_parent_id,
             order_index: self.reorder_data.old_order_index,
         };
@@ -157,7 +157,7 @@ impl<'a> Recovery<'a> {
         let mut values = vec![];
 
         for id in node_and_descendant_ids {
-            let branch_id = self.reorder_data.branchise_id(id);
+            let branch_id = self.reorder_data.branch_id;
             values.push((&self.reorder_data.added_ancestor_ids, id, branch_id));
         }
 
@@ -183,8 +183,7 @@ impl<'a> Recovery<'a> {
         let mut values = vec![];
 
         for id in node_and_descendant_ids {
-            let branch_id = self.reorder_data.branchise_id(id);
-            values.push((&self.reorder_data.removed_ancestor_ids, id, branch_id));
+            values.push((&self.reorder_data.removed_ancestor_ids, id, self.reorder_data.branch_id));
         }
 
         Node::unlogged_statement_batch()

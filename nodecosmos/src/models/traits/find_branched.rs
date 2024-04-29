@@ -163,7 +163,7 @@ impl FindForBranchMerge for Flow {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_flow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -187,7 +187,7 @@ impl FindForBranchMerge for UpdateTitleFlow {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_title_flow!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_update_title_flow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -211,7 +211,7 @@ impl FindForBranchMerge for FlowStep {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow_step!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -235,7 +235,7 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_input_ids_flow_step!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_update_input_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -259,7 +259,7 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_output_ids_flow_step!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_update_output_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -283,7 +283,7 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_node_ids_flow_step!("branch_id = AND node_id IN ?", (branch_id, node_ids))
+        find_update_node_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -303,14 +303,11 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
 
 impl FindForBranchMerge for Description {
     async fn find_by_branch_id_and_node_ids(
-        db_session: &CachingSession,
-        branch_id: Uuid,
-        node_ids: &Set<Uuid>,
+        _db_session: &CachingSession,
+        _branch_id: Uuid,
+        _node_ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_description!("branch_id = AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
+        unimplemented!("Description is not findable by node_ids");
     }
 
     async fn find_by_branch_id_and_ids(
@@ -318,7 +315,7 @@ impl FindForBranchMerge for Description {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_description!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_description!("branch_id = AND object_id IN ?", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)

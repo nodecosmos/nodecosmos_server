@@ -38,9 +38,10 @@ impl MergeNodes {
                 .await?
                 .try_collect()
                 .await?;
-            let already_restored_ids = PkNode::find_by_ids(db_session, branch.id, &branched_nodes.pluck_id())
-                .await?
-                .pluck_id_set();
+            let already_restored_ids =
+                PkNode::find_by_ids(db_session, branch.original_id(), &branched_nodes.pluck_id())
+                    .await?
+                    .pluck_id_set();
 
             branched_nodes.retain(|branched_node| !already_restored_ids.contains(&branched_node.id));
 

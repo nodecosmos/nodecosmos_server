@@ -139,13 +139,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        let nodes = if node.is_branched() {
-            Node::find_by_ids(db_session, node.branch_id, ids).await?
-        } else {
-            Node::find_by_ids(db_session, node.original_id(), ids).await?
-        };
-
-        nodes.try_collect().await.map_err(NodecosmosError::from)
+        Node::find_by_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     pub async fn deleted_descendants(
@@ -177,9 +175,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Flow>, NodecosmosError> {
-        let flows = Flow::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
-
-        flows.try_collect().await.map_err(NodecosmosError::from)
+        Flow::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_flow_steps(
@@ -187,9 +187,11 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
-        let flow_steps = FlowStep::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
-
-        flow_steps.try_collect().await.map_err(NodecosmosError::from)
+        FlowStep::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_ios(
@@ -197,19 +199,23 @@ impl<'a> NodeDelete<'a> {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = Io::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
-
-        ios.try_collect().await.map_err(NodecosmosError::from)
+        Io::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_descriptions(
         db_session: &CachingSession,
         node: &Node,
-        ids: &Set<Uuid>,
     ) -> Result<Vec<Description>, NodecosmosError> {
-        let descriptions = Description::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids).await?;
-
-        descriptions.try_collect().await.map_err(NodecosmosError::from)
+        Description::find_by_branch_id(node.branch_id)
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     async fn deleted_counter_data(
@@ -242,7 +248,7 @@ impl<'a> NodeDelete<'a> {
         let deleted_flows = Self::deleted_flows(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_flow_steps = Self::deleted_flow_steps(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_ios = Self::deleted_ios(data.db_session(), node, &node_ids_to_delete).await?;
-        let deleted_descriptions = Self::deleted_descriptions(data.db_session(), node, &node_ids_to_delete).await?;
+        let deleted_descriptions = Self::deleted_descriptions(data.db_session(), node).await?;
         let deleted_counter_data = Self::deleted_counter_data(data.db_session(), node, &node_ids_to_delete).await?;
 
         Ok(Self {
@@ -667,7 +673,7 @@ impl<'a> NodeDelete<'a> {
         for id in &self.deleted_node_ids {
             deleted_likes.push(Like {
                 object_id: *id,
-                branch_id: self.node.branchise_id(*id),
+                branch_id: self.node.branch_id,
                 ..Default::default()
             });
         }

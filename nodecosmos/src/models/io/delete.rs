@@ -25,10 +25,10 @@ impl Io {
 
     pub async fn pull_from_flow_steps_inputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if let Some(flow_step_ids) = &self.inputted_by_flow_steps {
-            let mut flow_steps = FlowStep::find_by_node_id_and_branch_id_and_ids(
+            let mut flow_steps = FlowStep::find_by_branch_id_and_node_id_and_ids(
                 data.db_session(),
-                self.node_id,
                 self.branch_id,
+                self.node_id,
                 flow_step_ids,
             )
             .await?;
