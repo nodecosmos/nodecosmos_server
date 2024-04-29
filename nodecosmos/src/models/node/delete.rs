@@ -705,18 +705,9 @@ impl<'a> NodeDelete<'a> {
 
     // not critical for delete/merge
     pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
-        let attachments = if self.node.is_branch() {
-            Attachment::find_by_branch_id_and_node_ids(
-                self.data.db_session(),
-                &self.deleted_node_ids,
-                self.node.branch_id,
-            )
+        Attachment::find_by_node_ids(self.data.db_session(), self.node.branch_id, &self.deleted_node_ids)
             .await?
-        } else {
-            Attachment::find_by_node_ids(self.data.db_session(), &self.deleted_node_ids).await?
-        };
-
-        attachments.delete_all(self.data)?;
+            .delete_all(self.data)?;
 
         Ok(())
     }
