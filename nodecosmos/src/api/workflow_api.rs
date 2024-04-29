@@ -15,7 +15,7 @@ use crate::models::node::AuthNode;
 use crate::models::traits::NodeBranchParams;
 use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
 
-#[get("/{original_id}/{branch_id}/{node_id}")]
+#[get("/{root_id}/{branch_id}/{node_id}")]
 pub async fn get_workflow(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,

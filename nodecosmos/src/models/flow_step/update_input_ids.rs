@@ -76,7 +76,7 @@ impl UpdateInputIdsFlowStep {
             for added_io in added_input_ids {
                 batch.append_statement(
                     Io::PUSH_INPUTTED_BY_FLOW_STEPS_QUERY,
-                    (vec![self.id], self.root_id, self.branch_id, added_io),
+                    (vec![self.id], self.branch_id, self.root_id, added_io),
                 );
             }
         }
@@ -85,7 +85,7 @@ impl UpdateInputIdsFlowStep {
             for removed_io in removed_input_ids {
                 batch.append_statement(
                     Io::PULL_INPUTTED_BY_FLOW_STEPS_QUERY,
-                    (vec![self.id], self.root_id, self.branch_id, removed_io),
+                    (vec![self.id], self.branch_id, self.root_id, removed_io),
                 );
             }
         }

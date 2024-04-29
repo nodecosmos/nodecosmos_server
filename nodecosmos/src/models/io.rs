@@ -90,12 +90,9 @@ impl Callbacks for Io {
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         *self = Io::find_branched_or_original(data.db_session(), self.original_id(), self.branch_id, self.id).await?;
 
-        if !self.is_parent_delete_context() {
-            self.pull_from_initial_input_ids(db_session).await?;
-            self.pull_form_flow_step_outputs(data).await?;
-            self.pull_from_flow_steps_inputs(data).await?;
-        }
-
+        self.pull_from_initial_input_ids(db_session).await?;
+        self.pull_from_flow_step_outputs(data).await?;
+        self.pull_from_flow_steps_inputs(data).await?;
         self.preserve_branch_flow_step(data).await?;
         self.update_branch_with_deletion(data).await?;
 
