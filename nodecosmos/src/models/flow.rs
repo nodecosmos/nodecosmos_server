@@ -69,11 +69,11 @@ impl Callbacks for Flow {
             self.update_branch_with_creation(data).await?;
         }
 
-        if self.is_default_context() || self.is_branched_init_context() {
+        if self.is_default_context() || self.is_branch_init_context() {
             self.preserve_branch_node(data).await?;
         }
 
-        if !self.is_branched_init_context() {
+        if !self.is_branch_init_context() {
             self.calculate_vertical_idx(data).await?;
         }
 

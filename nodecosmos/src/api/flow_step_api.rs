@@ -1,5 +1,5 @@
 use actix_web::{post, put, web, HttpResponse};
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 
 use crate::api::data::RequestData;
 use crate::api::types::Response;
@@ -7,6 +7,7 @@ use crate::models::flow_step::{
     FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
 use crate::models::node::AuthNode;
+use crate::models::traits::{Branchable, FindBranchedOrOriginal, ModelBranchParams};
 
 const LOCKER_TTL: usize = 1000 * 10; // 10 seconds
 
@@ -67,10 +68,17 @@ pub async fn delete_flow_step(data: RequestData, fs: web::Json<PkFlowStep>) -> R
         .lock_resource(fs.flow_id, fs.branch_id, LOCKER_TTL)
         .await?;
 
-    let mut flow_step =
-        FlowStep::find_by_primary_key_value(&(fs.branch_id, fs.node_id, fs.flow_id, fs.step_index.clone(), fs.id))
-            .execute(data.db_session())
-            .await?;
+    let mut flow_step = FlowStep::find_branched_or_original(
+        data.db_session(),
+        ModelBranchParams {
+            original_id: fs.original_id(),
+            branch_id: fs.branch_id,
+            node_id: fs.node_id,
+            id: fs.id,
+        },
+    )
+    .await?;
+
     flow_step.delete_cb(&data).execute(data.db_session()).await?;
 
     data.resource_locker()

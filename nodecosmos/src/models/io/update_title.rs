@@ -12,7 +12,7 @@ use crate::models::traits::Branchable;
 impl UpdateTitleIo {
     pub async fn update_ios_titles_by_main_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(main_id) = self.main_id {
-            if self.is_branched() {
+            if self.is_branch() {
                 self.as_native().clone_main_ios_to_branch(db_session).await?;
             }
 
@@ -38,7 +38,7 @@ impl UpdateTitleIo {
     }
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             self.as_native().create_branched_if_original_exists(data).await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;

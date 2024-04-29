@@ -41,7 +41,7 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
     description.find_branched(data.db_session()).await?;
 
     // we always return merged description as we want to keep branched description in sync with original
-    if description.is_branched() {
+    if description.is_branch() {
         let original = Description::find_by_branch_id_and_object_id(description.original_id(), description.object_id)
             .execute(data.db_session())
             .await;

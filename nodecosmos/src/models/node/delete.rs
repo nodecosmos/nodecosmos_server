@@ -41,7 +41,7 @@ impl Node {
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut node_ids = vec![self.id];
             let descendant_ids = self
                 .descendants(data.db_session())
@@ -705,7 +705,7 @@ impl<'a> NodeDelete<'a> {
 
     // not critical for delete/merge
     pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
-        let attachments = if self.node.is_branched() {
+        let attachments = if self.node.is_branch() {
             Attachment::find_by_branch_id_and_node_ids(
                 self.data.db_session(),
                 &self.deleted_node_ids,

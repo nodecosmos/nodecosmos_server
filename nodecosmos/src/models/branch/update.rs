@@ -1,4 +1,4 @@
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisBatch, CharybdisModelBatch};
 use charybdis::errors::CharybdisError;
 use charybdis::operations::Update;
 use charybdis::types::{Frozen, List, Map, Set, Uuid};
@@ -15,14 +15,14 @@ use crate::models::branch::{
     UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
     UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
     UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
-    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodeWorkflowsBranch,
+    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodesBranch,
     UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch, UpdateReorderedNodes,
     UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
 
 pub enum BranchUpdate {
-    CreateNode(Uuid),
+    CreateNode((Uuid, Set<Uuid>)),
     DeleteNodes(Vec<Uuid>),
     UndoDeleteNodes(Vec<Uuid>),
     RestoreNode(Uuid),
@@ -64,14 +64,24 @@ impl Branch {
         let mut check_conflicts = false;
 
         match update {
-            BranchUpdate::CreateNode(id) => {
-                res = UpdateCreatedNodesBranch {
+            BranchUpdate::CreateNode((id, ancestor_ids)) => {
+                let created_nodes_branch = UpdateCreatedNodesBranch {
                     id: branch_id,
                     ..Default::default()
-                }
-                .push_created_nodes(&vec![id])
-                .execute(data.db_session())
-                .await;
+                };
+                let push_node_q = created_nodes_branch.push_created_nodes(vec![id]);
+
+                let edited_nodes_branch = UpdateEditedNodesBranch {
+                    id: branch_id,
+                    ..Default::default()
+                };
+                let push_edited_node_q = edited_nodes_branch.push_edited_nodes(ancestor_ids);
+
+                res = CharybdisBatch::new()
+                    .append(push_node_q)
+                    .append(push_edited_node_q)
+                    .execute(data.db_session())
+                    .await;
             }
             BranchUpdate::DeleteNodes(ids) => {
                 let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
@@ -81,10 +91,7 @@ impl Branch {
                     .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, &params)
                     .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, &params)
                     .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, &params)
-                    .append_statement(
-                        UpdateEditedNodeWorkflowsBranch::PULL_EDITED_WORKFLOW_NODES_QUERY,
-                        &params,
-                    )
+                    .append_statement(UpdateEditedNodesBranch::PULL_EDITED_NODES_QUERY, &params)
                     .execute(data.db_session())
                     .await;
 
@@ -160,11 +167,11 @@ impl Branch {
                 check_conflicts = true;
             }
             BranchUpdate::EditNodeWorkflow(id) => {
-                res = UpdateEditedNodeWorkflowsBranch {
+                res = UpdateEditedNodesBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_edited_workflow_nodes(&vec![id])
+                .push_edited_nodes(&vec![id])
                 .execute(data.db_session())
                 .await;
             }
@@ -442,7 +449,6 @@ impl Branch {
         let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
 
         if check_conflicts {
-            println!("Checking conflicts");
             match branch.check_conflicts(data).await {
                 Ok(res) => {
                     branch = res;

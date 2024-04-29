@@ -64,7 +64,7 @@ pub struct Branch {
     pub edited_title_nodes: Option<Set<Uuid>>,
     pub edited_description_nodes: Option<Set<Uuid>>,
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
-    pub edited_workflow_nodes: Option<Set<Uuid>>,
+    pub edited_nodes: Option<Set<Uuid>>,
     /// node_id -> initial_input_ids
     pub created_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
     /// node_id -> initial_input_ids
@@ -238,7 +238,7 @@ partial_branch!(UpdateEditedDescriptionNodesBranch, id, edited_description_nodes
 
 partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
-partial_branch!(UpdateEditedNodeWorkflowsBranch, id, edited_workflow_nodes);
+partial_branch!(UpdateEditedNodesBranch, id, edited_nodes);
 
 partial_branch!(
     UpdateCreatedWorkflowInitialInputsBranch,

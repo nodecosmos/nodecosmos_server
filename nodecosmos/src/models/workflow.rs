@@ -55,33 +55,40 @@ pub struct Workflow {
 
 impl Workflow {
     pub async fn branched(db_session: &CachingSession, params: &NodeBranchParams) -> Result<Workflow, NodecosmosError> {
-        let mut original = Workflow::find_by_branch_id_and_node_id(params.original_id(), params.node_id)
-            .execute(db_session)
-            .await?;
-
         if params.is_original() {
-            Ok(original)
+            Workflow::find_by_branch_id_and_node_id(params.original_id(), params.node_id)
+                .execute(db_session)
+                .await
+                .map_err(NodecosmosError::from)
         } else {
+            let maybe_original =
+                Workflow::maybe_find_first_by_branch_id_and_node_id(params.original_id(), params.node_id)
+                    .execute(db_session)
+                    .await?;
             let maybe_branched = Workflow::maybe_find_first_by_branch_id_and_node_id(params.branch_id, params.node_id)
                 .execute(db_session)
                 .await?;
 
-            let mut branched;
+            return match (maybe_original, maybe_branched) {
+                (Some(mut original), Some(mut branched)) => {
+                    // merge original initial input ids with branched initial input ids
+                    if let Some(original_initial_input_ids) = original.initial_input_ids.as_mut() {
+                        original_initial_input_ids.merge_unique(branched.initial_input_ids.unwrap_or_default());
+                        branched.initial_input_ids = original.initial_input_ids;
+                    }
 
-            if let Some(mut maybe_branched) = maybe_branched {
-                // merge original initial input ids with branched initial input ids
-                if let Some(original_initial_input_ids) = original.initial_input_ids.as_mut() {
-                    original_initial_input_ids.merge_unique(maybe_branched.initial_input_ids.unwrap_or_default());
-                    maybe_branched.initial_input_ids = original.initial_input_ids;
+                    Ok(branched)
                 }
+                (Some(mut original), None) => {
+                    original.branch_id = params.branch_id;
 
-                branched = maybe_branched;
-            } else {
-                branched = original;
-                branched.branch_id = params.branch_id;
-            }
-
-            Ok(branched)
+                    Ok(original)
+                }
+                (None, Some(branched)) => Ok(branched),
+                (None, None) => Err(NodecosmosError::NotFound(
+                    "Branch related workflow not found".to_string(),
+                )),
+            };
         }
     }
 
@@ -113,7 +120,7 @@ impl Callbacks for UpdateInitialInputsWorkflow {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             self.update_branch(data).await?;
         }
 
