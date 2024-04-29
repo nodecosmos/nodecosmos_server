@@ -282,6 +282,7 @@ impl Node {
             let original_node = Node {
                 id: self.id,
                 branch_id: self.id,
+                root_id: self.root_id,
                 ..Default::default()
             }
             .maybe_find_by_primary_key()
