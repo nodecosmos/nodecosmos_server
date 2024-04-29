@@ -14,7 +14,7 @@ use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams,
 
 impl Io {
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut maybe_original = Io {
                 root_id: self.root_id,
                 branch_id: self.original_id(),
@@ -92,7 +92,7 @@ impl Io {
     }
 
     pub async fn preserve_branch_node(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Node::find_or_insert_branched(
                 data,
                 ModelBranchParams {
@@ -109,7 +109,7 @@ impl Io {
     }
 
     pub async fn preserve_branch_flow_step(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             if let Some(flow_step_id) = self.flow_step_id {
                 FlowStep::find_or_insert_branched(
                     data,
@@ -128,7 +128,7 @@ impl Io {
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateIo(self.id)).await?;
         }
@@ -137,7 +137,7 @@ impl Io {
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
         }

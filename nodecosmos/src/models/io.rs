@@ -15,7 +15,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal, NodeBranchParams};
+use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
 
 mod create;

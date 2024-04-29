@@ -124,7 +124,7 @@ impl<'a> MergeConflicts<'a> {
         let restored_node_ids = self.branch_merge.branch.restored_nodes.ref_cloned();
         let deleted_node_ids = self.branch_merge.branch.deleted_nodes.ref_cloned();
         let edited_description_nodes = self.branch_merge.branch.edited_description_nodes.ref_cloned();
-        let mut edited_node_ids = self.branch_merge.branch.edited_workflow_nodes.ref_cloned();
+        let mut edited_node_ids = self.branch_merge.branch.edited_nodes.ref_cloned();
 
         edited_node_ids.extend(edited_description_nodes);
 
@@ -262,11 +262,11 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if let Some(edited_workflow_node_ids) = &self.branch_merge.branch.edited_workflow_nodes {
-            let original_flow_ids_set = Flow::find_by_branch_id_and_ids(
+        if let Some(edited_node_ids) = &self.branch_merge.branch.edited_nodes {
+            let original_flow_ids_set = Flow::find_by_branch_id_and_node_ids(
                 data.db_session(),
                 self.branch_merge.branch.original_id(),
-                &edited_workflow_node_ids,
+                &edited_node_ids,
             )
             .await?
             .pluck_id_set()
@@ -352,11 +352,11 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if let Some(edited_workflow_node_ids) = &self.branch_merge.branch.edited_workflow_nodes {
-            let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_ids(
+        if let Some(edited_node_ids) = &self.branch_merge.branch.edited_nodes {
+            let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_node_ids(
                 data.db_session(),
                 self.branch_merge.branch.id,
-                &edited_workflow_node_ids,
+                &edited_node_ids,
             )
             .await?
             .pluck_id_set()

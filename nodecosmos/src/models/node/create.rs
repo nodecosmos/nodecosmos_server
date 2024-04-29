@@ -156,13 +156,14 @@ impl Node {
     /// so we can preserve branch changes in case any of ancestor is deleted,
     /// and we can allow users to resolve conflicts.
     pub async fn preserve_branch_ancestors(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut futures = vec![];
 
             for ancestor_id in self.ancestor_ids.ref_cloned() {
                 let ancestor = Node {
                     id: ancestor_id,
                     branch_id: self.branch_id,
+                    root_id: self.root_id,
                     ..Default::default()
                 };
                 let future = ancestor.create_branched_if_not_exist(&data);
@@ -217,7 +218,12 @@ impl Node {
                     node.maybe_create_workflow(&data).await?;
                 }
                 Err(e) => {
-                    error!("Error finding non-branched node {}: {:?}", self.id, e);
+                    error!(
+                        "Error finding non-branched node {}: original_id: {} {:?}",
+                        self.id,
+                        self.original_id(),
+                        e
+                    );
 
                     return Err(NodecosmosError::from(e));
                 }
@@ -228,7 +234,7 @@ impl Node {
     }
 
     pub async fn preserve_branch_descendants(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut descendants =
                 NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
                     .execute(data.db_session())
@@ -272,7 +278,7 @@ impl Node {
 
     // used to preserve deleted node for branch
     pub async fn create_branched_if_original_exist(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let original_node = Node {
                 id: self.id,
                 branch_id: self.id,
@@ -347,8 +353,13 @@ impl Node {
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::CreateNode(self.id)).await?;
+        if self.is_branch() {
+            Branch::update(
+                data,
+                self.branch_id,
+                BranchUpdate::CreateNode((self.id, self.ancestor_ids.clone().unwrap_or_default())),
+            )
+            .await?;
         }
 
         Ok(())

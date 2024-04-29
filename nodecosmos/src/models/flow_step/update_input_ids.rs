@@ -16,7 +16,7 @@ use crate::models::traits::{Branchable, HashMapVecToSet};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             // for each input and output create branch io if it does not exist
             let io_ids = self
                 .input_ids_by_node_id

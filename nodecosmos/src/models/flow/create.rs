@@ -26,7 +26,7 @@ impl Flow {
     }
 
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut maybe_original = Flow {
                 branch_id: self.original_id(),
                 ..self.clone()
@@ -46,14 +46,14 @@ impl Flow {
     }
 
     pub async fn preserve_branch_node(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Node::find_or_insert_branched(
                 data,
                 ModelBranchParams {
                     original_id: self.original_id(),
                     branch_id: self.branch_id,
                     node_id: self.node_id,
-                    id: self.id,
+                    id: self.node_id,
                 },
             )
             .await?;
@@ -63,7 +63,7 @@ impl Flow {
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
         }
@@ -72,7 +72,7 @@ impl Flow {
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Branch::update(data, self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
         }

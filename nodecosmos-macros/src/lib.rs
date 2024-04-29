@@ -95,7 +95,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
         impl crate::models::traits::Parent for #name {
             async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-                    if self.is_branched() {
+                    if self.is_branch() {
                         return self.branch_parent(db_session).await;
                     }
                     let parent = BaseNode::find_by_branch_id_and_id(self.branch_id, parent_id)
@@ -173,7 +173,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             fn is_frozen(&self) -> bool {
                 use crate::models::traits::AuthorizationFields;
 
-                if self.is_branched() {
+                if self.is_branch() {
                     return match &self.auth_branch {
                         Some(branch) => branch.is_frozen(),
                         None => {
@@ -262,7 +262,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                     return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
                 }
 
-                if self.is_branched() {
+                if self.is_branch() {
                     self.auth_update(data).await?;
                 } else if let Some(parent_id) = self.parent_id {
                     let mut auth_parent_node = crate::models::node::AuthNode::find_by_branch_id_and_id(self.original_id(), parent_id)

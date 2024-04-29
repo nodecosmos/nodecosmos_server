@@ -331,7 +331,7 @@ impl<'a> Reorder<'a> {
     }
 
     async fn update_branch(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.is_branched() {
+        if self.reorder_data.is_branch() {
             Branch::update(
                 self.request_data,
                 self.reorder_data.branch_id,

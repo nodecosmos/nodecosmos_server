@@ -13,7 +13,7 @@ use crate::models::traits::{
 
 impl Description {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let params = ModelBranchParams {
                 original_id: self.original_id(),
                 branch_id: self.branch_id,

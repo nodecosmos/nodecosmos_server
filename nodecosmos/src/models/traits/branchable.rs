@@ -22,7 +22,7 @@ pub trait Branchable {
         self.branch_id() == self.original_id()
     }
 
-    fn is_branched(&self) -> bool {
+    fn is_branch(&self) -> bool {
         self.branch_id() != self.original_id()
     }
 

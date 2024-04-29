@@ -12,7 +12,7 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal, NodeBranchParams};
+use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
 
@@ -252,7 +252,7 @@ impl Callbacks for UpdateTitleNode {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             self.as_native().create_branched_if_not_exist(data).await?;
             self.update_branch(&data).await?;
         }

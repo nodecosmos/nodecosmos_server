@@ -12,19 +12,19 @@ use crate::models::flow_step::{
     find_flow_step, find_update_input_ids_flow_step, find_update_node_ids_flow_step, find_update_output_ids_flow_step,
     FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
 };
-use crate::models::node::{GetStructureNode, Node, UpdateTitleNode};
+use crate::models::node::{BaseNode, GetStructureNode, Node, UpdateTitleNode};
 use crate::models::traits::ModelContext;
 
-pub trait FindBranchedOrOriginal: Model {
+pub trait FindBranchedOrOriginalNode: Model {
     async fn find_branched_or_original(
         db_session: &CachingSession,
         params: crate::models::traits::NodeBranchParams,
     ) -> Result<Self, NodecosmosError>;
 }
 
-macro_rules! impl_find_branched_or_original {
+macro_rules! impl_find_branched_or_original_node {
     ($struct_name:ident) => {
-        impl FindBranchedOrOriginal for $struct_name {
+        impl FindBranchedOrOriginalNode for $struct_name {
             async fn find_branched_or_original(
                 db_session: &CachingSession,
                 params: crate::models::traits::NodeBranchParams,
@@ -57,9 +57,55 @@ macro_rules! impl_find_branched_or_original {
     };
 }
 
-impl_find_branched_or_original!(Node);
-impl_find_branched_or_original!(GetStructureNode);
-impl_find_branched_or_original!(UpdateTitleNode);
+impl_find_branched_or_original_node!(Node);
+impl_find_branched_or_original_node!(BaseNode);
+impl_find_branched_or_original_node!(GetStructureNode);
+impl_find_branched_or_original_node!(UpdateTitleNode);
+
+pub trait FindBranchedOrOriginal: Model {
+    async fn find_branched_or_original(
+        db_session: &CachingSession,
+        params: crate::models::traits::ModelBranchParams,
+    ) -> Result<Self, NodecosmosError>;
+}
+
+macro_rules! impl_find_branched_or_original {
+    ($struct_name:ident) => {
+        impl FindBranchedOrOriginal for $struct_name {
+            async fn find_branched_or_original(
+                db_session: &CachingSession,
+                params: crate::models::traits::ModelBranchParams,
+            ) -> Result<Self, NodecosmosError> {
+                use crate::models::traits::Branchable;
+
+                if params.is_original() {
+                    return Self::find_first_by_branch_id_and_id(params.branch_id, params.id)
+                        .execute(db_session)
+                        .await
+                        .map_err(NodecosmosError::from);
+                } else {
+                    return match Self::maybe_find_first_by_branch_id_and_id(params.branch_id, params.id)
+                        .execute(db_session)
+                        .await?
+                    {
+                        Some(model) => Ok(model),
+                        None => {
+                            let mut model = Self::find_first_by_branch_id_and_id(params.original_id, params.id)
+                                .execute(db_session)
+                                .await?;
+                            model.branch_id = params.branch_id;
+
+                            Ok(model)
+                        }
+                    };
+                }
+            }
+        }
+    };
+}
+
+impl_find_branched_or_original!(Flow);
+impl_find_branched_or_original!(FlowStep);
 
 pub trait FindOrInsertBranched: Model {
     async fn find_or_insert_branched(
@@ -174,7 +220,7 @@ impl FindForBranchMerge for Flow {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -198,7 +244,7 @@ impl FindForBranchMerge for UpdateTitleFlow {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_title_flow!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_update_title_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -222,7 +268,7 @@ impl FindForBranchMerge for FlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow_step!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -246,7 +292,7 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_input_ids_flow_step!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_update_input_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -270,7 +316,7 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_output_ids_flow_step!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_update_output_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -294,7 +340,7 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_node_ids_flow_step!("branch_id = AND id IN ? ALLOW FILTERING", (branch_id, ids))
+        find_update_node_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
@@ -315,7 +361,7 @@ impl FindForBranchMerge for Description {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_description!("branch_id = AND object_id IN ?", (branch_id, ids))
+        find_description!("branch_id = ? AND object_id IN ?", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)

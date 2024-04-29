@@ -7,7 +7,7 @@ use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams}
 
 impl UpdateTitleFlow {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
             Flow::find_or_insert_branched(
                 data,

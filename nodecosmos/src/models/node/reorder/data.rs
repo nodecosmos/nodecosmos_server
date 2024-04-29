@@ -10,7 +10,7 @@ use crate::models::node::{BaseNode, GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, NodeBranchParams, Pluck};
 use crate::models::traits::{Descendants, Parent};
-use crate::models::traits::{FindBranchedOrOriginal, RefCloned};
+use crate::models::traits::{FindBranchedOrOriginalNode, RefCloned};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ReorderData {
@@ -48,7 +48,7 @@ impl ReorderData {
         params: &ReorderParams,
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        return if params.is_branched() {
+        return if params.is_branch() {
             node.branch_descendants(&db_session).await
         } else {
             node.descendants(&db_session)
@@ -95,7 +95,7 @@ impl ReorderData {
         tree_root: &GetStructureNode,
         params: &ReorderParams,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        if params.is_branched() {
+        if params.is_branch() {
             tree_root.branch_descendants(&db_session).await
         } else {
             tree_root

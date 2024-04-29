@@ -30,7 +30,7 @@ pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, no
     Ok(HttpResponse::Ok().json(contribution_requests))
 }
 
-#[get("/{nodeId}/{id}")]
+#[get("/{nodeId}/{rootId}/{id}")]
 pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
