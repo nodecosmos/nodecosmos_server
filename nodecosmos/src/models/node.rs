@@ -117,6 +117,7 @@ impl Callbacks for Node {
         Ok(())
     }
 
+    // TODO: fix delete as it hangs
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         *self = Node::find_branched_or_original(
             data.db_session(),

@@ -43,7 +43,7 @@ impl<'a> Recovery<'a> {
     // Recovers Tree from recovery data stored on disk.
     // This may be needed in case of connection loss during reorder.
     pub async fn recover_from_stored_data(db_session: &CachingSession, resource_locker: &ResourceLocker) {
-        create_dir_all(RECOVERY_DATA_DIR).unwrap();
+        create_dir_all(RECOVERY_DATA_DIR).expect("Error in creating recovery data directory");
         let files = read_file_names(RECOVERY_DATA_DIR, RECOVER_FILE_PREFIX).await;
 
         for file in files {
@@ -56,8 +56,8 @@ impl<'a> Recovery<'a> {
                         err
                     );
                 })
-                .unwrap();
-            std::fs::remove_file(file.clone()).unwrap();
+                .expect("Error in deserializing recovery data");
+            std::fs::remove_file(file.clone()).expect("Error in removing recovery data file");
 
             let mut recovery = Recovery::new(&recovery_data, db_session, resource_locker);
             let _ = recovery
@@ -89,6 +89,8 @@ impl<'a> Recovery<'a> {
                 self.serialize_and_store_to_disk();
 
                 error!("recover: {}", err);
+
+                return Err(NodecosmosError::FatalReorderError(err.to_string()));
             }
         }
 
@@ -124,7 +126,7 @@ impl<'a> Recovery<'a> {
             .chunked_insert(
                 self.db_session,
                 &self.reorder_data.tree_descendants,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -166,7 +168,7 @@ impl<'a> Recovery<'a> {
                 &self.db_session,
                 Node::PULL_ANCESTOR_IDS_QUERY,
                 values,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -191,7 +193,7 @@ impl<'a> Recovery<'a> {
                 &self.db_session,
                 Node::PUSH_ANCESTOR_IDS_QUERY,
                 values,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -203,7 +205,7 @@ impl<'a> Recovery<'a> {
     }
 
     fn serialize_and_store_to_disk(&mut self) {
-        let serialized = serde_json::to_string(&self.reorder_data).unwrap();
+        let serialized = serde_json::to_string(&self.reorder_data).expect("Error in serializing recovery data");
         let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.reorder_data.tree_root.id);
         let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
         let path_buf = Path::new(&path);

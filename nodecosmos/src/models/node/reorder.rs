@@ -1,6 +1,5 @@
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{execute, Update};
-use charybdis::options::Consistency;
 use charybdis::types::{Double, Uuid};
 use log::error;
 use scylla::CachingSession;
@@ -106,11 +105,7 @@ impl<'a> Reorder<'a> {
             order_index: self.reorder_data.new_order_index,
         };
 
-        update_order_node
-            .update()
-            .consistency(Consistency::EachQuorum)
-            .execute(&self.db_session)
-            .await?;
+        update_order_node.update().execute(&self.db_session).await?;
 
         Ok(())
     }
@@ -132,11 +127,10 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_delete(
                 &self.db_session,
                 &descendants_to_delete,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -166,11 +160,10 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_delete_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_delete(
                 &self.db_session,
                 &descendants_to_delete,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -199,11 +192,10 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_insert(
                 &self.db_session,
                 &descendants_to_add,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -234,7 +226,6 @@ impl<'a> Reorder<'a> {
         }
 
         NodeDescendant::unlogged_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_insert(&self.db_session, &descendants, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
@@ -269,12 +260,11 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_statements(
                 &self.db_session,
                 Node::PULL_ANCESTOR_IDS_QUERY,
                 values,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {
@@ -314,12 +304,11 @@ impl<'a> Reorder<'a> {
         }
 
         Node::unlogged_statement_batch()
-            .consistency(Consistency::EachQuorum)
             .chunked_statements(
                 &self.db_session,
                 Node::PUSH_ANCESTOR_IDS_QUERY,
                 values,
-                crate::constants::MAX_PARALLEL_REQUESTS,
+                crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
             .map_err(|err| {

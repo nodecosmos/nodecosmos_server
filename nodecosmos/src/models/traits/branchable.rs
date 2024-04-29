@@ -32,7 +32,7 @@ pub trait Branchable {
 
 impl Branchable for ReorderData {
     fn original_id(&self) -> Uuid {
-        self.node.id
+        self.node.root_id
     }
 
     fn branch_id(&self) -> Uuid {
