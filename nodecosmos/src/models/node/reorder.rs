@@ -30,7 +30,7 @@ const RECOVER_FILE_PREFIX: &str = "reorder_recover_data";
 #[derive(Clone, Copy, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum ReorderStep {
     Start = 0,
-    UpdateNodeOrder = 1,
+    UpdateNodeOrderIndex = 1,
     RemoveNodeFromOldAncestors = 2,
     AddNodeToNewAncestors = 3,
     PullRemovedAncestorsFromNode = 4,
@@ -57,7 +57,7 @@ impl From<u8> for ReorderStep {
     fn from(value: u8) -> Self {
         match value {
             0 => ReorderStep::Start,
-            1 => ReorderStep::UpdateNodeOrder,
+            1 => ReorderStep::UpdateNodeOrderIndex,
             2 => ReorderStep::RemoveNodeFromOldAncestors,
             3 => ReorderStep::AddNodeToNewAncestors,
             4 => ReorderStep::PullRemovedAncestorsFromNode,
@@ -178,7 +178,7 @@ impl Reorder {
         while self.reorder_step < ReorderStep::Finish {
             match self.reorder_step {
                 ReorderStep::Start => (),
-                ReorderStep::UpdateNodeOrder => self.update_node_order(db_session).await?,
+                ReorderStep::UpdateNodeOrderIndex => self.update_node_order(db_session).await?,
                 ReorderStep::RemoveNodeFromOldAncestors => self.remove_node_from_old_ancestors(db_session).await?,
                 ReorderStep::AddNodeToNewAncestors => self.add_node_to_new_ancestors(db_session).await?,
                 ReorderStep::PullRemovedAncestorsFromNode => self.pull_removed_ancestors_from_node(db_session).await?,
@@ -209,7 +209,7 @@ impl Reorder {
         while self.reorder_step > ReorderStep::Start {
             match self.reorder_step {
                 ReorderStep::Start => (),
-                ReorderStep::UpdateNodeOrder => self.undo_update_node_order(db_session).await?,
+                ReorderStep::UpdateNodeOrderIndex => self.undo_update_node_order(db_session).await?,
                 ReorderStep::RemoveNodeFromOldAncestors => self.undo_remove_node_from_old_ancestors(db_session).await?,
                 ReorderStep::AddNodeToNewAncestors => self.undo_add_node_to_new_ancestors(db_session).await?,
                 ReorderStep::PullRemovedAncestorsFromNode => {
