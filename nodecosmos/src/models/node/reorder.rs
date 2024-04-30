@@ -644,34 +644,32 @@ impl Reorder {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
-        let mut values = vec![];
+        if self.reorder_data.parent_changed() {
+            let mut values = vec![];
 
-        for descendant_id in &self.reorder_data.descendant_ids {
-            println!(
-                "added_ancestor_ids: {:?}\n descendant_id: {:?}",
-                &self.reorder_data.added_ancestor_ids, descendant_id
-            );
-            let val = (
-                &self.reorder_data.added_ancestor_ids,
-                self.reorder_data.branch_id,
-                descendant_id,
-            );
+            for descendant_id in &self.reorder_data.descendant_ids {
+                let val = (
+                    &self.reorder_data.added_ancestor_ids,
+                    self.reorder_data.branch_id,
+                    descendant_id,
+                );
 
-            values.push(val);
+                values.push(val);
+            }
+
+            Node::statement_batch()
+                .chunked_statements(
+                    db_session,
+                    Node::PUSH_ANCESTOR_IDS_QUERY,
+                    values,
+                    crate::constants::BATCH_CHUNK_SIZE,
+                )
+                .await
+                .map_err(|err| {
+                    error!("push_added_ancestors_to_descendants: {:?}", err);
+                    return err;
+                })?;
         }
-
-        Node::statement_batch()
-            .chunked_statements(
-                db_session,
-                Node::PUSH_ANCESTOR_IDS_QUERY,
-                values,
-                crate::constants::BATCH_CHUNK_SIZE,
-            )
-            .await
-            .map_err(|err| {
-                error!("push_added_ancestors_to_descendants: {:?}", err);
-                return err;
-            })?;
 
         Ok(())
     }
@@ -680,30 +678,32 @@ impl Reorder {
         &mut self,
         db_session: &CachingSession,
     ) -> Result<(), NodecosmosError> {
-        let mut values = vec![];
+        if self.reorder_data.parent_changed() {
+            let mut values = vec![];
 
-        for descendant_id in &self.reorder_data.descendant_ids {
-            let val = (
-                &self.reorder_data.added_ancestor_ids,
-                self.reorder_data.branch_id,
-                descendant_id,
-            );
+            for descendant_id in &self.reorder_data.descendant_ids {
+                let val = (
+                    &self.reorder_data.added_ancestor_ids,
+                    self.reorder_data.branch_id,
+                    descendant_id,
+                );
 
-            values.push(val);
+                values.push(val);
+            }
+
+            Node::statement_batch()
+                .chunked_statements(
+                    db_session,
+                    Node::PULL_ANCESTOR_IDS_QUERY,
+                    values,
+                    crate::constants::BATCH_CHUNK_SIZE,
+                )
+                .await
+                .map_err(|err| {
+                    error!("undo_push_added_ancestors_to_descendants: {:?}", err);
+                    return err;
+                })?;
         }
-
-        Node::statement_batch()
-            .chunked_statements(
-                db_session,
-                Node::PULL_ANCESTOR_IDS_QUERY,
-                values,
-                crate::constants::BATCH_CHUNK_SIZE,
-            )
-            .await
-            .map_err(|err| {
-                error!("undo_push_added_ancestors_to_descendants: {:?}", err);
-                return err;
-            })?;
 
         Ok(())
     }
