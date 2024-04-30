@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
     local_secondary_indexes = [id],
     table_options = r#"
         compression = {
-            'sstable_compression': 'SnappyCompressor',
+            'sstable_compression': 'ZstdCompressor',
             'chunk_length_in_kb': 64
         }
     "#

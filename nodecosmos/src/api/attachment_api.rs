@@ -35,7 +35,6 @@ pub struct AttachmentParams {
     node_id: Uuid,
     object_id: Uuid,
     root_id: Uuid,
-
     filename: String,
 }
 

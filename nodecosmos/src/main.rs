@@ -1,5 +1,5 @@
-use actix_web::{App as ActixWebApp, HttpServer, web};
 use actix_web::middleware::Logger;
+use actix_web::{web, App as ActixWebApp, HttpServer};
 
 use api::*;
 use app::App;

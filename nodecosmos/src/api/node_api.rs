@@ -11,6 +11,7 @@ use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
+use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
@@ -180,14 +181,29 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     }
 
     // execute reorder
-    node.reorder(&data, params.into_inner()).await?;
+    let res = node.reorder(&data, params.into_inner()).await;
 
-    // unlock complete resource
-    data.resource_locker()
-        .unlock_resource(node.root_id, node.branch_id)
-        .await?;
-
-    Ok(HttpResponse::Ok().finish())
+    return match res {
+        Ok(_) => {
+            // unlock complete resource
+            data.resource_locker()
+                .unlock_resource(node.root_id, node.branch_id)
+                .await?;
+            Ok(HttpResponse::Ok().finish())
+        }
+        Err(e) => {
+            match e {
+                // unlock complete resource in case of validation errors
+                NodecosmosError::Forbidden(_) | NodecosmosError::Conflict(_) => {
+                    data.resource_locker()
+                        .unlock_resource(node.root_id, node.branch_id)
+                        .await?;
+                }
+                _ => {}
+            }
+            Err(e)
+        }
+    };
 }
 
 #[post("/{branchId}/{id}/{rootId}/upload_cover_image")]

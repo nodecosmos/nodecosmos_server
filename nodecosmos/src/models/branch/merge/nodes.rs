@@ -149,7 +149,7 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_title_nodes {
-            let nodes_by_id = find_update_title_node!("id IN ? AND branch_id IN ?", (ids, ids))
+            let nodes_by_id = find_update_title_node!("branch_id = ? AND id IN ?", (branch.original_id(), ids))
                 .execute(db_session)
                 .await?
                 .group_by_id()
@@ -295,7 +295,7 @@ impl MergeNodes {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
                             root_id: node.root_id,
-                            branch_id: reorder_node_data.id,
+                            branch_id: node.original_id(),
                             id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.new_parent_id,
                             new_upper_sibling_id: reorder_node_data.new_upper_sibling_id,
@@ -333,7 +333,7 @@ impl MergeNodes {
                     Ok(node) => {
                         let reorder_params = ReorderParams {
                             root_id: node.root_id,
-                            branch_id: reorder_node_data.id,
+                            branch_id: node.original_id(),
                             id: reorder_node_data.id,
                             new_parent_id: reorder_node_data.old_parent_id,
                             new_order_index: Some(reorder_node_data.old_order_index),
