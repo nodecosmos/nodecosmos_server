@@ -125,7 +125,7 @@ impl Flow {
         if params.is_original() {
             Ok(flows.try_collect().await?)
         } else {
-            let mut original_flows = Self::find_by_branch_id_and_node_id(params.node_id, params.node_id)
+            let mut original_flows = Self::find_by_branch_id_and_node_id(params.original_id(), params.node_id)
                 .execute(db_session)
                 .await?;
             let mut branched_flows_set = HashSet::new();

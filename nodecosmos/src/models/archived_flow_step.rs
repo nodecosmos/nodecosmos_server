@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
     clustering_keys = [node_id, flow_id, step_index, id],
     table_options = r#"
         compression = {
-            'sstable_compression': 'SnappyCompressor',
-            'chunk_length_in_kb': 64
+            'sstable_compression': 'ZstdCompressor',
+            'chunk_length_in_kb': 128
         }
     "#
 )]

@@ -100,7 +100,7 @@ impl<'a> Reorder<'a> {
         let update_order_node = UpdateOrderNode {
             id: self.reorder_data.node.id,
             branch_id: self.reorder_data.branch_id,
-            root_id: self.reorder_data.tree_root.id,
+            root_id: self.reorder_data.node.root_id,
             parent_id: Some(self.reorder_data.new_parent.id),
             order_index: self.reorder_data.new_order_index,
         };
@@ -113,11 +113,11 @@ impl<'a> Reorder<'a> {
     async fn remove_node_from_old_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_delete = vec![];
 
-        for ancestor_id in self.reorder_data.old_ancestor_ids.clone() {
+        for ancestor_id in &self.reorder_data.old_ancestor_ids {
             let descendant = NodeDescendant {
-                root_id: self.reorder_data.tree_root.id,
+                root_id: self.reorder_data.node.root_id,
                 branch_id: self.reorder_data.branch_id,
-                node_id: ancestor_id,
+                node_id: *ancestor_id,
                 id: self.reorder_data.node.id,
                 order_index: self.reorder_data.old_order_index,
                 ..Default::default()
@@ -144,15 +144,16 @@ impl<'a> Reorder<'a> {
     async fn delete_node_descendants_from_removed_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_delete = vec![];
 
-        for ancestor_id in self.reorder_data.removed_ancestor_ids.clone() {
+        for ancestor_id in &self.reorder_data.removed_ancestor_ids {
             for descendant in &self.reorder_data.descendants {
                 let descendant = NodeDescendant {
-                    root_id: self.reorder_data.tree_root.id,
-                    node_id: ancestor_id,
-                    id: descendant.id,
+                    root_id: self.reorder_data.node.root_id,
                     branch_id: self.reorder_data.branch_id,
+                    node_id: *ancestor_id,
                     order_index: descendant.order_index,
-                    ..Default::default()
+                    id: descendant.id,
+                    parent_id: descendant.parent_id,
+                    title: String::default(),
                 };
 
                 descendants_to_delete.push(descendant);
@@ -177,13 +178,13 @@ impl<'a> Reorder<'a> {
     async fn add_node_to_new_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants_to_add = vec![];
 
-        for ancestor_id in self.reorder_data.new_ancestor_ids.clone() {
+        for ancestor_id in &self.reorder_data.new_ancestor_ids {
             let descendant = NodeDescendant {
-                root_id: self.reorder_data.tree_root.id,
+                root_id: self.reorder_data.node.root_id,
                 branch_id: self.reorder_data.branch_id,
-                node_id: ancestor_id,
-                id: self.reorder_data.node.id,
+                node_id: *ancestor_id,
                 order_index: self.reorder_data.new_order_index,
+                id: self.reorder_data.node.id,
                 title: self.reorder_data.node.title.clone(),
                 parent_id: self.reorder_data.new_parent.id,
             };
@@ -209,12 +210,12 @@ impl<'a> Reorder<'a> {
     async fn insert_node_descendants_to_added_ancestors(&mut self) -> Result<(), NodecosmosError> {
         let mut descendants = vec![];
 
-        for ancestor_id in self.reorder_data.added_ancestor_ids.clone() {
-            for descendant in self.reorder_data.descendants.clone() {
+        for ancestor_id in &self.reorder_data.added_ancestor_ids {
+            for descendant in &self.reorder_data.descendants {
                 let descendant = NodeDescendant {
-                    root_id: self.reorder_data.tree_root.id,
+                    root_id: self.reorder_data.node.root_id,
                     branch_id: self.reorder_data.branch_id,
-                    node_id: ancestor_id,
+                    node_id: *ancestor_id,
                     id: descendant.id,
                     order_index: descendant.order_index,
                     title: descendant.title.clone(),
@@ -251,7 +252,7 @@ impl<'a> Reorder<'a> {
 
         for descendant_id in &self.reorder_data.descendant_ids {
             let val = (
-                self.reorder_data.removed_ancestor_ids.clone(),
+                &self.reorder_data.removed_ancestor_ids,
                 self.reorder_data.branch_id,
                 descendant_id,
             );
@@ -259,7 +260,7 @@ impl<'a> Reorder<'a> {
             values.push(val);
         }
 
-        Node::unlogged_statement_batch()
+        Node::statement_batch()
             .chunked_statements(
                 &self.db_session,
                 Node::PULL_ANCESTOR_IDS_QUERY,
@@ -289,8 +290,12 @@ impl<'a> Reorder<'a> {
         let mut values = vec![];
 
         for descendant_id in &self.reorder_data.descendant_ids {
+            println!(
+                "added_ancestor_ids: {:?}\n descendant_id: {:?}",
+                &self.reorder_data.added_ancestor_ids, descendant_id
+            );
             let val = (
-                self.reorder_data.added_ancestor_ids.clone(),
+                &self.reorder_data.added_ancestor_ids,
                 self.reorder_data.branch_id,
                 descendant_id,
             );
@@ -298,7 +303,7 @@ impl<'a> Reorder<'a> {
             values.push(val);
         }
 
-        Node::unlogged_statement_batch()
+        Node::statement_batch()
             .chunked_statements(
                 &self.db_session,
                 Node::PUSH_ANCESTOR_IDS_QUERY,

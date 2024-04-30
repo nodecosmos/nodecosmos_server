@@ -281,7 +281,7 @@ impl Node {
         if self.is_branch() {
             let original_node = Node {
                 id: self.id,
-                branch_id: self.id,
+                branch_id: self.original_id(),
                 root_id: self.root_id,
                 ..Default::default()
             }
