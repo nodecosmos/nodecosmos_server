@@ -147,7 +147,6 @@ impl<'a> NodeDelete<'a> {
             .map_err(NodecosmosError::from)
     }
 
-    // TODO: append ancestors descendants to the list
     pub async fn deleted_descendants(
         db_session: &CachingSession,
         node: &Node,
@@ -156,12 +155,12 @@ impl<'a> NodeDelete<'a> {
         let mut descendants;
 
         if let Some(ancestor_ids) = &node.ancestor_ids {
-            let ids = ids.clone().into_iter().chain(ancestor_ids.clone()).collect();
+            let query_ids = ids.clone().into_iter().chain(ancestor_ids.clone()).collect();
 
             descendants = vec![];
 
             let mut fetched_desc =
-                NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, &ids).await?;
+                NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, &query_ids).await?;
 
             while let Some(desc) = fetched_desc.next().await {
                 let desc = desc?;
