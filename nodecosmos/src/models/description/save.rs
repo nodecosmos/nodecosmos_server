@@ -25,18 +25,28 @@ impl Description {
                 ObjectType::Node => {
                     Node::find_or_insert_branched(data, params).await?;
 
-                    Branch::update(&data, self.branch_id, BranchUpdate::EditNodeDescription(self.object_id)).await?;
+                    Branch::update(
+                        data.db_session(),
+                        self.branch_id,
+                        BranchUpdate::EditNodeDescription(self.object_id),
+                    )
+                    .await?;
                 }
                 ObjectType::Flow => {
                     Flow::find_or_insert_branched(data, params).await?;
 
-                    Branch::update(&data, self.branch_id, BranchUpdate::EditFlowDescription(self.object_id)).await?;
+                    Branch::update(
+                        data.db_session(),
+                        self.branch_id,
+                        BranchUpdate::EditFlowDescription(self.object_id),
+                    )
+                    .await?;
                 }
                 ObjectType::FlowStep => {
                     FlowStep::find_or_insert_branched(data, params).await?;
 
                     Branch::update(
-                        &data,
+                        data.db_session(),
                         self.branch_id,
                         BranchUpdate::EditFlowStepDescription(self.object_id),
                     )
@@ -45,7 +55,12 @@ impl Description {
                 ObjectType::Io => {
                     Io::find_or_insert_branched_main(data, params.original_id, params.branch_id, params.id).await?;
 
-                    Branch::update(&data, self.branch_id, BranchUpdate::EditIoDescription(self.object_id)).await?;
+                    Branch::update(
+                        data.db_session(),
+                        self.branch_id,
+                        BranchUpdate::EditIoDescription(self.object_id),
+                    )
+                    .await?;
                 }
                 _ => {}
             }

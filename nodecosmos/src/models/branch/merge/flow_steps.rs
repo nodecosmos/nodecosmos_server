@@ -38,8 +38,8 @@ pub struct MergeFlowSteps {
 
 impl MergeFlowSteps {
     pub async fn restored_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(restored_flow_step_ids) = &branch.restored_flow_steps {
             let already_restored_ids =
@@ -62,8 +62,8 @@ impl MergeFlowSteps {
     }
 
     pub async fn created_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_ids) = &branch.created_flow_steps {
             return Ok(Some(
@@ -79,8 +79,8 @@ impl MergeFlowSteps {
     }
 
     pub async fn deleted_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_ids) = &branch.deleted_flow_steps {
             return Ok(Some(
@@ -132,8 +132,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
@@ -150,8 +150,8 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
@@ -168,8 +168,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_nodes) = &branch.deleted_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_nodes.keys().cloned().collect();
@@ -187,8 +187,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
@@ -205,8 +205,8 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
@@ -223,8 +223,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_inputs_by_node) = &branch.deleted_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_inputs_by_node.keys().cloned().collect();
@@ -242,8 +242,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
@@ -260,8 +260,8 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
@@ -278,8 +278,8 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_outputs_by_node) = &branch.deleted_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_outputs_by_node.keys().cloned().collect();
@@ -295,22 +295,22 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_flow_steps = Self::restored_flow_steps(&branch, data.db_session()).await?;
-        let created_flow_steps = Self::created_flow_steps(&branch, data.db_session()).await?;
-        let deleted_flow_steps = Self::deleted_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_flow_steps = Self::restored_flow_steps(&db_session, branch).await?;
+        let created_flow_steps = Self::created_flow_steps(&db_session, branch).await?;
+        let deleted_flow_steps = Self::deleted_flow_steps(&db_session, branch).await?;
+        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&db_session, branch).await?;
         let branched_created_fs_nodes_flow_steps =
-            Self::branched_created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_nodes_flow_steps(&db_session, branch).await?;
+        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&db_session, branch).await?;
+        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&db_session, branch).await?;
         let branched_created_fs_inputs_flow_steps =
-            Self::branched_created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_inputs_flow_steps(&db_session, branch).await?;
+        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&db_session, branch).await?;
+        let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&db_session, branch).await?;
         let branched_created_fs_outputs_flow_steps =
-            Self::branched_created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_outputs_flow_steps(&db_session, branch).await?;
+        let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&db_session, branch).await?;
 
         Ok(Self {
             restored_flow_steps,

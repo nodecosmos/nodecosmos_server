@@ -79,8 +79,13 @@ impl FlowStep {
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }
 
         Ok(())
@@ -88,8 +93,13 @@ impl FlowStep {
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
         }
 
         Ok(())

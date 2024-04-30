@@ -356,7 +356,7 @@ impl Node {
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::CreateNode((self.id, self.ancestor_ids.clone().unwrap_or_default())),
             )

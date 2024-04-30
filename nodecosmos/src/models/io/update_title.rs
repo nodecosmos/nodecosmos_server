@@ -40,8 +40,13 @@ impl UpdateTitleIo {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             self.as_native().create_branched_if_original_exists(data).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditIoTitle(self.id)).await?;
         }
 
         Ok(())

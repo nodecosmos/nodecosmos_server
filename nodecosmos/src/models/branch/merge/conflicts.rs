@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use anyhow::Context;
 use charybdis::operations::Update;
 use charybdis::types::{Set, Uuid};
+use scylla::CachingSession;
 
-use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::merge::BranchMerge;
 use crate::models::branch::Branch;
@@ -28,7 +28,7 @@ impl<'a> MergeConflicts<'a> {
     }
 
     async fn extract_deleted_ancestors(
-        data: &RequestData,
+        db_session: &CachingSession,
         branch: &mut Branch,
         ancestor_ids: HashSet<Uuid>,
     ) -> Result<(), NodecosmosError> {
@@ -47,7 +47,7 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Vec<Uuid>>();
 
-        let original_ancestor_ids_set = PkNode::find_by_ids(data.db_session(), branch.id, &original_ancestor_ids)
+        let original_ancestor_ids_set = PkNode::find_by_ids(db_session, branch.id, &original_ancestor_ids)
             .await?
             .pluck_id_set();
 
@@ -77,21 +77,21 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    pub async fn run_check(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn run_check(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         self.reset_conflicts();
-        self.extract_created_nodes_conflicts(data).await?;
-        self.extract_deleted_edited_nodes(data).await?;
-        self.extract_deleted_edited_flows(data).await?;
-        self.extract_deleted_edited_flow_steps(data).await?;
-        self.extract_conflicting_flow_steps(data).await?;
-        self.extract_deleted_ios(data).await?;
+        self.extract_created_nodes_conflicts(db_session).await?;
+        self.extract_deleted_edited_nodes(db_session).await?;
+        self.extract_deleted_edited_flows(db_session).await?;
+        self.extract_deleted_edited_flow_steps(db_session).await?;
+        self.extract_conflicting_flow_steps(db_session).await?;
+        self.extract_deleted_ios(db_session).await?;
 
         let branch = &mut self.branch_merge.branch;
 
         if branch.conflict.as_mut().is_some() {
             branch
                 .update()
-                .execute(data.db_session())
+                .execute(db_session)
                 .await
                 .context("Failed to update branch with resolve")?;
             return Err(NodecosmosError::Conflict("Conflict detected".to_string()));
@@ -104,11 +104,11 @@ impl<'a> MergeConflicts<'a> {
         self.branch_merge.branch.conflict = None;
     }
 
-    async fn extract_created_nodes_conflicts(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_created_nodes_conflicts(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(created_nodes) = &self.branch_merge.nodes.created_nodes {
             for created_node in created_nodes {
                 Self::extract_deleted_ancestors(
-                    data,
+                    db_session,
                     &mut self.branch_merge.branch,
                     created_node.ancestor_ids.ref_cloned(),
                 )
@@ -119,7 +119,7 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    async fn extract_deleted_edited_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_deleted_edited_nodes(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let created_node_ids = self.branch_merge.branch.created_nodes.ref_cloned();
         let restored_node_ids = self.branch_merge.branch.restored_nodes.ref_cloned();
         let deleted_node_ids = self.branch_merge.branch.deleted_nodes.ref_cloned();
@@ -140,25 +140,22 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Vec<Uuid>>();
 
         // check ancestors of edited description nodes
-        let desc_branched_nodes = PkNode::find_by_ids(
-            data.db_session(),
-            self.branch_merge.branch.id,
-            &original_edited_node_ids,
-        )
-        .await?;
+        let desc_branched_nodes =
+            PkNode::find_by_ids(db_session, self.branch_merge.branch.id, &original_edited_node_ids).await?;
 
         for node in &desc_branched_nodes {
-            Self::extract_deleted_ancestors(data, &mut self.branch_merge.branch, node.ancestor_ids.ref_cloned())
-                .await?;
+            Self::extract_deleted_ancestors(
+                db_session,
+                &mut self.branch_merge.branch,
+                node.ancestor_ids.ref_cloned(),
+            )
+            .await?;
         }
 
-        let original_nodes_ids = PkNode::find_by_ids(
-            data.db_session(),
-            self.branch_merge.branch.id,
-            &original_edited_node_ids,
-        )
-        .await?
-        .pluck_id_set();
+        let original_nodes_ids =
+            PkNode::find_by_ids(db_session, self.branch_merge.branch.id, &original_edited_node_ids)
+                .await?
+                .pluck_id_set();
 
         let deleted_edited_nodes = original_edited_node_ids
             .iter()
@@ -182,7 +179,7 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    async fn extract_deleted_edited_flows(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_deleted_edited_flows(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut edited_flow_ids = self.branch_merge.branch.edited_description_flows.ref_cloned();
 
         self.branch_merge
@@ -264,7 +261,7 @@ impl<'a> MergeConflicts<'a> {
 
         if let Some(edited_node_ids) = &self.branch_merge.branch.edited_nodes {
             let original_flow_ids_set = Flow::find_by_branch_id_and_node_ids(
-                data.db_session(),
+                db_session,
                 self.branch_merge.branch.original_id(),
                 &edited_node_ids,
             )
@@ -295,7 +292,7 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    async fn extract_deleted_edited_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_deleted_edited_flow_steps(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut edited_flow_step_ids = self.branch_merge.branch.edited_description_flow_steps.ref_cloned();
 
         self.branch_merge
@@ -353,14 +350,11 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Set<Uuid>>();
 
         if let Some(edited_node_ids) = &self.branch_merge.branch.edited_nodes {
-            let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_node_ids(
-                data.db_session(),
-                self.branch_merge.branch.id,
-                &edited_node_ids,
-            )
-            .await?
-            .pluck_id_set()
-            .await?;
+            let original_flow_step_ids_set =
+                FlowStep::find_by_branch_id_and_node_ids(db_session, self.branch_merge.branch.id, &edited_node_ids)
+                    .await?
+                    .pluck_id_set()
+                    .await?;
 
             let conflict_deleted_edited_flow_steps = original_edited_flow_step_ids
                 .iter()
@@ -386,7 +380,7 @@ impl<'a> MergeConflicts<'a> {
     }
 
     /// Check if flow steps are diverged - if we flow steps within the same flow with the same step_index
-    async fn extract_conflicting_flow_steps(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_conflicting_flow_steps(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let created_flow_steps = self
             .branch_merge
             .flow_steps
@@ -417,7 +411,7 @@ impl<'a> MergeConflicts<'a> {
                 let mut pk_fs = PkFlowStep::from(flow_step);
                 pk_fs.set_original_id();
 
-                if let Some(original) = pk_fs.maybe_find_by_index(data.db_session()).await? {
+                if let Some(original) = pk_fs.maybe_find_by_index(db_session).await? {
                     if self
                         .branch_merge
                         .branch
@@ -443,7 +437,7 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 
-    async fn extract_deleted_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn extract_deleted_ios(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let created_io_ids = self.branch_merge.branch.created_ios.ref_cloned();
         let restored_io_ids = self.branch_merge.branch.restored_ios.ref_cloned();
         let deleted_io_ids = self.branch_merge.branch.deleted_ios.ref_cloned();
@@ -461,7 +455,7 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Set<Uuid>>();
 
         let original_io_ids_set = Io::find_by_branch_id_and_root_id_and_ids(
-            data.db_session(),
+            db_session,
             self.branch_merge.branch.root_id,
             self.branch_merge.branch.root_id,
             &original_edited_io_ids,

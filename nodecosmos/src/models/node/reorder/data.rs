@@ -1,4 +1,3 @@
-use charybdis::operations::Find;
 use charybdis::types::{Set, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -20,8 +19,8 @@ pub struct ReorderData {
     pub descendants: Vec<NodeDescendant>,
     pub descendant_ids: Vec<Uuid>,
 
-    pub old_parent_id: Option<Uuid>,
-    pub new_parent: BaseNode,
+    pub old_parent_id: Uuid,
+    pub new_parent_id: Uuid,
 
     pub old_ancestor_ids: Set<Uuid>,
     pub new_ancestor_ids: Set<Uuid>,
@@ -37,9 +36,6 @@ pub struct ReorderData {
 
     pub old_order_index: f64,
     pub new_order_index: f64,
-
-    pub tree_root: GetStructureNode,
-    pub tree_descendants: Vec<NodeDescendant>,
 }
 
 impl ReorderData {
@@ -75,37 +71,6 @@ impl ReorderData {
                 "Parent with id {} and branch_id {} not found",
                 params.new_parent_id, params.branch_id
             ))),
-        }
-    }
-
-    async fn find_tree_root(db_session: &CachingSession, node: &Node) -> Result<GetStructureNode, NodecosmosError> {
-        let tree_root = GetStructureNode {
-            id: node.root_id,
-            branch_id: node.branch_id,
-            root_id: node.root_id,
-            ..Default::default()
-        }
-        .find_by_primary_key()
-        .execute(&db_session)
-        .await?;
-
-        Ok(tree_root)
-    }
-
-    async fn find_tree_descendants(
-        db_session: &CachingSession,
-        tree_root: &GetStructureNode,
-        params: &ReorderParams,
-    ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        if params.is_branch() {
-            tree_root.branch_descendants(&db_session).await
-        } else {
-            tree_root
-                .descendants(&db_session)
-                .await?
-                .try_collect()
-                .await
-                .map_err(NodecosmosError::from)
         }
     }
 
@@ -191,21 +156,15 @@ impl ReorderData {
 
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
-
-        let old_parent_id = node.parent_id;
+        let old_parent_id = match node.parent_id {
+            Some(id) => id,
+            None => return Err(NodecosmosError::BadRequest("Node has no parent".to_string())),
+        };
         let new_parent = Self::find_new_parent(data.db_session(), params).await?;
-
         let old_ancestor_ids = node.ancestor_ids.ref_cloned();
         let new_ancestor_ids = Self::build_new_ancestor_ids(&new_parent);
-
-        println!("old_ancestor_ids: {:?}", &old_ancestor_ids);
-
         let removed_ancestor_ids = Self::extract_removed_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
         let added_ancestor_ids = Self::extract_added_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);
-
-        println!("removed_ancestor_ids: {:?}", removed_ancestor_ids);
-        println!("added_ancestor_ids: {:?}", added_ancestor_ids);
-
         let new_upper_sibling = if let Some(id) = params.new_upper_sibling_id {
             Self::init_sibling(
                 data.db_session(),
@@ -219,7 +178,6 @@ impl ReorderData {
         } else {
             None
         };
-
         let new_lower_sibling = if let Some(id) = params.new_lower_sibling_id {
             Self::init_sibling(
                 data.db_session(),
@@ -233,43 +191,29 @@ impl ReorderData {
         } else {
             None
         };
-
         let old_order_index = node.order_index;
         let new_order_index = match params.new_order_index {
             Some(index) => index,
             None => Self::build_new_index(&new_upper_sibling, &new_lower_sibling),
         };
 
-        // used for recovery in case of failure mid-reorder
-        let tree_root = Self::find_tree_root(data.db_session(), &node).await?;
-        let tree_descendants = Self::find_tree_descendants(data.db_session(), &tree_root, params).await?;
-
         let data = ReorderData {
             node,
             branch_id: params.branch_id,
             descendants,
             descendant_ids,
-
             old_parent_id,
-            new_parent,
-
+            new_parent_id: new_parent.id,
             old_ancestor_ids,
             new_ancestor_ids,
-
             removed_ancestor_ids,
             added_ancestor_ids,
-
             new_upper_sibling_id: params.new_upper_sibling_id,
             new_lower_sibling_id: params.new_lower_sibling_id,
-
             new_upper_sibling,
             new_lower_sibling,
-
             old_order_index,
             new_order_index,
-
-            tree_root,
-            tree_descendants,
         };
 
         Ok(data)
@@ -277,7 +221,7 @@ impl ReorderData {
 
     pub fn parent_changed(&self) -> bool {
         if let Some(current_parent_id) = self.node.parent_id {
-            return current_parent_id != self.new_parent.id;
+            return current_parent_id != self.new_parent_id;
         }
 
         false

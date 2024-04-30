@@ -2,6 +2,7 @@ use std::fs::create_dir_all;
 
 use charybdis::operations::Update;
 use log::{error, warn};
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
@@ -125,30 +126,30 @@ pub struct BranchMerge {
 }
 
 impl BranchMerge {
-    pub async fn new(data: &RequestData, branch: Branch) -> Result<Self, MergeError> {
-        let nodes = MergeNodes::new(&branch, data).await.map_err(|e| MergeError {
+    pub async fn new(db_session: &CachingSession, branch: Branch) -> Result<Self, MergeError> {
+        let nodes = MergeNodes::new(db_session, &branch).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
         let workflows = MergeWorkflows::new(&branch);
 
-        let ios = MergeIos::new(&branch, data).await.map_err(|e| MergeError {
+        let ios = MergeIos::new(db_session, &branch).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let flows = MergeFlows::new(&branch, data).await.map_err(|e| MergeError {
+        let flows = MergeFlows::new(db_session, &branch).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let flow_steps = MergeFlowSteps::new(&branch, data).await.map_err(|e| MergeError {
+        let flow_steps = MergeFlowSteps::new(db_session, &branch).await.map_err(|e| MergeError {
             inner: e,
             branch: branch.clone(),
         })?;
 
-        let descriptions = MergeDescriptions::new(data.db_session(), &branch)
+        let descriptions = MergeDescriptions::new(db_session, &branch)
             .await
             .map_err(|e| MergeError {
                 inner: e,
@@ -167,8 +168,8 @@ impl BranchMerge {
         })
     }
 
-    pub async fn check_conflicts(mut self, data: &RequestData) -> Result<Self, MergeError> {
-        if let Err(e) = MergeConflicts::new(&mut self).run_check(data).await {
+    pub async fn check_conflicts(mut self, db_session: &CachingSession) -> Result<Self, MergeError> {
+        if let Err(e) = MergeConflicts::new(&mut self).run_check(db_session).await {
             return Err(MergeError {
                 inner: e,
                 branch: self.branch,
@@ -352,9 +353,9 @@ impl Branch {
             return Err(MergeError { inner: e, branch: self });
         }
 
-        let merge = BranchMerge::new(data, self)
+        let merge = BranchMerge::new(data.db_session(), self)
             .await?
-            .check_conflicts(data)
+            .check_conflicts(data.db_session())
             .await?
             .run(data)
             .await?;
@@ -378,10 +379,13 @@ impl Branch {
 
         Ok(())
     }
-    pub async fn check_conflicts(self, data: &RequestData) -> Result<Self, MergeError> {
-        let merge = BranchMerge::new(data, self).await?.check_conflicts(data).await?;
+    pub async fn check_conflicts(self, db_session: &CachingSession) -> Result<Self, MergeError> {
+        let merge = BranchMerge::new(db_session, self)
+            .await?
+            .check_conflicts(db_session)
+            .await?;
 
-        let res = merge.branch.update().execute(data.db_session()).await;
+        let res = merge.branch.update().execute(db_session).await;
 
         if let Err(e) = res {
             return Err(MergeError {

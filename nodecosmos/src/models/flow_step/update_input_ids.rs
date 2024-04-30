@@ -175,14 +175,14 @@ impl UpdateInputIdsFlowStep {
             deleted_node_inputs_by_flow_step.insert(self.id, removed_input_ids_by_node_id);
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::CreatedFlowStepInputs(created_node_inputs_by_fow_step),
             )
             .await?;
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::DeletedFlowStepInputs(deleted_node_inputs_by_flow_step),
             )
