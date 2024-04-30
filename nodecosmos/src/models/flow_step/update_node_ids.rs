@@ -104,14 +104,14 @@ impl UpdateNodeIdsFlowStep {
             deleted_flow_step_nodes.insert(self.id, deleted_node_ids);
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes),
             )
             .await?;
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes),
             )

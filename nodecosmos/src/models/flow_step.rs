@@ -253,7 +253,12 @@ impl Callbacks for UpdateInputIdsFlowStep {
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
             FlowStep::find_or_insert_branched(
                 data,
                 ModelBranchParams {
@@ -337,7 +342,12 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         }
 
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
             self.update_branch(data).await?;
         }
 
@@ -376,7 +386,12 @@ impl Callbacks for UpdateOutputIdsFlowStep {
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
             let flow_step = FlowStep::find_or_insert_branched(
                 data,
                 ModelBranchParams {

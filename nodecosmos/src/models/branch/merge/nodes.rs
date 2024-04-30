@@ -30,8 +30,8 @@ pub struct MergeNodes {
 
 impl MergeNodes {
     pub async fn restored_nodes(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(restored_node_ids) = &branch.restored_nodes {
             let mut branched_nodes = Node::find_by_ids(db_session, branch.id, &restored_node_ids)
@@ -54,8 +54,8 @@ impl MergeNodes {
     }
 
     pub async fn created_nodes(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(created_node_ids) = &branch.created_nodes {
             let mut created_nodes = Node::find_by_ids(db_session, branch.id, &created_node_ids)
@@ -72,8 +72,8 @@ impl MergeNodes {
     }
 
     pub async fn deleted_nodes(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
             let mut deleted_node_ids = deleted_node_ids.clone();
@@ -120,8 +120,8 @@ impl MergeNodes {
     }
 
     pub async fn edited_title_nodes(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
         if let Some(edited_title_nodes) = &branch.edited_title_nodes {
             let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (branch.id, edited_title_nodes))
@@ -161,13 +161,13 @@ impl MergeNodes {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_nodes = Self::restored_nodes(&branch, data.db_session()).await?;
-        let created_nodes = Self::created_nodes(&branch, data.db_session()).await?;
-        let deleted_nodes = Self::deleted_nodes(&branch, data.db_session()).await?;
-        let reordered_nodes_data = Self::reordered_nodes_data(&branch);
-        let edited_title_nodes = Self::edited_title_nodes(&branch, data.db_session()).await?;
-        let original_title_nodes = Self::original_title_nodes(data.db_session(), &branch).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_nodes = Self::restored_nodes(db_session, branch).await?;
+        let created_nodes = Self::created_nodes(db_session, branch).await?;
+        let deleted_nodes = Self::deleted_nodes(db_session, branch).await?;
+        let reordered_nodes_data = Self::reordered_nodes_data(branch);
+        let edited_title_nodes = Self::edited_title_nodes(db_session, branch).await?;
+        let original_title_nodes = Self::original_title_nodes(db_session, branch).await?;
 
         Ok(Self {
             restored_nodes,

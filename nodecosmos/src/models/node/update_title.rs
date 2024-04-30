@@ -48,7 +48,7 @@ impl UpdateTitleNode {
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(&data, self.branch_id, BranchUpdate::EditNodeTitle(self.id)).await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNodeTitle(self.id)).await?;
         }
 
         Ok(())

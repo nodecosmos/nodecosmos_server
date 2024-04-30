@@ -51,7 +51,7 @@ impl Node {
                 .pluck_id();
             node_ids.extend(descendant_ids);
 
-            Branch::update(&data, self.branch_id, BranchUpdate::DeleteNodes(node_ids)).await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::DeleteNodes(node_ids)).await?;
         }
 
         Ok(())

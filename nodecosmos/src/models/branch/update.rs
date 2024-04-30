@@ -3,9 +3,8 @@ use charybdis::errors::CharybdisError;
 use charybdis::operations::Update;
 use charybdis::types::{Frozen, List, Map, Set, Uuid};
 use log::error;
-use scylla::QueryResult;
+use scylla::{CachingSession, QueryResult};
 
-use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
     Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
@@ -59,7 +58,11 @@ pub enum BranchUpdate {
 }
 
 impl Branch {
-    pub async fn update(data: &RequestData, branch_id: Uuid, update: BranchUpdate) -> Result<Self, NodecosmosError> {
+    pub async fn update(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        update: BranchUpdate,
+    ) -> Result<Self, NodecosmosError> {
         let res: Result<QueryResult, CharybdisError>;
         let mut check_conflicts = false;
 
@@ -80,7 +83,7 @@ impl Branch {
                 res = CharybdisBatch::new()
                     .append(push_node_q)
                     .append(push_edited_node_q)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
             }
             BranchUpdate::DeleteNodes(ids) => {
@@ -92,7 +95,7 @@ impl Branch {
                     .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, &params)
                     .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, &params)
                     .append_statement(UpdateEditedNodesBranch::PULL_EDITED_NODES_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -103,7 +106,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_nodes(ids)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
 
                 check_conflicts = true;
@@ -116,7 +119,7 @@ impl Branch {
                 res = batch
                     .append_statement(UpdateRestoredNodesBranch::PUSH_RESTORED_NODES_QUERY, &params)
                     .append_statement(UpdateDeletedNodesBranch::PULL_DELETED_NODES_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -127,7 +130,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_title_nodes(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::EditNodeDescription(id) => {
@@ -136,13 +139,11 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_description_nodes(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::ReorderNode(reorder_data) => {
-                let branch = UpdateReorderedNodes::find_by_id(branch_id)
-                    .execute(data.db_session())
-                    .await;
+                let branch = UpdateReorderedNodes::find_by_id(branch_id).execute(db_session).await;
                 match branch {
                     Ok(mut branch) => {
                         // filter out existing reorder nodes with same id
@@ -156,7 +157,7 @@ impl Branch {
                         new_reorder_nodes.push(reorder_data);
                         branch.reordered_nodes = Some(new_reorder_nodes);
 
-                        res = branch.update().execute(data.db_session()).await;
+                        res = branch.update().execute(db_session).await;
                     }
                     Err(err) => {
                         error!("[BranchUpdate::ReorderNode] Failed to find branch: {}", err);
@@ -172,7 +173,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_nodes(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreatedWorkflowInitialInputs(created_workflow_initial_inputs) => {
@@ -181,7 +182,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_workflow_initial_inputs(created_workflow_initial_inputs)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeleteWorkflowInitialInputs(deleted_workflow_initial_inputs) => {
@@ -190,7 +191,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_workflow_initial_inputs(deleted_workflow_initial_inputs)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreateFlow(id) => {
@@ -199,7 +200,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flows(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeleteFlow(id) => {
@@ -211,7 +212,7 @@ impl Branch {
                     .append_statement(UpdateDeletedFlowsBranch::PUSH_DELETED_FLOWS_QUERY, &params)
                     .append_statement(UpdateCreatedFlowsBranch::PULL_CREATED_FLOWS_QUERY, &params)
                     .append_statement(UpdateRestoredFlowsBranch::PULL_RESTORED_FLOWS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
             }
             BranchUpdate::UndoDeleteFlow(id) => {
@@ -220,7 +221,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_flows(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
 
                 check_conflicts = true
@@ -233,7 +234,7 @@ impl Branch {
                 res = batch
                     .append_statement(UpdateRestoredFlowsBranch::PUSH_RESTORED_FLOWS_QUERY, &params)
                     .append_statement(UpdateDeletedFlowsBranch::PULL_DELETED_FLOWS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -244,7 +245,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_title_flows(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::EditFlowDescription(id) => {
@@ -253,7 +254,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_description_flows(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreateFlowStep(id) => {
@@ -262,7 +263,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flow_steps(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeleteFlowStep(id) => {
@@ -274,7 +275,7 @@ impl Branch {
                     .append_statement(UpdateDeletedFlowStepsBranch::PUSH_DELETED_FLOW_STEPS_QUERY, &params)
                     .append_statement(UpdateCreatedFlowStepsBranch::PULL_CREATED_FLOW_STEPS_QUERY, &params)
                     .append_statement(UpdateRestoredFlowStepsBranch::PULL_RESTORED_FLOW_STEPS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -285,7 +286,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_flow_steps(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
 
                 check_conflicts = true
@@ -298,7 +299,7 @@ impl Branch {
                 res = batch
                     .append_statement(UpdateRestoredFlowStepsBranch::PUSH_RESTORED_FLOW_STEPS_QUERY, &params)
                     .append_statement(UpdateDeletedFlowStepsBranch::PULL_DELETED_FLOW_STEPS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -309,7 +310,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_kept_flow_steps(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
 
                 check_conflicts = true;
@@ -320,7 +321,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flow_step_nodes(created_flow_step_nodes)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
@@ -329,7 +330,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_flow_step_nodes(deleted_flow_step_nodes)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreatedFlowStepInputs(created_flow_step_inputs_by_node) => {
@@ -338,7 +339,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flow_step_inputs_by_node(created_flow_step_inputs_by_node)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeletedFlowStepInputs(deleted_flow_step_inputs_by_node) => {
@@ -347,7 +348,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_flow_step_inputs_by_node(deleted_flow_step_inputs_by_node)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreatedFlowStepOutputs(created_flow_step_outputs_by_node) => {
@@ -356,7 +357,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_flow_step_outputs_by_node(created_flow_step_outputs_by_node)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeletedFlowStepOutputs(deleted_flow_step_outputs_by_node) => {
@@ -365,7 +366,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_flow_step_outputs_by_node(deleted_flow_step_outputs_by_node)
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::EditFlowStepDescription(id) => {
@@ -374,7 +375,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_description_flow_steps(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::CreateIo(id) => {
@@ -383,7 +384,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_created_ios(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::DeleteIo(id) => {
@@ -395,7 +396,7 @@ impl Branch {
                     .append_statement(UpdateDeletedIosBranch::PUSH_DELETED_IOS_QUERY, &params)
                     .append_statement(UpdateCreatedIosBranch::PULL_CREATED_IOS_QUERY, &params)
                     .append_statement(UpdateRestoredIosBranch::PULL_RESTORED_IOS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -406,7 +407,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .pull_deleted_ios(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::RestoreIo(id) => {
@@ -417,7 +418,7 @@ impl Branch {
                 res = batch
                     .append_statement(UpdateRestoredIosBranch::PUSH_RESTORED_IOS_QUERY, &params)
                     .append_statement(UpdateDeletedIosBranch::PULL_DELETED_IOS_QUERY, &params)
-                    .execute(data.db_session())
+                    .execute(db_session)
                     .await;
 
                 check_conflicts = true;
@@ -428,7 +429,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_title_ios(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
             BranchUpdate::EditIoDescription(id) => {
@@ -437,7 +438,7 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_edited_description_ios(&vec![id])
-                .execute(data.db_session())
+                .execute(db_session)
                 .await;
             }
         }
@@ -446,10 +447,10 @@ impl Branch {
             error!("Failed to update branch: {}", err)
         }
 
-        let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
+        let mut branch = Branch::find_by_id(branch_id).execute(db_session).await?;
 
         if check_conflicts {
-            match branch.check_conflicts(data).await {
+            match branch.check_conflicts(db_session).await {
                 Ok(res) => {
                     branch = res;
                 }

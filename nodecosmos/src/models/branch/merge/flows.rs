@@ -41,8 +41,8 @@ impl MergeFlows {
     }
 
     pub async fn restored_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(restored_flow_ids) = &branch.restored_flows {
             let mut flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids)
@@ -65,8 +65,8 @@ impl MergeFlows {
     }
 
     pub async fn created_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(created_flow_ids) = &branch.created_flows {
             let flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids)
@@ -81,8 +81,8 @@ impl MergeFlows {
     }
 
     pub async fn deleted_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(deleted_flow_ids) = &branch.deleted_flows {
             let flows = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids)
@@ -97,8 +97,8 @@ impl MergeFlows {
     }
 
     pub async fn edited_title_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleFlow>>, NodecosmosError> {
         if let Some(edited_title_flows) = &branch.edited_title_flows {
             let flows = UpdateTitleFlow::find_by_branch_id_and_ids(db_session, branch.id, edited_title_flows)
@@ -114,12 +114,12 @@ impl MergeFlows {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_flows = Self::restored_flows(&branch, data.db_session()).await?;
-        let created_flows = Self::created_flows(&branch, data.db_session()).await?;
-        let deleted_flows = Self::deleted_flows(&branch, data.db_session()).await?;
-        let edited_title_flows = Self::edited_title_flows(&branch, data.db_session()).await?;
-        let original_title_flows = Self::original_title_flows(data.db_session(), &branch).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_flows = Self::restored_flows(&db_session, branch).await?;
+        let created_flows = Self::created_flows(&db_session, branch).await?;
+        let deleted_flows = Self::deleted_flows(&db_session, branch).await?;
+        let edited_title_flows = Self::edited_title_flows(&db_session, branch).await?;
+        let original_title_flows = Self::original_title_flows(&db_session, &branch).await?;
 
         Ok(Self {
             restored_flows,

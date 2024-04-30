@@ -43,6 +43,7 @@ pub enum NodecosmosError {
     UnsupportedMediaType,
     ValidationError((String, String)),
     PreconditionFailed(&'static str),
+    BadRequest(String),
     // 400 | 500
     CharybdisError(CharybdisError),
     // 500
@@ -76,6 +77,7 @@ impl fmt::Display for NodecosmosError {
             }
             NodecosmosError::NotFound(e) => write!(f, "Not Found: {}", e),
             NodecosmosError::PreconditionFailed(e) => write!(f, "Precondition Failed: {}", e),
+            NodecosmosError::BadRequest(e) => write!(f, "Bad Request: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: {}", e),
             NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
@@ -137,6 +139,10 @@ impl ResponseError for NodecosmosError {
             })),
             NodecosmosError::PreconditionFailed(e) => HttpResponse::PreconditionFailed().json(json!({
                 "status": 412,
+                "message": e
+            })),
+            NodecosmosError::BadRequest(e) => HttpResponse::BadRequest().json(json!({
+                "status": 400,
                 "message": e
             })),
             NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().json({

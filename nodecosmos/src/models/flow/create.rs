@@ -64,8 +64,13 @@ impl Flow {
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::CreateFlow(self.id)).await?;
         }
 
         Ok(())
@@ -73,8 +78,13 @@ impl Flow {
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
+            Branch::update(
+                data.db_session(),
+                self.branch_id,
+                BranchUpdate::EditNodeWorkflow(self.node_id),
+            )
+            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::DeleteFlow(self.id)).await?;
         }
 
         Ok(())

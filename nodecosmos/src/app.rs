@@ -14,7 +14,7 @@ use toml::Value;
 
 use crate::api::data::RequestData;
 use crate::models::branch::merge::BranchMerge;
-use crate::models::node::reorder::Recovery;
+use crate::models::node::reorder::Reorder;
 use crate::models::node::Node;
 use crate::models::traits::BuildIndex;
 use crate::models::user::User;
@@ -78,13 +78,14 @@ impl App {
         Node::build_index(&self.elastic_client).await;
         User::build_index(&self.elastic_client).await;
 
-        // init recovery in case reordering was interrupted or failed
-        Recovery::recover_from_stored_data(&self.db_session, &self.resource_locker).await;
-        BranchMerge::recover_from_stored_data(&RequestData {
+        let data = RequestData {
             app: web::Data::new(self.clone()),
             current_user: Default::default(),
-        })
-        .await;
+        };
+
+        // init recovery in case reordering was interrupted or failed
+        Reorder::recover_from_stored_data(&data).await;
+        BranchMerge::recover_from_stored_data(&data).await;
     }
 
     pub fn cors(&self) -> Cors {

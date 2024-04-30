@@ -1,7 +1,6 @@
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::data::ReorderData;
 
-const TREE_DESCENDANTS_LIMIT: usize = 150000;
 const REORDER_DESCENDANTS_LIMIT: usize = 15000;
 
 pub struct ReorderValidator<'a> {
@@ -36,8 +35,8 @@ impl<'a> ReorderValidator<'a> {
         if self
             .reorder_data
             .descendant_ids
-            .contains(&self.reorder_data.new_parent.id)
-            || self.reorder_data.node.id == self.reorder_data.new_parent.id
+            .contains(&self.reorder_data.new_parent_id)
+            || self.reorder_data.node.id == self.reorder_data.new_parent_id
         {
             return Err(NodecosmosError::Forbidden("Can not reorder within self".to_string()));
         }
@@ -53,22 +52,18 @@ impl<'a> ReorderValidator<'a> {
             )));
         }
 
-        if self.reorder_data.tree_descendants.len() > TREE_DESCENDANTS_LIMIT {
-            return Err(NodecosmosError::Forbidden("Tree too large".to_string()));
-        }
-
         Ok(())
     }
 
     fn validate_no_conflicts(&mut self) -> Result<(), NodecosmosError> {
         if let Some(new_upper_sibling) = &self.reorder_data.new_upper_sibling {
-            if new_upper_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
+            if new_upper_sibling.parent_id != Some(self.reorder_data.new_parent_id) {
                 return Err(NodecosmosError::Conflict("Upper Sibling Moved!".to_string()));
             }
         }
 
         if let Some(new_lower_sibling) = &self.reorder_data.new_lower_sibling {
-            if new_lower_sibling.parent_id != Some(self.reorder_data.new_parent.id) {
+            if new_lower_sibling.parent_id != Some(self.reorder_data.new_parent_id) {
                 return Err(NodecosmosError::Conflict("Bottom Sibling Moved!".to_string()));
             }
 
