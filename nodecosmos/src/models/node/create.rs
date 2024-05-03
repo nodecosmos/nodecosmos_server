@@ -321,6 +321,7 @@ impl Node {
             created_at: self.created_at,
             updated_at: self.updated_at,
             initial_input_ids: None,
+            ctx: self.ctx,
         }
         .insert_if_not_exists()
         .execute(data.db_session())

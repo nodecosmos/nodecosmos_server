@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::{Frozen, List, Uuid};
-use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +12,7 @@ use crate::models::branch::Branch;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::{Branchable, GroupById, Pluck, PluckFromStream};
+use crate::models::traits::{Branchable, GroupById, Pluck};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
 
@@ -76,14 +74,7 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
-            let mut deleted_node_ids = deleted_node_ids.clone();
-            let descendant_node_ids =
-                NodeDescendant::find_by_node_ids(db_session, branch.root_id, branch.original_id(), &deleted_node_ids)
-                    .await?
-                    .pluck_id_set()
-                    .await?;
-            deleted_node_ids.extend(descendant_node_ids);
-            let mut deleted_nodes = Node::find_by_ids(db_session, branch.id, &deleted_node_ids)
+            let mut deleted_nodes = Node::find_by_ids(db_session, branch.original_id(), &deleted_node_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -191,6 +182,7 @@ impl MergeNodes {
                 merge_node.set_merge_context();
                 merge_node.set_original_id();
 
+                merge_node.is_public = branch_node.is_public;
                 merge_node.owner_id = branch_node.owner_id;
                 merge_node.editor_ids = branch_node.editor_ids.clone();
                 merge_node.viewer_ids = branch_node.viewer_ids.clone();
@@ -284,10 +276,10 @@ impl MergeNodes {
         Ok(())
     }
 
-    pub async fn reorder_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn reorder_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(reordered_nodes_data) = &self.reordered_nodes_data {
             for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(reorder_node_data.id, reorder_node_data.id))
+                let node = Node::find_by_primary_key_value(&(branch.root_id, reorder_node_data.id))
                     .execute(data.db_session())
                     .await;
 
@@ -307,13 +299,32 @@ impl MergeNodes {
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {
-                            error!("Failed to process with reorder: {:?}", e);
+                            match e {
+                                NodecosmosError::FatalReorderError { .. } => {
+                                    log::error!(
+                                        "[reorder_nodes] Failed to reorder node with id {} and branch id {}",
+                                        reorder_node_data.id,
+                                        node.branch_id
+                                    );
+
+                                    return Err(e);
+                                }
+                                _ => {
+                                    log::warn!(
+                                        "[reorder_nodes] Failed to reorder node with id {} and branch id {}: {:?}",
+                                        reorder_node_data.id,
+                                        node.branch_id,
+                                        e
+                                    );
+                                }
+                            }
                         }
                     }
                     Err(e) => {
-                        error!(
-                            "Failed to find node with id {} and branch id {}: {:?}",
-                            reorder_node_data.id, reorder_node_data.id, e
+                        log::error!(
+                            "[reorder_nodes] Failed to find node with id {}: {:?}",
+                            reorder_node_data.id,
+                            e
                         )
                     }
                 }
@@ -322,10 +333,10 @@ impl MergeNodes {
         Ok(())
     }
 
-    pub async fn undo_reorder_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn undo_reorder_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(reordered_nodes_data) = &self.reordered_nodes_data {
             for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(reorder_node_data.id, reorder_node_data.id))
+                let node = Node::find_by_primary_key_value(&(branch.root_id, reorder_node_data.id))
                     .execute(data.db_session())
                     .await;
 
@@ -344,13 +355,19 @@ impl MergeNodes {
                         let res = node.reorder(data, reorder_params).await;
 
                         if let Err(e) = res {
-                            error!("Failed to process with reorder: {:?}", e);
+                            log::error!(
+                                "Failed to undo_reorder_nodes: {:?}. node_id: {} branch_id: {}",
+                                e,
+                                node.id,
+                                node.branch_id
+                            );
                         }
                     }
                     Err(e) => {
-                        error!(
-                            "Failed to find node with id {} and branch id {}: {:?}",
-                            reorder_node_data.id, reorder_node_data.id, e
+                        log::error!(
+                            "[undo_reorder_nodes] Failed to find node with id {}: {:?}",
+                            reorder_node_data.id,
+                            e
                         )
                     }
                 }

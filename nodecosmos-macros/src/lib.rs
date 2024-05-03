@@ -93,7 +93,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::Parent for #name {
-            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
+            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
                     if self.is_branch() {
                         return self.branch_parent(db_session).await;
@@ -101,12 +101,12 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
                     let parent = BaseNode::find_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
                         .await?;
-                    self.parent = Some(parent);
+                    self.parent = Some((Box::new(parent)));
                 }
                 Ok(self.parent.as_mut())
             }
 
-            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
+            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
                     let branch_parent = BaseNode::maybe_find_first_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
@@ -114,7 +114,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
 
                     match branch_parent {
                         Some(parent) => {
-                            self.parent = Some(parent);
+                            self.parent = Some((Box::new(parent)));
                         }
                         None => {
                             let mut parent = BaseNode::find_by_branch_id_and_id(self.original_id(), parent_id)
@@ -123,7 +123,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
 
                             parent.branch_id = self.branch_id;
 
-                            self.parent = Some(parent);
+                            self.parent = Some(Box::new(parent));
                         }
                     }
                 }
@@ -244,12 +244,15 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                     let auth_node = AuthNode::find_by_branch_id_and_id(self.branch_id, self.id)
                         .execute(db_session)
                         .await?;
+
+                    self.is_public = auth_node.is_public;
+                    self.viewer_ids = auth_node.viewer_ids;
                     self.owner_id = auth_node.owner_id;
                     self.editor_ids = auth_node.editor_ids;
                 } else {
                     // authorize by branch
                     let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
-                    self.auth_branch = Some(branch);
+                    self.auth_branch = Some(Box::new(branch));
                 }
 
                 Ok(())

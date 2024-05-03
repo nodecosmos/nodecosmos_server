@@ -18,7 +18,7 @@ use crate::models::traits::{Branchable, ElasticDocument, UpdateLikeCountNodeElas
     clustering_keys = [id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Branchable, Default, Debug)]
+#[derive(Serialize, Deserialize, Branchable, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeCounter {
     pub branch_id: Uuid,

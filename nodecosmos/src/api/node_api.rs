@@ -3,9 +3,12 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use futures::StreamExt;
 use scylla::CachingSession;
 use serde_json::json;
-use tokio_stream::wrappers::BroadcastStream;
+use std::time::Duration;
+use tokio::time;
+use tokio_stream::wrappers::BroadcastStream; // This is crucial for handling streams
 
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
@@ -111,7 +114,7 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
         )
         .await?;
 
-    node.update_cb(&data).execute(data.db_session()).await?;
+    let res = node.update_cb(&data).execute(data.db_session()).await;
 
     data.resource_locker()
         .unlock_resource_actions(
@@ -120,6 +123,8 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
             vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
+
+    res?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -230,11 +235,32 @@ async fn delete_cover_image(mut node: web::Path<UpdateCoverImageNode>, data: Req
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/{id}/events/listen")]
-pub async fn listen_node_events(id: web::Path<Uuid>, data: RequestData) -> Response {
-    let sender = data.sse_broadcast().get_or_create_room(id.into_inner());
-    let receiver = sender.subscribe();
-    let stream = BroadcastStream::new(receiver);
+#[get("/{root_id}/events/listen")]
+pub async fn listen_node_events(root_id: web::Path<Uuid>, data: RequestData) -> Response {
+    let root_id = *root_id;
+    let broadcaster = data.sse_broadcast();
+    let receiver = broadcaster.build_receiver(root_id);
+    let mut cleanup_interval = time::interval(Duration::from_secs(5)); // 10 minutes
+
+    tokio::spawn(async move {
+        loop {
+            cleanup_interval.tick().await;
+            let _ = data
+                .sse_broadcast()
+                .send_message(root_id, web::Bytes::from("event: PING\ndata: PONG\n\n"))
+                .await
+                .map_err(|e| {
+                    log::error!("Error sending message to room {}: {}", root_id, e);
+
+                    NodecosmosError::BroadcastError(format!("Error sending message to room {}: {}", root_id, e))
+                });
+        }
+    });
+
+    let stream = BroadcastStream::new(receiver).map(|msg| match msg {
+        Ok(data) => Ok::<_, actix_web::Error>(data),
+        Err(_) => Err(NodecosmosError::InternalServerError("Failed to send event".to_string()).into()),
+    });
 
     Ok(HttpResponse::Ok().content_type("text/event-stream").streaming(stream))
 }

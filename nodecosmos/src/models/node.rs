@@ -12,6 +12,7 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
+use crate::models::node::delete::NodeDelete;
 use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
@@ -36,6 +37,8 @@ mod update_title;
 #[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
+    /// Original records are ones where branch_id == root_id.
+    /// Branched are ones where branch_id == branch.id.
     #[serde(default)]
     pub branch_id: Uuid,
 
@@ -73,11 +76,19 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub parent: Option<BaseNode>,
+    pub parent: Option<Box<BaseNode>>,
 
+    // For branched node we use branch fields to authenticate edits, not the original node.
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub auth_branch: Option<AuthBranch>,
+    pub auth_branch: Option<Box<AuthBranch>>,
+
+    // Used only in case of merge undo to recover deleted data.
+    // We should only delete single node in the ancestor chain as the time,
+    // so we don't need to worry about large memory usage.
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub delete_data: Option<Box<NodeDelete>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -106,6 +117,13 @@ impl Callbacks for Node {
     }
 
     async fn after_insert(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        // In case of branch undo, we need to recover deleted data.
+        // We shouldn't have duplicate delete_data for descendants as we only delete single node in the ancestor chain.
+        // Note we consume delete_data here to avoid copying in next step
+        if let Some(mut delete_data) = self.delete_data.take() {
+            delete_data.recover(data, self).await?;
+        }
+
         let self_clone = self.clone();
         let data = data.clone();
 
@@ -117,7 +135,6 @@ impl Callbacks for Node {
         Ok(())
     }
 
-    // TODO: fix delete as it hangs
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         *self = Node::find_branched_or_original(
             data.db_session(),
@@ -258,20 +275,22 @@ impl Callbacks for UpdateTitleNode {
             self.update_branch(&data).await?;
         }
 
-        let current = Self::find_branched_or_original(
-            data.db_session(),
-            NodeBranchParams {
-                root_id: self.root_id,
-                branch_id: self.branch_id,
-                node_id: self.id,
-            },
-        )
-        .await?;
+        if !self.is_merge_context() {
+            let title_clone = self.title.clone();
 
-        self.root_id = current.root_id;
-        self.ancestor_ids = current.ancestor_ids;
-        self.order_index = current.order_index;
-        self.parent_id = current.parent_id;
+            // find_branched_or_original is used to get the latest data.
+            *self = Self::find_branched_or_original(
+                data.db_session(),
+                NodeBranchParams {
+                    root_id: self.root_id,
+                    branch_id: self.branch_id,
+                    node_id: self.id,
+                },
+            )
+            .await?;
+
+            self.title = title_clone;
+        }
 
         self.update_title_for_ancestors(data).await?;
 

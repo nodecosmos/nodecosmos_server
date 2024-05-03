@@ -1,5 +1,7 @@
+use crate::api::current_user::OptCurrentUser;
 use actix_web::{get, put, web, HttpResponse};
 use charybdis::types::Uuid;
+use scylla::CachingSession;
 use serde::Deserialize;
 
 use crate::api::data::RequestData;
@@ -8,12 +10,16 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::traits::Authorization;
 
-#[get("/reload/{id}")]
-pub async fn reload_branch(data: RequestData, id: web::Path<Uuid>) -> Response {
-    let mut branch = Branch::find_by_id(id.into_inner()).execute(data.db_session()).await?;
+#[get("/{id}")]
+pub async fn show_branch(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    id: web::Path<Uuid>,
+) -> Response {
+    let mut branch = Branch::find_by_id(id.into_inner()).execute(&db_session).await?;
 
     // we only reload on actions that require branch/update to be called
-    branch.auth_update(&data).await?;
+    branch.auth_view(&db_session, &opt_cu).await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }

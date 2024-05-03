@@ -66,7 +66,7 @@ impl ReorderData {
         let new_parent = query_new_parent_node.parent(&db_session).await?;
 
         match new_parent {
-            Some(new_parent) => Ok(new_parent.clone()),
+            Some(new_parent) => Ok(new_parent.as_ref().clone()),
             None => Err(NodecosmosError::NotFound(format!(
                 "Parent with id {} and branch_id {} not found",
                 params.new_parent_id, params.branch_id

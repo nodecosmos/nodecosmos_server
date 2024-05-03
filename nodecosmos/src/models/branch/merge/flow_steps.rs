@@ -84,7 +84,7 @@ impl MergeFlowSteps {
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_ids) = &branch.deleted_flow_steps {
             return Ok(Some(
-                FlowStep::find_by_branch_id_and_ids(db_session, branch.id, deleted_flow_step_ids)
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_step_ids)
                     .await?
                     .try_collect()
                     .await?,
@@ -458,8 +458,6 @@ impl MergeFlowSteps {
                     // of the current branch.
                     let mut added_delta = vec![];
 
-                    println!("branch_fs.node_ids: {:?}", branch_fs.node_ids);
-
                     if let Some(node_ids) = branch_fs.node_ids.as_ref() {
                         node_ids.iter().for_each(|node_id| {
                             if let Some(original_node_ids) = original_flow_step.node_ids.as_ref() {
@@ -472,7 +470,9 @@ impl MergeFlowSteps {
                         });
                     };
 
-                    println!("added_delta: {:?}", added_delta);
+                    if added_delta.is_empty() {
+                        continue;
+                    }
 
                     // run update
                     original_flow_step.append_nodes(&added_delta);
@@ -544,6 +544,10 @@ impl MergeFlowSteps {
                             }
                         }
                     });
+
+                    if removed_delta.is_empty() {
+                        continue;
+                    }
 
                     // run update
                     original_flow_step.remove_nodes(&removed_delta);
@@ -622,6 +626,10 @@ impl MergeFlowSteps {
 
                             added_inputs_delta.insert(*node_id, added_delta);
                         });
+                    }
+
+                    if added_inputs_delta.is_empty() {
+                        continue;
                     }
 
                     // run update
@@ -706,6 +714,10 @@ impl MergeFlowSteps {
                         }
                     });
 
+                    if deleted_inputs_delta.is_empty() {
+                        continue;
+                    }
+
                     // run update
                     original_flow_step.remove_inputs(&deleted_inputs_delta);
                     original_flow_step.set_merge_context();
@@ -784,6 +796,10 @@ impl MergeFlowSteps {
 
                             added_outputs_delta.insert(*node_id, added_delta);
                         });
+                    }
+
+                    if added_outputs_delta.is_empty() {
+                        continue;
                     }
 
                     // run update
@@ -868,6 +884,10 @@ impl MergeFlowSteps {
                             deleted_outputs_delta.insert(*node_id, removed_delta);
                         }
                     });
+
+                    if deleted_outputs_delta.is_empty() {
+                        continue;
+                    }
 
                     original_flow_step.remove_outputs(&deleted_outputs_delta);
                     original_flow_step.set_merge_context();

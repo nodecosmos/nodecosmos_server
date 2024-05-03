@@ -9,12 +9,7 @@ use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 impl UpdateInitialInputsWorkflow {
     pub async fn update_branch(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        Branch::update(
-            data.db_session(),
-            self.branch_id,
-            BranchUpdate::EditNodeWorkflow(self.node_id),
-        )
-        .await?;
+        Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
 
         let original_wf = Self::maybe_find_first_by_branch_id_and_node_id(self.original_id(), self.node_id)
             .execute(data.db_session())
