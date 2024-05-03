@@ -9,6 +9,7 @@ use actix_web::cookie::Key;
 use actix_web::{cookie, http, web};
 use deadpool_redis::Pool;
 use elasticsearch::Elasticsearch;
+use log::info;
 use scylla::CachingSession;
 use toml::Value;
 
@@ -22,6 +23,7 @@ use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::resource::Resource;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use tokio::time::{self, Duration};
 
 #[derive(Clone)]
 pub struct App {
@@ -86,6 +88,18 @@ impl App {
         // init recovery in case reordering was interrupted or failed
         Reorder::recover_from_stored_data(&data).await;
         BranchMerge::recover_from_stored_data(&data).await;
+
+        // Cleanup task
+        let mut cleanup_interval = time::interval(Duration::from_secs(3));
+        let sse_broadcast_clone = self.sse_broadcast.clone();
+
+        tokio::spawn(async move {
+            loop {
+                cleanup_interval.tick().await;
+                sse_broadcast_clone.cleanup_rooms();
+                info!("Cleanup task ran");
+            }
+        });
     }
 
     pub fn cors(&self) -> Cors {

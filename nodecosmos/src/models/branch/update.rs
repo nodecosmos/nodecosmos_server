@@ -28,7 +28,7 @@ pub enum BranchUpdate {
     EditNodeTitle(Uuid),
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
-    EditNodeWorkflow(Uuid),
+    EditNode(Uuid),
     CreatedWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     DeleteWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     CreateFlow(Uuid),
@@ -167,7 +167,7 @@ impl Branch {
 
                 check_conflicts = true;
             }
-            BranchUpdate::EditNodeWorkflow(id) => {
+            BranchUpdate::EditNode(id) => {
                 res = UpdateEditedNodesBranch {
                     id: branch_id,
                     ..Default::default()

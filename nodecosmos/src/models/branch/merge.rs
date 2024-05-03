@@ -40,8 +40,8 @@ pub enum MergeStep {
     RestoreNodes = 1,
     CreateNodes = 2,
     DeleteNodes = 3,
-    ReorderNodes = 4,
-    UpdateNodesTitles = 5,
+    UpdateNodesTitles = 4,
+    ReorderNodes = 5,
     UpdateWorkflowInitialInputs = 6,
     RestoreFlows = 7,
     CreateFlows = 8,
@@ -82,8 +82,8 @@ impl From<u8> for MergeStep {
             1 => MergeStep::RestoreNodes,
             2 => MergeStep::CreateNodes,
             3 => MergeStep::DeleteNodes,
-            4 => MergeStep::ReorderNodes,
-            5 => MergeStep::UpdateNodesTitles,
+            4 => MergeStep::UpdateNodesTitles,
+            5 => MergeStep::ReorderNodes,
             6 => MergeStep::UpdateWorkflowInitialInputs,
             7 => MergeStep::RestoreFlows,
             8 => MergeStep::CreateFlows,
@@ -110,7 +110,7 @@ impl From<u8> for MergeStep {
     }
 }
 
-/// ScyllaDB does not support transactions like SQL databases. We need to introduce a pattern to handle merge failures.
+/// ScyllaDB does not support transactions like traditional databases.
 /// We use the SAGA pattern to handle merge failures.
 /// We store the state of the merge process in a file and recover from it.
 #[derive(Serialize, Deserialize)]
@@ -250,8 +250,8 @@ impl BranchMerge {
                 MergeStep::RestoreNodes => self.nodes.restore_nodes(data, &self.branch).await?,
                 MergeStep::CreateNodes => self.nodes.create_nodes(data, &self.branch).await?,
                 MergeStep::DeleteNodes => self.nodes.delete_nodes(data).await?,
-                MergeStep::ReorderNodes => self.nodes.reorder_nodes(data).await?,
                 MergeStep::UpdateNodesTitles => self.nodes.update_title(data, &mut self.branch).await?,
+                MergeStep::ReorderNodes => self.nodes.reorder_nodes(data, &self.branch).await?,
                 MergeStep::UpdateWorkflowInitialInputs => self.workflows.update_initial_inputs(data).await?,
                 MergeStep::RestoreFlows => self.flows.restore_flows(data).await?,
                 MergeStep::CreateFlows => self.flows.create_flows(data).await?,
@@ -289,8 +289,8 @@ impl BranchMerge {
                 MergeStep::RestoreNodes => self.nodes.undo_delete_nodes(data).await?,
                 MergeStep::CreateNodes => self.nodes.undo_create_nodes(data).await?,
                 MergeStep::DeleteNodes => self.nodes.undo_restore_nodes(data).await?,
-                MergeStep::ReorderNodes => self.nodes.undo_reorder_nodes(data).await?,
                 MergeStep::UpdateNodesTitles => self.nodes.undo_update_title(data).await?,
+                MergeStep::ReorderNodes => self.nodes.undo_reorder_nodes(data, &self.branch).await?,
                 MergeStep::UpdateWorkflowInitialInputs => self.workflows.undo_update_initial_inputs(data).await?,
                 MergeStep::RestoreFlows => self.flows.undo_create_flows(data).await?,
                 MergeStep::CreateFlows => self.flows.undo_delete_flows(data).await?,

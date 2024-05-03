@@ -2,6 +2,7 @@ use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::{Node, UpdateTitleNode};
+use crate::models::workflow::{UpdateInitialInputsWorkflow, Workflow};
 
 #[derive(PartialEq, Default, Clone, Copy)]
 pub enum Context {
@@ -68,6 +69,8 @@ macro_rules! impl_context {
 impl_context!(
     Node,
     UpdateTitleNode,
+    Workflow,
+    UpdateInitialInputsWorkflow,
     Flow,
     UpdateTitleFlow,
     FlowStep,

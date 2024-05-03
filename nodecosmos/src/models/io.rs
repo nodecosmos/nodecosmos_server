@@ -222,6 +222,7 @@ impl Io {
                 let mut io = Self::find_first_by_branch_id_and_root_id_and_id(root_id, root_id, id)
                     .execute(db_session)
                     .await?;
+
                 io.branch_id = branch_id;
 
                 Ok(io)

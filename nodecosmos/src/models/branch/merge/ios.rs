@@ -59,9 +59,13 @@ impl MergeIos {
 
     pub async fn deleted_ios(db_session: &CachingSession, branch: &Branch) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(deleted_io_ids) = &branch.deleted_ios {
-            let deleted_ios =
-                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, deleted_io_ids)
-                    .await?;
+            let deleted_ios = Io::find_by_branch_id_and_root_id_and_ids(
+                db_session,
+                branch.original_id(),
+                branch.root_id,
+                deleted_io_ids,
+            )
+            .await?;
 
             return Ok(Some(deleted_ios));
         }

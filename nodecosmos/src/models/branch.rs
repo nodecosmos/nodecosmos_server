@@ -2,14 +2,13 @@ use std::cell::OnceCell;
 use std::collections::HashSet;
 
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
-use crate::models::traits::{Id, ObjectType};
+use crate::models::traits::{Branchable, Id, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 
@@ -129,7 +128,7 @@ impl Branch {
             return Ok(node);
         }
 
-        let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
+        let node = Node::find_by_branch_id_and_id(self.original_id(), self.node_id)
             .execute(db_session)
             .await?;
 

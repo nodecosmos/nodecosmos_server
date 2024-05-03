@@ -6,7 +6,7 @@ use charybdis::types::Uuid;
 use futures::StreamExt;
 
 use crate::errors::NodecosmosError;
-use crate::models::traits::{FlowId, FlowStepId, Id, MaybeFlowId, MaybeFlowStepId};
+use crate::models::traits::{FlowId, Id, MaybeFlowId, MaybeFlowStepId};
 
 pub trait Pluck {
     fn pluck_id(&self) -> Vec<Uuid>;
@@ -40,26 +40,10 @@ impl<T: Id> Pluck for Option<Vec<T>> {
 }
 
 pub trait PluckFromStream {
-    async fn pluck_id(&mut self) -> Result<Vec<Uuid>, NodecosmosError>;
     async fn pluck_id_set(&mut self) -> Result<HashSet<Uuid>, NodecosmosError>;
 }
 
 impl<T: Id + BaseModel> PluckFromStream for CharybdisModelStream<T> {
-    async fn pluck_id(&mut self) -> Result<Vec<Uuid>, NodecosmosError> {
-        let mut ids = Vec::new();
-
-        while let Some(result) = self.next().await {
-            match result {
-                Ok(item) => {
-                    ids.push(item.id());
-                }
-                Err(e) => return Err(e.into()),
-            }
-        }
-
-        Ok(ids)
-    }
-
     async fn pluck_id_set(&mut self) -> Result<HashSet<Uuid>, NodecosmosError> {
         let mut ids = HashSet::new();
 
@@ -109,25 +93,6 @@ impl<T: MaybeFlowId> MaybePluckFlowId for Option<Vec<T>> {
     fn maybe_pluck_flow_id(&self) -> HashSet<Uuid> {
         match self {
             Some(items) => items.iter().filter_map(|item| item.maybe_flow_id()).collect(),
-            None => HashSet::new(),
-        }
-    }
-}
-
-pub trait PluckFlowStepId {
-    fn pluck_flow_step_id(&self) -> HashSet<Uuid>;
-}
-
-impl<T: FlowStepId> PluckFlowStepId for Vec<T> {
-    fn pluck_flow_step_id(&self) -> HashSet<Uuid> {
-        self.iter().map(|item| item.flow_step_id()).collect()
-    }
-}
-
-impl<T: FlowStepId> PluckFlowStepId for Option<Vec<T>> {
-    fn pluck_flow_step_id(&self) -> HashSet<Uuid> {
-        match self {
-            Some(items) => items.iter().map(|item| item.flow_step_id()).collect(),
             None => HashSet::new(),
         }
     }

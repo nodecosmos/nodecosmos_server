@@ -57,6 +57,8 @@ pub struct CommentThread {
     pub object_id: Uuid,
     #[serde(default)]
     pub id: Uuid,
+    #[serde(default)]
+    pub root_id: Uuid,
     pub author_id: Option<Uuid>,
     pub author: Option<Profile>,
     pub object_type: Text,
@@ -122,6 +124,10 @@ impl Callbacks for CommentThread {
         if self.id.is_nil() {
             self.id = Uuid::new_v4();
         }
+
+        self.root_id = match self.object(data.db_session()).await? {
+            CommentObject::ContributionRequest(contribution_request) => contribution_request.root_id,
+        };
 
         self.created_at = now;
         self.updated_at = now;

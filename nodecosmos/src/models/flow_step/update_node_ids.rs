@@ -18,7 +18,7 @@ impl UpdateNodeIdsFlowStep {
     ) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_ref() {
             for (node_id, output_ids) in output_ids_by_node_id.iter() {
-                if !self.node_ids.as_ref().is_some_and(|ids| !ids.contains(node_id)) {
+                if self.node_ids.is_none() || self.node_ids.as_ref().is_some_and(|ids| !ids.contains(node_id)) {
                     for output_id in output_ids {
                         let mut output = Io {
                             root_id: self.root_id,

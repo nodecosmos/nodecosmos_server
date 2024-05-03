@@ -253,12 +253,7 @@ impl Callbacks for UpdateInputIdsFlowStep {
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::EditNodeWorkflow(self.node_id),
-            )
-            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
                 data,
                 ModelBranchParams {
@@ -331,23 +326,23 @@ impl Callbacks for UpdateNodeIdsFlowStep {
             flow_step.preserve_flow_step_outputs(data).await?;
         }
 
-        if self.is_original() {
-            let current = self.find_by_primary_key().execute(data.db_session()).await?;
-            self.output_ids_by_node_id = current.output_ids_by_node_id;
-            self.input_ids_by_node_id = current.input_ids_by_node_id;
+        let node_ids = self.node_ids.take();
 
-            self.delete_output_records_from_removed_nodes(data).await?;
+        *self = self.find_by_primary_key().execute(data.db_session()).await?;
+
+        self.node_ids = node_ids;
+
+        if self.is_original() {
+            // In merge context, outputs will be deleted in the next step.
+            if !self.is_merge_context() {
+                self.delete_output_records_from_removed_nodes(data).await?;
+            }
             self.remove_output_references_from_removed_nodes().await?;
             self.remove_input_references_from_removed_nodes().await?;
         }
 
         if self.is_branch() {
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::EditNodeWorkflow(self.node_id),
-            )
-            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             self.update_branch(data).await?;
         }
 
@@ -386,12 +381,7 @@ impl Callbacks for UpdateOutputIdsFlowStep {
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::EditNodeWorkflow(self.node_id),
-            )
-            .await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             let flow_step = FlowStep::find_or_insert_branched(
                 data,
                 ModelBranchParams {

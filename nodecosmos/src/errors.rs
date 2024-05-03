@@ -55,7 +55,9 @@ pub enum NodecosmosError {
     DecodeError(base64::DecodeError),
     YjsError(yrs::encoding::read::Error),
     FatalDeleteError(String),
+    /// Merge and recovery fails
     FatalMergeError(String),
+    /// Reorder and recovery fails
     FatalReorderError(String),
     InternalServerError(String),
     QuickXmlError(quick_xml::Error),
@@ -249,6 +251,12 @@ impl From<strum::ParseError> for NodecosmosError {
 
 impl From<anyhow::Error> for NodecosmosError {
     fn from(e: anyhow::Error) -> Self {
+        NodecosmosError::InternalServerError(format!("{:?}", e))
+    }
+}
+
+impl From<actix_web::Error> for NodecosmosError {
+    fn from(e: actix_web::Error) -> Self {
         NodecosmosError::InternalServerError(format!("{:?}", e))
     }
 }

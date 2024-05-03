@@ -12,49 +12,63 @@ use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
 
+#[derive(Debug)]
 pub struct SseBroadcast {
-    node_senders: DashMap<Uuid, broadcast::Sender<Bytes>>,
+    pub root_channels: DashMap<Uuid, broadcast::Sender<Bytes>>,
 }
 
 impl SseBroadcast {
     pub fn new() -> Self {
         SseBroadcast {
-            node_senders: DashMap::new(),
+            root_channels: DashMap::new(),
         }
     }
 
-    pub async fn send_message(&self, node_id: &Uuid, model_msg: Bytes) -> Result<(), NodecosmosError> {
-        if let Some(sender) = self.node_senders.get(&node_id) {
+    pub async fn send_message(&self, root_id: Uuid, model_msg: Bytes) -> Result<(), NodecosmosError> {
+        if let Some(sender) = self.root_channels.get(&root_id) {
             sender.send(model_msg).map_err(|e| {
-                error!("Error sending message to room {}: {}", node_id, e);
+                error!("Error sending message to room {}: {}", root_id, e);
 
-                NodecosmosError::BroadcastError(format!("Error sending message to room {}: {}", node_id, e))
+                NodecosmosError::BroadcastError(format!("Error sending message to room {}: {}", root_id, e))
             })?;
         }
 
         Ok(())
     }
 
-    pub fn get_or_create_room(&self, node_id: Uuid) -> broadcast::Sender<Bytes> {
-        let sender = self
-            .node_senders
-            .entry(node_id)
-            .or_insert_with(|| broadcast::channel(20).0.clone());
+    pub fn build_receiver(&self, root_id: Uuid) -> broadcast::Receiver<Bytes> {
+        let receiver;
 
-        sender.clone()
+        if let Some(sender) = self.root_channels.get(&root_id) {
+            receiver = sender.subscribe();
+        } else {
+            let (tx, rx) = broadcast::channel(20);
+            self.root_channels.insert(root_id, tx);
+            receiver = rx;
+        }
+
+        receiver
+    }
+
+    pub fn cleanup_rooms(&self) {
+        self.root_channels.retain(|_, v| {
+            log::info!("Cleaning up room: {}", v.receiver_count());
+
+            return v.receiver_count() > 0;
+        });
     }
 }
 
 pub struct ModelEvent<'a, M: BaseModel + Serialize> {
-    pub node_id: &'a Uuid,
+    pub root_id: Uuid,
     pub action_type: ActionTypes,
     pub model: &'a M,
 }
 
 impl<'a, M: BaseModel + Serialize> ModelEvent<'a, M> {
-    pub fn new(node_id: &'a Uuid, action_type: ActionTypes, model: &'a M) -> Self {
+    pub fn new(root_id: Uuid, action_type: ActionTypes, model: &'a M) -> Self {
         ModelEvent {
-            node_id,
+            root_id,
             action_type,
             model,
         }
@@ -64,7 +78,7 @@ impl<'a, M: BaseModel + Serialize> ModelEvent<'a, M> {
         let sse_broadcast = data.sse_broadcast();
         let msg = self.to_sse()?;
 
-        sse_broadcast.send_message(self.node_id, msg).await
+        sse_broadcast.send_message(self.root_id, msg).await
     }
 
     fn to_sse(&self) -> Result<Bytes, NodecosmosError> {

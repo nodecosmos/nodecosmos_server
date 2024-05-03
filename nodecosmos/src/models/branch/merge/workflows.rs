@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::traits::{Branchable, Merge};
+use crate::models::traits::{Branchable, Merge, ModelContext};
 use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 #[derive(Serialize, Deserialize)]
@@ -52,6 +52,7 @@ impl MergeWorkflows {
                 }
             }
 
+            workflow.set_merge_context();
             workflow.set_original_id();
             workflow.update().execute(data.db_session()).await?;
         }
@@ -75,6 +76,7 @@ impl MergeWorkflows {
                 workflow.initial_input_ids.merge(Some(deleted_inputs.clone()));
             }
 
+            workflow.set_merge_context();
             workflow.set_original_id();
             workflow.update().execute(data.db_session()).await?;
         }

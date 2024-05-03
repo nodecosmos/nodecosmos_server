@@ -23,18 +23,24 @@ use crate::models::like::Like;
 use crate::models::node::Node;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
-use crate::models::traits::{Branchable, ElasticDocument, Pluck};
+use crate::models::traits::{Branchable, ElasticDocument, ModelContext, Pluck};
 use crate::models::traits::{Descendants, FindForBranchMerge};
 use crate::models::workflow::Workflow;
 
 impl Node {
-    pub async fn archive_and_delete(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn archive_and_delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
-            NodeDelete::new(self, &data).await?.run().await?;
+            let mut node_delete = NodeDelete::new(data, self).await?;
+            node_delete.run(data, self).await?;
+
+            // if we are in merge context, we need to store the delete data for potential recovery
+            if self.is_merge_context() {
+                self.delete_data = Some(Box::new(node_delete));
+            }
         } else if Branch::contains_created_node(data.db_session(), self.branch_id, self.id).await?
             || Self::is_original_deleted(data.db_session(), self.original_id(), self.id).await?
         {
-            NodeDelete::new(self, &data).await?.run().await?;
+            NodeDelete::new(data, self).await?.run(data, self).await?;
         }
 
         Ok(())
@@ -119,10 +125,9 @@ impl From<u8> for NodeDeleteStep {
     }
 }
 
-pub struct NodeDelete<'a> {
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct NodeDelete {
     delete_step: NodeDeleteStep,
-    data: &'a RequestData,
-    node: &'a Node,
     deleted_node_ids: Vec<Uuid>,
     deleted_nodes: Vec<Node>,
     deleted_descendants: Vec<NodeDescendant>,
@@ -134,7 +139,7 @@ pub struct NodeDelete<'a> {
     deleted_counter_data: Vec<NodeCounter>,
 }
 
-impl<'a> NodeDelete<'a> {
+impl NodeDelete {
     async fn deleted_nodes(
         db_session: &CachingSession,
         node: &Node,
@@ -250,7 +255,7 @@ impl<'a> NodeDelete<'a> {
             .map_err(NodecosmosError::from)
     }
 
-    pub async fn new(node: &'a Node, data: &'a RequestData) -> Result<NodeDelete<'a>, NodecosmosError> {
+    pub async fn new(data: &RequestData, node: &Node) -> Result<NodeDelete, NodecosmosError> {
         let mut node_ids_to_delete = Set::new();
         node_ids_to_delete.insert(node.id);
 
@@ -273,8 +278,6 @@ impl<'a> NodeDelete<'a> {
 
         Ok(Self {
             delete_step: NodeDeleteStep::Start,
-            data,
-            node,
             deleted_node_ids: deleted_nodes.iter().map(|node| node.id).collect(),
             deleted_nodes,
             deleted_descendants,
@@ -287,11 +290,11 @@ impl<'a> NodeDelete<'a> {
         })
     }
 
-    pub async fn run(&mut self) -> Result<(), NodecosmosError> {
-        let delete = self.delete().await;
+    pub async fn run(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
+        let delete = self.delete(data, node).await;
 
         if let Err(e) = delete {
-            self.recover()
+            self.recover(data, node)
                 .await
                 .map_err(|e| NodecosmosError::FatalDeleteError(format!("Error deleting node: {:?}", e)))?;
 
@@ -301,27 +304,27 @@ impl<'a> NodeDelete<'a> {
         Ok(())
     }
 
-    pub async fn delete(&mut self) -> Result<(), NodecosmosError> {
+    pub async fn delete(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
         while self.delete_step < NodeDeleteStep::Finish {
             match self.delete_step {
                 NodeDeleteStep::Start => (),
-                NodeDeleteStep::ArchiveNodes => self.archive_nodes(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveWorkflows => self.archive_workflows(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveFlows => self.archive_flows(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveFlowSteps => self.archive_flow_steps(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveIos => self.archive_ios(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveDescriptions => self.archive_descriptions(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteNodes => self.delete_nodes(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteDescendants => self.delete_descendants(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteWorkflows => self.delete_workflows(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteFlows => self.delete_flows(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteFlowSteps => self.delete_flow_steps(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteIos => self.delete_ios(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteDescriptions => self.delete_descriptions(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteCounterData => self.delete_counter_data(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteLikes => self.delete_likes(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteAttachments => self.delete_attachments().await?,
-                NodeDeleteStep::DeleteElasticData => self.delete_elastic_data().await,
+                NodeDeleteStep::ArchiveNodes => self.archive_nodes(data.db_session()).await?,
+                NodeDeleteStep::ArchiveWorkflows => self.archive_workflows(data.db_session()).await?,
+                NodeDeleteStep::ArchiveFlows => self.archive_flows(data.db_session()).await?,
+                NodeDeleteStep::ArchiveFlowSteps => self.archive_flow_steps(data.db_session()).await?,
+                NodeDeleteStep::ArchiveIos => self.archive_ios(data.db_session()).await?,
+                NodeDeleteStep::ArchiveDescriptions => self.archive_descriptions(data.db_session()).await?,
+                NodeDeleteStep::DeleteNodes => self.delete_nodes(data.db_session()).await?,
+                NodeDeleteStep::DeleteDescendants => self.delete_descendants(data.db_session()).await?,
+                NodeDeleteStep::DeleteWorkflows => self.delete_workflows(data.db_session()).await?,
+                NodeDeleteStep::DeleteFlows => self.delete_flows(data.db_session()).await?,
+                NodeDeleteStep::DeleteFlowSteps => self.delete_flow_steps(data.db_session()).await?,
+                NodeDeleteStep::DeleteIos => self.delete_ios(data.db_session()).await?,
+                NodeDeleteStep::DeleteDescriptions => self.delete_descriptions(data.db_session()).await?,
+                NodeDeleteStep::DeleteCounterData => self.delete_counter_data(data.db_session()).await?,
+                NodeDeleteStep::DeleteLikes => self.delete_likes(data.db_session(), node).await?,
+                NodeDeleteStep::DeleteAttachments => self.delete_attachments(data, node).await?,
+                NodeDeleteStep::DeleteElasticData => self.delete_elastic_data(data, node).await,
                 NodeDeleteStep::Finish => (),
             }
 
@@ -331,29 +334,29 @@ impl<'a> NodeDelete<'a> {
         Ok(())
     }
 
-    pub async fn recover(&mut self) -> Result<(), NodecosmosError> {
+    pub async fn recover(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
         while self.delete_step > NodeDeleteStep::Start {
             self.delete_step.decrement();
 
             match self.delete_step {
                 NodeDeleteStep::Start => (),
-                NodeDeleteStep::ArchiveNodes => self.undo_archive_nodes(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveWorkflows => self.undo_archive_workflows(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveFlows => self.undo_archive_flows(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveFlowSteps => self.undo_archive_flow_steps(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveIos => self.undo_archive_ios(self.data.db_session()).await?,
-                NodeDeleteStep::ArchiveDescriptions => self.undo_archive_descriptions(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteNodes => self.undo_delete_nodes(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteDescendants => self.undo_delete_descendants(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteWorkflows => self.undo_delete_workflows(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteFlows => self.undo_delete_flows(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteFlowSteps => self.undo_delete_flow_steps(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteIos => self.undo_delete_ios(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteDescriptions => self.undo_delete_descriptions(self.data.db_session()).await?,
-                NodeDeleteStep::DeleteCounterData => self.undo_delete_counter_data(self.data.db_session()).await?,
+                NodeDeleteStep::ArchiveNodes => self.undo_archive_nodes(data.db_session()).await?,
+                NodeDeleteStep::ArchiveWorkflows => self.undo_archive_workflows(data.db_session()).await?,
+                NodeDeleteStep::ArchiveFlows => self.undo_archive_flows(data.db_session()).await?,
+                NodeDeleteStep::ArchiveFlowSteps => self.undo_archive_flow_steps(data.db_session()).await?,
+                NodeDeleteStep::ArchiveIos => self.undo_archive_ios(data.db_session()).await?,
+                NodeDeleteStep::ArchiveDescriptions => self.undo_archive_descriptions(data.db_session()).await?,
+                NodeDeleteStep::DeleteNodes => self.undo_delete_nodes(data.db_session()).await?,
+                NodeDeleteStep::DeleteDescendants => self.undo_delete_descendants(data.db_session()).await?,
+                NodeDeleteStep::DeleteWorkflows => self.undo_delete_workflows(data.db_session()).await?,
+                NodeDeleteStep::DeleteFlows => self.undo_delete_flows(data.db_session()).await?,
+                NodeDeleteStep::DeleteFlowSteps => self.undo_delete_flow_steps(data.db_session()).await?,
+                NodeDeleteStep::DeleteIos => self.undo_delete_ios(data.db_session()).await?,
+                NodeDeleteStep::DeleteDescriptions => self.undo_delete_descriptions(data.db_session()).await?,
+                NodeDeleteStep::DeleteCounterData => self.undo_delete_counter_data(data.db_session()).await?,
                 NodeDeleteStep::DeleteLikes => self.undo_delete_likes().await?,
                 NodeDeleteStep::DeleteAttachments => self.undo_delete_attachments().await?,
-                NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data().await,
+                NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data(data, node).await,
                 NodeDeleteStep::Finish => (),
             }
 
@@ -663,13 +666,13 @@ impl<'a> NodeDelete<'a> {
 
     // like undo is not critical, so we won't load it into memory as in case of merge
     // we might have a lot of likes to restore
-    async fn delete_likes(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    async fn delete_likes(&self, db_session: &CachingSession, node: &Node) -> Result<(), NodecosmosError> {
         let mut deleted_likes: Vec<Like> = vec![];
 
         for id in &self.deleted_node_ids {
             deleted_likes.push(Like {
                 object_id: *id,
-                branch_id: self.node.branch_id,
+                branch_id: node.branch_id,
                 ..Default::default()
             });
         }
@@ -687,23 +690,23 @@ impl<'a> NodeDelete<'a> {
         Ok(())
     }
 
-    async fn delete_elastic_data(&self) {
-        if self.node.is_original() {
-            Node::bulk_delete_elastic_documents(self.data.elastic_client(), &self.deleted_node_ids).await;
+    async fn delete_elastic_data(&self, data: &RequestData, node: &Node) {
+        if node.is_original() {
+            Node::bulk_delete_elastic_documents(data.elastic_client(), &self.deleted_node_ids).await;
         }
     }
 
-    async fn undo_delete_elastic_data(&self) {
-        if self.node.is_original() {
-            Node::bulk_insert_elastic_documents(self.data.elastic_client(), &self.deleted_nodes).await;
+    async fn undo_delete_elastic_data(&self, data: &RequestData, node: &Node) {
+        if node.is_original() {
+            Node::bulk_insert_elastic_documents(data.elastic_client(), &self.deleted_nodes).await;
         }
     }
 
     // not critical for delete/merge
-    pub async fn delete_attachments(&mut self) -> Result<(), NodecosmosError> {
-        Attachment::find_by_node_ids(self.data.db_session(), self.node.branch_id, &self.deleted_node_ids)
+    pub async fn delete_attachments(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
+        Attachment::find_by_node_ids(data.db_session(), node.branch_id, &self.deleted_node_ids)
             .await?
-            .delete_all(self.data)?;
+            .delete_all(data)?;
 
         Ok(())
     }
