@@ -92,15 +92,15 @@ impl MergeIos {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
-        let root_id = branch.node(&db_session).await?.root_id;
-
         if let Some(ids) = &branch.edited_title_ios {
-            let ios_by_id =
-                find_update_title_io!("root_id = ? AND branch_id = ? AND id IN = ?", (root_id, root_id, ids))
-                    .execute(db_session)
-                    .await?
-                    .group_by_id()
-                    .await?;
+            let ios_by_id = find_update_title_io!(
+                "root_id = ? AND branch_id = ? AND id IN = ?",
+                (branch.root_id, branch.original_id(), ids)
+            )
+            .execute(db_session)
+            .await?
+            .group_by_id()
+            .await?;
 
             return Ok(Some(ios_by_id));
         }

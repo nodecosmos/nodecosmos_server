@@ -1,10 +1,8 @@
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Update;
 use charybdis::types::{Double, Uuid};
-use log::{error, warn};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::fs::create_dir_all;
 
 use nodecosmos_macros::Branchable;
 
@@ -17,15 +15,12 @@ use crate::models::node::reorder::data::ReorderData;
 use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::recovery::{RecoveryLog, RecoveryObjectType};
 use crate::models::traits::Branchable;
 use crate::models::udts::BranchReorderData;
-use crate::models::utils::file::read_file_names;
 
 pub mod data;
 mod validator;
-
-const RECOVERY_DATA_DIR: &str = "tmp/reorder-recovery";
-const RECOVER_FILE_PREFIX: &str = "reorder_recover_data";
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum ReorderStep {
@@ -45,16 +40,16 @@ pub enum ReorderStep {
 
 impl ReorderStep {
     pub fn increment(&mut self) {
-        *self = ReorderStep::from(*self as u8 + 1);
+        *self = ReorderStep::from(*self as i8 + 1);
     }
 
     pub fn decrement(&mut self) {
-        *self = ReorderStep::from(*self as u8 - 1);
+        *self = ReorderStep::from(*self as i8 - 1);
     }
 }
 
-impl From<u8> for ReorderStep {
-    fn from(value: u8) -> Self {
+impl From<i8> for ReorderStep {
+    fn from(value: i8) -> Self {
         match value {
             0 => ReorderStep::Start,
             1 => ReorderStep::UpdateNodeOrderIndex,
@@ -94,39 +89,6 @@ pub struct Reorder {
 }
 
 impl Reorder {
-    pub async fn recover_from_stored_data(data: &RequestData) {
-        create_dir_all(RECOVERY_DATA_DIR).unwrap();
-        let files = read_file_names(RECOVERY_DATA_DIR, RECOVER_FILE_PREFIX).await;
-
-        for file in files {
-            let serialized = std::fs::read_to_string(file.clone()).unwrap();
-            let mut reorder: Reorder = serde_json::from_str(&serialized)
-                .map_err(|err| {
-                    error!(
-                        "Error in deserializing recovery data from file {}: {}",
-                        file.clone(),
-                        err
-                    );
-                })
-                .unwrap();
-            std::fs::remove_file(file.clone()).unwrap();
-
-            if let Err(err) = reorder.recover(data.db_session()).await {
-                error!("Error in recovery from file {}: {}", file, err);
-                reorder.serialize_and_store_to_disk();
-                continue;
-            }
-
-            reorder.unlock_resource(data).await.expect(
-                format!(
-                    "Reorder Recovery: Failed to unlock resource: node_id: {}",
-                    reorder.reorder_data.node.id
-                )
-                .as_str(),
-            );
-        }
-    }
-
     pub fn new(data: ReorderData) -> Reorder {
         Self {
             reorder_data: data,
@@ -153,17 +115,18 @@ impl Reorder {
         let res = self.execute_reorder(db_session).await;
 
         if let Err(err) = res {
-            error!(
+            log::error!(
                 "Reorder failed for node: {}\n! ERROR: {:?}",
-                self.reorder_data.node.id, err
+                self.reorder_data.node.id,
+                err
             );
 
             self.recover(db_session).await.map_err(|recover_err| {
-                error!(
+                log::error!(
                     "Fatal Reorder recovery failed for node: {}\n! ERROR: {:?}",
-                    self.reorder_data.node.id, recover_err
+                    self.reorder_data.node.id,
+                    recover_err
                 );
-                self.serialize_and_store_to_disk();
 
                 NodecosmosError::FatalReorderError(err.to_string())
             })?;
@@ -175,9 +138,11 @@ impl Reorder {
     }
 
     async fn execute_reorder(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        while self.reorder_step < ReorderStep::Finish {
+        while self.reorder_step <= ReorderStep::Finish {
             match self.reorder_step {
-                ReorderStep::Start => (),
+                ReorderStep::Start => {
+                    self.create_recovery_log(db_session).await?;
+                }
                 ReorderStep::UpdateNodeOrderIndex => self.update_node_order(db_session).await?,
                 ReorderStep::RemoveNodeFromOldAncestors => self.remove_node_from_old_ancestors(db_session).await?,
                 ReorderStep::AddNodeToNewAncestors => self.add_node_to_new_ancestors(db_session).await?,
@@ -196,19 +161,28 @@ impl Reorder {
                     self.insert_node_descendants_to_added_ancestors(db_session).await?
                 }
                 ReorderStep::UpdateBranch => self.update_branch(db_session).await?,
-                ReorderStep::Finish => (),
+                ReorderStep::Finish => {
+                    self.delete_recovery_log(db_session).await?;
+                }
             }
 
             self.reorder_step.increment();
+
+            if self.reorder_step != ReorderStep::Finish {
+                self.update_recovery_log_step(db_session, self.reorder_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
     }
 
     async fn recover(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        while self.reorder_step > ReorderStep::Start {
+        while self.reorder_step >= ReorderStep::Start {
             match self.reorder_step {
-                ReorderStep::Start => (),
+                ReorderStep::Start => {
+                    self.delete_recovery_log(db_session).await?;
+                }
                 ReorderStep::UpdateNodeOrderIndex => self.undo_update_node_order(db_session).await?,
                 ReorderStep::RemoveNodeFromOldAncestors => self.undo_remove_node_from_old_ancestors(db_session).await?,
                 ReorderStep::AddNodeToNewAncestors => self.undo_add_node_to_new_ancestors(db_session).await?,
@@ -230,10 +204,17 @@ impl Reorder {
                     self.undo_insert_node_descendants_to_added_ancestors(db_session).await?
                 }
                 ReorderStep::UpdateBranch => self.undo_update_branch(db_session).await?,
-                ReorderStep::Finish => (),
+                ReorderStep::Finish => {
+                    log::error!("should not recover finished process");
+                }
             }
 
             self.reorder_step.decrement();
+
+            if self.reorder_step != ReorderStep::Start {
+                self.update_recovery_log_step(db_session, self.reorder_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -287,7 +268,7 @@ impl Reorder {
             .chunked_delete(db_session, &descendants_to_delete, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
-                error!("remove_node_from_removed_ancestors: {:?}", err);
+                log::error!("remove_node_from_removed_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -318,7 +299,7 @@ impl Reorder {
             .chunked_insert(db_session, &descendants_to_add, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
-                error!("undo_remove_node_from_old_ancestors: {:?}", err);
+                log::error!("undo_remove_node_from_old_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -352,7 +333,7 @@ impl Reorder {
                 .chunked_delete(db_session, &descendants_to_delete, crate::constants::BATCH_CHUNK_SIZE)
                 .await
                 .map_err(|err| {
-                    error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
+                    log::error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
                     return err;
                 })?;
         }
@@ -387,7 +368,7 @@ impl Reorder {
                 .chunked_insert(db_session, &descendants_to_add, crate::constants::BATCH_CHUNK_SIZE)
                 .await
                 .map_err(|err| {
-                    error!("undo_delete_node_descendants_from_removed_ancestors: {:?}", err);
+                    log::error!("undo_delete_node_descendants_from_removed_ancestors: {:?}", err);
                     return err;
                 })?;
         }
@@ -416,7 +397,7 @@ impl Reorder {
             .chunked_insert(db_session, &descendants_to_add, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
-                error!("add_node_to_new_ancestors: {:?}", err);
+                log::error!("add_node_to_new_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -444,7 +425,7 @@ impl Reorder {
             .chunked_delete(db_session, &descendants_to_delete, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|err| {
-                error!("undo_add_node_to_new_ancestors: {:?}", err);
+                log::error!("undo_add_node_to_new_ancestors: {:?}", err);
                 return err;
             })?;
 
@@ -478,7 +459,7 @@ impl Reorder {
                 .chunked_insert(db_session, &descendants, crate::constants::BATCH_CHUNK_SIZE)
                 .await
                 .map_err(|err| {
-                    error!("insert_node_descendants_to_added_ancestors: {:?}", err);
+                    log::error!("insert_node_descendants_to_added_ancestors: {:?}", err);
                     return err;
                 })?;
         }
@@ -513,7 +494,7 @@ impl Reorder {
                 .chunked_delete(db_session, &descendants, crate::constants::BATCH_CHUNK_SIZE)
                 .await
                 .map_err(|err| {
-                    error!("undo_insert_node_descendants_to_added_ancestors: {:?}", err);
+                    log::error!("undo_insert_node_descendants_to_added_ancestors: {:?}", err);
                     return err;
                 })?;
         }
@@ -574,7 +555,7 @@ impl Reorder {
                 )
                 .await
                 .map_err(|err| {
-                    error!("pull_removed_ancestors_from_descendants: {:?}", err);
+                    log::error!("pull_removed_ancestors_from_descendants: {:?}", err);
                     return err;
                 })?;
         }
@@ -608,7 +589,7 @@ impl Reorder {
                 )
                 .await
                 .map_err(|err| {
-                    error!("undo_pull_removed_ancestors_from_descendants: {:?}", err);
+                    log::error!("undo_pull_removed_ancestors_from_descendants: {:?}", err);
                     return err;
                 })?;
         }
@@ -666,7 +647,7 @@ impl Reorder {
                 )
                 .await
                 .map_err(|err| {
-                    error!("push_added_ancestors_to_descendants: {:?}", err);
+                    log::error!("push_added_ancestors_to_descendants: {:?}", err);
                     return err;
                 })?;
         }
@@ -700,7 +681,7 @@ impl Reorder {
                 )
                 .await
                 .map_err(|err| {
-                    error!("undo_push_added_ancestors_to_descendants: {:?}", err);
+                    log::error!("undo_push_added_ancestors_to_descendants: {:?}", err);
                     return err;
                 })?;
         }
@@ -747,18 +728,45 @@ impl Reorder {
 
         Ok(())
     }
+}
 
-    fn serialize_and_store_to_disk(&self) {
-        // serialize reorder and store to disk
-        let serialized = serde_json::to_string(self).expect("Failed to serialize branch merge data");
-        let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.reorder_data.node.id);
-        let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
-        let res = std::fs::write(path.clone(), serialized);
+impl RecoveryLog<'_> for Reorder {
+    #[inline]
+    fn rec_id(&self) -> Uuid {
+        self.reorder_data.node.id
+    }
 
-        match res {
-            Ok(_) => warn!("Merge Recovery data saved to file: {}", path),
-            Err(err) => error!("Error in saving recovery data: {}", err),
-        }
+    #[inline]
+    fn rec_branch_id(&self) -> Uuid {
+        self.reorder_data.node.branch_id
+    }
+
+    #[inline]
+    fn rec_object_type(&self) -> RecoveryObjectType {
+        RecoveryObjectType::Reorder
+    }
+
+    async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.recover(data.db_session()).await.map_err(|recover_err| {
+            log::error!(
+                "Fatal Reorder Error: recover_from_log failed for node: {}\n! ERROR: {:?}",
+                self.reorder_data.node.id,
+                recover_err
+            );
+
+            NodecosmosError::FatalReorderError(recover_err.to_string())
+        })?;
+
+        let _ = self.unlock_resource(data).await.map_err(|unlock_err| {
+            log::error!(
+                "Reorder Error unlock_resource failed for node: {}\n! ERROR: {:?}",
+                self.reorder_data.node.id,
+                unlock_err
+            );
+            NodecosmosError::FatalReorderError(unlock_err.to_string())
+        });
+
+        Ok(())
     }
 }
 

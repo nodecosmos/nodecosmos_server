@@ -80,7 +80,7 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
         .lock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::TWO_SECONDS,
         )
         .await?;
@@ -91,7 +91,7 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
         .unlock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
 
@@ -109,7 +109,7 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
         .lock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::TWO_SECONDS,
         )
         .await?;
@@ -120,7 +120,7 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
         .unlock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
 
@@ -139,7 +139,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
         .lock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::ONE_HOUR,
         )
         .await?;
@@ -150,7 +150,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
         .unlock_resource_actions(
             node.root_id,
             node.branch_id,
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
 
@@ -165,7 +165,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
 
     node.auth_update(&data).await?;
 
-    // first lock the complete resource to avoid all types of race conditions
+    // first lock the complete resource to avoid all kinds of race conditions
     data.resource_locker()
         .lock_resource(node.root_id, node.branch_id, ResourceLocker::ONE_HOUR)
         .await?;
@@ -173,7 +173,12 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     // validate that reorder is allowed
     if let Err(e) = data
         .resource_locker()
-        .validate_resource_action_unlocked(ActionTypes::Reorder(ActionObject::Node), node.root_id, node.branch_id)
+        .validate_resource_action_unlocked(
+            ActionTypes::Reorder(ActionObject::Node),
+            node.root_id,
+            node.branch_id,
+            true,
+        )
         .await
     {
         // unlock complete resource as reorder is not allowed
@@ -240,7 +245,7 @@ pub async fn listen_node_events(root_id: web::Path<Uuid>, data: RequestData) -> 
     let root_id = *root_id;
     let broadcaster = data.sse_broadcast();
     let receiver = broadcaster.build_receiver(root_id);
-    let mut cleanup_interval = time::interval(Duration::from_secs(5)); // 10 minutes
+    let mut cleanup_interval = time::interval(Duration::from_secs(600)); // 10 minutes
 
     tokio::spawn(async move {
         loop {
