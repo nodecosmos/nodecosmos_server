@@ -36,8 +36,9 @@ impl From<i8> for RecoveryObjectType {
 
 #[charybdis_model(
     table_name = recoveries,
-    partition_keys = [updated_at],
-    clustering_keys = [branch_id, object_type, id],
+    partition_keys = [branch_id],
+    clustering_keys = [object_type, id],
+    global_secondary_indexes = [updated_at],
 )]
 #[derive(Default)]
 pub struct Recovery {
@@ -66,7 +67,7 @@ impl Recovery {
         // 3 minutes should be enough for main processes to recover from a crash.
         // If the process is still down after 3 minutes, we can assume that the process is not going to recover within
         // a main process lifetime, so we can recover the data from the log.
-        let mut recoveries = find_recovery!("updated_at <= ? ALLOW FILTERING", (from_min_ago,))
+        let mut recoveries = find_recovery!("updated_at <= ?", (from_min_ago,))
             .consistency(Consistency::All)
             .execute(&data.db_session())
             .await?;

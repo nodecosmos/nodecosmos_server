@@ -24,6 +24,7 @@ mod validator;
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum ReorderStep {
+    BeforePlaceholder = -1,
     Start = 0,
     UpdateNodeOrderIndex = 1,
     RemoveNodeFromOldAncestors = 2,
@@ -36,6 +37,7 @@ pub enum ReorderStep {
     InsertNodeDescendantsToAddedAncestors = 9,
     UpdateBranch = 10,
     Finish = 11,
+    AfterPlaceholder = 12,
 }
 
 impl ReorderStep {
@@ -51,6 +53,7 @@ impl ReorderStep {
 impl From<i8> for ReorderStep {
     fn from(value: i8) -> Self {
         match value {
+            -1 => ReorderStep::BeforePlaceholder,
             0 => ReorderStep::Start,
             1 => ReorderStep::UpdateNodeOrderIndex,
             2 => ReorderStep::RemoveNodeFromOldAncestors,
@@ -63,6 +66,7 @@ impl From<i8> for ReorderStep {
             9 => ReorderStep::InsertNodeDescendantsToAddedAncestors,
             10 => ReorderStep::UpdateBranch,
             11 => ReorderStep::Finish,
+            12 => ReorderStep::AfterPlaceholder,
             _ => panic!("Invalid value for ReorderStep"),
         }
     }
@@ -140,6 +144,9 @@ impl Reorder {
     async fn execute_reorder(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         while self.reorder_step <= ReorderStep::Finish {
             match self.reorder_step {
+                ReorderStep::BeforePlaceholder => {
+                    log::error!("should not execute before placeholder");
+                }
                 ReorderStep::Start => {
                     self.create_recovery_log(db_session).await?;
                 }
@@ -164,6 +171,9 @@ impl Reorder {
                 ReorderStep::Finish => {
                     self.delete_recovery_log(db_session).await?;
                 }
+                ReorderStep::AfterPlaceholder => {
+                    log::error!("should not execute after placeholder");
+                }
             }
 
             self.reorder_step.increment();
@@ -180,6 +190,9 @@ impl Reorder {
     async fn recover(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         while self.reorder_step >= ReorderStep::Start {
             match self.reorder_step {
+                ReorderStep::BeforePlaceholder => {
+                    log::error!("should not hit before placeholder");
+                }
                 ReorderStep::Start => {
                     self.delete_recovery_log(db_session).await?;
                 }
@@ -206,6 +219,9 @@ impl Reorder {
                 ReorderStep::UpdateBranch => self.undo_update_branch(db_session).await?,
                 ReorderStep::Finish => {
                     log::error!("should not recover finished process");
+                }
+                ReorderStep::AfterPlaceholder => {
+                    log::error!("should not hit after placeholder");
                 }
             }
 
