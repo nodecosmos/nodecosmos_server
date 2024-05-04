@@ -211,6 +211,12 @@ impl BranchMerge {
 
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step <= MergeStep::Finish {
+            // log current step
+            if self.merge_step > MergeStep::Start && self.merge_step < MergeStep::Finish {
+                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
+                    .await?;
+            }
+
             match self.merge_step {
                 MergeStep::BeforePlaceholder => {
                     log::error!("should not hit before placeholder");
@@ -252,11 +258,6 @@ impl BranchMerge {
             }
 
             self.merge_step.increment();
-
-            if self.merge_step != MergeStep::Finish {
-                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())
@@ -265,6 +266,12 @@ impl BranchMerge {
     /// Recover from merge failure in reverse order
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.merge_step >= MergeStep::Start {
+            // log current step
+            if self.merge_step < MergeStep::Finish && self.merge_step > MergeStep::Start {
+                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
+                    .await?;
+            }
+
             match self.merge_step {
                 MergeStep::BeforePlaceholder => {
                     log::error!("should not hit before placeholder");
@@ -306,11 +313,6 @@ impl BranchMerge {
             }
 
             self.merge_step.decrement();
-
-            if self.merge_step != MergeStep::Start {
-                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())

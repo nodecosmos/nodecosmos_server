@@ -313,6 +313,12 @@ impl NodeDelete {
 
     pub async fn delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.delete_step <= NodeDeleteStep::Finish {
+            // log current step
+            if self.delete_step > NodeDeleteStep::Start && self.delete_step < NodeDeleteStep::Finish {
+                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
+                    .await?;
+            }
+
             match self.delete_step {
                 NodeDeleteStep::BeforePlaceholder => {
                     log::error!("should not hit before placeholder");
@@ -346,11 +352,6 @@ impl NodeDelete {
             }
 
             self.delete_step.increment();
-
-            if self.delete_step != NodeDeleteStep::Finish {
-                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())
@@ -358,7 +359,11 @@ impl NodeDelete {
 
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.delete_step >= NodeDeleteStep::Start {
-            self.delete_step.decrement();
+            // log current step
+            if self.delete_step > NodeDeleteStep::Start && self.delete_step < NodeDeleteStep::Finish {
+                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
+                    .await?;
+            }
 
             match self.delete_step {
                 NodeDeleteStep::BeforePlaceholder => {
@@ -393,11 +398,6 @@ impl NodeDelete {
             }
 
             self.delete_step.decrement();
-
-            if self.delete_step != NodeDeleteStep::Start {
-                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())

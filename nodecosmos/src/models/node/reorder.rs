@@ -143,6 +143,12 @@ impl Reorder {
 
     async fn execute_reorder(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         while self.reorder_step <= ReorderStep::Finish {
+            // log current step
+            if self.reorder_step > ReorderStep::Start && self.reorder_step < ReorderStep::Finish {
+                self.update_recovery_log_step(db_session, self.reorder_step as i8)
+                    .await?;
+            }
+
             match self.reorder_step {
                 ReorderStep::BeforePlaceholder => {
                     log::error!("should not execute before placeholder");
@@ -177,11 +183,6 @@ impl Reorder {
             }
 
             self.reorder_step.increment();
-
-            if self.reorder_step != ReorderStep::Finish {
-                self.update_recovery_log_step(db_session, self.reorder_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())
@@ -189,6 +190,12 @@ impl Reorder {
 
     async fn recover(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         while self.reorder_step >= ReorderStep::Start {
+            // log current step
+            if self.reorder_step > ReorderStep::Start && self.reorder_step < ReorderStep::Finish {
+                self.update_recovery_log_step(db_session, self.reorder_step as i8)
+                    .await?;
+            }
+
             match self.reorder_step {
                 ReorderStep::BeforePlaceholder => {
                     log::error!("should not hit before placeholder");
@@ -226,11 +233,6 @@ impl Reorder {
             }
 
             self.reorder_step.decrement();
-
-            if self.reorder_step != ReorderStep::Start {
-                self.update_recovery_log_step(db_session, self.reorder_step as i8)
-                    .await?;
-            }
         }
 
         Ok(())

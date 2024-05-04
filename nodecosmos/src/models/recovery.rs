@@ -7,14 +7,14 @@ use crate::models::node::reorder::Reorder;
 use crate::resources::resource_locker::ResourceLocker;
 use anyhow::Context;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Delete, Insert};
+use charybdis::operations::{Delete, Insert, Update};
 use charybdis::options::Consistency;
 use charybdis::types::{Text, Timestamp, TinyInt, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-pub const RECOVERY_INTERVAL: u8 = 5;
+pub const RECOVERY_INTERVAL: u8 = 1;
 
 #[derive(Deserialize)]
 pub enum RecoveryObjectType {
@@ -67,7 +67,7 @@ impl Recovery {
         // 3 minutes should be enough for main processes to recover from a crash.
         // If the process is still down after 3 minutes, we can assume that the process is not going to recover within
         // a main process lifetime, so we can recover the data from the log.
-        let mut recoveries = find_recovery!("updated_at <= ?", (from_min_ago,))
+        let mut recoveries = find_recovery!("updated_at <= ? ALLOW FILTERING", (from_min_ago,))
             .consistency(Consistency::All)
             .execute(&data.db_session())
             .await?;
@@ -160,20 +160,19 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
 
     async fn update_recovery_log_step(&self, db_session: &CachingSession, step: i8) -> Result<(), NodecosmosError> {
         let recovery = UpdateStepRecovery {
-            updated_at: chrono::Utc::now(),
             branch_id: self.rec_branch_id(),
             object_type: self.rec_object_type() as i8,
             id: self.rec_id(),
             step,
         };
-        recovery.insert().execute(db_session).await?;
+
+        recovery.update().execute(db_session).await?;
 
         Ok(())
     }
 
     async fn delete_recovery_log(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         DeleteRecovery {
-            updated_at: chrono::Utc::now(),
             branch_id: self.rec_branch_id(),
             object_type: self.rec_object_type() as i8,
             id: self.rec_id(),
@@ -186,6 +185,6 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
     }
 }
 
-partial_recovery!(UpdateStepRecovery, updated_at, branch_id, object_type, id, step);
+partial_recovery!(UpdateStepRecovery, branch_id, object_type, id, step);
 
-partial_recovery!(DeleteRecovery, updated_at, branch_id, object_type, id);
+partial_recovery!(DeleteRecovery, branch_id, object_type, id);
