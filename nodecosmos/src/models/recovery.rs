@@ -151,6 +151,7 @@ impl Recovery {
         Ok(())
     }
 }
+// todo: fix this
 
 /// Trait for recovering from a log. Before performing a SAGA operation, we serialize
 /// the data structure that we are going to modify and store it in a recovery log. After each successful step, we
