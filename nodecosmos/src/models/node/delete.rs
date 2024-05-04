@@ -67,6 +67,7 @@ impl Node {
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 enum NodeDeleteStep {
+    BeforePlaceholder = -1,
     #[default]
     Start = 0,
     ArchiveNodes = 1,
@@ -87,6 +88,7 @@ enum NodeDeleteStep {
     DeleteAttachments = 16,
     DeleteElasticData = 17,
     Finish = 18,
+    AfterPlaceholder = 19,
 }
 
 impl NodeDeleteStep {
@@ -102,6 +104,7 @@ impl NodeDeleteStep {
 impl From<i8> for NodeDeleteStep {
     fn from(value: i8) -> Self {
         match value {
+            -1 => NodeDeleteStep::BeforePlaceholder,
             0 => NodeDeleteStep::Start,
             1 => NodeDeleteStep::ArchiveNodes,
             2 => NodeDeleteStep::ArchiveWorkflows,
@@ -121,6 +124,7 @@ impl From<i8> for NodeDeleteStep {
             16 => NodeDeleteStep::DeleteAttachments,
             17 => NodeDeleteStep::DeleteElasticData,
             18 => NodeDeleteStep::Finish,
+            19 => NodeDeleteStep::AfterPlaceholder,
             _ => panic!("Invalid NodeDeleteStep value: {}", value),
         }
     }
@@ -310,6 +314,9 @@ impl NodeDelete {
     pub async fn delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         while self.delete_step <= NodeDeleteStep::Finish {
             match self.delete_step {
+                NodeDeleteStep::BeforePlaceholder => {
+                    log::error!("should not hit before placeholder");
+                }
                 NodeDeleteStep::Start => {
                     self.create_recovery_log(data.db_session()).await?;
                 }
@@ -333,6 +340,9 @@ impl NodeDelete {
                 NodeDeleteStep::Finish => {
                     self.delete_recovery_log(data.db_session()).await?;
                 }
+                NodeDeleteStep::AfterPlaceholder => {
+                    log::error!("should not hit after placeholder");
+                }
             }
 
             self.delete_step.increment();
@@ -351,6 +361,9 @@ impl NodeDelete {
             self.delete_step.decrement();
 
             match self.delete_step {
+                NodeDeleteStep::BeforePlaceholder => {
+                    log::error!("should not hit before placeholder");
+                }
                 NodeDeleteStep::Start => {
                     self.delete_recovery_log(data.db_session()).await?;
                 }
@@ -373,6 +386,9 @@ impl NodeDelete {
                 NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data(data).await,
                 NodeDeleteStep::Finish => {
                     log::error!("should not recover finished process");
+                }
+                NodeDeleteStep::AfterPlaceholder => {
+                    log::error!("should not hit after placeholder");
                 }
             }
 
