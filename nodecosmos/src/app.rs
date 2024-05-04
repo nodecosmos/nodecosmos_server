@@ -14,8 +14,6 @@ use scylla::CachingSession;
 use toml::Value;
 
 use crate::api::data::RequestData;
-use crate::models::branch::merge::BranchMerge;
-use crate::models::node::reorder::Reorder;
 use crate::models::node::Node;
 use crate::models::traits::BuildIndex;
 use crate::models::user::User;
@@ -85,12 +83,29 @@ impl App {
             current_user: Default::default(),
         };
 
-        // init recovery in case reordering was interrupted or failed
-        Reorder::recover_from_stored_data(&data).await;
-        BranchMerge::recover_from_stored_data(&data).await;
+        self.init_recovery_task(data).await;
+        self.init_cleanup_rooms_task().await;
+    }
 
-        // Cleanup task
-        let mut cleanup_interval = time::interval(Duration::from_secs(3));
+    pub async fn init_recovery_task(&self, data: RequestData) {
+        let interval = crate::models::recovery::RECOVERY_INTERVAL as u64 * 60;
+        let mut recovery_interval = time::interval(Duration::from_secs(interval)); // 5 minutes
+
+        tokio::spawn(async move {
+            loop {
+                recovery_interval.tick().await;
+                let _ = crate::models::recovery::Recovery::run_recovery_task(&data.clone())
+                    .await
+                    .map_err(|e| {
+                        log::error!("Recovery task failed: {:?}", e);
+                    });
+                info!("Recovery task ran");
+            }
+        });
+    }
+
+    pub async fn init_cleanup_rooms_task(&self) {
+        let mut cleanup_interval = time::interval(Duration::from_secs(600));
         let sse_broadcast_clone = self.sse_broadcast.clone();
 
         tokio::spawn(async move {

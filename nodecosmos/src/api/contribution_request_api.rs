@@ -133,7 +133,7 @@ pub async fn merge_contribution_request(
     // check if merge is allowed in the root
     if let Err(e) = data
         .resource_locker()
-        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, root_id)
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, root_id, true)
         .await
     {
         // unlock complete resource as merge is not allowed
@@ -146,7 +146,7 @@ pub async fn merge_contribution_request(
     // check if merge is allowed in the branch
     if let Err(e) = data
         .resource_locker()
-        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, branch_id)
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, branch_id, true)
         .await
     {
         // unlock complete resource as merge is not allowed

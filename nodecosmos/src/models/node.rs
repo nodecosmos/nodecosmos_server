@@ -19,7 +19,7 @@ use crate::models::udts::Profile;
 
 mod auth;
 mod create;
-mod delete;
+pub mod delete;
 pub mod reorder;
 pub mod search;
 pub mod sort;
@@ -121,7 +121,7 @@ impl Callbacks for Node {
         // We shouldn't have duplicate delete_data for descendants as we only delete single node in the ancestor chain.
         // Note we consume delete_data here to avoid copying in next step
         if let Some(mut delete_data) = self.delete_data.take() {
-            delete_data.recover(data, self).await?;
+            delete_data.recover(data).await?;
         }
 
         let self_clone = self.clone();

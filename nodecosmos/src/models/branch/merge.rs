@@ -1,6 +1,5 @@
-use std::fs::create_dir_all;
-
 use charybdis::operations::Update;
+use charybdis::types::Uuid;
 use log::{error, warn};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ use crate::models::branch::merge::ios::MergeIos;
 use crate::models::branch::merge::nodes::MergeNodes;
 use crate::models::branch::merge::workflows::MergeWorkflows;
 use crate::models::branch::{Branch, BranchStatus};
-use crate::models::utils::file::read_file_names;
+use crate::models::recovery::{RecoveryLog, RecoveryObjectType};
 
 mod conflicts;
 mod descriptions;
@@ -25,9 +24,6 @@ mod flows;
 mod ios;
 mod nodes;
 mod workflows;
-
-const RECOVERY_DATA_DIR: &str = "tmp/merge-recovery";
-const RECOVER_FILE_PREFIX: &str = "merge_recovery_data";
 
 pub struct MergeError {
     pub inner: NodecosmosError,
@@ -67,16 +63,16 @@ pub enum MergeStep {
 
 impl MergeStep {
     pub fn increment(&mut self) {
-        *self = MergeStep::from(*self as u8 + 1);
+        *self = MergeStep::from(*self as i8 + 1);
     }
 
     pub fn decrement(&mut self) {
-        *self = MergeStep::from(*self as u8 - 1);
+        *self = MergeStep::from(*self as i8 - 1);
     }
 }
 
-impl From<u8> for MergeStep {
-    fn from(value: u8) -> Self {
+impl From<i8> for MergeStep {
+    fn from(value: i8) -> Self {
         match value {
             0 => MergeStep::Start,
             1 => MergeStep::RestoreNodes,
@@ -199,7 +195,6 @@ impl BranchMerge {
                     self.branch.status = Some(BranchStatus::RecoveryFailed.to_string());
 
                     error!("Mere::Failed to recover: {}", recovery_err);
-                    self.serialize_and_store_to_disk();
 
                     Err(MergeError {
                         inner: NodecosmosError::FatalMergeError(format!("Failed to merge and recover: {}", e)),
@@ -210,45 +205,14 @@ impl BranchMerge {
         }
     }
 
-    pub async fn recover_from_stored_data(data: &RequestData) {
-        create_dir_all(RECOVERY_DATA_DIR).unwrap();
-        let files = read_file_names(RECOVERY_DATA_DIR, RECOVER_FILE_PREFIX).await;
-
-        for file in files {
-            let serialized = std::fs::read_to_string(file.clone()).unwrap();
-            let mut branch_merge: BranchMerge = serde_json::from_str(&serialized)
-                .map_err(|err| {
-                    error!(
-                        "Error in deserializing recovery data from file {}: {}",
-                        file.clone(),
-                        err
-                    );
-                })
-                .unwrap();
-            std::fs::remove_file(file.clone()).unwrap();
-
-            if let Err(err) = branch_merge.recover(data).await {
-                error!("Error in recovery from file {}: {}", file, err);
-                branch_merge.serialize_and_store_to_disk();
-                continue;
-            }
-
-            branch_merge.unlock_resource(data).await.expect(
-                format!(
-                    "Merge Recovery: Failed to unlock resource: branch_id: {}",
-                    branch_merge.branch.id
-                )
-                .as_str(),
-            );
-        }
-    }
-
     async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        while self.merge_step < MergeStep::Finish {
+        while self.merge_step <= MergeStep::Finish {
             match self.merge_step {
-                MergeStep::Start => (),
-                MergeStep::RestoreNodes => self.nodes.restore_nodes(data, &self.branch).await?,
-                MergeStep::CreateNodes => self.nodes.create_nodes(data, &self.branch).await?,
+                MergeStep::Start => {
+                    self.create_recovery_log(data.db_session()).await?;
+                }
+                MergeStep::RestoreNodes => self.nodes.restore_nodes(data, &mut self.branch).await?,
+                MergeStep::CreateNodes => self.nodes.create_nodes(data, &mut self.branch).await?,
                 MergeStep::DeleteNodes => self.nodes.delete_nodes(data).await?,
                 MergeStep::UpdateNodesTitles => self.nodes.update_title(data, &mut self.branch).await?,
                 MergeStep::ReorderNodes => self.nodes.reorder_nodes(data, &self.branch).await?,
@@ -272,10 +236,17 @@ impl BranchMerge {
                 MergeStep::UpdateIoTitles => self.ios.update_title(data, &mut self.branch).await?,
                 MergeStep::UpdateDescriptions => self.descriptions.update_descriptions(data, &mut self.branch).await?,
                 MergeStep::DeleteDescriptions => self.descriptions.delete_descriptions(data).await?,
-                MergeStep::Finish => (),
+                MergeStep::Finish => {
+                    self.delete_recovery_log(data.db_session()).await?;
+                }
             }
 
             self.merge_step.increment();
+
+            if self.merge_step != MergeStep::Finish {
+                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -283,9 +254,11 @@ impl BranchMerge {
 
     /// Recover from merge failure in reverse order
     pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        while self.merge_step > MergeStep::Start {
+        while self.merge_step >= MergeStep::Start {
             match self.merge_step {
-                MergeStep::Start => (),
+                MergeStep::Start => {
+                    self.delete_recovery_log(data.db_session()).await?;
+                }
                 MergeStep::RestoreNodes => self.nodes.undo_delete_nodes(data).await?,
                 MergeStep::CreateNodes => self.nodes.undo_create_nodes(data).await?,
                 MergeStep::DeleteNodes => self.nodes.undo_restore_nodes(data).await?,
@@ -311,10 +284,17 @@ impl BranchMerge {
                 MergeStep::UpdateIoTitles => self.ios.undo_update_title(data).await?,
                 MergeStep::UpdateDescriptions => self.descriptions.undo_update_description(data).await?,
                 MergeStep::DeleteDescriptions => self.descriptions.undo_delete_descriptions(data).await?,
-                MergeStep::Finish => (),
+                MergeStep::Finish => {
+                    log::error!("should not recover finished process");
+                }
             }
 
             self.merge_step.decrement();
+
+            if self.merge_step != MergeStep::Start {
+                self.update_recovery_log_step(data.db_session(), self.merge_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -332,18 +312,42 @@ impl BranchMerge {
 
         Ok(())
     }
+}
 
-    fn serialize_and_store_to_disk(&self) {
-        // serialize branch_merge and store to disk
-        let serialized = serde_json::to_string(self).expect("Failed to serialize branch merge data");
-        let filename = format!("{}{}.json", RECOVER_FILE_PREFIX, self.branch.id);
-        let path = format!("{}/{}", RECOVERY_DATA_DIR, filename);
-        let res = std::fs::write(path.clone(), serialized);
+impl RecoveryLog<'_> for BranchMerge {
+    fn rec_id(&self) -> Uuid {
+        self.branch.id
+    }
 
-        match res {
-            Ok(_) => warn!("Merge Recovery data saved to file: {}", path),
-            Err(err) => error!("Error in saving recovery data: {}", err),
-        }
+    fn rec_branch_id(&self) -> Uuid {
+        self.branch.id
+    }
+
+    fn rec_object_type(&self) -> RecoveryObjectType {
+        RecoveryObjectType::Merge
+    }
+
+    async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.recover(data).await.map_err(|e| {
+            log::error!(
+                "Fatal Merge Error: recover_from_log failed for branch: {}\n! ERROR: {:?}",
+                self.branch.id,
+                e
+            );
+            NodecosmosError::FatalDeleteError(format!("Error recovering from log: {:?}", e))
+        })?;
+
+        let _ = self.unlock_resource(data).await.map_err(|e| {
+            log::error!(
+                "Merge Error: unlock_resource failed for branch: {}\n! ERROR: {:?}",
+                self.branch.id,
+                e
+            );
+
+            NodecosmosError::FatalDeleteError(format!("Error unlocking resource: {:?}", e))
+        });
+
+        Ok(())
     }
 }
 

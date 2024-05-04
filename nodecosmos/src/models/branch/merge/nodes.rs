@@ -172,7 +172,7 @@ impl MergeNodes {
 
     async fn insert_nodes(
         data: &RequestData,
-        branch: &Branch,
+        branch: &mut Branch,
         merge_nodes: &mut Option<Vec<Node>>,
     ) -> Result<(), NodecosmosError> {
         let branch_node = branch.node(data.db_session()).await?;
@@ -221,7 +221,7 @@ impl MergeNodes {
         Ok(())
     }
 
-    pub async fn restore_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
+    pub async fn restore_nodes(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         Self::insert_nodes(data, branch, &mut self.restored_nodes)
             .await
             .context("Failed to restore nodes")?;
@@ -237,7 +237,7 @@ impl MergeNodes {
         Ok(())
     }
 
-    pub async fn create_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
+    pub async fn create_nodes(&mut self, data: &RequestData, branch: &mut Branch) -> Result<(), NodecosmosError> {
         Self::insert_nodes(data, branch, &mut self.created_nodes)
             .await
             .context("Failed to create nodes")?;

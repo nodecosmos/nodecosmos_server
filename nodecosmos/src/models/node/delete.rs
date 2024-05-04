@@ -23,6 +23,7 @@ use crate::models::like::Like;
 use crate::models::node::Node;
 use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::recovery::{RecoveryLog, RecoveryObjectType};
 use crate::models::traits::{Branchable, ElasticDocument, ModelContext, Pluck};
 use crate::models::traits::{Descendants, FindForBranchMerge};
 use crate::models::workflow::Workflow;
@@ -31,7 +32,7 @@ impl Node {
     pub async fn archive_and_delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() {
             let mut node_delete = NodeDelete::new(data, self).await?;
-            node_delete.run(data, self).await?;
+            node_delete.run(data).await?;
 
             // if we are in merge context, we need to store the delete data for potential recovery
             if self.is_merge_context() {
@@ -40,7 +41,7 @@ impl Node {
         } else if Branch::contains_created_node(data.db_session(), self.branch_id, self.id).await?
             || Self::is_original_deleted(data.db_session(), self.original_id(), self.id).await?
         {
-            NodeDelete::new(data, self).await?.run(data, self).await?;
+            NodeDelete::new(data, self).await?.run(data).await?;
         }
 
         Ok(())
@@ -90,16 +91,16 @@ enum NodeDeleteStep {
 
 impl NodeDeleteStep {
     pub fn increment(&mut self) {
-        *self = NodeDeleteStep::from(*self as u8 + 1);
+        *self = NodeDeleteStep::from(*self as i8 + 1);
     }
 
     pub fn decrement(&mut self) {
-        *self = NodeDeleteStep::from(*self as u8 - 1);
+        *self = NodeDeleteStep::from(*self as i8 - 1);
     }
 }
 
-impl From<u8> for NodeDeleteStep {
-    fn from(value: u8) -> Self {
+impl From<i8> for NodeDeleteStep {
+    fn from(value: i8) -> Self {
         match value {
             0 => NodeDeleteStep::Start,
             1 => NodeDeleteStep::ArchiveNodes,
@@ -127,6 +128,7 @@ impl From<u8> for NodeDeleteStep {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct NodeDelete {
+    node: Node,
     delete_step: NodeDeleteStep,
     deleted_node_ids: Vec<Uuid>,
     deleted_nodes: Vec<Node>,
@@ -277,6 +279,7 @@ impl NodeDelete {
         let deleted_counter_data = Self::deleted_counter_data(data.db_session(), node, &node_ids_to_delete).await?;
 
         Ok(Self {
+            node: node.clone(),
             delete_step: NodeDeleteStep::Start,
             deleted_node_ids: deleted_nodes.iter().map(|node| node.id).collect(),
             deleted_nodes,
@@ -290,11 +293,11 @@ impl NodeDelete {
         })
     }
 
-    pub async fn run(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        let delete = self.delete(data, node).await;
+    pub async fn run(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let delete = self.delete(data).await;
 
         if let Err(e) = delete {
-            self.recover(data, node)
+            self.recover(data)
                 .await
                 .map_err(|e| NodecosmosError::FatalDeleteError(format!("Error deleting node: {:?}", e)))?;
 
@@ -304,10 +307,12 @@ impl NodeDelete {
         Ok(())
     }
 
-    pub async fn delete(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        while self.delete_step < NodeDeleteStep::Finish {
+    pub async fn delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        while self.delete_step <= NodeDeleteStep::Finish {
             match self.delete_step {
-                NodeDeleteStep::Start => (),
+                NodeDeleteStep::Start => {
+                    self.create_recovery_log(data.db_session()).await?;
+                }
                 NodeDeleteStep::ArchiveNodes => self.archive_nodes(data.db_session()).await?,
                 NodeDeleteStep::ArchiveWorkflows => self.archive_workflows(data.db_session()).await?,
                 NodeDeleteStep::ArchiveFlows => self.archive_flows(data.db_session()).await?,
@@ -322,24 +327,33 @@ impl NodeDelete {
                 NodeDeleteStep::DeleteIos => self.delete_ios(data.db_session()).await?,
                 NodeDeleteStep::DeleteDescriptions => self.delete_descriptions(data.db_session()).await?,
                 NodeDeleteStep::DeleteCounterData => self.delete_counter_data(data.db_session()).await?,
-                NodeDeleteStep::DeleteLikes => self.delete_likes(data.db_session(), node).await?,
-                NodeDeleteStep::DeleteAttachments => self.delete_attachments(data, node).await?,
-                NodeDeleteStep::DeleteElasticData => self.delete_elastic_data(data, node).await,
-                NodeDeleteStep::Finish => (),
+                NodeDeleteStep::DeleteLikes => self.delete_likes(data.db_session()).await?,
+                NodeDeleteStep::DeleteAttachments => self.delete_attachments(data).await?,
+                NodeDeleteStep::DeleteElasticData => self.delete_elastic_data(data).await,
+                NodeDeleteStep::Finish => {
+                    self.delete_recovery_log(data.db_session()).await?;
+                }
             }
 
             self.delete_step.increment();
+
+            if self.delete_step != NodeDeleteStep::Finish {
+                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
     }
 
-    pub async fn recover(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        while self.delete_step > NodeDeleteStep::Start {
+    pub async fn recover(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        while self.delete_step >= NodeDeleteStep::Start {
             self.delete_step.decrement();
 
             match self.delete_step {
-                NodeDeleteStep::Start => (),
+                NodeDeleteStep::Start => {
+                    self.delete_recovery_log(data.db_session()).await?;
+                }
                 NodeDeleteStep::ArchiveNodes => self.undo_archive_nodes(data.db_session()).await?,
                 NodeDeleteStep::ArchiveWorkflows => self.undo_archive_workflows(data.db_session()).await?,
                 NodeDeleteStep::ArchiveFlows => self.undo_archive_flows(data.db_session()).await?,
@@ -356,11 +370,18 @@ impl NodeDelete {
                 NodeDeleteStep::DeleteCounterData => self.undo_delete_counter_data(data.db_session()).await?,
                 NodeDeleteStep::DeleteLikes => self.undo_delete_likes().await?,
                 NodeDeleteStep::DeleteAttachments => self.undo_delete_attachments().await?,
-                NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data(data, node).await,
-                NodeDeleteStep::Finish => (),
+                NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data(data).await,
+                NodeDeleteStep::Finish => {
+                    log::error!("should not recover finished process");
+                }
             }
 
             self.delete_step.decrement();
+
+            if self.delete_step != NodeDeleteStep::Start {
+                self.update_recovery_log_step(data.db_session(), self.delete_step as i8)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -666,13 +687,13 @@ impl NodeDelete {
 
     // like undo is not critical, so we won't load it into memory as in case of merge
     // we might have a lot of likes to restore
-    async fn delete_likes(&self, db_session: &CachingSession, node: &Node) -> Result<(), NodecosmosError> {
+    async fn delete_likes(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut deleted_likes: Vec<Like> = vec![];
 
         for id in &self.deleted_node_ids {
             deleted_likes.push(Like {
                 object_id: *id,
-                branch_id: node.branch_id,
+                branch_id: self.node.branch_id,
                 ..Default::default()
             });
         }
@@ -690,21 +711,21 @@ impl NodeDelete {
         Ok(())
     }
 
-    async fn delete_elastic_data(&self, data: &RequestData, node: &Node) {
-        if node.is_original() {
+    async fn delete_elastic_data(&self, data: &RequestData) {
+        if self.node.is_original() {
             Node::bulk_delete_elastic_documents(data.elastic_client(), &self.deleted_node_ids).await;
         }
     }
 
-    async fn undo_delete_elastic_data(&self, data: &RequestData, node: &Node) {
-        if node.is_original() {
+    async fn undo_delete_elastic_data(&self, data: &RequestData) {
+        if self.node.is_original() {
             Node::bulk_insert_elastic_documents(data.elastic_client(), &self.deleted_nodes).await;
         }
     }
 
     // not critical for delete/merge
-    pub async fn delete_attachments(&mut self, data: &RequestData, node: &Node) -> Result<(), NodecosmosError> {
-        Attachment::find_by_node_ids(data.db_session(), node.branch_id, &self.deleted_node_ids)
+    pub async fn delete_attachments(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        Attachment::find_by_node_ids(data.db_session(), self.node.branch_id, &self.deleted_node_ids)
             .await?
             .delete_all(data)?;
 
@@ -714,5 +735,26 @@ impl NodeDelete {
     // not critical for delete/merge
     pub async fn undo_delete_attachments(&mut self) -> Result<(), NodecosmosError> {
         Ok(())
+    }
+}
+
+impl RecoveryLog<'_> for NodeDelete {
+    fn rec_id(&self) -> Uuid {
+        self.node.id
+    }
+
+    fn rec_branch_id(&self) -> Uuid {
+        self.node.branch_id
+    }
+
+    fn rec_object_type(&self) -> RecoveryObjectType {
+        RecoveryObjectType::NodeDelete
+    }
+
+    async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.recover(data).await.map_err(|e| {
+            log::error!("FatalDeleteError recovering from log: {:?}", e);
+            NodecosmosError::FatalDeleteError(format!("Error recovering from log: {:?}", e))
+        })
     }
 }
