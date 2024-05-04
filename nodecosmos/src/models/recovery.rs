@@ -13,6 +13,7 @@ use charybdis::types::{Text, Timestamp, TinyInt, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 pub const RECOVERY_INTERVAL: u8 = 1;
 
@@ -21,6 +22,16 @@ pub enum RecoveryObjectType {
     NodeDelete = 0,
     Reorder = 1,
     Merge = 2,
+}
+
+impl Display for RecoveryObjectType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RecoveryObjectType::NodeDelete => write!(f, "NodeDelete"),
+            RecoveryObjectType::Reorder => write!(f, "Reorder"),
+            RecoveryObjectType::Merge => write!(f, "Merge"),
+        }
+    }
 }
 
 impl From<i8> for RecoveryObjectType {
@@ -126,6 +137,12 @@ impl Recovery {
                 }
             }
 
+            log::info!(
+                "Recovery completed for {} with object id: {}",
+                recovery.object_type.to_string(),
+                recovery.id
+            );
+
             data.resource_locker()
                 .unlock_resource_actions(recovery.id, recovery.branch_id, &[ActionTypes::Recover])
                 .await?;
@@ -159,6 +176,9 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
     }
 
     async fn update_recovery_log_step(&self, db_session: &CachingSession, step: i8) -> Result<(), NodecosmosError> {
+        // sleep 3 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
         let recovery = UpdateStepRecovery {
             branch_id: self.rec_branch_id(),
             object_type: self.rec_object_type() as i8,
