@@ -141,6 +141,7 @@ impl Reorder {
         Ok(())
     }
 
+    // todo: fix this
     async fn execute_reorder(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         while self.reorder_step <= ReorderStep::Finish {
             // log current step
