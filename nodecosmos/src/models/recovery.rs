@@ -77,7 +77,7 @@ impl Recovery {
         let from_min_ago = chrono::Utc::now() - chrono::Duration::minutes(RECOVERY_INTERVAL as i64);
         // 3 minutes should be enough for main processes to recover from a crash.
         // If the process is still down after 3 minutes, we can assume that the process is not going to recover within
-        // a main process lifetime, so we can recover the data from the log.
+        // a main flow and we can start the recovery process.
         let mut recoveries = find_recovery!("updated_at <= ? ALLOW FILTERING", (from_min_ago,))
             .consistency(Consistency::All)
             .execute(&data.db_session())
@@ -114,6 +114,7 @@ impl Recovery {
                 RecoveryObjectType::NodeDelete => {
                     let mut node_delete: NodeDelete =
                         serde_json::from_str(&recovery.data).context("Failed to deserialize node delete data")?;
+                    node_delete.set_step(recovery.step);
                     node_delete
                         .recover_from_log(&data)
                         .await
@@ -122,6 +123,7 @@ impl Recovery {
                 RecoveryObjectType::Reorder => {
                     let mut reorder: Reorder =
                         serde_json::from_str(&recovery.data).context("Failed to deserialize reorder data")?;
+                    reorder.set_step(recovery.step);
                     reorder
                         .recover_from_log(&data)
                         .await
@@ -130,6 +132,9 @@ impl Recovery {
                 RecoveryObjectType::Merge => {
                     let mut merge: BranchMerge =
                         serde_json::from_str(&recovery.data).context("Failed to deserialize branch merge data")?;
+
+                    merge.set_step(recovery.step);
+
                     merge
                         .recover_from_log(&data)
                         .await
@@ -151,7 +156,6 @@ impl Recovery {
         Ok(())
     }
 }
-// todo: fix this
 
 /// Trait for recovering from a log. Before performing a SAGA operation, we serialize
 /// the data structure that we are going to modify and store it in a recovery log. After each successful step, we
@@ -165,6 +169,8 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
 
     fn rec_object_type(&self) -> RecoveryObjectType;
 
+    fn set_step(&mut self, step: i8);
+
     async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError>;
 
     async fn create_recovery_log(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
@@ -177,9 +183,6 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
     }
 
     async fn update_recovery_log_step(&self, db_session: &CachingSession, step: i8) -> Result<(), NodecosmosError> {
-        // sleep 3 seconds
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
         let recovery = UpdateStepRecovery {
             branch_id: self.rec_branch_id(),
             object_type: self.rec_object_type() as i8,

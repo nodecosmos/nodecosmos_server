@@ -88,8 +88,8 @@ pub struct ReorderParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct Reorder {
-    pub reorder_data: ReorderData,
-    pub reorder_step: ReorderStep,
+    reorder_data: ReorderData,
+    reorder_step: ReorderStep,
 }
 
 impl Reorder {
@@ -749,19 +749,20 @@ impl Reorder {
 }
 
 impl RecoveryLog<'_> for Reorder {
-    #[inline]
     fn rec_id(&self) -> Uuid {
         self.reorder_data.node.id
     }
 
-    #[inline]
     fn rec_branch_id(&self) -> Uuid {
         self.reorder_data.node.branch_id
     }
 
-    #[inline]
     fn rec_object_type(&self) -> RecoveryObjectType {
         RecoveryObjectType::Reorder
+    }
+
+    fn set_step(&mut self, step: i8) {
+        self.reorder_step = ReorderStep::from(step);
     }
 
     async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
