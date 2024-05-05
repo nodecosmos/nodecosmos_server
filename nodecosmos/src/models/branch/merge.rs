@@ -345,6 +345,10 @@ impl RecoveryLog<'_> for BranchMerge {
         RecoveryObjectType::Merge
     }
 
+    fn set_step(&mut self, step: i8) {
+        self.merge_step = MergeStep::from(step);
+    }
+
     async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         self.recover(data).await.map_err(|e| {
             log::error!(

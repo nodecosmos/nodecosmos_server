@@ -66,7 +66,7 @@ impl Node {
 }
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
-enum NodeDeleteStep {
+pub enum NodeDeleteStep {
     BeforePlaceholder = -1,
     #[default]
     Start = 0,
@@ -765,6 +765,10 @@ impl RecoveryLog<'_> for NodeDelete {
 
     fn rec_object_type(&self) -> RecoveryObjectType {
         RecoveryObjectType::NodeDelete
+    }
+
+    fn set_step(&mut self, step: i8) {
+        self.delete_step = NodeDeleteStep::from(step);
     }
 
     async fn recover_from_log(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
