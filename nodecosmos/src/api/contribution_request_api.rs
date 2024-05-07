@@ -85,7 +85,7 @@ pub async fn update_contribution_request_description(
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
-#[delete("/{nodeId}/${rootId}/{id}")]
+#[delete("/{nodeId}{rootId}/{id}")]
 pub async fn delete_contribution_request(
     data: RequestData,
     contribution_request: web::Path<ContributionRequest>,

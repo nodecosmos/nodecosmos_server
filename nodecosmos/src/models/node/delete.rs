@@ -67,7 +67,7 @@ impl Node {
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum NodeDeleteStep {
-    BeforePlaceholder = -1,
+    BeforeStart = -1,
     #[default]
     Start = 0,
     ArchiveNodes = 1,
@@ -88,7 +88,7 @@ pub enum NodeDeleteStep {
     DeleteAttachments = 16,
     DeleteElasticData = 17,
     Finish = 18,
-    AfterPlaceholder = 19,
+    AfterFinish = 19,
 }
 
 impl NodeDeleteStep {
@@ -104,7 +104,7 @@ impl NodeDeleteStep {
 impl From<i8> for NodeDeleteStep {
     fn from(value: i8) -> Self {
         match value {
-            -1 => NodeDeleteStep::BeforePlaceholder,
+            -1 => NodeDeleteStep::BeforeStart,
             0 => NodeDeleteStep::Start,
             1 => NodeDeleteStep::ArchiveNodes,
             2 => NodeDeleteStep::ArchiveWorkflows,
@@ -124,7 +124,7 @@ impl From<i8> for NodeDeleteStep {
             16 => NodeDeleteStep::DeleteAttachments,
             17 => NodeDeleteStep::DeleteElasticData,
             18 => NodeDeleteStep::Finish,
-            19 => NodeDeleteStep::AfterPlaceholder,
+            19 => NodeDeleteStep::AfterFinish,
             _ => panic!("Invalid NodeDeleteStep value: {}", value),
         }
     }
@@ -320,7 +320,7 @@ impl NodeDelete {
             }
 
             match self.delete_step {
-                NodeDeleteStep::BeforePlaceholder => {
+                NodeDeleteStep::BeforeStart => {
                     log::error!("should not hit before placeholder");
                 }
                 NodeDeleteStep::Start => {
@@ -346,7 +346,7 @@ impl NodeDelete {
                 NodeDeleteStep::Finish => {
                     self.delete_recovery_log(data.db_session()).await?;
                 }
-                NodeDeleteStep::AfterPlaceholder => {
+                NodeDeleteStep::AfterFinish => {
                     log::error!("should not hit after placeholder");
                 }
             }
@@ -366,7 +366,7 @@ impl NodeDelete {
             }
 
             match self.delete_step {
-                NodeDeleteStep::BeforePlaceholder => {
+                NodeDeleteStep::BeforeStart => {
                     log::error!("should not hit before placeholder");
                 }
                 NodeDeleteStep::Start => {
@@ -392,7 +392,7 @@ impl NodeDelete {
                 NodeDeleteStep::Finish => {
                     log::error!("should not recover finished process");
                 }
-                NodeDeleteStep::AfterPlaceholder => {
+                NodeDeleteStep::AfterFinish => {
                     log::error!("should not hit after placeholder");
                 }
             }
