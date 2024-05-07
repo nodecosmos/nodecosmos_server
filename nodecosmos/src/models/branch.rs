@@ -216,6 +216,8 @@ impl Branch {
     }
 }
 
+partial_branch!(GetNodeIdBranch, id, node_id);
+
 partial_branch!(AuthBranch, id, owner_id, editor_ids, viewer_ids, is_public, status);
 
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes);

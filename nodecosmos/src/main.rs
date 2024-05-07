@@ -10,6 +10,7 @@ mod constants;
 mod errors;
 mod models;
 mod resources;
+mod tasks;
 
 fn main() {
     tokio::runtime::Builder::new_multi_thread()
@@ -113,6 +114,7 @@ fn main() {
                         .service(
                             web::scope("branches")
                                 .service(show_branch)
+                                .service(get_branch_node_id)
                                 .service(restore_node)
                                 .service(undo_delete_node)
                                 .service(restore_io)
@@ -140,6 +142,7 @@ fn main() {
                         )
                         .service(web::scope("ws").service(description_ws))
                 })
+                .keep_alive(std::time::Duration::from_secs(15))
                 .bind(("0.0.0.0", port))
                 .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
                 .run()
