@@ -28,8 +28,8 @@ impl MergeFlows {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleFlow>>, NodecosmosError> {
-        if let (Some(ids), Some(edited_wf_node_ids)) = (&branch.edited_title_flows, &branch.edited_workflow_nodes) {
-            let ios_by_id = UpdateTitleFlow::find_original_by_ids(db_session, edited_wf_node_ids, ids)
+        if let Some(ids) = &branch.edited_title_flows {
+            let ios_by_id = UpdateTitleFlow::find_by_branch_id_and_ids(db_session, branch.id, ids)
                 .await?
                 .group_by_id()
                 .await?;
@@ -41,22 +41,17 @@ impl MergeFlows {
     }
 
     pub async fn restored_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(restored_flow_ids)) =
-            (&branch.edited_workflow_nodes, &branch.restored_flows)
-        {
-            let mut flows = Flow::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                restored_flow_ids,
-            )
-            .await?;
+        if let Some(restored_flow_ids) = &branch.restored_flows {
+            let mut flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             let already_restored_ids =
-                Flow::find_original_by_ids(db_session, edited_workflow_node_ids, restored_flow_ids)
+                Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_ids)
                     .await?
                     .pluck_id_set()
                     .await?;
@@ -70,19 +65,14 @@ impl MergeFlows {
     }
 
     pub async fn created_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_ids)) =
-            (&branch.edited_workflow_nodes, &branch.created_flows)
-        {
-            let flows = Flow::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                created_flow_ids,
-            )
-            .await?;
+        if let Some(created_flow_ids) = &branch.created_flows {
+            let flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flows));
         }
@@ -91,13 +81,11 @@ impl MergeFlows {
     }
 
     pub async fn deleted_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_ids)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flows)
-        {
-            let flows = Flow::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_ids)
+        if let Some(deleted_flow_ids) = &branch.deleted_flows {
+            let flows = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -109,19 +97,14 @@ impl MergeFlows {
     }
 
     pub async fn edited_title_flows(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleFlow>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(edited_title_flows)) =
-            (&branch.edited_workflow_nodes, &branch.edited_title_flows)
-        {
-            let flows = UpdateTitleFlow::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                edited_title_flows,
-            )
-            .await?;
+        if let Some(edited_title_flows) = &branch.edited_title_flows {
+            let flows = UpdateTitleFlow::find_by_branch_id_and_ids(db_session, branch.id, edited_title_flows)
+                .await?
+                .try_collect()
+                .await?;
 
             let flows = branch.map_original_records(flows, ObjectType::Flow).collect();
 
@@ -131,12 +114,12 @@ impl MergeFlows {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_flows = Self::restored_flows(&branch, data.db_session()).await?;
-        let created_flows = Self::created_flows(&branch, data.db_session()).await?;
-        let deleted_flows = Self::deleted_flows(&branch, data.db_session()).await?;
-        let edited_title_flows = Self::edited_title_flows(&branch, data.db_session()).await?;
-        let original_title_flows = Self::original_title_flows(data.db_session(), &branch).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_flows = Self::restored_flows(&db_session, branch).await?;
+        let created_flows = Self::created_flows(&db_session, branch).await?;
+        let deleted_flows = Self::deleted_flows(&db_session, branch).await?;
+        let edited_title_flows = Self::edited_title_flows(&db_session, branch).await?;
+        let original_title_flows = Self::original_title_flows(&db_session, &branch).await?;
 
         Ok(Self {
             restored_flows,

@@ -1,15 +1,12 @@
-use std::cell::OnceCell;
-use std::collections::HashSet;
-
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Find;
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
-use crate::models::traits::{Id, ObjectType};
+use crate::models::traits::{Branchable, Id, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
 
@@ -64,7 +61,7 @@ pub struct Branch {
     pub edited_title_nodes: Option<Set<Uuid>>,
     pub edited_description_nodes: Option<Set<Uuid>>,
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
-    pub edited_workflow_nodes: Option<Set<Uuid>>,
+    pub edited_nodes: Option<Set<Uuid>>,
     /// node_id -> initial_input_ids
     pub created_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
     /// node_id -> initial_input_ids
@@ -108,7 +105,7 @@ pub struct Branch {
 
     #[serde(skip)]
     #[charybdis(ignore)]
-    pub node: OnceCell<Node>,
+    pub node: Option<Node>,
 }
 
 impl Branch {
@@ -124,20 +121,15 @@ impl Branch {
             .map_or(false, |created_nodes| created_nodes.contains(&node_id)))
     }
 
-    pub async fn node(&self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
-        if let Some(node) = self.node.get() {
-            return Ok(node);
+    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
+        if self.node.is_none() {
+            let node = Node::find_by_branch_id_and_id(self.original_id(), self.node_id)
+                .execute(db_session)
+                .await?;
+            self.node = Some(node);
         }
 
-        let node = Node::find_by_primary_key_value(&(self.node_id, self.node_id))
-            .execute(db_session)
-            .await?;
-
-        self.node
-            .set(node)
-            .map_err(|_| NodecosmosError::InternalServerError("Failed to set branch node".to_string()))?;
-
-        Ok(self.node.get().expect("Just set node, so it must be present"))
+        Ok(self.node.as_ref().unwrap())
     }
 
     pub fn all_edited_description_ids(&self) -> HashSet<Uuid> {
@@ -224,6 +216,8 @@ impl Branch {
     }
 }
 
+partial_branch!(GetNodeIdBranch, id, node_id);
+
 partial_branch!(AuthBranch, id, owner_id, editor_ids, viewer_ids, is_public, status);
 
 partial_branch!(UpdateCreatedNodesBranch, id, created_nodes);
@@ -238,7 +232,7 @@ partial_branch!(UpdateEditedDescriptionNodesBranch, id, edited_description_nodes
 
 partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
-partial_branch!(UpdateEditedNodeWorkflowsBranch, id, edited_workflow_nodes);
+partial_branch!(UpdateEditedNodesBranch, id, edited_nodes);
 
 partial_branch!(
     UpdateCreatedWorkflowInitialInputsBranch,

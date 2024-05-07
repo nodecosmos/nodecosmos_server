@@ -25,15 +25,15 @@ pub struct MergeIos {
 
 impl MergeIos {
     pub async fn restored_ios(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(restored_io_ids) = &branch.restored_ios {
             let mut branched_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, &restored_io_ids)
                     .await?;
             let already_restored_ids =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.root_id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, &restored_io_ids)
                     .await?
                     .pluck_id_set();
 
@@ -45,10 +45,10 @@ impl MergeIos {
         Ok(None)
     }
 
-    pub async fn created_ios(branch: &Branch, db_session: &CachingSession) -> Result<Option<Vec<Io>>, NodecosmosError> {
+    pub async fn created_ios(db_session: &CachingSession, branch: &Branch) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(created_io_ids) = &branch.created_ios {
             let created_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.id, created_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, created_io_ids)
                     .await?;
 
             return Ok(Some(created_ios));
@@ -57,11 +57,15 @@ impl MergeIos {
         Ok(None)
     }
 
-    pub async fn deleted_ios(branch: &Branch, db_session: &CachingSession) -> Result<Option<Vec<Io>>, NodecosmosError> {
+    pub async fn deleted_ios(db_session: &CachingSession, branch: &Branch) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(deleted_io_ids) = &branch.deleted_ios {
-            let deleted_ios =
-                Io::find_by_root_id_and_branch_id_and_ids(db_session, branch.root_id, branch.root_id, deleted_io_ids)
-                    .await?;
+            let deleted_ios = Io::find_by_branch_id_and_root_id_and_ids(
+                db_session,
+                branch.original_id(),
+                branch.root_id,
+                deleted_io_ids,
+            )
+            .await?;
 
             return Ok(Some(deleted_ios));
         }
@@ -70,17 +74,11 @@ impl MergeIos {
     }
 
     pub async fn edited_title_ios(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleIo>>, NodecosmosError> {
         if let Some(edited_title_ios) = &branch.edited_title_ios {
-            let ios = UpdateTitleIo::find_by_root_id_and_branch_id_and_ids(
-                db_session,
-                branch.root_id,
-                branch.id,
-                edited_title_ios,
-            )
-            .await?;
+            let ios = UpdateTitleIo::find_by_branch_id_and_ids(db_session, branch.id, edited_title_ios).await?;
 
             let ios = branch.map_original_records(ios, ObjectType::Io).collect();
 
@@ -94,15 +92,15 @@ impl MergeIos {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
-        let root_id = branch.node(&db_session).await?.root_id;
-
         if let Some(ids) = &branch.edited_title_ios {
-            let ios_by_id =
-                find_update_title_io!("root_id = ? AND branch_id = ? AND id IN = ?", (root_id, root_id, ids))
-                    .execute(db_session)
-                    .await?
-                    .group_by_id()
-                    .await?;
+            let ios_by_id = find_update_title_io!(
+                "root_id = ? AND branch_id = ? AND id IN = ?",
+                (branch.root_id, branch.original_id(), ids)
+            )
+            .execute(db_session)
+            .await?
+            .group_by_id()
+            .await?;
 
             return Ok(Some(ios_by_id));
         }
@@ -110,12 +108,12 @@ impl MergeIos {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_ios = Self::restored_ios(branch, data.db_session()).await?;
-        let created_ios = Self::created_ios(branch, data.db_session()).await?;
-        let deleted_ios = Self::deleted_ios(branch, data.db_session()).await?;
-        let edited_title_ios = Self::edited_title_ios(branch, data.db_session()).await?;
-        let original_title_ios = Self::original_title_ios(data.db_session(), &branch).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_ios = Self::restored_ios(db_session, branch).await?;
+        let created_ios = Self::created_ios(db_session, branch).await?;
+        let deleted_ios = Self::deleted_ios(db_session, branch).await?;
+        let edited_title_ios = Self::edited_title_ios(db_session, branch).await?;
+        let original_title_ios = Self::original_title_ios(db_session, &branch).await?;
 
         Ok(Self {
             restored_ios,

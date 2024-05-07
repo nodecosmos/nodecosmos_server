@@ -7,6 +7,7 @@ pub trait Id {
 
 /// implemented by #[derive(RootId)]
 pub trait RootId {
+    #[allow(unused)]
     fn root_id(&self) -> Uuid;
 }
 
@@ -30,6 +31,7 @@ pub trait MaybeFlowId {
 }
 
 pub trait FlowStepId {
+    #[allow(unused)]
     fn flow_step_id(&self) -> Uuid;
 }
 

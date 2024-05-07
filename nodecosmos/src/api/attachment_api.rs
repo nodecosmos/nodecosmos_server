@@ -13,14 +13,15 @@ use crate::models::traits::s3::S3;
 
 #[derive(Deserialize)]
 pub struct ImageAttachmentParams {
-    pub node_id: Uuid,
     pub branch_id: Uuid,
+    pub node_id: Uuid,
     pub object_id: Uuid,
+    pub root_id: Uuid,
 }
 
-#[post("/{node_id}/{branch_id}/{object_id}/upload_image")]
+#[post("/{branch_id}/{node_id}/{root_id}/{object_id}/upload_image")]
 pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: RequestData, payload: Multipart) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
 
     let attachment = Attachment::create_image(&params, &data, payload).await?;
 
@@ -28,19 +29,18 @@ pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: Reques
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AttachmentParams {
-    #[serde(rename = "nodeId")]
+    branch_id: Uuid,
     node_id: Uuid,
-
-    #[serde(rename = "objectId")]
     object_id: Uuid,
-
+    root_id: Uuid,
     filename: String,
 }
 
 #[get("/presigned_url")]
 pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, params.node_id, params.node_id).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
 
     let url = Attachment::get_presigned_url(&data, &params.object_id, &params.filename).await?;
 
@@ -54,7 +54,7 @@ pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: Reque
 
 #[post("")]
 pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, attachment.node_id, attachment.node_id).await?;
+    AuthNode::auth_update(&data, attachment.branch_id, attachment.node_id, attachment.root_id).await?;
 
     attachment.user_id = Some(data.current_user_id());
 

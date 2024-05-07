@@ -43,6 +43,7 @@ pub enum NodecosmosError {
     UnsupportedMediaType,
     ValidationError((String, String)),
     PreconditionFailed(&'static str),
+    BadRequest(String),
     // 400 | 500
     CharybdisError(CharybdisError),
     // 500
@@ -54,7 +55,10 @@ pub enum NodecosmosError {
     DecodeError(base64::DecodeError),
     YjsError(yrs::encoding::read::Error),
     FatalDeleteError(String),
+    /// Merge and recovery fails
     FatalMergeError(String),
+    /// Reorder and recovery fails
+    FatalReorderError(String),
     InternalServerError(String),
     QuickXmlError(quick_xml::Error),
     BroadcastError(String),
@@ -75,6 +79,7 @@ impl fmt::Display for NodecosmosError {
             }
             NodecosmosError::NotFound(e) => write!(f, "Not Found: {}", e),
             NodecosmosError::PreconditionFailed(e) => write!(f, "Precondition Failed: {}", e),
+            NodecosmosError::BadRequest(e) => write!(f, "Bad Request: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: {}", e),
             NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
@@ -85,6 +90,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::YjsError(e) => write!(f, "Yjs Error: {}", e),
             NodecosmosError::FatalDeleteError(e) => write!(f, "Fatal Delete Error: {}", e),
             NodecosmosError::FatalMergeError(e) => write!(f, "Fatal Merge Error: {}", e),
+            NodecosmosError::FatalReorderError(e) => write!(f, "Fatal Reorder Error: {}", e),
             NodecosmosError::QuickXmlError(e) => write!(f, "QuickXmlError Error: {}", e),
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: {}", e),
             NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: {}", e),
@@ -135,6 +141,10 @@ impl ResponseError for NodecosmosError {
             })),
             NodecosmosError::PreconditionFailed(e) => HttpResponse::PreconditionFailed().json(json!({
                 "status": 412,
+                "message": e
+            })),
+            NodecosmosError::BadRequest(e) => HttpResponse::BadRequest().json(json!({
+                "status": 400,
                 "message": e
             })),
             NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().json({
@@ -241,6 +251,12 @@ impl From<strum::ParseError> for NodecosmosError {
 
 impl From<anyhow::Error> for NodecosmosError {
     fn from(e: anyhow::Error) -> Self {
+        NodecosmosError::InternalServerError(format!("{:?}", e))
+    }
+}
+
+impl From<actix_web::Error> for NodecosmosError {
+    fn from(e: actix_web::Error) -> Self {
         NodecosmosError::InternalServerError(format!("{:?}", e))
     }
 }

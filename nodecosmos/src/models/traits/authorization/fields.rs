@@ -14,13 +14,9 @@ pub trait AuthorizationFields {
 
     fn viewer_ids(&self) -> &Option<Set<Uuid>>;
 
-    fn is_frozen(&self) -> bool {
-        false
-    }
+    fn is_frozen(&self) -> bool;
 
-    fn is_public(&self) -> bool {
-        false
-    }
+    fn is_public(&self) -> bool;
 }
 
 impl AuthorizationFields for Branch {
@@ -109,6 +105,14 @@ impl AuthorizationFields for User {
     fn viewer_ids(&self) -> &Option<Set<Uuid>> {
         &None
     }
+
+    fn is_frozen(&self) -> bool {
+        false
+    }
+
+    fn is_public(&self) -> bool {
+        false
+    }
 }
 
 impl AuthorizationFields for CommentThread {
@@ -123,6 +127,14 @@ impl AuthorizationFields for CommentThread {
     fn viewer_ids(&self) -> &Option<Set<Uuid>> {
         &None
     }
+
+    fn is_frozen(&self) -> bool {
+        false
+    }
+
+    fn is_public(&self) -> bool {
+        false
+    }
 }
 
 impl AuthorizationFields for Comment {
@@ -136,5 +148,13 @@ impl AuthorizationFields for Comment {
 
     fn viewer_ids(&self) -> &Option<Set<Uuid>> {
         &None
+    }
+
+    fn is_frozen(&self) -> bool {
+        false
+    }
+
+    fn is_public(&self) -> bool {
+        false
     }
 }

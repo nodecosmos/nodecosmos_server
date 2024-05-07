@@ -1843,7 +1843,7 @@
           false
         ],
         [
-          "edited_workflow_nodes",
+          "edited_nodes",
           "set<uuid>",
           false
         ],
@@ -1973,7 +1973,7 @@
         "is_public",
         "restored_nodes",
         "title",
-        "edited_workflow_nodes",
+        "edited_nodes",
         "created_ios",
         "created_flow_step_inputs_by_node",
         "node_id",
@@ -1995,7 +1995,7 @@
         "restored_ios": "set<uuid>",
         "edited_description_flows": "set<uuid>",
         "deleted_flow_step_nodes": "map<uuid, frozen<set<uuid>>>",
-        "edited_workflow_nodes": "set<uuid>",
+        "edited_nodes": "set<uuid>",
         "id": "uuid",
         "node_id": "uuid",
         "restored_flows": "set<uuid>",

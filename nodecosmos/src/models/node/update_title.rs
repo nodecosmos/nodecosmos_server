@@ -20,7 +20,7 @@ impl UpdateTitleNode {
             for ancestor_id in ancestor_ids {
                 let node_descendant = NodeDescendant {
                     root_id: self.root_id,
-                    branch_id: self.branchise_id(*ancestor_id),
+                    branch_id: self.branch_id,
                     node_id: *ancestor_id,
                     id: self.id,
                     parent_id: self.parent_id.expect("Parent id is should be set"),
@@ -32,11 +32,7 @@ impl UpdateTitleNode {
             }
 
             if let Err(e) = NodeDescendant::batch()
-                .chunked_update(
-                    data.db_session(),
-                    &node_descendants,
-                    crate::constants::MAX_PARALLEL_REQUESTS,
-                )
+                .chunked_update(data.db_session(), &node_descendants, crate::constants::BATCH_CHUNK_SIZE)
                 .await
             {
                 error!(":chunked_update: {}", e);
@@ -47,8 +43,8 @@ impl UpdateTitleNode {
     }
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(&data, self.branch_id, BranchUpdate::EditNodeTitle(self.id)).await?;
+        if self.is_branch() {
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNodeTitle(self.id)).await?;
         }
 
         Ok(())

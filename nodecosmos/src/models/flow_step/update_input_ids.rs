@@ -16,7 +16,7 @@ use crate::models::traits::{Branchable, HashMapVecToSet};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             // for each input and output create branch io if it does not exist
             let io_ids = self
                 .input_ids_by_node_id
@@ -28,7 +28,7 @@ impl UpdateInputIdsFlowStep {
                 .collect();
 
             let ios =
-                Io::find_by_root_id_and_branch_id_and_ids(data.db_session(), self.root_id, self.original_id(), &io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
                     .await?
                     .into_iter()
                     .map(|mut io| {
@@ -76,7 +76,7 @@ impl UpdateInputIdsFlowStep {
             for added_io in added_input_ids {
                 batch.append_statement(
                     Io::PUSH_INPUTTED_BY_FLOW_STEPS_QUERY,
-                    (vec![self.id], self.root_id, self.branch_id, added_io),
+                    (vec![self.id], self.branch_id, self.root_id, added_io),
                 );
             }
         }
@@ -85,7 +85,7 @@ impl UpdateInputIdsFlowStep {
             for removed_io in removed_input_ids {
                 batch.append_statement(
                     Io::PULL_INPUTTED_BY_FLOW_STEPS_QUERY,
-                    (vec![self.id], self.root_id, self.branch_id, removed_io),
+                    (vec![self.id], self.branch_id, self.root_id, removed_io),
                 );
             }
         }
@@ -175,14 +175,14 @@ impl UpdateInputIdsFlowStep {
             deleted_node_inputs_by_flow_step.insert(self.id, removed_input_ids_by_node_id);
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::CreatedFlowStepInputs(created_node_inputs_by_fow_step),
             )
             .await?;
 
             Branch::update(
-                data,
+                data.db_session(),
                 self.branch_id,
                 BranchUpdate::DeletedFlowStepInputs(deleted_node_inputs_by_flow_step),
             )

@@ -43,6 +43,8 @@ pub trait ElasticDocument<T: ElasticIndex + Serialize> {
 
     async fn add_elastic_document(&self, client: &Elasticsearch);
     async fn update_elastic_document(&self, client: &Elasticsearch);
+
+    #[allow(unused)]
     async fn delete_elastic_document(&self, client: &Elasticsearch);
 }
 

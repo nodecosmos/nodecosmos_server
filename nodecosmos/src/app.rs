@@ -13,8 +13,6 @@ use scylla::CachingSession;
 use toml::Value;
 
 use crate::api::data::RequestData;
-use crate::models::branch::merge::BranchMerge;
-use crate::models::node::reorder::Recovery;
 use crate::models::node::Node;
 use crate::models::traits::BuildIndex;
 use crate::models::user::User;
@@ -22,6 +20,7 @@ use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::resource::Resource;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use crate::tasks;
 
 #[derive(Clone)]
 pub struct App {
@@ -78,13 +77,13 @@ impl App {
         Node::build_index(&self.elastic_client).await;
         User::build_index(&self.elastic_client).await;
 
-        // init recovery in case reordering was interrupted or failed
-        Recovery::recover_from_stored_data(&self.db_session, &self.resource_locker).await;
-        BranchMerge::recover_from_stored_data(&RequestData {
+        let data = RequestData {
             app: web::Data::new(self.clone()),
             current_user: Default::default(),
-        })
-        .await;
+        };
+
+        tasks::recovery_task(data).await;
+        tasks::cleanup_rooms_task(self.sse_broadcast.clone()).await;
     }
 
     pub fn cors(&self) -> Cors {

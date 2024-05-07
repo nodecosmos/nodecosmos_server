@@ -11,6 +11,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
+use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
 
@@ -56,6 +57,8 @@ pub struct ContributionRequest {
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+
+    pub root_id: Uuid,
 
     pub editor_ids: Option<Set<Uuid>>,
     pub title: Option<Text>,
@@ -107,7 +110,7 @@ impl Callbacks for ContributionRequest {
 
 impl ContributionRequest {
     pub async fn init_node(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let node = Node::find_by_id_and_branch_id(self.node_id, self.node_id)
+        let node = Node::find_by_branch_id_and_id(self.original_id(), self.node_id)
             .execute(db_session)
             .await?;
         self.node = Some(node);

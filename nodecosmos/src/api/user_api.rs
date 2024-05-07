@@ -58,15 +58,18 @@ pub async fn login(
 
 #[get("/session/sync")]
 pub async fn sync(data: RequestData, client_session: Session) -> Response {
-    let current_user = data
-        .current_user
-        .find_by_primary_key()
-        .execute(data.db_session())
-        .await?;
+    let current_user = data.current_user.find_by_primary_key().execute(data.db_session()).await;
 
-    set_current_user(&client_session, &current_user)?;
-
-    Ok(HttpResponse::Ok().json(current_user))
+    match current_user {
+        Ok(user) => {
+            set_current_user(&client_session, &user)?;
+            Ok(HttpResponse::Ok().json(user))
+        }
+        Err(_) => {
+            remove_current_user(&client_session);
+            Ok(HttpResponse::Unauthorized().finish())
+        }
+    }
 }
 
 #[delete("/session/logout")]

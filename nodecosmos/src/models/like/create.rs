@@ -1,5 +1,4 @@
 use charybdis::operations::Find;
-use charybdis::types::Uuid;
 use chrono::Utc;
 use scylla::CachingSession;
 
@@ -16,10 +15,6 @@ impl Like {
 
         self.user_id = data.current_user.id;
         self.username = data.current_user.username.clone();
-
-        if self.branch_id == Uuid::default() {
-            self.branch_id = self.object_id;
-        }
 
         self.created_at = now;
         self.updated_at = now;
@@ -49,11 +44,9 @@ impl Like {
     pub async fn increment_like_count(&mut self, data: &RequestData) {
         match self.object_type.parse() {
             Ok(LikeObjectType::Node) => {
-                let _ = NodeCounter::increment_like(data, self.object_id, self.branch_id)
-                    .await
-                    .map_err(|e| {
-                        log::error!("Error incrementing like count: {:?}", e);
-                    });
+                let _ = NodeCounter::increment_like(data, &self).await.map_err(|e| {
+                    log::error!("Error incrementing like count: {:?}", e);
+                });
             }
             _ => log::error!("Like Object type not supported"),
         }
@@ -62,11 +55,9 @@ impl Like {
     pub async fn decrement_like_count(&mut self, data: &RequestData) {
         match self.object_type.parse() {
             Ok(LikeObjectType::Node) => {
-                let _ = NodeCounter::decrement_like(data, self.object_id, self.branch_id)
-                    .await
-                    .map_err(|e| {
-                        log::error!("Error decrementing like count: {:?}", e);
-                    });
+                let _ = NodeCounter::decrement_like(data, &self).await.map_err(|e| {
+                    log::error!("Error decrementing like count: {:?}", e);
+                });
             }
             _ => log::error!("Like Object type not supported"),
         }

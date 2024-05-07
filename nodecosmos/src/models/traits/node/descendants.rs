@@ -31,17 +31,24 @@ macro_rules! impl_descendants {
                 Ok(descendants)
             }
 
+            /// combine descendants from original and branched nodes
             async fn branch_descendants(
                 &self,
                 db_session: &CachingSession,
             ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-                let original =
-                    NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
-                        .page_size(5)
-                        .execute(db_session)
-                        .await?
-                        .try_collect()
-                        .await?;
+                use crate::models::traits::Branchable;
+
+                let original = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(
+                    self.root_id,
+                    self.original_id(),
+                    self.id,
+                )
+                .page_size(5)
+                .execute(db_session)
+                .await?
+                .try_collect()
+                .await?;
+
                 let branched =
                     NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.branch_id, self.id)
                         .execute(db_session)

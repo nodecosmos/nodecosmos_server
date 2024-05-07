@@ -43,14 +43,14 @@ impl Comment {
 
         match thread {
             Some(thread) => {
-                let node_id = &thread.object_node_id.map_or(thread.object_id, |id| id);
+                let root_id = thread.root_id;
 
-                let res = ModelEvent::new(&node_id, ActionTypes::Create(ActionObject::Comment), self)
+                let res = ModelEvent::new(root_id, ActionTypes::Create(ActionObject::Comment), self)
                     .send(data)
                     .await;
 
                 if let Err(e) = res {
-                    error!("Error sending message to room {}: {}", node_id, e);
+                    error!("Error sending message to room {}: {}", root_id, e);
                 }
             }
             None => {

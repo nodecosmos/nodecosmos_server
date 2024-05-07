@@ -2,6 +2,7 @@ use crate::models::flow::{Flow, UpdateTitleFlow};
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
 use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::{Node, UpdateTitleNode};
+use crate::models::workflow::{UpdateInitialInputsWorkflow, Workflow};
 
 #[derive(PartialEq, Default, Clone, Copy)]
 pub enum Context {
@@ -40,7 +41,7 @@ pub trait ModelContext {
     /// so change would be visible to the user.
     /// E.g. if we create Contribution Request, and we add Io to the FlowStep, we need to preserve FlowStep, Flow,
     /// and node references on the branch.
-    fn is_branched_init_context(&self) -> bool {
+    fn is_branch_init_context(&self) -> bool {
         self.context_ref() == &Context::BranchedInit
     }
 
@@ -68,6 +69,8 @@ macro_rules! impl_context {
 impl_context!(
     Node,
     UpdateTitleNode,
+    Workflow,
+    UpdateInitialInputsWorkflow,
     Flow,
     UpdateTitleFlow,
     FlowStep,

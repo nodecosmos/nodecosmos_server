@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = archived_workflows,
-    partition_keys = [node_id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]

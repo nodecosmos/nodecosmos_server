@@ -93,34 +93,37 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::Parent for #name {
-            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
+            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-                    if self.is_branched() {
+                    if self.is_branch() {
                         return self.branch_parent(db_session).await;
                     }
-                    let parent = BaseNode::find_by_primary_key_value(&(parent_id, parent_id))
+                    let parent = BaseNode::find_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
                         .await?;
-                    self.parent = Some(parent);
+                    self.parent = Some((Box::new(parent)));
                 }
                 Ok(self.parent.as_mut())
             }
 
-            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut BaseNode>, NodecosmosError> {
+            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-                    let branch_parent = BaseNode::maybe_find_by_primary_key_value(&(parent_id, self.branch_id))
+                    let branch_parent = BaseNode::maybe_find_first_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
                         .await?;
 
                     match branch_parent {
                         Some(parent) => {
-                            self.parent = Some(parent);
+                            self.parent = Some((Box::new(parent)));
                         }
                         None => {
-                            let parent = BaseNode::find_by_primary_key_value(&(parent_id, parent_id))
+                            let mut parent = BaseNode::find_by_branch_id_and_id(self.original_id(), parent_id)
                                 .execute(db_session)
                                 .await?;
-                            self.parent = Some(parent);
+
+                            parent.branch_id = self.branch_id;
+
+                            self.parent = Some(Box::new(parent));
                         }
                     }
                 }
@@ -170,7 +173,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             fn is_frozen(&self) -> bool {
                 use crate::models::traits::AuthorizationFields;
 
-                if self.is_branched() {
+                if self.is_branch() {
                     return match &self.auth_branch {
                         Some(branch) => branch.is_frozen(),
                         None => {
@@ -232,21 +235,24 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
 
         impl crate::models::traits::Authorization for #name {
             async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-                if self.is_original() {
+                 if self.is_original() {
                     // auth info is already initialized
                     if self.owner_id.is_some() {
                         return Ok(());
                     }
 
-                    let auth_node = AuthNode::find_by_id_and_branch_id(self.id, self.id)
+                    let auth_node = AuthNode::find_by_branch_id_and_id(self.branch_id, self.id)
                         .execute(db_session)
                         .await?;
+
+                    self.is_public = auth_node.is_public;
+                    self.viewer_ids = auth_node.viewer_ids;
                     self.owner_id = auth_node.owner_id;
                     self.editor_ids = auth_node.editor_ids;
                 } else {
                     // authorize by branch
                     let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
-                    self.auth_branch = Some(branch);
+                    self.auth_branch = Some(Box::new(branch));
                 }
 
                 Ok(())
@@ -259,10 +265,10 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
                     return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
                 }
 
-                if self.is_branched() {
+                if self.is_branch() {
                     self.auth_update(data).await?;
                 } else if let Some(parent_id) = self.parent_id {
-                    let mut auth_parent_node = crate::models::node::AuthNode::find_by_id_and_branch_id(parent_id, parent_id)
+                    let mut auth_parent_node = crate::models::node::AuthNode::find_by_branch_id_and_id(self.original_id(), parent_id)
                         .execute(data.db_session())
                         .await?;
 

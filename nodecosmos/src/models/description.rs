@@ -23,20 +23,20 @@ mod save;
 
 #[charybdis_model(
     table_name = description,
-    partition_keys = [node_id, branch_id],
+    partition_keys = [branch_id],
     clustering_keys = [object_id],
     global_secondary_indexes = []
 )]
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Description {
-    #[branch(original_id)]
     pub node_id: Uuid,
 
     pub branch_id: Uuid,
+
     pub object_id: Uuid,
 
-    #[serde(default)]
+    #[branch(original_id)]
     pub root_id: Uuid,
 
     pub object_type: Text,
@@ -61,10 +61,9 @@ impl Callbacks for Description {
             )));
         }
 
-        let current =
-            Self::maybe_find_first_by_node_id_and_branch_id_and_object_id(self.node_id, self.branch_id, self.object_id)
-                .execute(session)
-                .await?;
+        let current = Self::maybe_find_first_by_branch_id_and_object_id(self.branch_id, self.object_id)
+            .execute(session)
+            .await?;
 
         if let Some(mut current) = current {
             let branch_id = self.branch_id;
@@ -174,11 +173,10 @@ macro_rules! find_branched {
             pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<&mut Self, NodecosmosError> {
                 use anyhow::Context;
 
-                let branch_self =
-                    Self::maybe_find_by_primary_key_value(&(self.node_id, self.branch_id, self.object_id))
-                        .execute(db_session)
-                        .await
-                        .context("Failed to find branched description")?;
+                let branch_self = Self::maybe_find_by_primary_key_value(&(self.branch_id, self.object_id))
+                    .execute(db_session)
+                    .await
+                    .context("Failed to find branched description")?;
 
                 match branch_self {
                     Some(branch_self) => {
@@ -187,7 +185,7 @@ macro_rules! find_branched {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value(&(self.node_id, self.original_id(), self.object_id))
+                        *self = Self::find_by_primary_key_value(&(self.original_id(), self.object_id))
                             .execute(db_session)
                             .await?;
 
@@ -208,6 +206,7 @@ partial_description!(
     BaseDescription,
     object_id,
     branch_id,
+    root_id,
     object_type,
     node_id,
     html,
