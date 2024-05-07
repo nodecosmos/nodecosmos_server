@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
     table_name = archived_flows,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [vertical_index, start_index, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, vertical_index, start_index, id],
     local_secondary_indexes = [id],
     table_options = r#"
         compression = {
-            'sstable_compression': 'SnappyCompressor',
+            'sstable_compression': 'ZstdCompressor',
             'chunk_length_in_kb': 64
         }
     "#

@@ -9,15 +9,16 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
-use crate::models::traits::{ElasticDocument, UpdateLikeCountNodeElasticIdx};
+use crate::models::like::Like;
+use crate::models::traits::{Branchable, ElasticDocument, UpdateLikeCountNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [id],
     global_secondary_indexes = []
 )]
-#[derive(Serialize, Deserialize, Branchable, Default, Debug)]
+#[derive(Serialize, Deserialize, Branchable, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeCounter {
     pub branch_id: Uuid,
@@ -30,81 +31,76 @@ pub struct NodeCounter {
 }
 
 impl NodeCounter {
-    pub async fn find_by_ids_and_branch_id(
+    pub async fn find_by_ids(
         db_session: &CachingSession,
-        ids: &Set<Uuid>,
         branch_id: Uuid,
+        ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("id IN ? AND branch_id = ?", (ids, branch_id))
+        find_node_counter!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
     }
 
-    pub async fn find_by_ids(
-        db_session: &CachingSession,
-        ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
+    pub async fn update_elastic_document(data: &RequestData, branch_id: Uuid, id: Uuid) {
+        let data = data.clone();
+        tokio::spawn(async move {
+            match Self::like_count(data.db_session(), branch_id, id).await {
+                Ok(lc) => {
+                    UpdateLikeCountNodeElasticIdx {
+                        id,
+                        likes_count: lc as i32,
+                    }
+                    .update_elastic_document(data.elastic_client())
+                    .await;
+                }
+                Err(e) => {
+                    log::error!("Error getting like count: {:?}", e);
+
+                    return;
+                }
+            };
+        });
     }
 }
 
 impl Likeable for NodeCounter {
-    async fn increment_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let lc = Self::like_count(data.db_session(), id, branch_id).await? + 1;
+    async fn increment_like(data: &RequestData, like: &Like) -> Result<(), NodecosmosError> {
         Self {
-            id,
-            branch_id,
+            id: like.object_id,
+            branch_id: like.branch_id,
             ..Default::default()
         }
         .increment_like_count(1)
         .execute(data.db_session())
         .await?;
 
-        let is_original = id == branch_id;
-
-        if is_original {
-            UpdateLikeCountNodeElasticIdx {
-                id,
-                likes_count: lc as i32,
-            }
-            .update_elastic_document(data.elastic_client())
-            .await;
+        if like.is_branch() {
+            Self::update_elastic_document(data, like.branch_id, like.object_id).await;
         }
 
-        Ok(lc)
+        Ok(())
     }
 
-    async fn decrement_like(data: &RequestData, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let lc = Self::like_count(data.db_session(), id, branch_id).await? - 1;
+    async fn decrement_like(data: &RequestData, like: &Like) -> Result<(), NodecosmosError> {
         Self {
-            id,
-            branch_id,
+            id: like.object_id,
+            branch_id: like.branch_id,
             ..Default::default()
         }
         .decrement_like_count(1)
         .execute(data.db_session())
         .await?;
 
-        let is_original = id == branch_id;
-
-        if is_original {
-            UpdateLikeCountNodeElasticIdx {
-                id,
-                likes_count: lc as i32,
-            }
-            .update_elastic_document(data.elastic_client())
-            .await;
+        if like.is_branch() {
+            Self::update_elastic_document(data, like.branch_id, like.object_id).await;
         }
 
-        Ok(lc)
+        Ok(())
     }
 
-    async fn like_count(db_session: &CachingSession, id: Uuid, branch_id: Uuid) -> Result<i64, NodecosmosError> {
-        let res = Self::find_by_primary_key_value(&(id, branch_id))
+    async fn like_count(db_session: &CachingSession, branch_id: Uuid, id: Uuid) -> Result<i64, NodecosmosError> {
+        let res = Self::find_by_primary_key_value(&(branch_id, id))
             .execute(db_session)
             .await
             .ok();

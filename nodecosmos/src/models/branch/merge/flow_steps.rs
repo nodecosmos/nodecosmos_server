@@ -38,25 +38,20 @@ pub struct MergeFlowSteps {
 
 impl MergeFlowSteps {
     pub async fn restored_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(restored_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.restored_flow_steps)
-        {
+        if let Some(restored_flow_step_ids) = &branch.restored_flow_steps {
             let already_restored_ids =
-                FlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, restored_flow_step_ids)
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_step_ids)
                     .await?
                     .pluck_id_set()
                     .await?;
 
-            let mut flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                restored_flow_step_ids,
-            )
-            .await?;
+            let mut flow_steps = FlowStep::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             flow_steps.retain(|flow_step| !already_restored_ids.contains(&flow_step.id));
 
@@ -67,40 +62,33 @@ impl MergeFlowSteps {
     }
 
     pub async fn created_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_steps)
-        {
-            let flow_steps = FlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                created_flow_step_ids,
-            )
-            .await?;
-
-            return Ok(Some(flow_steps));
+        if let Some(created_flow_step_ids) = &branch.created_flow_steps {
+            return Ok(Some(
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.id, created_flow_step_ids)
+                    .await?
+                    .try_collect()
+                    .await
+                    .map_err(NodecosmosError::from)?,
+            ));
         }
 
         Ok(None)
     }
 
     pub async fn deleted_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_ids)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_steps)
-        {
-            let flow_steps =
-                FlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, deleted_flow_step_ids)
+        if let Some(deleted_flow_step_ids) = &branch.deleted_flow_steps {
+            return Ok(Some(
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_step_ids)
                     .await?
                     .try_collect()
-                    .await?;
-
-            return Ok(Some(flow_steps));
+                    .await?,
+            ));
         }
 
         Ok(None)
@@ -144,15 +132,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_nodes)
-        {
+        if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
             let flow_steps =
-                UpdateNodeIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -164,20 +150,15 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_nodes)
-        {
+        if let Some(created_flow_step_nodes) = &branch.created_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = created_flow_step_nodes.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -187,15 +168,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_nodes_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_nodes)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_nodes)
-        {
+        if let Some(deleted_flow_step_nodes) = &branch.deleted_flow_step_nodes {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_nodes.keys().cloned().collect();
             let flow_steps =
-                UpdateNodeIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -208,15 +187,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_inputs_by_node)
-        {
+        if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateInputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateInputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -228,20 +205,15 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_inputs_by_node)
-        {
+        if let Some(created_flow_step_inputs_by_node) = &branch.created_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_inputs_by_node.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -251,15 +223,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_inputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateInputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_inputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_inputs_by_node)
-        {
+        if let Some(deleted_flow_step_inputs_by_node) = &branch.deleted_flow_step_inputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_inputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateInputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateInputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -272,15 +242,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn created_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_outputs_by_node)
-        {
+        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateOutputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -292,20 +260,15 @@ impl MergeFlowSteps {
     }
 
     pub async fn branched_created_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(created_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.created_flow_step_outputs_by_node)
-        {
+        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_node_ids_and_branch_id_and_ids(
-                db_session,
-                edited_workflow_node_ids,
-                branch.id,
-                &flow_step_ids,
-            )
-            .await?;
+            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
+                .await?
+                .try_collect()
+                .await?;
 
             return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
         }
@@ -315,15 +278,13 @@ impl MergeFlowSteps {
 
     // Returns original flow steps
     pub async fn deleted_fs_outputs_flow_steps(
-        branch: &Branch,
         db_session: &CachingSession,
+        branch: &Branch,
     ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let (Some(edited_workflow_node_ids), Some(deleted_flow_step_outputs_by_node)) =
-            (&branch.edited_workflow_nodes, &branch.deleted_flow_step_outputs_by_node)
-        {
+        if let Some(deleted_flow_step_outputs_by_node) = &branch.deleted_flow_step_outputs_by_node {
             let flow_step_ids: Set<Uuid> = deleted_flow_step_outputs_by_node.keys().cloned().collect();
             let flow_steps =
-                UpdateOutputIdsFlowStep::find_original_by_ids(db_session, edited_workflow_node_ids, &flow_step_ids)
+                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
                     .await?
                     .try_collect()
                     .await?;
@@ -334,22 +295,22 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
-    pub async fn new(branch: &Branch, data: &RequestData) -> Result<Self, NodecosmosError> {
-        let restored_flow_steps = Self::restored_flow_steps(&branch, data.db_session()).await?;
-        let created_flow_steps = Self::created_flow_steps(&branch, data.db_session()).await?;
-        let deleted_flow_steps = Self::deleted_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
+    pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
+        let restored_flow_steps = Self::restored_flow_steps(&db_session, branch).await?;
+        let created_flow_steps = Self::created_flow_steps(&db_session, branch).await?;
+        let deleted_flow_steps = Self::deleted_flow_steps(&db_session, branch).await?;
+        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&db_session, branch).await?;
         let branched_created_fs_nodes_flow_steps =
-            Self::branched_created_fs_nodes_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_nodes_flow_steps(&db_session, branch).await?;
+        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&db_session, branch).await?;
+        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&db_session, branch).await?;
         let branched_created_fs_inputs_flow_steps =
-            Self::branched_created_fs_inputs_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&branch, data.db_session()).await?;
-        let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_inputs_flow_steps(&db_session, branch).await?;
+        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&db_session, branch).await?;
+        let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&db_session, branch).await?;
         let branched_created_fs_outputs_flow_steps =
-            Self::branched_created_fs_outputs_flow_steps(&branch, data.db_session()).await?;
-        let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&branch, data.db_session()).await?;
+            Self::branched_created_fs_outputs_flow_steps(&db_session, branch).await?;
+        let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&db_session, branch).await?;
 
         Ok(Self {
             restored_flow_steps,
@@ -497,8 +458,6 @@ impl MergeFlowSteps {
                     // of the current branch.
                     let mut added_delta = vec![];
 
-                    println!("branch_fs.node_ids: {:?}", branch_fs.node_ids);
-
                     if let Some(node_ids) = branch_fs.node_ids.as_ref() {
                         node_ids.iter().for_each(|node_id| {
                             if let Some(original_node_ids) = original_flow_step.node_ids.as_ref() {
@@ -511,7 +470,9 @@ impl MergeFlowSteps {
                         });
                     };
 
-                    println!("added_delta: {:?}", added_delta);
+                    if added_delta.is_empty() {
+                        continue;
+                    }
 
                     // run update
                     original_flow_step.append_nodes(&added_delta);
@@ -583,6 +544,10 @@ impl MergeFlowSteps {
                             }
                         }
                     });
+
+                    if removed_delta.is_empty() {
+                        continue;
+                    }
 
                     // run update
                     original_flow_step.remove_nodes(&removed_delta);
@@ -661,6 +626,10 @@ impl MergeFlowSteps {
 
                             added_inputs_delta.insert(*node_id, added_delta);
                         });
+                    }
+
+                    if added_inputs_delta.is_empty() {
+                        continue;
                     }
 
                     // run update
@@ -745,6 +714,10 @@ impl MergeFlowSteps {
                         }
                     });
 
+                    if deleted_inputs_delta.is_empty() {
+                        continue;
+                    }
+
                     // run update
                     original_flow_step.remove_inputs(&deleted_inputs_delta);
                     original_flow_step.set_merge_context();
@@ -823,6 +796,10 @@ impl MergeFlowSteps {
 
                             added_outputs_delta.insert(*node_id, added_delta);
                         });
+                    }
+
+                    if added_outputs_delta.is_empty() {
+                        continue;
                     }
 
                     // run update
@@ -907,6 +884,10 @@ impl MergeFlowSteps {
                             deleted_outputs_delta.insert(*node_id, removed_delta);
                         }
                     });
+
+                    if deleted_outputs_delta.is_empty() {
+                        continue;
+                    }
 
                     original_flow_step.remove_outputs(&deleted_outputs_delta);
                     original_flow_step.set_merge_context();

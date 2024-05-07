@@ -17,8 +17,8 @@ const MAX_IMAGE_WIDTH: u32 = 852;
 
 #[charybdis_model(
     table_name = attachments,
-    partition_keys = [node_id, branch_id],
-    clustering_keys = [object_id, id],
+    partition_keys = [branch_id],
+    clustering_keys = [node_id, object_id, id],
     static_columns = [],
 )]
 #[derive(Serialize, Deserialize, Default)]
@@ -27,6 +27,7 @@ pub struct Attachment {
     pub node_id: Uuid,
     pub branch_id: Uuid,
     pub object_id: Uuid,
+    pub root_id: Uuid,
 
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
@@ -91,22 +92,10 @@ impl Attachment {
 
     pub async fn find_by_node_ids(
         db_session: &CachingSession,
-        ids: &[Uuid],
-    ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("node_id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
-    pub async fn find_by_node_ids_and_branch_id(
-        db_session: &CachingSession,
-        ids: &[Uuid],
         branch_id: Uuid,
+        ids: &[Uuid],
     ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("node_id = ? AND branch_id = ?", (ids, branch_id))
+        find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()

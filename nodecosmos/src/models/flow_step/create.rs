@@ -7,8 +7,8 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow::Flow;
 use crate::models::flow_step::{FlowStep, PkFlowStep};
-use crate::models::traits::ModelContext;
 use crate::models::traits::{Branchable, FindOrInsertBranched};
+use crate::models::traits::{ModelBranchParams, ModelContext};
 
 impl FlowStep {
     pub fn set_defaults(&mut self) {
@@ -22,7 +22,7 @@ impl FlowStep {
     }
 
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             let mut maybe_original = FlowStep {
                 node_id: self.node_id,
                 branch_id: self.original_id(),
@@ -61,26 +61,35 @@ impl FlowStep {
     }
 
     pub async fn preserve_branch_flow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Flow::find_or_insert_branched(data, self.node_id, self.branch_id, self.flow_id).await?;
+        if self.is_branch() {
+            Flow::find_or_insert_branched(
+                data,
+                ModelBranchParams {
+                    original_id: self.original_id(),
+                    branch_id: self.branch_id,
+                    node_id: self.node_id,
+                    id: self.flow_id,
+                },
+            )
+            .await?;
         }
 
         Ok(())
     }
 
     pub async fn update_branch_with_creation(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
+        if self.is_branch() {
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::CreateFlowStep(self.id)).await?;
         }
 
         Ok(())
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
-            Branch::update(data, self.branch_id, BranchUpdate::EditNodeWorkflow(self.node_id)).await?;
-            Branch::update(data, self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
+        if self.is_branch() {
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
+            Branch::update(data.db_session(), self.branch_id, BranchUpdate::DeleteFlowStep(self.id)).await?;
         }
 
         Ok(())

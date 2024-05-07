@@ -2,7 +2,6 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::operations::{Delete, Find};
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
@@ -13,13 +12,14 @@ use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal};
+use crate::models::node::delete::NodeDelete;
+use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
 
 mod auth;
 mod create;
-mod delete;
+pub mod delete;
 pub mod reorder;
 pub mod search;
 pub mod sort;
@@ -28,24 +28,25 @@ mod update_owner;
 mod update_title;
 
 /// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
-/// So `Authorization` trait is implemented within `NodeAuthorization` and it's automatically implemented for all
-/// partial models if they have `auth_branch` field.
+/// So `Branchable` derive is automatically applied to all partial_node models.
 #[charybdis_model(
     table_name = nodes,
-    partition_keys = [id],
-    clustering_keys = [branch_id],
+    partition_keys = [branch_id],
+    clustering_keys = [id],
 )]
 #[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
+    /// Original records are ones where branch_id == root_id.
+    /// Branched are ones where branch_id == branch.id.
     #[serde(default)]
     pub branch_id: Uuid,
 
     #[serde(default)]
-    #[branch(original_id)]
     pub id: Uuid,
 
     #[serde(default)]
+    #[branch(original_id)]
     pub root_id: Uuid,
 
     #[serde(default)]
@@ -75,11 +76,19 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub parent: Option<BaseNode>,
+    pub parent: Option<Box<BaseNode>>,
 
+    // For branched node we use branch fields to authenticate edits, not the original node.
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub auth_branch: Option<AuthBranch>,
+    pub auth_branch: Option<Box<AuthBranch>>,
+
+    // Used only in case of merge undo to recover deleted data.
+    // We should only delete single node in the ancestor chain as the time,
+    // so we don't need to worry about large memory usage.
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub delete_data: Option<Box<NodeDelete>>,
 
     #[charybdis(ignore)]
     #[serde(skip)]
@@ -104,12 +113,17 @@ impl Callbacks for Node {
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 
-        self.delete_by_partition_key().execute(db_session).await?;
-
         Ok(())
     }
 
     async fn after_insert(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        // In case of branch undo, we need to recover deleted data.
+        // We shouldn't have duplicate delete_data for descendants as we only delete single node in the ancestor chain.
+        // Note we consume delete_data here to avoid copying in next step
+        if let Some(mut delete_data) = self.delete_data.take() {
+            delete_data.recover(data).await?;
+        }
+
         let self_clone = self.clone();
         let data = data.clone();
 
@@ -122,7 +136,15 @@ impl Callbacks for Node {
     }
 
     async fn before_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        *self = Node::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+        *self = Node::find_branched_or_original(
+            data.db_session(),
+            NodeBranchParams {
+                root_id: self.root_id,
+                branch_id: self.branch_id,
+                node_id: self.id,
+            },
+        )
+        .await?;
 
         self.preserve_branch_ancestors(data).await?;
         self.preserve_branch_descendants(data).await?;
@@ -140,8 +162,12 @@ impl Callbacks for Node {
 }
 
 impl Node {
-    pub async fn is_original_deleted(db_session: &CachingSession, id: Uuid) -> Result<bool, NodecosmosError> {
-        let is_none = PkNode::maybe_find_first_by_id_and_branch_id(id, id)
+    pub async fn is_original_deleted(
+        db_session: &CachingSession,
+        original_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, NodecosmosError> {
+        let is_none = PkNode::maybe_find_first_by_branch_id_and_id(original_id, id)
             .execute(db_session)
             .await?
             .is_none();
@@ -149,23 +175,12 @@ impl Node {
         Ok(is_none)
     }
 
-    pub async fn find_by_ids_and_branch_id(
-        db_session: &CachingSession,
-        ids: &Set<Uuid>,
-        branch_id: Uuid,
-    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("id IN ? AND branch_id = ?", (ids, branch_id))
-            .execute(db_session)
-            .await?;
-
-        Ok(res)
-    }
-
     pub async fn find_by_ids(
         db_session: &CachingSession,
+        branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("id IN ? AND branch_id IN ?", (ids, ids))
+        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?;
 
@@ -173,25 +188,15 @@ impl Node {
     }
 }
 
-partial_node!(PkNode, id, branch_id, owner_id, editor_ids, ancestor_ids);
+partial_node!(PkNode, branch_id, id, root_id, owner_id, editor_ids, ancestor_ids);
 
 impl PkNode {
-    pub async fn find_by_ids(db_session: &CachingSession, ids: &[Uuid]) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("id IN ? AND branch_id IN ?", (ids, ids))
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await?;
-
-        Ok(res)
-    }
-
-    pub async fn find_by_ids_and_branch_id(
+    pub async fn find_by_ids(
         db_session: &CachingSession,
-        ids: &[Uuid],
         branch_id: Uuid,
+        ids: &[Uuid],
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("id IN ? AND branch_id = ?", (ids, branch_id))
+        let res = find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -203,9 +208,9 @@ impl PkNode {
 
 partial_node!(
     BaseNode,
-    root_id,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -224,9 +229,9 @@ partial_node!(
 
 partial_node!(
     GetStructureNode,
-    root_id,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -239,12 +244,13 @@ partial_node!(
     ctx
 );
 
-partial_node!(UpdateOrderNode, id, branch_id, parent_id, order_index);
+partial_node!(UpdateOrderNode, branch_id, id, root_id, parent_id, order_index);
 
 partial_node!(
     UpdateTitleNode,
-    id,
     branch_id,
+    id,
+    root_id,
     order_index,
     owner_id,
     editor_ids,
@@ -253,7 +259,6 @@ partial_node!(
     ancestor_ids,
     title,
     updated_at,
-    root_id,
     parent_id,
     parent,
     auth_branch,
@@ -265,17 +270,27 @@ impl Callbacks for UpdateTitleNode {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
-        if self.is_branched() {
+        if self.is_branch() {
             self.as_native().create_branched_if_not_exist(data).await?;
             self.update_branch(&data).await?;
         }
 
-        let current = Self::find_branched_or_original(data.db_session(), self.id, self.branch_id).await?;
+        if !self.is_merge_context() {
+            let title_clone = self.title.clone();
 
-        self.root_id = current.root_id;
-        self.ancestor_ids = current.ancestor_ids;
-        self.order_index = current.order_index;
-        self.parent_id = current.parent_id;
+            // find_branched_or_original is used to get the latest data.
+            *self = Self::find_branched_or_original(
+                data.db_session(),
+                NodeBranchParams {
+                    root_id: self.root_id,
+                    branch_id: self.branch_id,
+                    node_id: self.id,
+                },
+            )
+            .await?;
+
+            self.title = title_clone;
+        }
 
         self.update_title_for_ancestors(data).await?;
 
@@ -294,12 +309,13 @@ impl Callbacks for UpdateTitleNode {
     }
 }
 
-partial_node!(PrimaryKeyNode, id, branch_id);
+partial_node!(PrimaryKeyNode, branch_id, id, root_id);
 
 partial_node!(
     AuthNode,
-    id,
     branch_id,
+    id,
+    root_id,
     owner_id,
     editor_ids,
     viewer_ids,
@@ -309,12 +325,13 @@ partial_node!(
     auth_branch
 );
 
-partial_node!(UpdateOwnerNode, id, branch_id, owner_id, owner, updated_at);
+partial_node!(UpdateOwnerNode, branch_id, id, root_id, owner_id, owner, updated_at);
 
 partial_node!(
     UpdateCoverImageNode,
-    id,
     branch_id,
+    id,
+    root_id,
     cover_image_filename,
     cover_image_url,
     updated_at

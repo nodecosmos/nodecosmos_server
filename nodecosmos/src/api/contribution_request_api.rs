@@ -30,7 +30,7 @@ pub async fn get_contribution_requests(db_session: web::Data<CachingSession>, no
     Ok(HttpResponse::Ok().json(contribution_requests))
 }
 
-#[get("/{nodeId}/{id}")]
+#[get("/{nodeId}/{rootId}/{id}")]
 pub async fn get_contribution_request(
     db_session: web::Data<CachingSession>,
     contribution_request: web::Path<ContributionRequest>,
@@ -85,7 +85,7 @@ pub async fn update_contribution_request_description(
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
-#[delete("/{nodeId}/{id}")]
+#[delete("/{nodeId}/${rootId}/{id}")]
 pub async fn delete_contribution_request(
     data: RequestData,
     contribution_request: web::Path<ContributionRequest>,
@@ -133,7 +133,7 @@ pub async fn merge_contribution_request(
     // check if merge is allowed in the root
     if let Err(e) = data
         .resource_locker()
-        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, root_id)
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, root_id, true)
         .await
     {
         // unlock complete resource as merge is not allowed
@@ -146,7 +146,7 @@ pub async fn merge_contribution_request(
     // check if merge is allowed in the branch
     if let Err(e) = data
         .resource_locker()
-        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, branch_id)
+        .validate_resource_action_unlocked(ActionTypes::Merge, root_id, branch_id, true)
         .await
     {
         // unlock complete resource as merge is not allowed

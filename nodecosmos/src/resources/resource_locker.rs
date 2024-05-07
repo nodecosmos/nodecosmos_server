@@ -16,6 +16,7 @@ pub struct ResourceLocker {
 impl ResourceLocker {
     pub const ONE_HOUR: usize = 1000 * 60 * 60;
     pub const TWO_SECONDS: usize = 2000;
+    pub const FIVE_MINUTES: usize = 1000 * 60 * 5;
 
     pub fn new(pool: &Pool) -> Self {
         Self { pool: pool.clone() }
@@ -25,7 +26,7 @@ impl ResourceLocker {
     pub async fn lock_resource(&self, id: Uuid, branch_id: Uuid, ttl: usize) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
-        if let Err(e) = self.validate_resource_unlocked(id, branch_id).await {
+        if let Err(e) = self.validate_resource_unlocked(id, branch_id, true).await {
             return Err(NodecosmosError::ResourceAlreadyLocked(format!(
                 "Resource: {} is already locked: Error: {}",
                 id, e
@@ -53,18 +54,20 @@ impl ResourceLocker {
         &self,
         id: Uuid,
         branch_id: Uuid,
-        actions: Vec<ActionTypes>,
+        actions: &[ActionTypes],
         ttl: usize,
     ) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
         // Locking particular actions requires resource to be unlocked
-        self.validate_resource_unlocked(id, branch_id).await.map_err(|e| {
-            return NodecosmosError::ResourceAlreadyLocked(format!(
-                "[lock_resource_actions] Resource  is already locked. Error: {}",
-                e
-            ));
-        })?;
+        self.validate_resource_unlocked(id, branch_id, true)
+            .await
+            .map_err(|e| {
+                return NodecosmosError::ResourceAlreadyLocked(format!(
+                    "[lock_resource_actions] Resource  is already locked. Error: {}",
+                    e
+                ));
+            })?;
 
         let mut pipe = redis::pipe();
         for action in actions {
@@ -94,7 +97,7 @@ impl ResourceLocker {
         &self,
         id: Uuid,
         branch_id: Uuid,
-        actions: Vec<ActionTypes>,
+        actions: &[ActionTypes],
     ) -> Result<bool, NodecosmosError> {
         let mut connection = self.pool.get().await?;
         let mut pipe = redis::pipe();
@@ -142,8 +145,13 @@ impl ResourceLocker {
         Ok(res)
     }
 
-    pub async fn validate_resource_unlocked(&self, id: Uuid, branch_id: Uuid) -> Result<(), NodecosmosError> {
-        if self.is_resource_locked(id, branch_id).await? {
+    pub async fn validate_resource_unlocked(
+        &self,
+        id: Uuid,
+        branch_id: Uuid,
+        retry: bool,
+    ) -> Result<(), NodecosmosError> {
+        if self.is_resource_locked(id, branch_id).await? && retry {
             // try again
             tokio::time::sleep(tokio::time::Duration::from_millis(Self::RETRY_LOCK_TIMEOUT)).await;
 
@@ -160,8 +168,9 @@ impl ResourceLocker {
         action: ActionTypes,
         id: Uuid,
         branch_id: Uuid,
+        retry: bool,
     ) -> Result<(), NodecosmosError> {
-        if self.is_resource_action_locked(&action, id, branch_id).await? {
+        if self.is_resource_action_locked(&action, id, branch_id).await? && retry {
             // try again
             tokio::time::sleep(tokio::time::Duration::from_millis(Self::RETRY_LOCK_TIMEOUT)).await;
 

@@ -16,6 +16,7 @@ impl UpdateOwnerNode {
         Self {
             id: nodes_by_owner.id,
             branch_id: nodes_by_owner.branch_id,
+            root_id: nodes_by_owner.root_id,
             owner_id: Some(nodes_by_owner.owner_id),
             owner: Some(owner),
             updated_at: chrono::Utc::now(),
@@ -60,11 +61,7 @@ impl UpdateOwnerNode {
         UpdateOwnerNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await;
 
         Self::unlogged_batch()
-            .chunked_insert(
-                data.db_session(),
-                &nodes_to_update,
-                crate::constants::MAX_PARALLEL_REQUESTS,
-            )
+            .chunked_insert(data.db_session(), &nodes_to_update, crate::constants::BATCH_CHUNK_SIZE)
             .await
             .map_err(|e| {
                 error!("[run::chunked_insert] {}", e);

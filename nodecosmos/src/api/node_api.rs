@@ -3,19 +3,21 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use futures::StreamExt;
 use scylla::CachingSession;
 use serde_json::json;
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::BroadcastStream; // This is crucial for handling streams
 
 use crate::api::request::current_user::OptCurrentUser;
 use crate::api::request::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
+use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
+use crate::models::traits::Authorization;
 use crate::models::traits::Descendants;
-use crate::models::traits::{Authorization, Branchable};
 use crate::resources::resource_locker::ResourceLocker;
 
 #[get("")]
@@ -24,9 +26,13 @@ pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) 
     Ok(HttpResponse::Ok().json(nodes))
 }
 
-#[get("/{id}")]
-pub async fn get_node(db_session: web::Data<CachingSession>, opt_cu: OptCurrentUser, id: web::Path<Uuid>) -> Response {
-    let mut node = BaseNode::find_by_id_and_branch_id(*id, *id)
+#[get("/{branchId}/{id}/original")]
+pub async fn get_node(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    params: web::Path<PrimaryKeyNode>,
+) -> Response {
+    let mut node = BaseNode::find_by_branch_id_and_id(params.branch_id, params.id)
         .execute(&db_session)
         .await?;
 
@@ -42,13 +48,13 @@ pub async fn get_node(db_session: web::Data<CachingSession>, opt_cu: OptCurrentU
     }))
 }
 
-#[get("/{id}/{branchId}")]
+#[get("/{branchId}/{id}/branch")]
 pub async fn get_branched_node(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
     pk: web::Path<PrimaryKeyNode>,
 ) -> Response {
-    let mut node = BaseNode::find_by_id_and_branch_id(pk.id, pk.branch_id)
+    let mut node = BaseNode::find_by_branch_id_and_id(pk.branch_id, pk.id)
         .execute(&db_session)
         .await?;
 
@@ -71,8 +77,8 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
     data.resource_locker()
         .lock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::TWO_SECONDS,
         )
         .await?;
@@ -82,8 +88,8 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
     data.resource_locker()
         .unlock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
 
@@ -100,26 +106,28 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
     data.resource_locker()
         .lock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::TWO_SECONDS,
         )
         .await?;
 
-    node.update_cb(&data).execute(data.db_session()).await?;
+    let res = node.update_cb(&data).execute(data.db_session()).await;
 
     data.resource_locker()
         .unlock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
+
+    res?;
 
     Ok(HttpResponse::Ok().json(node))
 }
 
-#[delete("/{id}/{branchId}")]
+#[delete("/{branchId}/{id}/{rootId}")]
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
 
@@ -128,8 +136,8 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
     data.resource_locker()
         .lock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
             ResourceLocker::ONE_HOUR,
         )
         .await?;
@@ -139,8 +147,8 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
     data.resource_locker()
         .unlock_resource_actions(
             node.root_id,
-            node.branchise_id(node.root_id),
-            vec![ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            node.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
 
@@ -149,15 +157,15 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_by_id_and_branch_id(params.id, params.branch_id)
+    let mut node = Node::find_by_branch_id_and_id(params.branch_id, params.id)
         .execute(data.db_session())
         .await?;
 
     node.auth_update(&data).await?;
 
-    // first lock the complete resource to avoid all types of race conditions
+    // first lock the complete resource to avoid all kinds of race conditions
     data.resource_locker()
-        .lock_resource(node.root_id, node.branchise_id(node.root_id), ResourceLocker::ONE_HOUR)
+        .lock_resource(node.root_id, node.branch_id, ResourceLocker::ONE_HOUR)
         .await?;
 
     // validate that reorder is allowed
@@ -166,13 +174,14 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
         .validate_resource_action_unlocked(
             ActionTypes::Reorder(ActionObject::Node),
             node.root_id,
-            node.branchise_id(node.root_id),
+            node.branch_id,
+            true,
         )
         .await
     {
         // unlock complete resource as reorder is not allowed
         data.resource_locker()
-            .unlock_resource(node.root_id, node.branchise_id(node.root_id))
+            .unlock_resource(node.root_id, node.branch_id)
             .await?;
 
         // return reorder not allowed error
@@ -180,23 +189,38 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     }
 
     // execute reorder
-    node.reorder(&data, params.into_inner()).await?;
+    let res = node.reorder(&data, params.into_inner()).await;
 
-    // unlock complete resource
-    data.resource_locker()
-        .unlock_resource(node.root_id, node.branchise_id(node.root_id))
-        .await?;
-
-    Ok(HttpResponse::Ok().finish())
+    return match res {
+        Ok(_) => {
+            // unlock complete resource
+            data.resource_locker()
+                .unlock_resource(node.root_id, node.branch_id)
+                .await?;
+            Ok(HttpResponse::Ok().finish())
+        }
+        Err(e) => {
+            match e {
+                // unlock complete resource in case of validation errors
+                NodecosmosError::Forbidden(_) | NodecosmosError::Conflict(_) => {
+                    data.resource_locker()
+                        .unlock_resource(node.root_id, node.branch_id)
+                        .await?;
+                }
+                _ => {}
+            }
+            Err(e)
+        }
+    };
 }
 
-#[post("/{id}/{branchId}/upload_cover_image")]
+#[post("/{branchId}/{id}/{rootId}/upload_cover_image")]
 async fn upload_cover_image(
     mut node: web::Path<UpdateCoverImageNode>,
     data: RequestData,
     payload: Multipart,
 ) -> Response {
-    AuthNode::auth_update(&data, node.id, node.branch_id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id, node.root_id).await?;
 
     node.update_cover_image(&data, payload).await?;
 
@@ -205,20 +229,24 @@ async fn upload_cover_image(
     })))
 }
 
-#[delete("/{id}/{branchId}/delete_cover_image")]
+#[delete("/{branchId}/{id}/{rootId}/delete_cover_image")]
 async fn delete_cover_image(mut node: web::Path<UpdateCoverImageNode>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, node.id, node.branch_id).await?;
+    AuthNode::auth_update(&data, node.branch_id, node.id, node.root_id).await?;
 
     node.delete_cover_image(&data).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/{id}/events/listen")]
-pub async fn listen_node_events(id: web::Path<Uuid>, data: RequestData) -> Response {
-    let sender = data.sse_broadcast().get_or_create_room(id.into_inner());
-    let receiver = sender.subscribe();
-    let stream = BroadcastStream::new(receiver);
+#[get("/{root_id}/events/listen")]
+pub async fn listen_node_events(root_id: web::Path<Uuid>, data: RequestData) -> Response {
+    let root_id = *root_id;
+    let broadcaster = data.sse_broadcast();
+    let receiver = broadcaster.build_receiver(root_id);
+    let stream = BroadcastStream::new(receiver).map(|msg| match msg {
+        Ok(data) => Ok::<_, actix_web::Error>(data),
+        Err(_) => Err(NodecosmosError::InternalServerError("Failed to send event".to_string()).into()),
+    });
 
     Ok(HttpResponse::Ok().content_type("text/event-stream").streaming(stream))
 }

@@ -1,4 +1,8 @@
+use crate::models::branch::Branch;
+use crate::models::contribution_request::ContributionRequest;
 use charybdis::types::Uuid;
+use nodecosmos_macros::Branchable;
+use serde::Deserialize;
 
 use crate::models::node::reorder::data::ReorderData;
 
@@ -18,19 +22,8 @@ pub trait Branchable {
         self.branch_id() == self.original_id()
     }
 
-    fn is_branched(&self) -> bool {
+    fn is_branch(&self) -> bool {
         self.branch_id() != self.original_id()
-    }
-
-    /// Returns the branch_id if the model is branched, otherwise returns the provided id
-    /// Logic is very simple and more symbolic than functional, but it's useful for readability as
-    /// different models can be branched by different fields.
-    fn branchise_id(&self, id: Uuid) -> Uuid {
-        if self.is_original() {
-            id
-        } else {
-            self.branch_id()
-        }
     }
 
     /// Sets the branch_id to the original_id
@@ -39,7 +32,7 @@ pub trait Branchable {
 
 impl Branchable for ReorderData {
     fn original_id(&self) -> Uuid {
-        self.node.id
+        self.node.root_id
     }
 
     fn branch_id(&self) -> Uuid {
@@ -47,4 +40,50 @@ impl Branchable for ReorderData {
     }
 
     fn set_original_id(&mut self) {}
+}
+
+impl Branchable for Branch {
+    fn original_id(&self) -> Uuid {
+        self.root_id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.id
+    }
+
+    fn set_original_id(&mut self) {
+        panic!("Branch model cannot be original")
+    }
+}
+
+impl Branchable for ContributionRequest {
+    fn original_id(&self) -> Uuid {
+        self.root_id
+    }
+
+    fn branch_id(&self) -> Uuid {
+        self.id
+    }
+
+    fn set_original_id(&mut self) {
+        panic!("Branch model cannot be original")
+    }
+}
+
+#[derive(Branchable, Deserialize)]
+pub struct NodeBranchParams {
+    #[branch(original_id)]
+    pub root_id: Uuid,
+
+    pub branch_id: Uuid,
+    pub node_id: Uuid,
+}
+
+#[derive(Branchable)]
+pub struct ModelBranchParams {
+    #[branch(original_id)]
+    pub original_id: Uuid,
+    pub branch_id: Uuid,
+    pub node_id: Uuid,
+    pub id: Uuid,
 }
