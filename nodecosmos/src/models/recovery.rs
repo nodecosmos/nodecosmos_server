@@ -15,7 +15,7 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-pub const RECOVERY_INTERVAL: u8 = 1;
+pub const RECOVERY_INTERVAL_MIN: i64 = 3;
 
 #[derive(Deserialize)]
 pub enum RecoveryObjectType {
@@ -74,10 +74,10 @@ impl Recovery {
     }
 
     pub async fn run_recovery_task(data: &RequestData) -> Result<(), NodecosmosError> {
-        let from_min_ago = chrono::Utc::now() - chrono::Duration::minutes(RECOVERY_INTERVAL as i64);
+        let from_min_ago = chrono::Utc::now() - chrono::Duration::minutes(RECOVERY_INTERVAL_MIN);
         // 3 minutes should be enough for main processes to recover from a crash.
-        // If the process is still down after 3 minutes, we can assume that the process is not going to recover within
-        // a main flow and we can start the recovery process.
+        // If the process is still down after 3 minutes, we can assume that the process is dead,
+        // and we can recover the data from the log.
         let mut recoveries = find_recovery!("updated_at <= ? ALLOW FILTERING", (from_min_ago,))
             .consistency(Consistency::All)
             .execute(&data.db_session())

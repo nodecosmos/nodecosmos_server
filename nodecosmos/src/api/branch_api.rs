@@ -7,7 +7,7 @@ use serde::Deserialize;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
+use crate::models::branch::{Branch, GetNodeIdBranch};
 use crate::models::traits::Authorization;
 
 #[get("/{id}")]
@@ -20,6 +20,15 @@ pub async fn show_branch(
 
     // we only reload on actions that require branch/update to be called
     branch.auth_view(&db_session, &opt_cu).await?;
+
+    Ok(HttpResponse::Ok().json(branch))
+}
+
+#[get("/{id}/node_id")]
+pub async fn get_branch_node_id(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
+    let branch = GetNodeIdBranch::find_by_id(id.into_inner())
+        .execute(&db_session)
+        .await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }

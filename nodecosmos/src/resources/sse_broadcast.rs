@@ -36,6 +36,15 @@ impl SseBroadcast {
         Ok(())
     }
 
+    pub fn ping_channels(&self) {
+        for channel in self.root_channels.iter() {
+            let root_id = channel.key();
+            if let Some(sender) = self.root_channels.get(&root_id) {
+                let _ = sender.send(web::Bytes::from("event: PING\ndata: PONG\n\n"));
+            }
+        }
+    }
+
     pub fn build_receiver(&self, root_id: Uuid) -> broadcast::Receiver<Bytes> {
         let receiver;
 

@@ -47,7 +47,7 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Vec<Uuid>>();
 
-        let original_ancestor_ids_set = PkNode::find_by_ids(db_session, branch.id, &original_ancestor_ids)
+        let original_ancestor_ids_set = PkNode::find_by_ids(db_session, branch.original_id(), &original_ancestor_ids)
             .await?
             .pluck_id_set();
 
@@ -350,11 +350,14 @@ impl<'a> MergeConflicts<'a> {
             .collect::<Set<Uuid>>();
 
         if let Some(edited_node_ids) = &self.branch_merge.branch.edited_nodes {
-            let original_flow_step_ids_set =
-                FlowStep::find_by_branch_id_and_node_ids(db_session, self.branch_merge.branch.id, &edited_node_ids)
-                    .await?
-                    .pluck_id_set()
-                    .await?;
+            let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_node_ids(
+                db_session,
+                self.branch_merge.branch.original_id(),
+                &edited_node_ids,
+            )
+            .await?
+            .pluck_id_set()
+            .await?;
 
             let conflict_deleted_edited_flow_steps = original_edited_flow_step_ids
                 .iter()
@@ -456,7 +459,7 @@ impl<'a> MergeConflicts<'a> {
 
         let original_io_ids_set = Io::find_by_branch_id_and_root_id_and_ids(
             db_session,
-            self.branch_merge.branch.root_id,
+            self.branch_merge.branch.original_id(),
             self.branch_merge.branch.root_id,
             &original_edited_io_ids,
         )
