@@ -32,7 +32,7 @@ pub struct MergeError {
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum MergeStep {
-    BeforePlaceholder = -1,
+    BeforeStart = -1,
     Start = 0,
     RestoreNodes = 1,
     CreateNodes = 2,
@@ -60,7 +60,7 @@ pub enum MergeStep {
     UpdateDescriptions = 24,
     DeleteDescriptions = 25,
     Finish = 26,
-    AfterPlaceholder = 27,
+    AfterFinish = 27,
 }
 
 impl MergeStep {
@@ -76,7 +76,7 @@ impl MergeStep {
 impl From<i8> for MergeStep {
     fn from(value: i8) -> Self {
         match value {
-            -1 => MergeStep::BeforePlaceholder,
+            -1 => MergeStep::BeforeStart,
             0 => MergeStep::Start,
             1 => MergeStep::RestoreNodes,
             2 => MergeStep::CreateNodes,
@@ -104,7 +104,7 @@ impl From<i8> for MergeStep {
             24 => MergeStep::UpdateDescriptions,
             25 => MergeStep::DeleteDescriptions,
             26 => MergeStep::Finish,
-            27 => MergeStep::AfterPlaceholder,
+            27 => MergeStep::AfterFinish,
             _ => panic!("Invalid merge step value: {}", value),
         }
     }
@@ -218,7 +218,7 @@ impl BranchMerge {
             }
 
             match self.merge_step {
-                MergeStep::BeforePlaceholder => {
+                MergeStep::BeforeStart => {
                     log::error!("should not hit before placeholder");
                 }
                 MergeStep::Start => {
@@ -252,7 +252,7 @@ impl BranchMerge {
                 MergeStep::Finish => {
                     self.delete_recovery_log(data.db_session()).await?;
                 }
-                MergeStep::AfterPlaceholder => {
+                MergeStep::AfterFinish => {
                     log::error!("should not hit after placeholder");
                 }
             }
@@ -273,7 +273,7 @@ impl BranchMerge {
             }
 
             match self.merge_step {
-                MergeStep::BeforePlaceholder => {
+                MergeStep::BeforeStart => {
                     log::error!("should not hit before placeholder");
                 }
                 MergeStep::Start => {
@@ -307,7 +307,7 @@ impl BranchMerge {
                 MergeStep::Finish => {
                     log::error!("should not recover finished process");
                 }
-                MergeStep::AfterPlaceholder => {
+                MergeStep::AfterFinish => {
                     log::error!("should not hit after placeholder");
                 }
             }

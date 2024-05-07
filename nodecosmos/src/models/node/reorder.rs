@@ -24,7 +24,7 @@ mod validator;
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum ReorderStep {
-    BeforePlaceholder = -1,
+    BeforeStart = -1,
     Start = 0,
     UpdateNodeOrderIndex = 1,
     RemoveNodeFromOldAncestors = 2,
@@ -37,7 +37,7 @@ pub enum ReorderStep {
     InsertNodeDescendantsToAddedAncestors = 9,
     UpdateBranch = 10,
     Finish = 11,
-    AfterPlaceholder = 12,
+    AfterFinish = 12,
 }
 
 impl ReorderStep {
@@ -53,7 +53,7 @@ impl ReorderStep {
 impl From<i8> for ReorderStep {
     fn from(value: i8) -> Self {
         match value {
-            -1 => ReorderStep::BeforePlaceholder,
+            -1 => ReorderStep::BeforeStart,
             0 => ReorderStep::Start,
             1 => ReorderStep::UpdateNodeOrderIndex,
             2 => ReorderStep::RemoveNodeFromOldAncestors,
@@ -66,7 +66,7 @@ impl From<i8> for ReorderStep {
             9 => ReorderStep::InsertNodeDescendantsToAddedAncestors,
             10 => ReorderStep::UpdateBranch,
             11 => ReorderStep::Finish,
-            12 => ReorderStep::AfterPlaceholder,
+            12 => ReorderStep::AfterFinish,
             _ => panic!("Invalid value for ReorderStep"),
         }
     }
@@ -150,7 +150,7 @@ impl Reorder {
             }
 
             match self.reorder_step {
-                ReorderStep::BeforePlaceholder => {
+                ReorderStep::BeforeStart => {
                     log::error!("should not execute before placeholder");
                 }
                 ReorderStep::Start => {
@@ -177,7 +177,7 @@ impl Reorder {
                 ReorderStep::Finish => {
                     self.delete_recovery_log(db_session).await?;
                 }
-                ReorderStep::AfterPlaceholder => {
+                ReorderStep::AfterFinish => {
                     log::error!("should not execute after placeholder");
                 }
             }
@@ -197,7 +197,7 @@ impl Reorder {
             }
 
             match self.reorder_step {
-                ReorderStep::BeforePlaceholder => {
+                ReorderStep::BeforeStart => {
                     log::error!("should not hit before placeholder");
                 }
                 ReorderStep::Start => {
@@ -227,7 +227,7 @@ impl Reorder {
                 ReorderStep::Finish => {
                     log::error!("should not recover finished process");
                 }
-                ReorderStep::AfterPlaceholder => {
+                ReorderStep::AfterFinish => {
                     log::error!("should not hit after placeholder");
                 }
             }
