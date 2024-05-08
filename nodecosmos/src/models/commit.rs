@@ -4,7 +4,7 @@ use charybdis::types::{Frozen, List, Map, Set, Text, Timestamp, Uuid};
 use nodecosmos_macros::Branchable;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Serialize, Deserialize)]
 pub enum CommitObject {
     /// For each ancestor we need to store node creation, deletion, title, description, and reordering
     CreateNode(Uuid),
@@ -45,7 +45,7 @@ pub enum CommitObject {
 #[charybdis_model(
     table_name = commits,
     partition_keys = [branch_id],
-    clustering_keys = [node_id],
+    clustering_keys = [node_id, id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
@@ -58,7 +58,11 @@ pub struct Commit {
 
     pub object_id: Uuid,
 
-    pub commit_object: Text,
+    pub id: Uuid,
+
+    pub commit_type: Text,
+
+    pub data: Text,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
