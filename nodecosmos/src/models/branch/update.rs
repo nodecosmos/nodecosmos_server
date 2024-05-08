@@ -90,9 +90,10 @@ impl Branch {
                 let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();
                 let params = (ids, branch_id);
 
+                // we may need to pull created nodes, but the problem is that if ancestor is deleted then restored
+                // we will not have created node in the created_nodes set.
                 res = batch
                     .append_statement(UpdateDeletedNodesBranch::PUSH_DELETED_NODES_QUERY, &params)
-                    .append_statement(UpdateCreatedNodesBranch::PULL_CREATED_NODES_QUERY, &params)
                     .append_statement(UpdateRestoredNodesBranch::PULL_RESTORED_NODES_QUERY, &params)
                     .append_statement(UpdateEditedNodesBranch::PULL_EDITED_NODES_QUERY, &params)
                     .execute(db_session)

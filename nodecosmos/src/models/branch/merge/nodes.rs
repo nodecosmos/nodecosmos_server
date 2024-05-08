@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::{Frozen, List, Uuid};
+use charybdis::types::{Frozen, List, Set, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +55,15 @@ impl MergeNodes {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let Some(created_node_ids) = &branch.created_nodes {
+        if let Some(mut created_node_ids) = branch.created_nodes.clone() {
+            if let Some(deleted_node_ids) = &branch.deleted_nodes {
+                created_node_ids = created_node_ids
+                    .iter()
+                    .filter(|id| !deleted_node_ids.contains(id))
+                    .copied()
+                    .collect::<Set<Uuid>>();
+            }
+
             let mut created_nodes = Node::find_by_ids(db_session, branch.id, &created_node_ids)
                 .await?
                 .try_collect()
@@ -296,7 +304,7 @@ impl MergeNodes {
                         };
 
                         // reorder has it's own recovery logic
-                        let res = node.reorder(data, reorder_params).await;
+                        let res = Node::reorder(data, &reorder_params).await;
 
                         if let Err(e) = res {
                             match e {
@@ -352,7 +360,7 @@ impl MergeNodes {
                             new_lower_sibling_id: None,
                         };
 
-                        let res = node.reorder(data, reorder_params).await;
+                        let res = Node::reorder(data, &reorder_params).await;
 
                         if let Err(e) = res {
                             log::error!(

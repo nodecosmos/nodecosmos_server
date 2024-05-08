@@ -76,7 +76,7 @@ pub struct Node {
 
     #[charybdis(ignore)]
     #[serde(skip)]
-    pub parent: Option<Box<BaseNode>>,
+    pub parent: Option<Box<Node>>,
 
     // For branched node we use branch fields to authenticate edits, not the original node.
     #[charybdis(ignore)]

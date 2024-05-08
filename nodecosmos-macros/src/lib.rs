@@ -93,12 +93,12 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::models::traits::Parent for #name {
-            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
+            async fn parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<Node>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
                     if self.is_branch() {
                         return self.branch_parent(db_session).await;
                     }
-                    let parent = BaseNode::find_by_branch_id_and_id(self.branch_id, parent_id)
+                    let parent = Node::find_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
                         .await?;
                     self.parent = Some((Box::new(parent)));
@@ -106,9 +106,9 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
                 Ok(self.parent.as_mut())
             }
 
-            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<BaseNode>>, NodecosmosError> {
+            async fn branch_parent(&mut self, db_session: &CachingSession) -> Result<Option<&mut Box<Node>>, NodecosmosError> {
                 if let (Some(parent_id), None) = (self.parent_id, &self.parent) {
-                    let branch_parent = BaseNode::maybe_find_first_by_branch_id_and_id(self.branch_id, parent_id)
+                    let branch_parent = Node::maybe_find_first_by_branch_id_and_id(self.branch_id, parent_id)
                         .execute(db_session)
                         .await?;
 
@@ -117,7 +117,7 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
                             self.parent = Some((Box::new(parent)));
                         }
                         None => {
-                            let mut parent = BaseNode::find_by_branch_id_and_id(self.original_id(), parent_id)
+                            let mut parent = Node::find_by_branch_id_and_id(self.original_id(), parent_id)
                                 .execute(db_session)
                                 .await?;
 

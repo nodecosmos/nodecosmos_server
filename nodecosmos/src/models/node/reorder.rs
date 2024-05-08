@@ -790,8 +790,8 @@ impl RecoveryLog<'_> for Reorder {
 }
 
 impl Node {
-    pub async fn reorder(&self, data: &RequestData, params: ReorderParams) -> Result<(), NodecosmosError> {
-        let reorder_data = ReorderData::from_params(&params, data).await?;
+    pub async fn reorder(data: &RequestData, params: &ReorderParams) -> Result<(), NodecosmosError> {
+        let reorder_data = ReorderData::from_params(params, data).await?;
 
         ReorderValidator::new(&reorder_data).validate()?;
         Reorder::new(reorder_data).run(data.db_session()).await?;

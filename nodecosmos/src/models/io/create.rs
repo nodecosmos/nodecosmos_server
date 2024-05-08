@@ -10,7 +10,7 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, NodeBranchParams};
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext, NodeBranchParams};
 
 impl Io {
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -137,7 +137,7 @@ impl Io {
     }
 
     pub async fn update_branch_with_deletion(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
+        if self.is_branch() && !self.is_parent_delete_context() {
             Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             Branch::update(data.db_session(), self.branch_id, BranchUpdate::DeleteIo(self.id)).await?;
         }

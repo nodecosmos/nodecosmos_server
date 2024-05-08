@@ -157,15 +157,11 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
 
 #[put("/reorder")]
 pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) -> Response {
-    let mut node = Node::find_by_branch_id_and_id(params.branch_id, params.id)
-        .execute(data.db_session())
-        .await?;
-
-    node.auth_update(&data).await?;
+    AuthNode::auth_update(&data, params.branch_id, params.id, params.root_id).await?;
 
     // first lock the complete resource to avoid all kinds of race conditions
     data.resource_locker()
-        .lock_resource(node.root_id, node.branch_id, ResourceLocker::ONE_HOUR)
+        .lock_resource(params.root_id, params.branch_id, ResourceLocker::ONE_HOUR)
         .await?;
 
     // validate that reorder is allowed
@@ -173,15 +169,15 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
         .resource_locker()
         .validate_resource_action_unlocked(
             ActionTypes::Reorder(ActionObject::Node),
-            node.root_id,
-            node.branch_id,
+            params.root_id,
+            params.branch_id,
             true,
         )
         .await
     {
         // unlock complete resource as reorder is not allowed
         data.resource_locker()
-            .unlock_resource(node.root_id, node.branch_id)
+            .unlock_resource(params.root_id, params.branch_id)
             .await?;
 
         // return reorder not allowed error
@@ -189,13 +185,13 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     }
 
     // execute reorder
-    let res = node.reorder(&data, params.into_inner()).await;
+    let res = Node::reorder(&data, &params).await;
 
     return match res {
         Ok(_) => {
             // unlock complete resource
             data.resource_locker()
-                .unlock_resource(node.root_id, node.branch_id)
+                .unlock_resource(params.root_id, params.branch_id)
                 .await?;
             Ok(HttpResponse::Ok().finish())
         }
@@ -204,7 +200,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
                 // unlock complete resource in case of validation errors
                 NodecosmosError::Forbidden(_) | NodecosmosError::Conflict(_) => {
                     data.resource_locker()
-                        .unlock_resource(node.root_id, node.branch_id)
+                        .unlock_resource(params.root_id, params.branch_id)
                         .await?;
                 }
                 _ => {}
