@@ -45,16 +45,13 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(restored_flow_ids) = &branch.restored_flows {
-            let mut flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids)
-                .await?
-                .try_collect()
-                .await?;
-
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids).await?;
             let already_restored_ids =
                 Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_ids)
                     .await?
                     .pluck_id_set()
                     .await?;
+            let mut flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
 
             flows.retain(|flow| !already_restored_ids.contains(&flow.id));
 
@@ -69,10 +66,8 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(created_flow_ids) = &branch.created_flows {
-            let flows = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids).await?;
+            let flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
 
             return Ok(Some(flows));
         }
@@ -85,10 +80,8 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(deleted_flow_ids) = &branch.deleted_flows {
-            let flows = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids).await?;
+            let flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
 
             return Ok(Some(flows));
         }

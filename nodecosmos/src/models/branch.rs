@@ -1,10 +1,15 @@
 use charybdis::macros::charybdis_model;
+use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
+use futures::stream::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::errors::NodecosmosError;
+use crate::models::flow::Flow;
+use crate::models::flow_step::FlowStep;
+use crate::models::io::Io;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, Id, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
@@ -213,6 +218,108 @@ impl Branch {
                     .as_ref()
                     .map_or(false, |deleted_ids| deleted_ids.contains(&record.id()))
         })
+    }
+
+    async fn filter_out_nodes_with_deleted_parents(
+        &self,
+        mut records: CharybdisModelStream<Node>,
+    ) -> Result<Vec<Node>, NodecosmosError> {
+        let mut nodes = vec![];
+
+        while let Some(node) = records.next().await {
+            let node = node?;
+
+            if self.deleted_nodes.as_ref().is_some_and(|deleted_ids| {
+                node.ancestor_ids
+                    .as_ref()
+                    .is_some_and(|ancestor_ids| ancestor_ids.iter().any(|id| deleted_ids.contains(&id)))
+            }) {
+                continue;
+            }
+
+            nodes.push(node);
+        }
+
+        Ok(nodes)
+    }
+
+    async fn filter_out_flows_with_deleted_parents(
+        &self,
+        mut records: CharybdisModelStream<Flow>,
+    ) -> Result<Vec<Flow>, NodecosmosError> {
+        let mut flows = vec![];
+
+        while let Some(flow) = records.next().await {
+            let flow = flow?;
+
+            if self
+                .deleted_nodes
+                .as_ref()
+                .is_some_and(|ids| ids.contains(&flow.node_id))
+            {
+                continue;
+            }
+
+            flows.push(flow);
+        }
+
+        Ok(flows)
+    }
+
+    async fn filter_out_flow_steps_with_deleted_parents(
+        &self,
+        mut records: CharybdisModelStream<FlowStep>,
+    ) -> Result<Vec<FlowStep>, NodecosmosError> {
+        let mut flow_steps = vec![];
+
+        while let Some(flow_step) = records.next().await {
+            let flow_step = flow_step.unwrap();
+
+            if self
+                .deleted_flows
+                .as_ref()
+                .is_some_and(|ids| ids.contains(&flow_step.flow_id))
+            {
+                continue;
+            }
+
+            if self
+                .deleted_nodes
+                .as_ref()
+                .is_some_and(|ids| ids.contains(&flow_step.node_id))
+            {
+                continue;
+            }
+
+            flow_steps.push(flow_step);
+        }
+
+        Ok(flow_steps)
+    }
+
+    fn filter_out_ios_with_deleted_parents(&self, records: Vec<Io>) -> Vec<Io> {
+        records
+            .into_iter()
+            .filter(|io| {
+                if let Some(fs_id) = io.flow_step_id {
+                    if self.deleted_flow_steps.as_ref().is_some_and(|ids| ids.contains(&fs_id)) {
+                        return false;
+                    }
+                }
+
+                if let Some(flow_id) = io.flow_id {
+                    if self.deleted_flows.as_ref().is_some_and(|ids| ids.contains(&flow_id)) {
+                        return false;
+                    }
+                }
+
+                if self.deleted_nodes.as_ref().is_some_and(|ids| ids.contains(&io.node_id)) {
+                    return false;
+                }
+
+                return true;
+            })
+            .collect()
     }
 }
 

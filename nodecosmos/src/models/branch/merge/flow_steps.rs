@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep};
+use crate::models::flow_step::{
+    FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
+};
 use crate::models::traits::{Branchable, FindForBranchMerge, FlowId, Id, IncrementFraction, NodeId, Reload};
 use crate::models::traits::{ModelContext, PluckFromStream};
 
@@ -43,15 +45,12 @@ impl MergeFlowSteps {
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(restored_flow_step_ids) = &branch.restored_flow_steps {
             let already_restored_ids =
-                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_step_ids)
+                PkFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_step_ids)
                     .await?
                     .pluck_id_set()
                     .await?;
-
-            let mut flow_steps = FlowStep::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_step_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let fs_stream = FlowStep::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_step_ids).await?;
+            let mut flow_steps = branch.filter_out_flow_steps_with_deleted_parents(fs_stream).await?;
 
             flow_steps.retain(|flow_step| !already_restored_ids.contains(&flow_step.id));
 
@@ -66,13 +65,10 @@ impl MergeFlowSteps {
         branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(created_flow_step_ids) = &branch.created_flow_steps {
-            return Ok(Some(
-                FlowStep::find_by_branch_id_and_ids(db_session, branch.id, created_flow_step_ids)
-                    .await?
-                    .try_collect()
-                    .await
-                    .map_err(NodecosmosError::from)?,
-            ));
+            let fs_stream = FlowStep::find_by_branch_id_and_ids(db_session, branch.id, created_flow_step_ids).await?;
+            let flow_steps = branch.filter_out_flow_steps_with_deleted_parents(fs_stream).await?;
+
+            return Ok(Some(flow_steps));
         }
 
         Ok(None)
@@ -83,12 +79,11 @@ impl MergeFlowSteps {
         branch: &Branch,
     ) -> Result<Option<Vec<FlowStep>>, NodecosmosError> {
         if let Some(deleted_flow_step_ids) = &branch.deleted_flow_steps {
-            return Ok(Some(
-                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_step_ids)
-                    .await?
-                    .try_collect()
-                    .await?,
-            ));
+            let fs_stream =
+                FlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_step_ids).await?;
+            let flow_steps = branch.filter_out_flow_steps_with_deleted_parents(fs_stream).await?;
+
+            return Ok(Some(flow_steps));
         }
 
         Ok(None)

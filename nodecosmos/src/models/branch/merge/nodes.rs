@@ -64,10 +64,8 @@ impl MergeNodes {
                     .collect::<Set<Uuid>>();
             }
 
-            let mut created_nodes = Node::find_by_ids(db_session, branch.id, &created_node_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let n_stream = Node::find_by_ids(db_session, branch.id, &created_node_ids).await?;
+            let mut created_nodes = branch.filter_out_nodes_with_deleted_parents(n_stream).await?;
 
             created_nodes.sort_by_depth();
 
