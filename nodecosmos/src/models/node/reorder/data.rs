@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::{BaseNode, GetStructureNode, Node};
+use crate::models::node::{GetStructureNode, Node};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, NodeBranchParams, Pluck};
 use crate::models::traits::{Descendants, Parent};
@@ -55,7 +55,7 @@ impl ReorderData {
         };
     }
 
-    async fn find_new_parent(db_session: &CachingSession, params: &ReorderParams) -> Result<BaseNode, NodecosmosError> {
+    async fn find_new_parent(data: &RequestData, params: &ReorderParams) -> Result<Node, NodecosmosError> {
         let mut query_new_parent_node = Node {
             id: params.id,
             branch_id: params.branch_id,
@@ -63,10 +63,16 @@ impl ReorderData {
             root_id: params.root_id,
             ..Default::default()
         };
-        let new_parent = query_new_parent_node.parent(&db_session).await?;
+        let new_parent = query_new_parent_node.parent(data.db_session()).await?;
 
         match new_parent {
-            Some(new_parent) => Ok(new_parent.as_ref().clone()),
+            Some(new_parent) => {
+                let mut parent = new_parent.as_ref().clone();
+                parent.preserve_branch_ancestors(data).await?;
+                parent.create_branched_if_original_exist(data).await?;
+
+                Ok(parent)
+            }
             None => Err(NodecosmosError::NotFound(format!(
                 "Parent with id {} and branch_id {} not found",
                 params.new_parent_id, params.branch_id
@@ -83,7 +89,7 @@ impl ReorderData {
         return Ok(Some(node));
     }
 
-    fn build_new_ancestor_ids(new_parent: &BaseNode) -> Set<Uuid> {
+    fn build_new_ancestor_ids(new_parent: &Node) -> Set<Uuid> {
         let mut new_ancestors = new_parent.ancestor_ids.ref_cloned();
 
         new_ancestors.insert(new_parent.id);
@@ -153,6 +159,7 @@ impl ReorderData {
             },
         )
         .await?;
+        node.preserve_branch_ancestors(data).await?;
 
         let descendants = Self::find_descendants(data.db_session(), params, &node).await?;
         let descendant_ids = descendants.pluck_id();
@@ -160,7 +167,7 @@ impl ReorderData {
             Some(id) => id,
             None => return Err(NodecosmosError::BadRequest("Node has no parent".to_string())),
         };
-        let new_parent = Self::find_new_parent(data.db_session(), params).await?;
+        let new_parent = Self::find_new_parent(data, params).await?;
         let old_ancestor_ids = node.ancestor_ids.ref_cloned();
         let new_ancestor_ids = Self::build_new_ancestor_ids(&new_parent);
         let removed_ancestor_ids = Self::extract_removed_ancestor_ids(&old_ancestor_ids, &new_ancestor_ids);

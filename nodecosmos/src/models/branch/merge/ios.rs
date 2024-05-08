@@ -65,7 +65,22 @@ impl MergeIos {
                 branch.root_id,
                 deleted_io_ids,
             )
-            .await?;
+            .await?
+            .into_iter()
+            .filter(|io| {
+                if let Some(fs_id) = io.flow_step_id {
+                    if branch
+                        .deleted_flow_steps
+                        .as_ref()
+                        .is_some_and(|ids| ids.contains(&fs_id))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            .collect();
 
             return Ok(Some(deleted_ios));
         }
