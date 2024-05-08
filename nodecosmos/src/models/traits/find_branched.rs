@@ -9,8 +9,9 @@ use crate::errors::NodecosmosError;
 use crate::models::description::{find_description, Description};
 use crate::models::flow::{find_flow, find_update_title_flow, Flow, UpdateTitleFlow};
 use crate::models::flow_step::{
-    find_flow_step, find_update_input_ids_flow_step, find_update_node_ids_flow_step, find_update_output_ids_flow_step,
-    FlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
+    find_flow_step, find_pk_flow_step, find_update_input_ids_flow_step, find_update_node_ids_flow_step,
+    find_update_output_ids_flow_step, FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep,
+    UpdateOutputIdsFlowStep,
 };
 use crate::models::node::{BaseNode, GetStructureNode, Node, UpdateTitleNode};
 use crate::models::traits::ModelContext;
@@ -269,6 +270,30 @@ impl FindForBranchMerge for FlowStep {
         ids: &Set<Uuid>,
     ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
         find_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+}
+
+impl FindForBranchMerge for PkFlowStep {
+    async fn find_by_branch_id_and_node_ids(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        node_ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_pk_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
+    }
+
+    async fn find_by_branch_id_and_ids(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        ids: &Set<Uuid>,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        find_pk_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)

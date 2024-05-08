@@ -38,6 +38,7 @@ impl MergeIos {
                     .pluck_id_set();
 
             branched_ios.retain(|branched_node| !already_restored_ids.contains(&branched_node.id));
+            let branched_ios = branch.filter_out_ios_with_deleted_parents(branched_ios);
 
             return Ok(Some(branched_ios));
         }
@@ -50,6 +51,7 @@ impl MergeIos {
             let created_ios =
                 Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, created_io_ids)
                     .await?;
+            let created_ios = branch.filter_out_ios_with_deleted_parents(created_ios);
 
             return Ok(Some(created_ios));
         }
@@ -65,22 +67,9 @@ impl MergeIos {
                 branch.root_id,
                 deleted_io_ids,
             )
-            .await?
-            .into_iter()
-            .filter(|io| {
-                if let Some(fs_id) = io.flow_step_id {
-                    if branch
-                        .deleted_flow_steps
-                        .as_ref()
-                        .is_some_and(|ids| ids.contains(&fs_id))
-                    {
-                        return false;
-                    }
-                }
+            .await?;
 
-                return true;
-            })
-            .collect();
+            let deleted_ios = branch.filter_out_ios_with_deleted_parents(deleted_ios);
 
             return Ok(Some(deleted_ios));
         }
