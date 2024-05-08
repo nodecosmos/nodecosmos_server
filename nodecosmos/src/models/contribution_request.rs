@@ -1,3 +1,4 @@
+use charybdis::batch::CharybdisBatch;
 use std::fmt;
 
 use charybdis::callbacks::Callbacks;
@@ -10,10 +11,15 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::node::Node;
+use crate::models::description::Description;
+use crate::models::flow::PkFlow;
+use crate::models::flow_step::PkFlowStep;
+use crate::models::io::DeleteIo;
+use crate::models::node::{Node, PkNode};
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
+use crate::models::workflow::DeleteWorkflow;
 
 pub mod create;
 pub mod update;
@@ -103,6 +109,52 @@ impl Callbacks for ContributionRequest {
 
     async fn after_delete(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), Self::Error> {
         self.branch(db_session).await?.delete().execute(db_session).await?;
+
+        // delete branch data
+        let nodes = PkNode {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let workflow = DeleteWorkflow {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let flow = PkFlow {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let step = PkFlowStep {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let io = DeleteIo {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let description = Description {
+            branch_id: self.id,
+            ..Default::default()
+        };
+
+        let mut batch = CharybdisBatch::new();
+
+        let _ = batch
+            .append(nodes.delete_by_partition_key())
+            .append(workflow.delete_by_partition_key())
+            .append(flow.delete_by_partition_key())
+            .append(step.delete_by_partition_key())
+            .append(io.delete_by_partition_key())
+            .append(description.delete_by_partition_key())
+            .execute(db_session)
+            .await
+            .map_err(|e| {
+                log::error!("Error deleting branch data: {:?}", e);
+            });
 
         Ok(())
     }
