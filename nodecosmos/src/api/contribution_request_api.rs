@@ -9,6 +9,8 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionTypes, Response};
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
+use crate::models::comment::Comment;
+use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
 };
@@ -37,10 +39,22 @@ pub async fn get_contribution_request(
 ) -> Response {
     let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
     let branch = Branch::find_by_id(contribution_request.id).execute(&db_session).await?;
+    let comments = Comment::find_by_object_id(contribution_request.id)
+        .execute(&db_session)
+        .await?
+        .try_collect()
+        .await?;
+    let threads = CommentThread::find_by_object_id(contribution_request.id)
+        .execute(&db_session)
+        .await?
+        .try_collect()
+        .await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "contributionRequest": contribution_request,
         "branch": branch,
+        "comments": comments,
+        "threads": threads,
     })))
 }
 
@@ -85,7 +99,7 @@ pub async fn update_contribution_request_description(
     Ok(HttpResponse::Ok().json(contribution_request))
 }
 
-#[delete("/{nodeId}{rootId}/{id}")]
+#[delete("/{nodeId}/{rootId}/{id}")]
 pub async fn delete_contribution_request(
     data: RequestData,
     contribution_request: web::Path<ContributionRequest>,
