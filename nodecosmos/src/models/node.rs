@@ -110,6 +110,7 @@ impl Callbacks for Node {
                 .context("Failed to update branch")?;
         }
 
+        self.create_workflow(&data).await?;
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 
@@ -129,7 +130,6 @@ impl Callbacks for Node {
 
         tokio::spawn(async move {
             self_clone.add_to_elastic(data.elastic_client()).await;
-            self_clone.create_workflow(&data).await;
         });
 
         Ok(())

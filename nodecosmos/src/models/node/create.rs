@@ -312,8 +312,8 @@ impl Node {
         }
     }
 
-    pub async fn create_workflow(&self, data: &RequestData) {
-        let _ = Workflow {
+    pub async fn create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        Workflow {
             root_id: self.root_id,
             node_id: self.id,
             branch_id: self.branch_id,
@@ -323,14 +323,16 @@ impl Node {
             initial_input_ids: None,
             ctx: self.ctx,
         }
-        .insert_if_not_exists()
+        .insert()
         .execute(data.db_session())
         .map_err(|e| {
             error!("Error creating new workflow for node {}: {:?}", self.id, e);
 
             e
         })
-        .await;
+        .await?;
+
+        Ok(())
     }
 
     pub async fn maybe_create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
