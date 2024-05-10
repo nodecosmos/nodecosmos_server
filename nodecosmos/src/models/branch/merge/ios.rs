@@ -30,10 +30,10 @@ impl MergeIos {
     ) -> Result<Option<Vec<Io>>, NodecosmosError> {
         if let Some(restored_io_ids) = &branch.restored_ios {
             let mut branched_ios =
-                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.id, branch.root_id, restored_io_ids)
                     .await?;
             let already_restored_ids =
-                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, &restored_io_ids)
+                Io::find_by_branch_id_and_root_id_and_ids(db_session, branch.root_id, branch.root_id, restored_io_ids)
                     .await?
                     .pluck_id_set();
 
@@ -82,7 +82,13 @@ impl MergeIos {
         branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleIo>>, NodecosmosError> {
         if let Some(edited_title_ios) = &branch.edited_title_ios {
-            let ios = UpdateTitleIo::find_by_branch_id_and_ids(db_session, branch.id, edited_title_ios).await?;
+            let ios = UpdateTitleIo::find_by_branch_id_and_root_id_and_ids(
+                db_session,
+                branch.id,
+                branch.root_id,
+                edited_title_ios,
+            )
+            .await?;
 
             let ios = branch.map_original_records(ios, ObjectType::Io).collect();
 
@@ -98,7 +104,7 @@ impl MergeIos {
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_title_ios {
             let ios_by_id = find_update_title_io!(
-                "root_id = ? AND branch_id = ? AND id IN = ?",
+                "root_id = ? AND branch_id = ? AND id IN ?",
                 (branch.root_id, branch.original_id(), ids)
             )
             .execute(db_session)

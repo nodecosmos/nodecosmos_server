@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
+use charybdis::scylla::SerializeCql;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
@@ -75,8 +76,7 @@ impl Callbacks for Io {
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_default_context() {
-            self.validate_root_id(db_session).await?;
-            self.set_defaults();
+            self.validate_attributes(db_session).await?;
             self.copy_vals_from_main(db_session).await?;
         }
 
@@ -88,8 +88,6 @@ impl Callbacks for Io {
     }
 
     async fn before_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        *self = Io::find_branched_or_original(data.db_session(), self.root_id, self.branch_id, self.id).await?;
-
         self.pull_from_initial_input_ids(db_session).await?;
         self.pull_from_flow_step_outputs(data).await?;
         self.pull_from_flow_steps_inputs(data).await?;
@@ -101,6 +99,11 @@ impl Callbacks for Io {
 
     async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
+        if self.is_main() {
+            // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
+            // keep the main io in the database as it can be later used by flow steps where it was deleted.
+            self.insert().execute(db_session).await?;
+        }
 
         let _ = ArchivedIo::from(&*self)
             .insert()
@@ -149,11 +152,11 @@ impl Io {
         }
     }
 
-    pub async fn find_by_branch_id_and_root_id_and_ids(
+    pub async fn find_by_branch_id_and_root_id_and_ids<I: IntoIterator<Item = Uuid> + SerializeCql>(
         db_session: &CachingSession,
         branch_id: Uuid,
         root_id: Uuid,
-        ids: &Set<Uuid>,
+        ids: &I,
     ) -> Result<Vec<Io>, NodecosmosError> {
         let ios = find_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
             .execute(db_session)
@@ -228,6 +231,10 @@ impl Io {
                 Ok(io)
             }
         }
+    }
+
+    pub fn is_main(&self) -> bool {
+        self.main_id == Some(self.id)
     }
 
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
@@ -341,12 +348,13 @@ impl UpdateTitleIo {
         Ok(ios)
     }
 
-    pub async fn find_by_branch_id_and_ids(
+    pub async fn find_by_branch_id_and_root_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
+        root_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_title_io!("branch_id = ? AND id IN ?", (branch_id, ids))
+        let ios = find_update_title_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
             .execute(db_session)
             .await?
             .try_collect()
@@ -357,3 +365,5 @@ impl UpdateTitleIo {
 }
 
 partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_id, flow_step_id);
+
+partial_io!(BaseIo, branch_id, node_id, root_id, id);

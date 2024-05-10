@@ -1,6 +1,5 @@
 use charybdis::batch::ModelBatch;
 use charybdis::operations::{Find, Insert};
-use charybdis::types::Uuid;
 use scylla::CachingSession;
 
 use crate::api::data::RequestData;
@@ -36,7 +35,7 @@ impl Io {
         Ok(())
     }
 
-    pub async fn validate_root_id(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn validate_attributes(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let node = self.node(db_session).await?;
         let root_id = node.root_id;
 
@@ -44,15 +43,11 @@ impl Io {
             return Err(NodecosmosError::Unauthorized("Not authorized to add IO for this node!"));
         }
 
+        if self.title.is_none() {
+            return Err(NodecosmosError::BadRequest("Title is required!".to_string()));
+        }
+
         Ok(())
-    }
-
-    pub fn set_defaults(&mut self) {
-        let now = chrono::Utc::now();
-
-        self.id = Uuid::new_v4();
-        self.created_at = now;
-        self.updated_at = now;
     }
 
     pub async fn copy_vals_from_main(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {

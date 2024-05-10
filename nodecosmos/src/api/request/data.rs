@@ -36,6 +36,10 @@ impl RequestData {
         &self.app.s3_client
     }
 
+    pub fn s3_client_arc(&self) -> Arc<aws_sdk_s3::Client> {
+        self.app.s3_client.clone()
+    }
+
     pub fn s3_bucket(&self) -> &String {
         &self.app.s3_bucket
     }

@@ -317,6 +317,10 @@ impl Branch {
                     return false;
                 }
 
+                if self.deleted_ios.as_ref().is_some_and(|ids| ids.contains(&io.id)) {
+                    return false;
+                }
+
                 return true;
             })
             .collect()

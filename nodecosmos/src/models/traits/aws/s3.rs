@@ -45,16 +45,18 @@ pub trait S3: Sized {
     }
 
     async fn delete_s3_object(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let delete_s3_object = data
-            .s3_client()
-            .delete_object()
-            .key(self.s3_key())
-            .bucket(data.s3_bucket());
+        let s3_key = self.s3_key().clone();
+        let s3_bucket = data.s3_bucket().clone();
+        let s3_client = data.s3_client_arc();
 
-        delete_s3_object
-            .send()
-            .await
-            .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to delete from S3: {:?}", e)))?;
+        tokio::spawn(async move {
+            let delete_s3_object = s3_client.delete_object().key(s3_key).bucket(s3_bucket);
+
+            let _ = delete_s3_object
+                .send()
+                .await
+                .map_err(|e| log::error!("Failed to delete from S3: {:?}", e));
+        });
 
         Ok(())
     }

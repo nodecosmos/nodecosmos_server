@@ -137,7 +137,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
             async fn before_update(
                 &mut self,
-                _session: &charybdis::CachingSession,
+                _session: &scylla::CachingSession,
                 _ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 self.updated_at = Utc::now();
@@ -147,7 +147,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
             async fn after_update(
                 &mut self,
-                _session: &charybdis::CachingSession,
+                _session: &scylla::CachingSession,
                 data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::models::node::UpdateOwnerNode;
