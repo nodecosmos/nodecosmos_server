@@ -19,17 +19,15 @@ impl UpdateNodeIdsFlowStep {
         if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_ref() {
             for (node_id, output_ids) in output_ids_by_node_id.iter() {
                 if self.node_ids.is_none() || self.node_ids.as_ref().is_some_and(|ids| !ids.contains(node_id)) {
-                    for output_id in output_ids {
-                        let mut output = Io {
-                            root_id: self.root_id,
-                            branch_id: self.branch_id,
-                            node_id: self.node_id,
-                            id: *output_id,
-                            flow_step_id: Some(self.id),
+                    let outputs = Io::find_by_branch_id_and_root_id_and_ids(
+                        data.db_session(),
+                        self.branch_id,
+                        self.root_id,
+                        output_ids,
+                    )
+                    .await?;
 
-                            ..Default::default()
-                        };
-
+                    for mut output in outputs {
                         output.set_parent_delete_context();
                         output.delete_cb(data).execute(data.db_session()).await?;
                     }

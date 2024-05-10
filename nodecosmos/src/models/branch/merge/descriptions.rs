@@ -119,7 +119,6 @@ impl MergeDescriptions {
 
     pub async fn delete_descriptions(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         for deleted_description in self.deleted_descriptions.iter_mut() {
-            // description merge is handled within before_insert callback
             deleted_description
                 .delete_cb(data)
                 .execute(data.db_session())

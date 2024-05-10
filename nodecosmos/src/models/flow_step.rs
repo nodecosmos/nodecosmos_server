@@ -333,10 +333,7 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         self.node_ids = node_ids;
 
         if self.is_original() {
-            // In merge context, outputs will be deleted in the next step.
-            if !self.is_merge_context() {
-                self.delete_output_records_from_removed_nodes(data).await?;
-            }
+            self.delete_output_records_from_removed_nodes(data).await?;
             self.remove_output_references_from_removed_nodes().await?;
             self.remove_input_references_from_removed_nodes().await?;
         }

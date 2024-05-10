@@ -13,7 +13,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
-use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
+use crate::models::traits::{Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
 
@@ -302,7 +302,9 @@ impl Callbacks for UpdateTitleNode {
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.update_elastic_index(data.elastic_client()).await;
+            if self_clone.is_original() {
+                self_clone.update_elastic_document(data.elastic_client()).await;
+            }
         });
 
         Ok(())
@@ -344,11 +346,9 @@ impl Callbacks for UpdateCoverImageNode {
     async fn after_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         use crate::models::traits::ElasticDocument;
 
-        if self.id != self.branch_id {
-            return Ok(());
+        if self.is_original() {
+            self.update_elastic_document(data.elastic_client()).await;
         }
-
-        self.update_elastic_document(data.elastic_client()).await;
 
         Ok(())
     }

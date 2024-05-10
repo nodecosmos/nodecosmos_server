@@ -18,7 +18,7 @@ macro_rules! created_at_cb_fn {
     () => {
         async fn before_insert(
             &mut self,
-            _session: &charybdis::CachingSession,
+            _session: &scylla::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
             let now = chrono::Utc::now();
@@ -49,7 +49,7 @@ macro_rules! updated_at_cb_fn {
     () => {
         async fn before_update(
             &mut self,
-            _session: &charybdis::CachingSession,
+            _session: &scylla::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
             self.updated_at = chrono::Utc::now();
@@ -76,7 +76,7 @@ macro_rules! sanitize_description_cb_fn {
     () => {
         async fn before_update(
             &mut self,
-            _session: &charybdis::CachingSession,
+            _session: &scylla::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
             use crate::models::traits::SanitizeDescription;

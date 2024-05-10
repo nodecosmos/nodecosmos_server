@@ -239,10 +239,10 @@ impl NodeDelete {
 
     async fn deleted_descriptions(
         db_session: &CachingSession,
-        node: &Node,
+        branch_id: Uuid,
+        ids_to_del: Set<Uuid>,
     ) -> Result<Vec<Description>, NodecosmosError> {
-        Description::find_by_branch_id(node.branch_id)
-            .execute(db_session)
+        Description::find_by_branch_id_and_ids(db_session, branch_id, &ids_to_del)
             .await?
             .try_collect()
             .await
@@ -279,8 +279,17 @@ impl NodeDelete {
         let deleted_flows = Self::deleted_flows(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_flow_steps = Self::deleted_flow_steps(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_ios = Self::deleted_ios(data.db_session(), node, &node_ids_to_delete).await?;
-        let deleted_descriptions = Self::deleted_descriptions(data.db_session(), node).await?;
         let deleted_counter_data = Self::deleted_counter_data(data.db_session(), node, &node_ids_to_delete).await?;
+
+        let desc_ids = deleted_nodes
+            .pluck_id_set()
+            .into_iter()
+            .chain(deleted_flows.pluck_id_set())
+            .chain(deleted_flow_steps.pluck_id_set())
+            .chain(deleted_ios.pluck_id_set())
+            .collect();
+
+        let deleted_descriptions = Self::deleted_descriptions(data.db_session(), node.branch_id, desc_ids).await?;
 
         Ok(Self {
             node: node.clone(),

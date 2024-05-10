@@ -1,5 +1,4 @@
 use charybdis::batch::ModelBatch;
-use elasticsearch::Elasticsearch;
 use log::error;
 
 use crate::api::data::RequestData;
@@ -9,7 +8,6 @@ use crate::models::branch::Branch;
 use crate::models::node::UpdateTitleNode;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::Branchable;
-use crate::models::traits::ElasticDocument;
 
 impl UpdateTitleNode {
     /// Update self reference in node_descendants for each ancestor
@@ -48,11 +46,5 @@ impl UpdateTitleNode {
         }
 
         Ok(())
-    }
-
-    pub async fn update_elastic_index(&self, elastic_client: &Elasticsearch) {
-        if self.is_original() {
-            self.update_elastic_document(elastic_client).await;
-        }
     }
 }
