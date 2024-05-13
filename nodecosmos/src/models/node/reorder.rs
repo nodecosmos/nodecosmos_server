@@ -1,6 +1,8 @@
 use charybdis::batch::ModelBatch;
 use charybdis::operations::Update;
 use charybdis::types::{Double, Uuid};
+use futures::{stream, StreamExt};
+use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +10,7 @@ use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;
+use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
@@ -16,7 +19,7 @@ use crate::models::node::reorder::validator::ReorderValidator;
 use crate::models::node::{Node, UpdateOrderNode};
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::recovery::{RecoveryLog, RecoveryObjectType};
-use crate::models::traits::Branchable;
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams};
 use crate::models::udts::BranchReorderData;
 
 pub mod data;
@@ -115,8 +118,10 @@ impl Reorder {
         Ok(())
     }
 
-    pub async fn run(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let res = self.execute_reorder(db_session).await;
+    pub async fn run(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.create_branch_nodes(data).await?;
+
+        let res = self.execute_reorder(data.db_session()).await;
 
         if let Err(err) = res {
             log::error!(
@@ -125,7 +130,7 @@ impl Reorder {
                 err
             );
 
-            self.recover(db_session).await.map_err(|recover_err| {
+            self.recover(data.db_session()).await.map_err(|recover_err| {
                 log::error!(
                     "Fatal Reorder recovery failed for node: {}\n! ERROR: {:?}",
                     self.reorder_data.node.id,
@@ -136,6 +141,74 @@ impl Reorder {
             })?;
 
             return Err(err);
+        }
+
+        Ok(())
+    }
+
+    async fn create_branch_nodes(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.reorder_data.is_branch() {
+            let mut futures = vec![];
+
+            for ancestor_id in &self.reorder_data.old_ancestor_ids {
+                let future = Node::find_or_insert_branched(
+                    data,
+                    ModelBranchParams {
+                        original_id: self.reorder_data.original_id(),
+                        branch_id: self.reorder_data.branch_id,
+                        node_id: *ancestor_id,
+                        id: *ancestor_id,
+                    },
+                );
+
+                futures.push(future);
+            }
+
+            for ancestor_id in &self.reorder_data.new_ancestor_ids {
+                let future = Node::find_or_insert_branched(
+                    data,
+                    ModelBranchParams {
+                        original_id: self.reorder_data.original_id(),
+                        branch_id: self.reorder_data.branch_id,
+                        node_id: *ancestor_id,
+                        id: *ancestor_id,
+                    },
+                );
+
+                futures.push(future);
+            }
+
+            for descendant_id in &self.reorder_data.descendant_ids {
+                let future = Node::find_or_insert_branched(
+                    data,
+                    ModelBranchParams {
+                        original_id: self.reorder_data.original_id(),
+                        branch_id: self.reorder_data.branch_id,
+                        node_id: *descendant_id,
+                        id: *descendant_id,
+                    },
+                );
+
+                futures.push(future);
+            }
+
+            let futures_stream = stream::iter(futures);
+
+            for future in futures_stream
+                .buffer_unordered(MAX_PARALLEL_REQUESTS)
+                .collect::<Vec<Result<Node, NodecosmosError>>>()
+                .await
+                .into_iter()
+            {
+                if let Err(e) = future {
+                    error!(
+                        "[preserve_branch_descendants] Error preserving descendants for branch: {:?}",
+                        e
+                    );
+
+                    return Err(e);
+                }
+            }
         }
 
         Ok(())
@@ -246,6 +319,8 @@ impl Reorder {
             parent_id: Some(self.reorder_data.new_parent_id),
             order_index: self.reorder_data.new_order_index,
         };
+
+        if self.reorder_data.is_original() {}
 
         update_order_node.update().execute(db_session).await?;
 
@@ -794,7 +869,7 @@ impl Node {
         let reorder_data = ReorderData::from_params(params, data).await?;
 
         ReorderValidator::new(&reorder_data).validate()?;
-        Reorder::new(reorder_data).run(data.db_session()).await?;
+        Reorder::new(reorder_data).run(data).await?;
 
         Ok(())
     }
