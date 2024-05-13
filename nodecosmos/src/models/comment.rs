@@ -34,6 +34,7 @@ pub struct Comment {
     pub content: Text,
     pub author_id: Option<Uuid>,
     pub author: Option<Frozen<Profile>>,
+    pub url: Text,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
