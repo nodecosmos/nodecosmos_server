@@ -5,6 +5,7 @@ use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWith
 use charybdis::types::Uuid;
 use futures::StreamExt;
 use scylla::CachingSession;
+use serde::Deserialize;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream; // This is crucial for handling streams
 
@@ -48,16 +49,38 @@ pub async fn get_node(
     }))
 }
 
+#[derive(Deserialize)]
+pub struct BranchedNodeQ {
+    #[serde(rename = "originalId")]
+    original_id: Option<Uuid>,
+}
+
 #[get("/{branchId}/{id}/branch")]
 pub async fn get_branched_node(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
     pk: web::Path<PrimaryKeyNode>,
+    q: web::Query<BranchedNodeQ>,
 ) -> Response {
-    let mut node = BaseNode::find_by_branch_id_and_id(pk.branch_id, pk.id)
-        .execute(&db_session)
-        .await?;
+    let mut node = if let Some(original_id) = q.original_id {
+        match BaseNode::maybe_find_first_by_branch_id_and_id(pk.branch_id, pk.id)
+            .execute(&db_session)
+            .await?
+        {
+            Some(node) => node,
+            None => {
+                BaseNode::find_by_branch_id_and_id(original_id, pk.id)
+                    .execute(&db_session)
+                    .await?
+            }
+        }
+    } else {
+        BaseNode::find_by_branch_id_and_id(pk.branch_id, pk.id)
+            .execute(&db_session)
+            .await?
+    };
 
+    node.branch_id = pk.branch_id;
     node.auth_view(&db_session, &opt_cu).await?;
 
     let descendants = node.branch_descendants(&db_session).await?;
