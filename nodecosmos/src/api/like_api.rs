@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::like::Like;
+use crate::models::like::{Like, PkLike};
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
 
@@ -34,8 +34,10 @@ pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Respon
 }
 
 #[delete("/{objectId}/{branchId}")]
-pub async fn delete_like(data: RequestData, like: web::Path<Like>) -> Response {
-    let mut like = like.find_by_primary_key().execute(data.db_session()).await?;
+pub async fn delete_like(data: RequestData, like: web::Path<PkLike>) -> Response {
+    let mut like = Like::find_by_object_id_and_branch_id(like.object_id, like.branch_id)
+        .execute(data.db_session())
+        .await?;
 
     if like.user_id != data.current_user_id() {
         return Ok(HttpResponse::Forbidden().finish());

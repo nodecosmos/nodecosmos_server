@@ -98,3 +98,5 @@ impl Like {
         }
     }
 }
+
+partial_like!(PkLike, branch_id, object_id);
