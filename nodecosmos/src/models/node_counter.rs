@@ -1,7 +1,6 @@
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
-use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{Counter, Set, Uuid};
+use charybdis::types::{Counter, Uuid};
 use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -31,17 +30,6 @@ pub struct NodeCounter {
 }
 
 impl NodeCounter {
-    pub async fn find_by_ids(
-        db_session: &CachingSession,
-        branch_id: Uuid,
-        ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<NodeCounter>, NodecosmosError> {
-        find_node_counter!("branch_id = ? AND id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
     pub async fn update_elastic_document(data: &RequestData, branch_id: Uuid, id: Uuid) {
         let data = data.clone();
         tokio::spawn(async move {
@@ -75,7 +63,7 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        if like.is_branch() {
+        if like.is_original() {
             Self::update_elastic_document(data, like.branch_id, like.object_id).await;
         }
 
@@ -92,7 +80,7 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        if like.is_branch() {
+        if like.is_original() {
             Self::update_elastic_document(data, like.branch_id, like.object_id).await;
         }
 
