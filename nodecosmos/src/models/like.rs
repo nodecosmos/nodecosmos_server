@@ -26,7 +26,7 @@ pub enum LikeObjectType {
 #[charybdis_model(
     table_name = likes,
     partition_keys = [object_id],
-    clustering_keys = [branch_id],
+    clustering_keys = [branch_id, user_id],
     global_secondary_indexes = []
 )]
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
@@ -99,4 +99,4 @@ impl Like {
     }
 }
 
-partial_like!(PkLike, branch_id, object_id);
+partial_like!(PkLike, branch_id, object_id, user_id);

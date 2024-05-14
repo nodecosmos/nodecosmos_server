@@ -9,9 +9,13 @@ use crate::models::like::{Like, PkLike};
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::user::CurrentUser;
 
-#[get("/{objectId}/{branchId}/{objectType}")]
-pub async fn get_like_count(db_session: web::Data<CachingSession>, mut like: web::Path<Like>) -> Response {
-    let like_count = like.like_count(&db_session).await?;
+#[get("/{objectId}/{branchId}")]
+pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<PkLike>) -> Response {
+    let like_count = Like::find_first_by_object_id_and_branch_id(like.object_id, like.branch_id)
+        .execute(&db_session)
+        .await?
+        .like_count(&db_session)
+        .await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "id": like.object_id,
@@ -33,9 +37,9 @@ pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Respon
     })))
 }
 
-#[delete("/{objectId}/{branchId}")]
+#[delete("/{objectId}/{branchId}/{userId}")]
 pub async fn delete_like(data: RequestData, like: web::Path<PkLike>) -> Response {
-    let mut like = Like::find_by_object_id_and_branch_id(like.object_id, like.branch_id)
+    let mut like = Like::find_by_object_id_and_branch_id_and_user_id(like.object_id, like.branch_id, like.user_id)
         .execute(data.db_session())
         .await?;
 
