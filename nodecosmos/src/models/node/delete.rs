@@ -21,7 +21,6 @@ use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::like::Like;
 use crate::models::node::Node;
-use crate::models::node_counter::NodeCounter;
 use crate::models::node_descendant::NodeDescendant;
 use crate::models::recovery::{RecoveryLog, RecoveryObjectType};
 use crate::models::traits::{Branchable, ElasticDocument, ModelContext, Pluck};
@@ -65,6 +64,7 @@ impl Node {
     }
 }
 
+// we don't delete counter data as counter row can not be recreated
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialOrd, PartialEq, Debug)]
 pub enum NodeDeleteStep {
     BeforeStart = -1,
@@ -83,12 +83,11 @@ pub enum NodeDeleteStep {
     DeleteFlowSteps = 11,
     DeleteIos = 12,
     DeleteDescriptions = 13,
-    DeleteCounterData = 14,
-    DeleteLikes = 15,
-    DeleteAttachments = 16,
-    DeleteElasticData = 17,
-    Finish = 18,
-    AfterFinish = 19,
+    DeleteLikes = 14,
+    DeleteAttachments = 15,
+    DeleteElasticData = 16,
+    Finish = 17,
+    AfterFinish = 18,
 }
 
 impl NodeDeleteStep {
@@ -119,12 +118,11 @@ impl From<i8> for NodeDeleteStep {
             11 => NodeDeleteStep::DeleteFlowSteps,
             12 => NodeDeleteStep::DeleteIos,
             13 => NodeDeleteStep::DeleteDescriptions,
-            14 => NodeDeleteStep::DeleteCounterData,
-            15 => NodeDeleteStep::DeleteLikes,
-            16 => NodeDeleteStep::DeleteAttachments,
-            17 => NodeDeleteStep::DeleteElasticData,
-            18 => NodeDeleteStep::Finish,
-            19 => NodeDeleteStep::AfterFinish,
+            14 => NodeDeleteStep::DeleteLikes,
+            15 => NodeDeleteStep::DeleteAttachments,
+            16 => NodeDeleteStep::DeleteElasticData,
+            17 => NodeDeleteStep::Finish,
+            18 => NodeDeleteStep::AfterFinish,
             _ => panic!("Invalid NodeDeleteStep value: {}", value),
         }
     }
@@ -142,7 +140,6 @@ pub struct NodeDelete {
     deleted_flow_steps: Vec<FlowStep>,
     deleted_ios: Vec<Io>,
     deleted_descriptions: Vec<Description>,
-    deleted_counter_data: Vec<NodeCounter>,
 }
 
 impl NodeDelete {
@@ -249,18 +246,6 @@ impl NodeDelete {
             .map_err(NodecosmosError::from)
     }
 
-    async fn deleted_counter_data(
-        db_session: &CachingSession,
-        node: &Node,
-        ids: &Set<Uuid>,
-    ) -> Result<Vec<NodeCounter>, NodecosmosError> {
-        NodeCounter::find_by_ids(db_session, node.branch_id, ids)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
     pub async fn new(data: &RequestData, node: &Node) -> Result<NodeDelete, NodecosmosError> {
         let mut node_ids_to_delete = Set::new();
         node_ids_to_delete.insert(node.id);
@@ -279,7 +264,6 @@ impl NodeDelete {
         let deleted_flows = Self::deleted_flows(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_flow_steps = Self::deleted_flow_steps(data.db_session(), node, &node_ids_to_delete).await?;
         let deleted_ios = Self::deleted_ios(data.db_session(), node, &node_ids_to_delete).await?;
-        let deleted_counter_data = Self::deleted_counter_data(data.db_session(), node, &node_ids_to_delete).await?;
 
         let desc_ids = deleted_nodes
             .pluck_id_set()
@@ -302,7 +286,6 @@ impl NodeDelete {
             deleted_flow_steps,
             deleted_ios,
             deleted_descriptions,
-            deleted_counter_data,
         })
     }
 
@@ -348,7 +331,6 @@ impl NodeDelete {
                 NodeDeleteStep::DeleteFlowSteps => self.delete_flow_steps(data.db_session()).await?,
                 NodeDeleteStep::DeleteIos => self.delete_ios(data.db_session()).await?,
                 NodeDeleteStep::DeleteDescriptions => self.delete_descriptions(data.db_session()).await?,
-                NodeDeleteStep::DeleteCounterData => self.delete_counter_data(data.db_session()).await?,
                 NodeDeleteStep::DeleteLikes => self.delete_likes(data.db_session()).await?,
                 NodeDeleteStep::DeleteAttachments => self.delete_attachments(data).await?,
                 NodeDeleteStep::DeleteElasticData => self.delete_elastic_data(data).await,
@@ -394,7 +376,6 @@ impl NodeDelete {
                 NodeDeleteStep::DeleteFlowSteps => self.undo_delete_flow_steps(data.db_session()).await?,
                 NodeDeleteStep::DeleteIos => self.undo_delete_ios(data.db_session()).await?,
                 NodeDeleteStep::DeleteDescriptions => self.undo_delete_descriptions(data.db_session()).await?,
-                NodeDeleteStep::DeleteCounterData => self.undo_delete_counter_data(data.db_session()).await?,
                 NodeDeleteStep::DeleteLikes => self.undo_delete_likes().await?,
                 NodeDeleteStep::DeleteAttachments => self.undo_delete_attachments().await?,
                 NodeDeleteStep::DeleteElasticData => self.undo_delete_elastic_data(data).await,
@@ -682,28 +663,6 @@ impl NodeDelete {
             .chunked_insert(
                 db_session,
                 &self.deleted_descriptions,
-                crate::constants::BATCH_CHUNK_SIZE,
-            )
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
-    async fn delete_counter_data(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        NodeCounter::unlogged_batch()
-            .chunked_delete(
-                db_session,
-                &self.deleted_counter_data,
-                crate::constants::BATCH_CHUNK_SIZE,
-            )
-            .await
-            .map_err(NodecosmosError::from)
-    }
-
-    async fn undo_delete_counter_data(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        NodeCounter::unlogged_batch()
-            .chunked_insert(
-                db_session,
-                &self.deleted_counter_data,
                 crate::constants::BATCH_CHUNK_SIZE,
             )
             .await
