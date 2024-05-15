@@ -34,18 +34,16 @@ impl Mailer {
         token: String,
     ) -> Result<(), NodecosmosError> {
         let url = format!("{}/{}?token={}", self.client_url, username, token);
-        let logo_url = format!("{}/logo.svg", self.client_url);
 
         let mut ctx = HashMap::<&str, &str>::new();
         ctx.insert("confirmation_link", &url);
-        ctx.insert("logo_url", &logo_url);
 
         let message = self
             .templates
             .render(CONFIRM_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "Confirm your email", message).await
+        self.send_email(to, "Confirm your nodecosmos account", message).await
     }
 
     async fn send_email(&self, to: String, subject: &str, message: String) -> Result<(), NodecosmosError> {
@@ -63,7 +61,7 @@ impl Mailer {
             .charset("UTF-8")
             .build()
             .expect("building Content");
-        let body = aws_sdk_ses::types::Body::builder().text(body_content).build();
+        let body = aws_sdk_ses::types::Body::builder().html(body_content).build();
 
         let msg = aws_sdk_ses::types::Message::builder()
             .subject(subject_content)
@@ -77,7 +75,7 @@ impl Mailer {
             .message(msg)
             .send()
             .await
-            .map_err(|e| NodecosmosError::AwsSdkError(e.to_string()))?;
+            .map_err(|e| NodecosmosError::AwsSdkError(format!("{:?}", e)))?;
 
         Ok(())
     }
