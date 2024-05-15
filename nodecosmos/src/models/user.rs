@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
+use charybdis::operations::Insert;
 use charybdis::types::{Boolean, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
@@ -13,9 +14,11 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::app::App;
 use crate::errors::NodecosmosError;
+use crate::models::token::Token;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
 use crate::models::udts::Address;
 
+pub mod search;
 pub mod update_profile_image;
 
 const BCRYPT_COST: u32 = 6;
@@ -59,8 +62,49 @@ impl Callbacks for User {
     type Extension = Arc<App>;
     type Error = NodecosmosError;
 
-    async fn before_insert(&mut self, db_session: &CachingSession, _ext: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.check_existing_user(db_session).await?;
+    async fn before_insert(&mut self, db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
+        if Self::maybe_find_first_by_username(self.username.clone())
+            .execute(db_session)
+            .await?
+            .is_some()
+        {
+            return Err(NodecosmosError::ValidationError((
+                "username".to_string(),
+                "is taken".to_string(),
+            )));
+        }
+
+        if let Some(user) = Self::maybe_find_first_by_email(self.email.clone())
+            .execute(db_session)
+            .await?
+        {
+            // If the user is not confirmed, resend the confirmation email, otherwise don't disturb them
+            if !user.is_confirmed {
+                let token = if let Some(token) = Token::maybe_find_first_by_user_id(user.id).execute(db_session).await?
+                {
+                    token
+                } else {
+                    let token = Token::new_user_confirmation(user.id);
+
+                    token.insert().execute(db_session).await?;
+
+                    token
+                };
+
+                app.mailer
+                    .send_confirm_user_email(user.email, user.username, token.id.to_string())
+                    .await?;
+            }
+
+            return Err(NodecosmosError::EmailAlreadyExists);
+        }
+
+        let token = Token::new_user_confirmation(self.id);
+        token.insert().execute(db_session).await?;
+
+        app.mailer
+            .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
+            .await?;
 
         self.id = Uuid::new_v4();
 
@@ -83,32 +127,6 @@ impl Callbacks for User {
 }
 
 impl User {
-    pub async fn check_existing_user(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if Self::maybe_find_first_by_username(self.username.clone())
-            .execute(db_session)
-            .await?
-            .is_some()
-        {
-            return Err(NodecosmosError::ValidationError((
-                "username".to_string(),
-                "is taken".to_string(),
-            )));
-        }
-
-        if Self::maybe_find_first_by_email(self.email.clone())
-            .execute(db_session)
-            .await?
-            .is_some()
-        {
-            return Err(NodecosmosError::ValidationError((
-                "email".to_string(),
-                "is taken".to_string(),
-            )));
-        }
-
-        Ok(())
-    }
-
     pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
         let res = verify(password, &self.password)
             .map_err(|_| NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string())))?;

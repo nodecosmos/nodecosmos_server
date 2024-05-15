@@ -8,6 +8,7 @@ use scylla::{CachingSession, Session, SessionBuilder};
 use toml::Value;
 
 use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::mailer::Mailer;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
 
@@ -82,6 +83,26 @@ impl<'a> Resource<'a> for aws_sdk_s3::Client {
         let client = aws_sdk_s3::Client::new(&config);
 
         client
+    }
+}
+
+impl<'a> Resource<'a> for aws_sdk_ses::Client {
+    type Cfg = ();
+
+    async fn init_resource(_config: ()) -> Self {
+        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
+
+        let client = aws_sdk_ses::Client::new(&config);
+
+        client
+    }
+}
+
+impl<'a> Resource<'a> for Mailer {
+    type Cfg = (aws_sdk_ses::Client, &'a Value);
+
+    async fn init_resource(cfg: Self::Cfg) -> Self {
+        Mailer::new(cfg.0, cfg.1)
     }
 }
 

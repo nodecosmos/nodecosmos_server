@@ -52,6 +52,8 @@ pub enum NodecosmosError {
     ElasticError(elasticsearch::Error),
     RedisError(RedisError),
     LockerError(String),
+    AwsSdkError(String),
+    TemplateError(String),
     DecodeError(base64::DecodeError),
     YjsError(yrs::encoding::read::Error),
     FatalDeleteError(String),
@@ -63,6 +65,7 @@ pub enum NodecosmosError {
     QuickXmlError(quick_xml::Error),
     BroadcastError(String),
     ParseError(strum::ParseError),
+    EmailAlreadyExists,
 }
 
 impl fmt::Display for NodecosmosError {
@@ -86,6 +89,8 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
             NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
+            NodecosmosError::AwsSdkError(e) => write!(f, "Aws SDK Error: {}", e),
+            NodecosmosError::TemplateError(e) => write!(f, "TemplateError: {}", e),
             NodecosmosError::DecodeError(e) => write!(f, "Decode Error: {}", e),
             NodecosmosError::YjsError(e) => write!(f, "Yjs Error: {}", e),
             NodecosmosError::FatalDeleteError(e) => write!(f, "Fatal Delete Error: {}", e),
@@ -95,6 +100,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: {}", e),
             NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: {}", e),
             NodecosmosError::ParseError(e) => write!(f, "ParseError: {}", e),
+            NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
         }
     }
 }

@@ -196,6 +196,7 @@ impl ElasticIndex for User {
     }
 }
 
+// Implement the ElasticIndex trait for the partial models based on native models
 macro_rules! impl_elastic_index {
     ($target_struct:ident, $source_struct:ident) => {
         impl ElasticIndex for $target_struct {

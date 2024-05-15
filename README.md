@@ -104,3 +104,15 @@ example, to set the stack size to 8MB, you can run the following command:
 ```shell
 RUST_MIN_STACK=8388608 cargo run
 ```
+
+# AWS
+
+As entries in the `credentials` file in the `.aws` directory in your home directory (`~
+/.aws/credentials`
+on Linux, macOS, and Unix; `%userprofile%\.aws\credentials` on Microsoft Windows):
+
+```shell
+[default]
+  aws_access_key_id=YOUR-ACCESS-KEY
+  aws_secret_access_key=YOUR-SECRET-KEY
+```

@@ -65,14 +65,14 @@ impl<'a> NodeSearch<'a> {
             .send()
             .await?;
 
-        let response_body = response.json::<Value>().await?;
+        let mut response_body = response.json::<Value>().await?;
 
-        let res = vec![];
-        let hits = response_body["hits"]["hits"].as_array().unwrap_or(&res);
+        let mut res = vec![];
+        let hits = response_body["hits"]["hits"].as_array_mut().unwrap_or(&mut res);
 
         let mut nodes: Vec<IndexNode> = Vec::new();
         for hit in hits {
-            let document = serde_json::from_value(hit["_source"].clone())?;
+            let document = serde_json::from_value(hit["_source"].take())?;
 
             nodes.push(document);
         }
