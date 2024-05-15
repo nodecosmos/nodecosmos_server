@@ -13,6 +13,7 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::traits::Authorization;
+use crate::models::user::search::UserSearchQuery;
 use crate::models::user::{CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
 use crate::App;
 
@@ -78,6 +79,13 @@ pub async fn logout(client_session: Session) -> Response {
     Ok(HttpResponse::Ok().finish())
 }
 
+#[get("/search")]
+pub async fn search_users(data: RequestData, query: web::Query<UserSearchQuery>) -> Response {
+    let users = User::search(data, &query).await?;
+
+    Ok(HttpResponse::Ok().json(users))
+}
+
 #[get("/{id}")]
 pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>) -> Response {
     let user = ShowUser::find_by_id(*id).execute(&db_session).await?;
@@ -95,14 +103,21 @@ pub async fn get_user_by_username(db_session: web::Data<CachingSession>, usernam
 }
 
 #[post("")]
-pub async fn create_user(app: web::Data<App>, client_session: Session, mut user: web::Json<User>) -> Response {
-    user.insert_cb(&app).execute(&app.db_session).await?;
+pub async fn create_user(app: web::Data<App>, mut user: web::Json<User>) -> Response {
+    let res = user.insert_cb(&app).execute(&app.db_session).await;
 
-    let current_user = CurrentUser::from_user(user.into_inner());
-
-    set_current_user(&client_session, &current_user)?;
-
-    Ok(HttpResponse::Ok().json(json!({ "message": "User created", "user": current_user })))
+    match res {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(e) => {
+            if let NodecosmosError::EmailAlreadyExists = e {
+                // for security reasons, we don't want to leak the fact that the email is already taken, we just
+                // print that they can continue with the login from the email
+                Ok(HttpResponse::Ok().finish())
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 #[put("/bio")]

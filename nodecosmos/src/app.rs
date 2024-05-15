@@ -17,6 +17,7 @@ use crate::models::node::Node;
 use crate::models::traits::BuildIndex;
 use crate::models::user::User;
 use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::mailer::Mailer;
 use crate::resources::resource::Resource;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
@@ -30,9 +31,11 @@ pub struct App {
     pub redis_pool: Arc<Pool>,
     pub s3_bucket: String,
     pub s3_client: Arc<aws_sdk_s3::Client>,
+    pub ses_client: Arc<aws_sdk_ses::Client>,
     pub resource_locker: Arc<ResourceLocker>,
     pub description_ws_pool: Arc<DescriptionWsPool>,
     pub sse_broadcast: Arc<SseBroadcast>,
+    pub mailer: Arc<Mailer>,
 }
 
 impl App {
@@ -46,9 +49,11 @@ impl App {
         let s3_bucket = config["aws"]["bucket"].as_str().expect("Missing bucket").to_string();
 
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
+        let ses_client = aws_sdk_ses::Client::init_resource(()).await;
         let db_session = CachingSession::init_resource(&config).await;
         let elastic_client = Elasticsearch::init_resource(&config).await;
         let redis_pool = Pool::init_resource(&config).await;
+        let mailer = Mailer::init_resource((ses_client.clone(), &config)).await;
 
         // app data
         let resource_locker = ResourceLocker::init_resource(&redis_pool).await;
@@ -60,8 +65,10 @@ impl App {
             db_session: Arc::new(db_session),
             elastic_client: Arc::new(elastic_client),
             redis_pool: Arc::new(redis_pool),
+            mailer: Arc::new(mailer),
             s3_bucket,
             s3_client: Arc::new(s3_client),
+            ses_client: Arc::new(ses_client),
             resource_locker: Arc::new(resource_locker),
             description_ws_pool,
             sse_broadcast,
