@@ -8,6 +8,7 @@ use crate::models::branch::Branch;
 use crate::models::comment::Comment;
 use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
+use crate::models::invitation::Invitation;
 use crate::models::traits::AuthorizationFields;
 use crate::models::user::User;
 
@@ -36,6 +37,14 @@ pub trait Authorization: AuthorizationFields {
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !data.current_user.is_confirmed {
+            return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+        }
+
+        if data.current_user.is_blocked {
+            return Err(NodecosmosError::Unauthorized("User is blocked"));
+        }
+
         self.init_auth_info(data.db_session()).await?;
 
         if self.is_frozen() {
@@ -148,5 +157,25 @@ impl Authorization for Comment {
             Some(thread) => thread.auth_creation(data).await,
             None => Err(NodecosmosError::Forbidden("Comment must have a thread!".to_string())),
         };
+    }
+}
+
+impl Authorization for Invitation {
+    async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        self.node(db_session).await?;
+
+        Ok(())
+    }
+
+    async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.node(data.db_session()).await?.auth_update(data).await?;
+
+        Ok(())
+    }
+
+    async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.node(data.db_session()).await?.auth_update(data).await?;
+
+        Ok(())
     }
 }

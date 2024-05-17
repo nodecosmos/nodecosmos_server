@@ -261,6 +261,14 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             async fn auth_creation(&mut self, data: &crate::api::data::RequestData) -> Result<(), NodecosmosError> {
                 use crate::models::traits::Parent;
 
+                if !data.current_user.is_confirmed {
+                    return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+                }
+
+                if data.current_user.is_blocked {
+                    return Err(NodecosmosError::Unauthorized("User is blocked"));
+                }
+
                 if self.id != Uuid::default() {
                     return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
                 }

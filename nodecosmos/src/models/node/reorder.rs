@@ -39,8 +39,9 @@ pub enum ReorderStep {
     PushAddedAncestorsToDescendants = 8,
     InsertNodeDescendantsToAddedAncestors = 9,
     UpdateBranch = 10,
-    Finish = 11,
-    AfterFinish = 12,
+    PushNewEditors = 11,
+    Finish = 12,
+    AfterFinish = 13,
 }
 
 impl ReorderStep {
@@ -68,8 +69,9 @@ impl From<i8> for ReorderStep {
             8 => ReorderStep::PushAddedAncestorsToDescendants,
             9 => ReorderStep::InsertNodeDescendantsToAddedAncestors,
             10 => ReorderStep::UpdateBranch,
-            11 => ReorderStep::Finish,
-            12 => ReorderStep::AfterFinish,
+            11 => ReorderStep::PushNewEditors,
+            12 => ReorderStep::Finish,
+            13 => ReorderStep::AfterFinish,
             _ => panic!("Invalid value for ReorderStep"),
         }
     }
@@ -247,6 +249,9 @@ impl Reorder {
                     self.insert_node_descendants_to_added_ancestors(db_session).await?
                 }
                 ReorderStep::UpdateBranch => self.update_branch(db_session).await?,
+                ReorderStep::PushNewEditors => {
+                    self.push_new_editors(db_session).await?;
+                }
                 ReorderStep::Finish => {
                     self.delete_recovery_log(db_session).await?;
                 }
@@ -297,6 +302,9 @@ impl Reorder {
                     self.undo_insert_node_descendants_to_added_ancestors(db_session).await?
                 }
                 ReorderStep::UpdateBranch => self.undo_update_branch(db_session).await?,
+                ReorderStep::PushNewEditors => {
+                    self.undo_push_new_editors(db_session).await?;
+                }
                 ReorderStep::Finish => {
                     log::error!("should not recover finished process");
                 }
@@ -817,6 +825,37 @@ impl Reorder {
                 }),
             )
             .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn push_new_editors(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        if self.reorder_data.is_original() && self.reorder_data.parent_changed() {
+            if let Some(editor_ids) = &self.reorder_data.new_parent_editor_ids {
+                let mut batch = Node::statement_batch();
+                batch.append_statement(
+                    Node::PUSH_EDITOR_IDS_QUERY,
+                    (editor_ids, self.reorder_data.branch_id, self.reorder_data.node.id),
+                );
+
+                for id in &self.reorder_data.descendant_ids {
+                    batch.append_statement(
+                        Node::PUSH_EDITOR_IDS_QUERY,
+                        (editor_ids, self.reorder_data.branch_id, *id),
+                    );
+                }
+
+                batch.execute(db_session).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn undo_push_new_editors(&mut self) -> Result<(), NodecosmosError> {
+        if self.reorder_data.is_original() && self.reorder_data.parent_changed() {
+            // we would need delta for new editors in order to undo this step
         }
 
         Ok(())

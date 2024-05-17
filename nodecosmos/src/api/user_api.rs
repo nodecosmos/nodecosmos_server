@@ -12,9 +12,10 @@ use crate::api::current_user::{refresh_current_user, remove_current_user, set_cu
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
+use crate::models::token::Token;
 use crate::models::traits::Authorization;
 use crate::models::user::search::UserSearchQuery;
-use crate::models::user::{CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
+use crate::models::user::{ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
 use crate::App;
 
 #[derive(Deserialize)]
@@ -118,6 +119,27 @@ pub async fn create_user(app: web::Data<App>, mut user: web::Json<User>) -> Resp
             }
         }
     }
+}
+
+#[post("/confirm_email/{token}")]
+pub async fn confirm_user_email(data: RequestData, token: web::Path<String>) -> Response {
+    let token = Token::find_by_token(token.into_inner())
+        .execute(data.db_session())
+        .await?;
+
+    if token.expires_at < chrono::Utc::now() {
+        return Err(NodecosmosError::NotFound("Token expired".to_string()));
+    }
+
+    let mut user = ConfirmUser::find_by_id(token.user_id)
+        .execute(data.db_session())
+        .await?;
+
+    user.is_confirmed = true;
+
+    user.update_cb(&data).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[put("/bio")]

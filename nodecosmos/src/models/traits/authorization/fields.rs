@@ -4,6 +4,8 @@ use crate::models::branch::{AuthBranch, Branch, BranchStatus};
 use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
+use crate::models::invitation::Invitation;
+use crate::models::traits::Authorization;
 use crate::models::user::User;
 
 /// AuthorizationFields for nodes is implemented with the `NodeAuthorization` derive macro.
@@ -147,6 +149,36 @@ impl AuthorizationFields for Comment {
     }
 
     fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        &None
+    }
+
+    fn is_frozen(&self) -> bool {
+        false
+    }
+
+    fn is_public(&self) -> bool {
+        false
+    }
+}
+
+impl AuthorizationFields for Invitation {
+    fn owner_id(&self) -> Option<Uuid> {
+        return self.node.as_ref().and_then(|node| node.owner_id);
+    }
+
+    fn editor_ids(&self) -> &Option<Set<Uuid>> {
+        if let Some(node) = &self.node {
+            return &node.editor_ids;
+        }
+
+        &None
+    }
+
+    fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+        if let Some(node) = &self.node {
+            return &node.viewer_ids;
+        }
+
         &None
     }
 

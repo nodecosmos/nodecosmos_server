@@ -353,3 +353,5 @@ impl Callbacks for UpdateCoverImageNode {
         Ok(())
     }
 }
+
+partial_node!(UpdateEditorNode, branch_id, id, root_id, editor_ids, updated_at);

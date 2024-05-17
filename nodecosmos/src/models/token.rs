@@ -1,6 +1,10 @@
+use base64::engine::general_purpose::URL_SAFE;
+use base64::Engine;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
+use rand::rngs::OsRng;
+use rand::Rng;
 
 #[derive(strum_macros::Display, strum_macros::EnumString)]
 pub enum TokenType {
@@ -11,12 +15,12 @@ pub enum TokenType {
 
 #[charybdis_model(
     table_name = tokens,
-    partition_keys = [id],
+    partition_keys = [token],
     clustering_keys = [],
     global_secondary_indexes = [user_id, expires_at],
 )]
 pub struct Token {
-    pub id: Uuid,
+    pub token: Text,
     pub user_id: Uuid,
     pub token_type: Text,
     pub created_at: Timestamp,
@@ -24,9 +28,15 @@ pub struct Token {
 }
 
 impl Token {
+    fn generate_token() -> String {
+        let mut rng = OsRng::default();
+        let random_bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+        return URL_SAFE.encode(&random_bytes);
+    }
+
     pub fn new_user_confirmation(user_id: Uuid) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            token: Self::generate_token(),
             user_id,
             token_type: TokenType::UserConfirmation.to_string(),
             created_at: Utc::now(),
