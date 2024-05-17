@@ -22,6 +22,7 @@ mod description_api;
 mod flow_api;
 mod flow_step_api;
 mod input_output_api;
+mod invitation_api;
 mod like_api;
 mod node_api;
 pub mod request;

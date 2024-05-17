@@ -188,6 +188,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
+impl_user_updated_at_with_elastic_ext_cb!(ConfirmUser);
 
 partial_user!(
     ShowUser,
@@ -205,6 +206,8 @@ partial_user!(
 );
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+
+partial_user!(ConfirmUser, id, is_confirmed, updated_at);
 
 partial_user!(
     CurrentUser,

@@ -1,5 +1,6 @@
 use charybdis::operations::{Insert, InsertWithCallbacks};
 use charybdis::types::Uuid;
+use std::collections::HashSet;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
@@ -37,6 +38,16 @@ impl ContributionRequest {
         let root_id = node.root_id;
         let is_public = node.is_public;
 
+        let mut editor_ids = HashSet::new();
+
+        if let Some(ids) = &node.editor_ids {
+            editor_ids = ids.clone();
+        }
+
+        if let Some(id) = node.owner_id {
+            editor_ids.insert(id);
+        }
+
         let branch = Branch {
             id: self.id, //
             node_id: self.node_id,
@@ -47,6 +58,7 @@ impl ContributionRequest {
             owner: self.owner.clone(),
             is_public,
             is_contribution_request: Some(true),
+            editor_ids: Some(editor_ids),
             ..Default::default()
         };
 

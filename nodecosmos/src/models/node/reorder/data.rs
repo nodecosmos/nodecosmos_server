@@ -22,6 +22,8 @@ pub struct ReorderData {
     pub old_parent_id: Uuid,
     pub new_parent_id: Uuid,
 
+    pub new_parent_editor_ids: Option<Set<Uuid>>,
+
     pub old_ancestor_ids: Set<Uuid>,
     pub new_ancestor_ids: Set<Uuid>,
 
@@ -205,6 +207,7 @@ impl ReorderData {
             descendant_ids,
             old_parent_id,
             new_parent_id: new_parent.id,
+            new_parent_editor_ids: new_parent.editor_ids,
             old_ancestor_ids,
             new_ancestor_ids,
             removed_ancestor_ids,
