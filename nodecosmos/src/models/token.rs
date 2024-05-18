@@ -17,7 +17,6 @@ pub enum TokenType {
     table_name = tokens,
     partition_keys = [id],
     clustering_keys = [],
-    global_secondary_indexes = [email, expires_at],
 )]
 pub struct Token {
     pub id: Text,

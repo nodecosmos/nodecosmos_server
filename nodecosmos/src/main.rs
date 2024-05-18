@@ -42,6 +42,7 @@ fn main() {
                                 .service(create_user)
                                 .service(search_users)
                                 .service(confirm_user_email)
+                                .service(resend_confirmation_email)
                                 .service(update_bio)
                                 .service(delete_user)
                                 .service(login)
