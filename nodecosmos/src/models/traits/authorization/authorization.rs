@@ -8,7 +8,7 @@ use crate::models::branch::Branch;
 use crate::models::comment::Comment;
 use crate::models::comment_thread::{CommentObject, CommentThread};
 use crate::models::contribution_request::ContributionRequest;
-use crate::models::invitation::Invitation;
+use crate::models::invitation::{Invitation, InvitationStatus};
 use crate::models::traits::AuthorizationFields;
 use crate::models::user::User;
 
@@ -168,12 +168,30 @@ impl Authorization for Invitation {
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.inviter_id != data.current_user.id {
+            return Err(NodecosmosError::Unauthorized("Unauthorized"));
+        }
+
         self.node(data.db_session()).await?.auth_update(data).await?;
 
         Ok(())
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.email != data.current_user.email {
+            return Err(NodecosmosError::Unauthorized("Unauthorized"));
+        }
+
+        if self.status == InvitationStatus::Accepted.to_string() {
+            return Err(NodecosmosError::Unauthorized("Invitation already accepted."));
+        }
+
+        if self.expires_at < chrono::Utc::now() {
+            return Err(NodecosmosError::Unauthorized(
+                "Invitation expired. Please request a new invitation.",
+            ));
+        }
+
         self.node(data.db_session()).await?.auth_update(data).await?;
 
         Ok(())

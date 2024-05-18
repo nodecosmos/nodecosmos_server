@@ -12,10 +12,12 @@ use crate::api::current_user::{refresh_current_user, remove_current_user, set_cu
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
-use crate::models::token::Token;
+use crate::models::token::{Token, TokenType};
 use crate::models::traits::Authorization;
 use crate::models::user::search::UserSearchQuery;
-use crate::models::user::{ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User};
+use crate::models::user::{
+    ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User, UserContext,
+};
 use crate::App;
 
 #[derive(Deserialize)]
@@ -103,12 +105,54 @@ pub async fn get_user_by_username(db_session: web::Data<CachingSession>, usernam
     Ok(HttpResponse::Ok().json(user))
 }
 
+#[derive(Deserialize)]
+pub struct PostQ {
+    pub token: Option<String>,
+}
+
 #[post("")]
-pub async fn create_user(app: web::Data<App>, mut user: web::Json<User>) -> Response {
+pub async fn create_user(
+    app: web::Data<App>,
+    client_session: Session,
+    mut user: web::Json<User>,
+    q: web::Query<PostQ>,
+) -> Response {
+    let token = if let Some(token) = &q.token {
+        Token::find_by_id(token.clone()).execute(&app.db_session).await.ok()
+    } else {
+        None
+    };
+
+    if let Some(token) = &token {
+        if token.email != user.email {
+            return Err(NodecosmosError::Unauthorized("Email from token does not match"));
+        }
+
+        if TokenType::from(token.token_type.parse()?) != TokenType::Invitation {
+            return Err(NodecosmosError::Unauthorized("Invalid token type"));
+        }
+
+        // token is created within the last 24 hours so we can safely confirm the user
+        if token.created_at >= (chrono::Utc::now() - chrono::Duration::days(1)) {
+            user.ctx = Some(UserContext::ConfirmInvitationTokenValid);
+        }
+    }
+
     let res = user.insert_cb(&app).execute(&app.db_session).await;
 
     match res {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => {
+            if user.is_confirmed {
+                let current_user = CurrentUser::from_user(user.into_inner());
+
+                // we can set the current user session as user is created from the email invitation
+                set_current_user(&client_session, &current_user)?;
+
+                return Ok(HttpResponse::Ok().json(current_user));
+            }
+
+            return Ok(HttpResponse::Ok().finish());
+        }
         Err(e) => {
             if let NodecosmosError::EmailAlreadyExists = e {
                 // for security reasons, we don't want to leak the fact that the email is already taken, we just
@@ -123,15 +167,13 @@ pub async fn create_user(app: web::Data<App>, mut user: web::Json<User>) -> Resp
 
 #[post("/confirm_email/{token}")]
 pub async fn confirm_user_email(data: RequestData, token: web::Path<String>) -> Response {
-    let token = Token::find_by_token(token.into_inner())
-        .execute(data.db_session())
-        .await?;
+    let token = Token::find_by_id(token.into_inner()).execute(data.db_session()).await?;
 
     if token.expires_at < chrono::Utc::now() {
         return Err(NodecosmosError::NotFound("Token expired".to_string()));
     }
 
-    let mut user = ConfirmUser::find_by_id(token.user_id)
+    let mut user = ConfirmUser::find_first_by_email(token.email)
         .execute(data.db_session())
         .await?;
 

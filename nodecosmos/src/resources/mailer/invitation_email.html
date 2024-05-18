@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirm Your Email</title>
+    <title>Invitation for collaboration</title>
 </head>
 <body style="background-color: #faf9f8;">
 <table style="color:#333;
@@ -63,6 +63,7 @@
         </td>
     </tr>
 </table>
+
 <table style="color:#333;
               width: 100%;
               line-height: 1.8;
@@ -73,27 +74,29 @@
     <tbody>
     <tr>
         <td>
-            <table style="max-width: 600px; width: 100%; background-color: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; text-align: left;">
+            <table style="max-width: 600px;
+                          width: 100%;
+                          background-color: #fff;
+                          border: 1px solid #ddd;
+                          border-radius: 8px;
+                          padding: 20px;
+                          text-align: left;">
                 <tbody>
                 <tr>
                     <td>
-                        <p style="font-size: 24px; margin-block-start: 0px">Welcome to
-                            <a href="https://nodecosmos.com" target="_blank"
-                               style="color: #6955ff;
-                                  border-radius:3px;
-                                  line-height:16px;
-                                  font-weight:700;
-                                  text-decoration:none;">
-                                nodecosmos.com
-                            </a>
+                        <p style="font-size: 24px; margin-block-start: 0;"><b
+                                style="color: #9880ff">@{{username}}</b> has
+                            invited you to collaborate on
+                            <b style="color: #9880ff">{{node_name}}</b> node.
                         </p>
-                        <p style="font-size: 16px;">Thank you for registering with us. Please
-                            confirm your email address by clicking the button below.</p>
+                        <p style="font-size: 16px;">
+                            You can review the invitation by clicking the button below.
+                        </p>
                     </td>
                 </tr>
                 <tr>
                     <td>
-                        <a href="{{confirmation_url}}"
+                        <a href="{{invitation_url}}"
                            style="background-color:#6955ff;
                                   border-radius:3px;
                                   line-height:16px;
@@ -103,9 +106,8 @@
                                   font-size:14px;
                                   display:inline-block;
                                   padding:16px 24px;
-                                  border-radius:5px;
-                                  min-width:90px">
-                            Confirm Email
+                                  border-radius:5px;">
+                            Go to Invitation
                         </a>
                     </td>
                 </tr>
@@ -115,14 +117,18 @@
                             Alternatively, you can copy and paste the following link in your
                             browser:
                         </p>
-                        <a href="{{confirmation_url}}"
+                        <a href="{{invitation_url}}"
                            style="color: #6955ff;
-                                  text-decoration: none;
-                                  font-size: 16px;">
-                            {{confirmation_url}}
+                                  text-decoration: none;">
+                            {{invitation_url}}
                         </a>
-                        <p style="font-size: 16px;">If you did not create an account, no further
-                            action is required.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <p style="font-size: 16px;">
+                            Invitation link will expire in 1 week.
+                        </p>
                     </td>
                 </tr>
                 </tbody>

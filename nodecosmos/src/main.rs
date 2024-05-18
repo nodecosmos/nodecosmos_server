@@ -40,6 +40,8 @@ fn main() {
                                 .service(get_user)
                                 .service(get_user_by_username)
                                 .service(create_user)
+                                .service(search_users)
+                                .service(confirm_user_email)
                                 .service(update_bio)
                                 .service(delete_user)
                                 .service(login)
@@ -141,6 +143,12 @@ fn main() {
                                 .service(save_description),
                         )
                         .service(web::scope("ws").service(description_ws))
+                        .service(
+                            web::scope("invitations")
+                                .service(create_invitation)
+                                .service(find_invitation_by_token)
+                                .service(confirm_invitation),
+                        )
                 })
                 .keep_alive(std::time::Duration::from_secs(15))
                 .bind(("0.0.0.0", port))

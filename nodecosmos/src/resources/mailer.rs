@@ -1,9 +1,12 @@
 use crate::errors::NodecosmosError;
+use charybdis::types::Uuid;
 use handlebars::Handlebars;
 use std::collections::HashMap;
 use toml::Value;
 
 const CONFIRM_EMAIL: &str = "confirm_email";
+const INVITATION_EMAIL: &str = "invitation_email";
+const INVITATION_ACCEPTED_EMAIL: &str = "invitation_accepted_email";
 
 pub struct Mailer {
     pub templates: Handlebars<'static>,
@@ -18,6 +21,17 @@ impl Mailer {
 
         templates
             .register_template_string(CONFIRM_EMAIL, include_str!("./mailer/confirm_email.html"))
+            .expect("Template should be valid");
+
+        templates
+            .register_template_string(INVITATION_EMAIL, include_str!("./mailer/invitation_email.html"))
+            .expect("Template should be valid");
+
+        templates
+            .register_template_string(
+                INVITATION_ACCEPTED_EMAIL,
+                include_str!("./mailer/invitation_accepted_email.html"),
+            )
             .expect("Template should be valid");
 
         Self {
@@ -36,7 +50,7 @@ impl Mailer {
         let url = format!("{}/{}?token={}", self.client_url, username, token);
 
         let mut ctx = HashMap::<&str, &str>::new();
-        ctx.insert("confirmation_link", &url);
+        ctx.insert("confirmation_url", &url);
 
         let message = self
             .templates
@@ -44,6 +58,52 @@ impl Mailer {
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
         self.send_email(to, "Confirm your nodecosmos account", message).await
+    }
+
+    pub async fn send_invitation_email(
+        &self,
+        to: String,
+        username: &String,
+        node_name: &String,
+        token: String,
+    ) -> Result<(), NodecosmosError> {
+        let url = format!("{}/invitations?token={}", self.client_url, token);
+
+        let mut ctx = HashMap::<&str, &str>::new();
+        ctx.insert("username", &username);
+        ctx.insert("node_name", &node_name);
+        ctx.insert("invitation_url", &url);
+
+        let message = self
+            .templates
+            .render(INVITATION_EMAIL, &ctx)
+            .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
+
+        self.send_email(to, "You have been invited to collaborate on nodecosmos", message)
+            .await
+    }
+
+    pub async fn send_invitation_accepted_email(
+        &self,
+        to: String,
+        username: &String,
+        branch_id: Uuid,
+        node_id: Uuid,
+        node_name: &String,
+    ) -> Result<(), NodecosmosError> {
+        let node_url = format!("{}/nodes/{}/{}", self.client_url, branch_id, node_id);
+
+        let mut ctx = HashMap::<&str, &str>::new();
+        ctx.insert("username", &username);
+        ctx.insert("node_name", &node_name);
+        ctx.insert("node_url", &node_url);
+
+        let message = self
+            .templates
+            .render(INVITATION_ACCEPTED_EMAIL, &ctx)
+            .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
+
+        self.send_email(to, "Your invitation has been accepted", message).await
     }
 
     async fn send_email(&self, to: String, subject: &str, message: String) -> Result<(), NodecosmosError> {

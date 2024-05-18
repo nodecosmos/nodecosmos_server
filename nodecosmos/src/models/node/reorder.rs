@@ -303,7 +303,7 @@ impl Reorder {
                 }
                 ReorderStep::UpdateBranch => self.undo_update_branch(db_session).await?,
                 ReorderStep::PushNewEditors => {
-                    self.undo_push_new_editors(db_session).await?;
+                    self.undo_push_new_editors().await?;
                 }
                 ReorderStep::Finish => {
                     log::error!("should not recover finished process");
@@ -854,9 +854,9 @@ impl Reorder {
     }
 
     async fn undo_push_new_editors(&mut self) -> Result<(), NodecosmosError> {
-        if self.reorder_data.is_original() && self.reorder_data.parent_changed() {
-            // we would need delta for new editors in order to undo this step
-        }
+        // We would need delta for new editors in order to undo this step, but that would
+        // cause a bad performance hit as we would need to calculate delta for each descendant.
+        // For now, we will not support undoing this step.
 
         Ok(())
     }

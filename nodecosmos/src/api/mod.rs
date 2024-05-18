@@ -6,6 +6,7 @@ pub use description_api::*;
 pub use flow_api::*;
 pub use flow_step_api::*;
 pub use input_output_api::*;
+pub use invitation_api::*;
 pub use like_api::*;
 pub use node_api::*;
 pub use request::*;

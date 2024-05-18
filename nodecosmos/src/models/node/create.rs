@@ -17,41 +17,9 @@ use crate::models::traits::ModelContext;
 use crate::models::traits::Parent;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
-use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
 
 impl Node {
-    pub async fn set_owner(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_original() {
-            let current_user = &data.current_user;
-            let owner = Profile::init_from_current_user(current_user);
-
-            self.owner_id = Some(owner.id);
-
-            self.owner = Some(owner);
-        } else {
-            if let Some(parent) = self.parent(data.db_session()).await? {
-                if let Some(owner) = parent.owner.clone() {
-                    self.owner_id = Some(owner.id);
-
-                    self.owner = Some(owner);
-                } else {
-                    return Err(NodecosmosError::ValidationError((
-                        "parent.owner".to_string(),
-                        "must be present".to_string(),
-                    )));
-                }
-            } else {
-                return Err(NodecosmosError::ValidationError((
-                    "parent_id".to_string(),
-                    "must be present".to_string(),
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
     pub async fn set_defaults(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
 
@@ -61,7 +29,9 @@ impl Node {
             let root_id = parent.root_id;
             let is_public = parent.is_public;
             let parent_id = parent.id;
+            let owner_id = parent.owner_id;
             let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
+            let owner = parent.owner.clone();
             ancestor_ids.insert(parent.id);
 
             self.root_id = root_id;
@@ -71,6 +41,8 @@ impl Node {
             self.is_public = is_public;
             self.is_root = false;
             self.ancestor_ids = Some(ancestor_ids);
+            self.owner_id = owner_id;
+            self.owner = owner;
         } else {
             self.root_id = self.id;
             self.parent_id = None;

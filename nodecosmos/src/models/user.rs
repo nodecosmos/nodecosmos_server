@@ -23,6 +23,13 @@ pub mod update_profile_image;
 
 const BCRYPT_COST: u32 = 6;
 
+#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+pub enum UserContext {
+    #[default]
+    Default,
+    ConfirmInvitationTokenValid,
+}
+
 #[charybdis_model(
     table_name = users,
     partition_keys = [id],
@@ -56,6 +63,10 @@ pub struct User {
 
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub ctx: Option<UserContext>,
 }
 
 impl Callbacks for User {
@@ -74,17 +85,25 @@ impl Callbacks for User {
             )));
         }
 
-        if let Some(user) = Self::maybe_find_first_by_email(self.email.clone())
+        self.id = Uuid::new_v4();
+
+        self.set_password()?;
+
+        if self.ctx == Some(UserContext::ConfirmInvitationTokenValid) {
+            self.is_confirmed = true;
+        } else if let Some(user) = Self::maybe_find_first_by_email(self.email.clone())
             .execute(db_session)
             .await?
         {
             // If the user is not confirmed, resend the confirmation email, otherwise don't disturb them
-            if !user.is_confirmed {
-                let token = if let Some(token) = Token::maybe_find_first_by_user_id(user.id).execute(db_session).await?
+            if !user.is_confirmed && !user.is_blocked {
+                let token = if let Some(token) = Token::maybe_find_first_by_email(user.email.clone())
+                    .execute(db_session)
+                    .await?
                 {
                     token
                 } else {
-                    let token = Token::new_user_confirmation(user.id);
+                    let token = Token::new_user_confirmation(user.email.clone());
 
                     token.insert().execute(db_session).await?;
 
@@ -97,18 +116,14 @@ impl Callbacks for User {
             }
 
             return Err(NodecosmosError::EmailAlreadyExists);
+        } else {
+            let token = Token::new_user_confirmation(self.email.clone());
+            token.insert().execute(db_session).await?;
+
+            app.mailer
+                .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
+                .await?;
         }
-
-        let token = Token::new_user_confirmation(self.id);
-        token.insert().execute(db_session).await?;
-
-        app.mailer
-            .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
-            .await?;
-
-        self.id = Uuid::new_v4();
-
-        self.set_password()?;
 
         Ok(())
     }
@@ -207,7 +222,7 @@ partial_user!(
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
-partial_user!(ConfirmUser, id, is_confirmed, updated_at);
+partial_user!(ConfirmUser, id, is_confirmed, email, updated_at);
 
 partial_user!(
     CurrentUser,
@@ -249,6 +264,8 @@ partial_user!(
     profile_image_url,
     updated_at
 );
+
+partial_user!(EmailUser, id, email);
 
 partial_user!(UpdateBioUser, id, username, bio, updated_at);
 

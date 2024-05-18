@@ -5,7 +5,6 @@ use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
 use crate::models::invitation::Invitation;
-use crate::models::traits::Authorization;
 use crate::models::user::User;
 
 /// AuthorizationFields for nodes is implemented with the `NodeAuthorization` derive macro.
