@@ -17,6 +17,7 @@ use crate::errors::NodecosmosError;
 use crate::models::token::Token;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
 use crate::models::udts::Address;
+use crate::models::user_counter::UserCounter;
 
 pub mod search;
 pub mod update_profile_image;
@@ -97,28 +98,16 @@ impl Callbacks for User {
         {
             // If the user is not confirmed, resend the confirmation email, otherwise don't disturb them
             if !user.is_confirmed && !user.is_blocked {
-                let token = if let Some(token) = Token::maybe_find_first_by_email(user.email.clone())
-                    .execute(db_session)
-                    .await?
-                {
-                    token
-                } else {
-                    let token = Token::new_user_confirmation(user.email.clone());
-
-                    token.insert().execute(db_session).await?;
-
-                    token
-                };
+                let token = self.generate_token(db_session).await?;
 
                 app.mailer
-                    .send_confirm_user_email(user.email, user.username, token.id.to_string())
+                    .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
                     .await?;
             }
 
             return Err(NodecosmosError::EmailAlreadyExists);
         } else {
-            let token = Token::new_user_confirmation(self.email.clone());
-            token.insert().execute(db_session).await?;
+            let token = self.generate_token(db_session).await?;
 
             app.mailer
                 .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
@@ -147,6 +136,23 @@ impl User {
             .map_err(|_| NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string())))?;
 
         Ok(res)
+    }
+
+    pub async fn generate_token(&self, db_session: &CachingSession) -> Result<Token, NodecosmosError> {
+        let token = Token::new_user_confirmation(self.email.clone());
+        token.insert().execute(db_session).await?;
+
+        Ok(token)
+    }
+
+    pub async fn resend_token_count(&self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
+        let count = UserCounter::maybe_find_first_by_id(self.id).execute(db_session).await?;
+
+        if let Some(counter) = count {
+            Ok(counter.resend_token_count.0)
+        } else {
+            Ok(0i64)
+        }
     }
 
     fn set_password(&mut self) -> Result<(), NodecosmosError> {

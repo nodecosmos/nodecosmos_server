@@ -107,6 +107,14 @@ impl Authorization for ContributionRequest {
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !data.current_user.is_confirmed {
+            return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+        }
+
+        if data.current_user.is_blocked {
+            return Err(NodecosmosError::Unauthorized("User is blocked"));
+        }
+
         let node = self.node(data.db_session()).await?;
 
         if node.is_public {
@@ -127,6 +135,14 @@ impl Authorization for User {
 
 impl Authorization for CommentThread {
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !data.current_user.is_confirmed {
+            return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+        }
+
+        if data.current_user.is_blocked {
+            return Err(NodecosmosError::Unauthorized("User is blocked"));
+        }
+
         let object = self.object(data.db_session()).await?;
         match object {
             CommentObject::ContributionRequest(mut contribution_request) => {

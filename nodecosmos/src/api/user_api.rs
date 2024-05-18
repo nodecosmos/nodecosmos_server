@@ -18,6 +18,7 @@ use crate::models::user::search::UserSearchQuery;
 use crate::models::user::{
     ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User, UserContext,
 };
+use crate::models::user_counter::UserCounter;
 use crate::App;
 
 #[derive(Deserialize)]
@@ -180,6 +181,39 @@ pub async fn confirm_user_email(data: RequestData, token: web::Path<String>) -> 
     user.is_confirmed = true;
 
     user.update_cb(&data).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/resend_confirmation_email")]
+pub async fn resend_confirmation_email(data: RequestData) -> Response {
+    let user = User::find_first_by_email(data.current_user.email.clone())
+        .execute(data.db_session())
+        .await?;
+
+    if user.is_confirmed {
+        return Err(NodecosmosError::Unauthorized("User is already confirmed"));
+    }
+
+    if user.resend_token_count(data.db_session()).await? > 3 {
+        return Err(NodecosmosError::Unauthorized(
+            "Resend Token limit reached. Please contact support: support@nodecosmos.com",
+        ));
+    }
+
+    UserCounter {
+        id: user.id,
+        ..Default::default()
+    }
+    .increment_resend_token_count(1)
+    .execute(data.db_session())
+    .await?;
+
+    let token = user.generate_token(data.db_session()).await?;
+
+    data.mailer()
+        .send_confirm_user_email(user.email, user.username, token.id)
+        .await?;
 
     Ok(HttpResponse::Ok().finish())
 }

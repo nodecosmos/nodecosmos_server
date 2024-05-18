@@ -25,5 +25,6 @@ pub mod token;
 pub mod traits;
 pub mod udts;
 pub mod user;
+pub mod user_counter;
 pub mod utils;
 pub mod workflow;
