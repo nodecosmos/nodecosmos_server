@@ -43,7 +43,7 @@ pub async fn delete_like(data: RequestData, like: web::Path<PkLike>) -> Response
         .execute(data.db_session())
         .await?;
 
-    if like.user_id != data.current_user_id() {
+    if like.user_id != data.current_user.id {
         return Ok(HttpResponse::Forbidden().finish());
     }
 

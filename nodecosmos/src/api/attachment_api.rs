@@ -56,7 +56,7 @@ pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: Reque
 pub async fn create_attachment(mut attachment: web::Json<Attachment>, data: RequestData) -> Response {
     AuthNode::auth_update(&data, attachment.branch_id, attachment.node_id, attachment.root_id).await?;
 
-    attachment.user_id = Some(data.current_user_id());
+    attachment.user_id = Some(data.current_user.id);
 
     attachment.insert_cb(&None).execute(data.db_session()).await?;
 

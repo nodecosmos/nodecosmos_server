@@ -29,7 +29,7 @@ impl Comment {
         }
 
         self.id = Uuid::new_v4();
-        self.author_id = Some(data.current_user_id());
+        self.author_id = Some(data.current_user.id);
         self.author = Some(Profile::init_from_current_user(&data.current_user));
         self.content.sanitize()?;
         self.created_at = now;

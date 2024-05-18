@@ -4,7 +4,6 @@ use std::sync::Arc;
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
-use charybdis::types::Uuid;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 
@@ -44,6 +43,10 @@ impl RequestData {
         &self.app.s3_bucket
     }
 
+    pub fn mailer(&self) -> &crate::resources::mailer::Mailer {
+        &self.app.mailer
+    }
+
     pub fn resource_locker(&self) -> &ResourceLocker {
         &self.app.resource_locker
     }
@@ -54,10 +57,6 @@ impl RequestData {
 
     pub fn sse_broadcast(&self) -> Arc<SseBroadcast> {
         self.app.sse_broadcast.clone()
-    }
-
-    pub fn current_user_id(&self) -> Uuid {
-        self.current_user.id
     }
 }
 
