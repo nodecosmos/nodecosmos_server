@@ -43,6 +43,8 @@ fn main() {
                                 .service(search_users)
                                 .service(confirm_user_email)
                                 .service(resend_confirmation_email)
+                                .service(reset_password_email)
+                                .service(update_password)
                                 .service(update_bio)
                                 .service(delete_user)
                                 .service(login)

@@ -101,7 +101,7 @@ impl Callbacks for Node {
 
     async fn before_insert(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_default_context() {
-            self.set_defaults(db_session).await?;
+            self.set_defaults(data).await?;
             self.validate_root()?;
             self.validate_owner()?;
             self.update_branch_with_creation(data)
