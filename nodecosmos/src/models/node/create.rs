@@ -17,13 +17,14 @@ use crate::models::traits::ModelContext;
 use crate::models::traits::Parent;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
+use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
 
 impl Node {
-    pub async fn set_defaults(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+    pub async fn set_defaults(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
 
-        if let Some(parent) = self.parent(db_session).await? {
+        if let Some(parent) = self.parent(data.db_session()).await? {
             let editor_ids = parent.editor_ids.clone();
             let viewer_ids = parent.viewer_ids.clone();
             let root_id = parent.root_id;
@@ -44,6 +45,8 @@ impl Node {
             self.owner_id = owner_id;
             self.owner = owner;
         } else {
+            self.owner_id = Some(data.current_user.id);
+            self.owner = Some(Profile::init_from_current_user(&data.current_user));
             self.root_id = self.id;
             self.parent_id = None;
             self.order_index = 0.0;

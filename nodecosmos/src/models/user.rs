@@ -172,7 +172,7 @@ impl User {
         }
     }
 
-    pub fn hash_password(&mut self) -> Result<(), NodecosmosError> {
+    fn hash_password(&mut self) -> Result<(), NodecosmosError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
             error!("{}", "error hashing password".bright_red().bold());
 
@@ -243,6 +243,35 @@ partial_user!(
 );
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
+
+partial_user!(UpdatePasswordUser, id, password, email, username, updated_at);
+
+impl Callbacks for UpdatePasswordUser {
+    type Extension = App;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _: &CachingSession, _: &App) -> Result<(), NodecosmosError> {
+        self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
+            error!("{}", "error hashing password".bright_red().bold());
+
+            NodecosmosError::InternalServerError(
+                "There was an error processing your request. Please try again later.".to_string(),
+            )
+        })?;
+
+        self.updated_at = Utc::now();
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, app: &App) -> Result<(), NodecosmosError> {
+        app.mailer
+            .send_password_changed_email(self.email.clone(), self.username.clone())
+            .await?;
+
+        Ok(())
+    }
+}
 
 partial_user!(ConfirmUser, id, is_confirmed, email, updated_at);
 

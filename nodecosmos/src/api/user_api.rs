@@ -16,7 +16,7 @@ use crate::models::token::{Token, TokenType};
 use crate::models::traits::Authorization;
 use crate::models::user::search::UserSearchQuery;
 use crate::models::user::{
-    ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdateProfileImageUser, User, UserContext,
+    ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdatePasswordUser, UpdateProfileImageUser, User, UserContext,
 };
 use crate::models::user_counter::UserCounter;
 use crate::App;
@@ -41,7 +41,7 @@ pub async fn login(
         .await?
     {
         user = user_by_username;
-    } else if let Some(user_by_email) = User::maybe_find_first_by_username(login_form.username_or_email.clone())
+    } else if let Some(user_by_email) = User::maybe_find_first_by_email(login_form.username_or_email.clone())
         .execute(&db_session)
         .await?
     {
@@ -182,7 +182,7 @@ pub async fn confirm_user_email(token: web::Path<String>, app: web::Data<App>) -
 
     user.update_cb(&app).execute(&app.db_session).await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(user))
 }
 
 #[post("/resend_confirmation_email")]
@@ -218,9 +218,14 @@ pub async fn resend_confirmation_email(data: RequestData) -> Response {
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/reset_password_email/{email}")]
-pub async fn reset_password_email(app: web::Data<App>, email: web::Path<String>) -> Response {
-    let user_res = User::find_first_by_email(email.into_inner())
+#[derive(Deserialize)]
+pub struct ResetPassword {
+    pub email: String,
+}
+
+#[post("/reset_password")]
+pub async fn reset_password_email(app: web::Data<App>, data: web::Json<ResetPassword>) -> Response {
+    let user_res = User::find_first_by_email(data.into_inner().email)
         .execute(&app.db_session)
         .await
         .map_err(|e| {
@@ -256,18 +261,19 @@ pub async fn update_password(app: web::Data<App>, pass: web::Json<UpdatePassword
 
     if token.expires_at < chrono::Utc::now() {
         return Err(NodecosmosError::Unauthorized(
-            "Token expired! Please request a new one.",
+            "Token expired. Please request a new password.",
         ));
     }
 
-    let mut user = User::find_first_by_email(token.email).execute(&app.db_session).await?;
+    let mut user = UpdatePasswordUser::find_first_by_email(token.email)
+        .execute(&app.db_session)
+        .await?;
 
     user.password = pass_data.password;
-    user.hash_password()?;
 
     user.update_cb(&app).execute(&app.db_session).await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(json!({"email": user.email })))
 }
 
 #[put("/bio")]
