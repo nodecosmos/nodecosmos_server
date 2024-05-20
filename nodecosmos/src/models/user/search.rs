@@ -82,13 +82,6 @@ impl<'a> UserSearch<'a> {
 
     fn search_json(&self) -> Value {
         let mut data = json!({
-            // "query": {
-            //     "bool": {
-            //         "must": [
-            //             { "term": { "isConfirmed": true } } // Only confirmed users
-            //         ]
-            //     }
-            // },
             "from": self.q.page * PAGE_SIZE,
             "size": PAGE_SIZE
         });

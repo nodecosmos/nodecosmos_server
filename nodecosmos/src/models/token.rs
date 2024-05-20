@@ -45,6 +45,17 @@ impl Token {
         }
     }
 
+    pub fn new_password_reset(email: Text) -> Self {
+        Self {
+            id: Self::generate_token(),
+            email,
+            token_type: TokenType::PasswordReset.to_string(),
+            created_at: Utc::now(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+            node_pk: None,
+        }
+    }
+
     pub fn new_invitation(email: Text, node_pk: (Uuid, Uuid)) -> Self {
         Self {
             id: Self::generate_token(),

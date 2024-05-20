@@ -7,6 +7,7 @@ use toml::Value;
 const CONFIRM_EMAIL: &str = "confirm_email";
 const INVITATION_EMAIL: &str = "invitation_email";
 const INVITATION_ACCEPTED_EMAIL: &str = "invitation_accepted_email";
+const RESET_PASSWORD_EMAIL: &str = "reset_password_email";
 
 pub struct Mailer {
     pub templates: Handlebars<'static>,
@@ -32,6 +33,10 @@ impl Mailer {
                 INVITATION_ACCEPTED_EMAIL,
                 include_str!("./mailer/invitation_accepted_email.html"),
             )
+            .expect("Template should be valid");
+
+        templates
+            .register_template_string(RESET_PASSWORD_EMAIL, include_str!("./mailer/reset_password_email.html"))
             .expect("Template should be valid");
 
         Self {
@@ -104,6 +109,26 @@ impl Mailer {
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
         self.send_email(to, "Your invitation has been accepted", message).await
+    }
+
+    pub async fn send_reset_password_email(
+        &self,
+        to: String,
+        username: String,
+        token: String,
+    ) -> Result<(), NodecosmosError> {
+        let url = format!("{}/reset_password?token={}", self.client_url, token);
+
+        let mut ctx = HashMap::<&str, &str>::new();
+        ctx.insert("username", &username);
+        ctx.insert("reset_password_url", &url);
+
+        let message = self
+            .templates
+            .render(RESET_PASSWORD_EMAIL, &ctx)
+            .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
+
+        self.send_email(to, "Reset your nodecosmos password", message).await
     }
 
     async fn send_email(&self, to: String, subject: &str, message: String) -> Result<(), NodecosmosError> {
