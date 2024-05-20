@@ -88,7 +88,7 @@ impl Callbacks for User {
 
         self.id = Uuid::new_v4();
 
-        self.set_password()?;
+        self.hash_password()?;
 
         if self.ctx == Some(UserContext::ConfirmInvitationTokenValid) {
             self.is_confirmed = true;
@@ -98,7 +98,7 @@ impl Callbacks for User {
         {
             // If the user is not confirmed, resend the confirmation email, otherwise don't disturb them
             if !user.is_confirmed && !user.is_blocked {
-                let token = self.generate_token(db_session).await?;
+                let token = self.generate_confirmation_token(db_session).await?;
 
                 app.mailer
                     .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
@@ -107,7 +107,7 @@ impl Callbacks for User {
 
             return Err(NodecosmosError::EmailAlreadyExists);
         } else {
-            let token = self.generate_token(db_session).await?;
+            let token = self.generate_confirmation_token(db_session).await?;
 
             app.mailer
                 .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
@@ -119,6 +119,12 @@ impl Callbacks for User {
 
     async fn after_insert(&mut self, _db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
         self.add_elastic_document(&app.elastic_client).await;
+
+        Ok(())
+    }
+
+    async fn before_update(&mut self, _: &CachingSession, _: &Arc<App>) -> Result<(), NodecosmosError> {
+        self.updated_at = Utc::now();
 
         Ok(())
     }
@@ -138,11 +144,22 @@ impl User {
         Ok(res)
     }
 
-    pub async fn generate_token(&self, db_session: &CachingSession) -> Result<Token, NodecosmosError> {
+    pub async fn generate_confirmation_token(&self, db_session: &CachingSession) -> Result<Token, NodecosmosError> {
         let token = Token::new_user_confirmation(self.email.clone());
         token.insert().execute(db_session).await?;
 
         Ok(token)
+    }
+
+    pub async fn reset_password_token(&self, app: &Arc<App>) -> Result<(), NodecosmosError> {
+        let token = Token::new_password_reset(self.email.clone());
+        token.insert().execute(&app.db_session).await?;
+
+        app.mailer
+            .send_reset_password_email(self.email.clone(), self.username.clone(), token.id.to_string())
+            .await?;
+
+        Ok(())
     }
 
     pub async fn resend_token_count(&self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
@@ -155,7 +172,7 @@ impl User {
         }
     }
 
-    fn set_password(&mut self) -> Result<(), NodecosmosError> {
+    pub fn hash_password(&mut self) -> Result<(), NodecosmosError> {
         self.password = hash(&self.password, BCRYPT_COST).map_err(|_| {
             error!("{}", "error hashing password".bright_red().bold());
 
@@ -209,7 +226,6 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
 impl_user_updated_at_with_elastic_ext_cb!(UpdateUser);
 impl_user_updated_at_with_elastic_ext_cb!(UpdateProfileImageUser);
-impl_user_updated_at_with_elastic_ext_cb!(ConfirmUser);
 
 partial_user!(
     ShowUser,
@@ -229,6 +245,25 @@ partial_user!(
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
 partial_user!(ConfirmUser, id, is_confirmed, email, updated_at);
+
+impl Callbacks for ConfirmUser {
+    type Extension = App;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, _: &CachingSession, _ext: &Self::Extension) -> Result<(), NodecosmosError> {
+        self.updated_at = Utc::now();
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, app: &Self::Extension) -> Result<(), NodecosmosError> {
+        use crate::models::traits::ElasticDocument;
+
+        self.update_elastic_document(&app.elastic_client).await;
+
+        Ok(())
+    }
+}
 
 partial_user!(
     CurrentUser,

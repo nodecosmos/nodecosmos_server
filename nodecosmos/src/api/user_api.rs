@@ -167,20 +167,20 @@ pub async fn create_user(
 }
 
 #[post("/confirm_email/{token}")]
-pub async fn confirm_user_email(data: RequestData, token: web::Path<String>) -> Response {
-    let token = Token::find_by_id(token.into_inner()).execute(data.db_session()).await?;
+pub async fn confirm_user_email(token: web::Path<String>, app: web::Data<App>) -> Response {
+    let token = Token::find_by_id(token.into_inner()).execute(&app.db_session).await?;
 
     if token.expires_at < chrono::Utc::now() {
-        return Err(NodecosmosError::NotFound("Token expired".to_string()));
+        return Err(NodecosmosError::Unauthorized("Token expired"));
     }
 
     let mut user = ConfirmUser::find_first_by_email(token.email)
-        .execute(data.db_session())
+        .execute(&app.db_session)
         .await?;
 
     user.is_confirmed = true;
 
-    user.update_cb(&data).execute(data.db_session()).await?;
+    user.update_cb(&app).execute(&app.db_session).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -195,7 +195,7 @@ pub async fn resend_confirmation_email(data: RequestData) -> Response {
         return Err(NodecosmosError::Unauthorized("User is already confirmed"));
     }
 
-    if user.resend_token_count(data.db_session()).await? > 3 {
+    if user.resend_token_count(data.db_session()).await? > 5 {
         return Err(NodecosmosError::Unauthorized(
             "Resend Token limit reached. Please contact support: support@nodecosmos.com",
         ));
@@ -209,11 +209,63 @@ pub async fn resend_confirmation_email(data: RequestData) -> Response {
     .execute(data.db_session())
     .await?;
 
-    let token = user.generate_token(data.db_session()).await?;
+    let token = user.generate_confirmation_token(data.db_session()).await?;
 
     data.mailer()
         .send_confirm_user_email(user.email, user.username, token.id)
         .await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/reset_password_email/{email}")]
+pub async fn reset_password_email(app: web::Data<App>, email: web::Path<String>) -> Response {
+    let user_res = User::find_first_by_email(email.into_inner())
+        .execute(&app.db_session)
+        .await
+        .map_err(|e| {
+            log::warn!("Error finding user by email for pass reset: {:?}", e);
+
+            e
+        });
+
+    match user_res {
+        Ok(user) => {
+            user.reset_password_token(&app).await?;
+
+            Ok(HttpResponse::Ok().finish())
+        }
+        Err(_) => {
+            // we don't want to leak the fact that the email is not found, we just
+            // print that if the email is found, an email will be sent
+            return Ok(HttpResponse::Ok().finish());
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UpdatePassword {
+    pub password: String,
+    pub token: String,
+}
+
+#[put("/update_password")]
+pub async fn update_password(app: web::Data<App>, pass: web::Json<UpdatePassword>) -> Response {
+    let pass_data = pass.into_inner();
+    let token = Token::find_by_id(pass_data.token).execute(&app.db_session).await?;
+
+    if token.expires_at < chrono::Utc::now() {
+        return Err(NodecosmosError::Unauthorized(
+            "Token expired! Please request a new one.",
+        ));
+    }
+
+    let mut user = User::find_first_by_email(token.email).execute(&app.db_session).await?;
+
+    user.password = pass_data.password;
+    user.hash_password()?;
+
+    user.update_cb(&app).execute(&app.db_session).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

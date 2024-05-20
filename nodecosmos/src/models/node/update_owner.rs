@@ -28,7 +28,7 @@ impl UpdateOwnerNode {
 
         match user {
             Ok(user) => {
-                let _ = UpdateOwnerNode::run(data, user.clone()).await;
+                let _ = Self::run(data, user.clone()).await;
             }
             Err(e) => {
                 error!("[update_owner_records::find_by_id] {}", e);
