@@ -55,10 +55,7 @@ impl Callbacks for Description {
 
     async fn before_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.root_id == Uuid::default() {
-            return Err(NodecosmosError::ValidationError((
-                "Root id".to_string(),
-                "is required".to_string(),
-            )));
+            return Err(NodecosmosError::ValidationError(("Root id", "is required")));
         }
 
         let current = Self::maybe_find_first_by_branch_id_and_object_id(self.branch_id, self.object_id)

@@ -1295,7 +1295,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "charybdis"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1311,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "charybdis_parser",
  "darling 0.20.8",
@@ -1322,7 +1322,7 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "colored",
  "darling 0.20.8",
@@ -1824,6 +1824,9 @@ name = "email_address"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2153bd83ebc09db15bcbdc3e2194d901804952e3dc96967e1cd3b0c5c32d112"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "encode_unicode"
@@ -2874,6 +2877,7 @@ dependencies = [
  "deadpool-redis",
  "dotenv",
  "elasticsearch",
+ "email_address",
  "env_logger",
  "futures",
  "handlebars",
@@ -3576,9 +3580,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.3"
+version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62dbe01f0b06f9d8dc7d49e05a0785f153b00b2c227856282f671e0318c9b15"
+checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 dependencies = [
  "aho-corasick",
  "memchr",

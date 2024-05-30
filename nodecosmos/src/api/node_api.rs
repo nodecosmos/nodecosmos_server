@@ -19,6 +19,7 @@ use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
 use crate::models::traits::Authorization;
 use crate::models::traits::Descendants;
+use crate::models::user::ShowUser;
 use crate::resources::resource_locker::ResourceLocker;
 
 #[get("")]
@@ -268,4 +269,15 @@ pub async fn listen_node_events(root_id: web::Path<Uuid>, data: RequestData) -> 
     });
 
     Ok(HttpResponse::Ok().content_type("text/event-stream").streaming(stream))
+}
+
+#[get("/{branchId}/{id}/editors")]
+pub async fn get_node_editors(db_session: web::Data<CachingSession>, pk: web::Path<PrimaryKeyNode>) -> Response {
+    let node = AuthNode::find_by_branch_id_and_id(pk.branch_id, pk.id)
+        .execute(&db_session)
+        .await?;
+    let user_ids = node.editor_ids.unwrap_or_default();
+    let users = ShowUser::find_by_ids(&db_session, user_ids).await?;
+
+    Ok(HttpResponse::Ok().json(users))
 }

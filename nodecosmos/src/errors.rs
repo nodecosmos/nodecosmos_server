@@ -41,7 +41,7 @@ pub enum NodecosmosError {
     NotFound(String),
     Conflict(String),
     UnsupportedMediaType,
-    ValidationError((String, String)),
+    ValidationError((&'static str, &'static str)),
     PreconditionFailed(&'static str),
     BadRequest(String),
     // 400 | 500
@@ -131,7 +131,7 @@ impl ResponseError for NodecosmosError {
             })),
             NodecosmosError::ValidationError((field, message)) => HttpResponse::BadRequest().json(json!({
                 "status": 403,
-                "message": {field: message}
+                "message": {field.to_string(): message.to_string()}
             })),
             NodecosmosError::Forbidden(e) => HttpResponse::Forbidden().json(json!({
                 "status": 403,

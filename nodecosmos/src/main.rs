@@ -64,7 +64,8 @@ fn main() {
                                 .service(reorder_nodes)
                                 .service(upload_cover_image)
                                 .service(delete_cover_image)
-                                .service(listen_node_events),
+                                .service(listen_node_events)
+                                .service(get_node_editors),
                         )
                         .service(
                             web::scope("/likes")
@@ -128,7 +129,8 @@ fn main() {
                                 .service(undo_delete_flow)
                                 .service(restore_flow_step)
                                 .service(keep_flow_step)
-                                .service(undo_delete_flow_step),
+                                .service(undo_delete_flow_step)
+                                .service(get_branch_editors),
                         )
                         .service(
                             web::scope("comments")
@@ -149,8 +151,10 @@ fn main() {
                         .service(
                             web::scope("invitations")
                                 .service(create_invitation)
-                                .service(find_invitation_by_token)
-                                .service(confirm_invitation),
+                                .service(get_invitations)
+                                .service(get_invitation_by_token)
+                                .service(confirm_invitation)
+                                .service(reject_invitation),
                         )
                 })
                 .keep_alive(std::time::Duration::from_secs(15))

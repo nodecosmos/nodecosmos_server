@@ -184,17 +184,13 @@ impl Authorization for Invitation {
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.inviter_id != data.current_user.id {
-            return Err(NodecosmosError::Unauthorized("Unauthorized"));
-        }
-
         self.node(data.db_session()).await?.auth_update(data).await?;
 
         Ok(())
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.email != data.current_user.email {
+        if self.username_or_email != data.current_user.email && self.username_or_email != data.current_user.username {
             return Err(NodecosmosError::Unauthorized("Unauthorized"));
         }
 
@@ -207,8 +203,6 @@ impl Authorization for Invitation {
                 "Invitation expired. Please request a new invitation.",
             ));
         }
-
-        self.node(data.db_session()).await?.auth_update(data).await?;
 
         Ok(())
     }

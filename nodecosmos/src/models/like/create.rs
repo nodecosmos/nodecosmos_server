@@ -32,10 +32,7 @@ impl Like {
         .ok();
 
         if existing_like.is_some() {
-            return Err(NodecosmosError::ValidationError((
-                "user".to_string(),
-                "already liked!".to_string(),
-            )));
+            return Err(NodecosmosError::ValidationError(("user", "already liked!")));
         }
 
         Ok(())
