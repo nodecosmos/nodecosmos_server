@@ -2,12 +2,16 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::token::Token;
+use crate::models::traits::Descendants;
 use crate::models::user::User;
+use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert};
-use charybdis::types::{Boolean, Text, Timestamp, Uuid};
+use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
+use email_address::EmailAddress;
+use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -29,21 +33,29 @@ pub enum InvitationStatus {
 #[charybdis_model(
     table_name = invitations,
     partition_keys = [branch_id],
-    clustering_keys = [node_id, email]
+    clustering_keys = [node_id, username_or_email]
 )]
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Invitation {
-    pub id: Uuid,
-    pub email: Text,
-    pub seen: Boolean,
-    pub status: Text,
-    pub inviter_id: Uuid,
     pub branch_id: Uuid,
     pub node_id: Uuid,
+    pub username_or_email: Text,
+
+    #[serde(default)]
+    pub status: Text,
+
+    #[serde(default)]
+    pub inviter_id: Uuid,
+
+    #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
-    pub expires_at: Timestamp,
+
+    #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
+
+    #[serde(default)]
+    pub expires_at: Timestamp,
 
     #[serde(skip)]
     #[charybdis(ignore)]
@@ -59,13 +71,44 @@ impl Callbacks for Invitation {
     type Error = NodecosmosError;
 
     async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        let existing = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
+        if let Some(existing) = existing {
+            if existing.status == InvitationStatus::Accepted.to_string() {
+                return Err(NodecosmosError::PreconditionFailed("Invitation already accepted."));
+            }
+
+            if existing.expires_at > Utc::now() {
+                return Err(NodecosmosError::PreconditionFailed("Invitation already sent."));
+            }
+        }
+
         self.status = InvitationStatus::Created.to_string();
         self.inviter_id = data.current_user.id;
         self.expires_at = Utc::now() + chrono::Duration::weeks(1);
 
-        let email = self.email.clone();
+        let mut username = None;
+        let email;
+
+        if EmailAddress::is_valid(&self.username_or_email) {
+            email = self.username_or_email.clone()
+        } else {
+            let user = User::maybe_find_first_by_username(self.username_or_email.clone())
+                .execute(data.db_session())
+                .await?;
+
+            if let Some(user) = user {
+                email = user.email;
+                username = Some(user.username);
+            } else {
+                return Err(NodecosmosError::ValidationError((
+                    "usernameOrEmail",
+                    "username not found",
+                )));
+            }
+        };
+
         let node = self.node(data.db_session()).await?;
-        let token = Token::new_invitation(email.clone(), (node.branch_id, node.id));
+        let token = Token::new_invitation(email.clone(), username, (node.branch_id, node.id));
 
         token.insert().execute(data.db_session()).await?;
 
@@ -76,11 +119,25 @@ impl Callbacks for Invitation {
         Ok(())
     }
 
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.ctx == InvitationContext::Confirm {
             let node = self.node(data.db_session()).await?;
-            node.push_editor_ids(vec![data.current_user.id])
-                .execute(data.db_session())
+            let mut descendants = node.descendants(data.db_session()).await?;
+
+            let mut statement_vals = vec![(vec![data.current_user.id], self.branch_id, self.node_id)];
+
+            while let Some(descendant) = descendants.next().await {
+                let descendant = descendant?;
+
+                statement_vals.push((vec![data.current_user.id], descendant.branch_id, descendant.id));
+            }
+
+            Node::statement_batch()
+                .chunked_statements(db_session, Node::PUSH_EDITOR_IDS_QUERY, statement_vals.clone(), 100)
+                .await?;
+
+            Node::statement_batch()
+                .chunked_statements(db_session, Node::PUSH_VIEWER_IDS_QUERY, statement_vals, 100)
                 .await?;
         }
 
@@ -110,7 +167,15 @@ impl Invitation {
     pub async fn find_by_token(db_session: &CachingSession, token: String) -> Result<Invitation, NodecosmosError> {
         let token = Token::find_by_id(token).execute(db_session).await?;
         if let Some(node_pk) = token.node_pk {
-            let invitation = Self::find_by_primary_key_value(&(node_pk.0, node_pk.1, token.email))
+            let username_or_email;
+
+            if let Some(username) = token.username {
+                username_or_email = username;
+            } else {
+                username_or_email = token.email;
+            }
+
+            let invitation = Self::find_by_primary_key_value(&(node_pk.0, node_pk.1, username_or_email))
                 .execute(db_session)
                 .await?;
 
@@ -136,5 +201,19 @@ impl Invitation {
             .execute(db_session)
             .await
             .map_err(NodecosmosError::from)
+    }
+
+    pub async fn invitee(&self, db_session: &CachingSession) -> Result<Option<User>, NodecosmosError> {
+        return if EmailAddress::is_valid(&self.username_or_email) {
+            User::maybe_find_first_by_email(self.username_or_email.clone())
+                .execute(db_session)
+                .await
+                .map_err(NodecosmosError::from)
+        } else {
+            User::maybe_find_first_by_username(self.username_or_email.clone())
+                .execute(db_session)
+                .await
+                .map_err(NodecosmosError::from)
+        };
     }
 }

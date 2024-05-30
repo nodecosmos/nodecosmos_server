@@ -4,7 +4,7 @@ use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
-use charybdis::types::{Boolean, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use log::error;
@@ -45,7 +45,10 @@ pub struct User {
 
     pub username: Text,
     pub email: Text,
+
+    #[serde(skip_serializing)]
     pub password: Text,
+
     pub first_name: Text,
     pub last_name: Text,
     pub bio: Option<Text>,
@@ -80,10 +83,7 @@ impl Callbacks for User {
             .await?
             .is_some()
         {
-            return Err(NodecosmosError::ValidationError((
-                "username".to_string(),
-                "is taken".to_string(),
-            )));
+            return Err(NodecosmosError::ValidationError(("username", "is taken")));
         }
 
         self.id = Uuid::new_v4();
@@ -139,7 +139,7 @@ impl Callbacks for User {
 impl User {
     pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
         let res = verify(password, &self.password)
-            .map_err(|_| NodecosmosError::ValidationError(("password".to_string(), "is incorrect".to_string())))?;
+            .map_err(|_| NodecosmosError::ValidationError(("password", "is incorrect")))?;
 
         Ok(res)
     }
@@ -241,6 +241,18 @@ partial_user!(
     is_confirmed,
     is_blocked
 );
+
+impl ShowUser {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
+        let users = find_show_user!("id IN ?", (ids,))
+            .execute(db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+        Ok(users)
+    }
+}
 
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 

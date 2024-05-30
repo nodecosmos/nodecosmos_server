@@ -5,10 +5,57 @@ use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::invitation::{Invitation, InvitationContext, InvitationStatus};
 use crate::models::traits::Authorization;
-use crate::models::user::EmailUser;
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, put, web, HttpResponse};
 use charybdis::operations::{Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::Uuid;
+use serde::Deserialize;
 use serde_json::json;
+
+#[get("/{token}/token")]
+pub async fn get_invitation_by_token(
+    app: web::Data<App>,
+    opt_cu: OptCurrentUser,
+    token: web::Path<String>,
+) -> Response {
+    let mut invitation = Invitation::find_by_token(&app.db_session, token.into_inner()).await?;
+    let invitee = invitation.invitee(&app.db_session).await?;
+    let invite_for_different_user = if let Some(current_user) = opt_cu.0 {
+        if let Some(invitee) = &invitee {
+            invitee.id != current_user.id
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    let inviter = invitation.inviter(&app.db_session).await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "invitation": invitation,
+        "inviter": inviter,
+        "node": invitation.node(&app.db_session).await?,
+        "hasUser": invitee.is_some(),
+        "inviteForDifferentUser": invite_for_different_user
+    })))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvitationPayload {
+    pub node_id: Uuid,
+    pub branch_id: Uuid,
+}
+
+#[get("/index/{nodeId}/{branchId}")]
+pub async fn get_invitations(data: RequestData, payload: web::Path<InvitationPayload>) -> Response {
+    let invitations = Invitation::find_by_branch_id_and_node_id(payload.branch_id, payload.node_id)
+        .execute(data.db_session())
+        .await?
+        .try_collect()
+        .await?;
+
+    Ok(HttpResponse::Ok().json(invitations))
+}
 
 #[post("")]
 pub async fn create_invitation(data: RequestData, mut invitation: web::Json<Invitation>) -> Response {
@@ -19,7 +66,7 @@ pub async fn create_invitation(data: RequestData, mut invitation: web::Json<Invi
     Ok(HttpResponse::Ok().json(invitation))
 }
 
-#[post("/confirm")]
+#[put("/confirm")]
 pub async fn confirm_invitation(data: RequestData, invitation: web::Json<Invitation>) -> Response {
     let mut invitation = invitation.find_by_primary_key().execute(data.db_session()).await?;
 
@@ -41,25 +88,14 @@ pub async fn confirm_invitation(data: RequestData, invitation: web::Json<Invitat
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/{token}/token")]
-pub async fn find_invitation_by_token(
-    app: web::Data<App>,
-    opt_cu: OptCurrentUser,
-    token: web::Path<String>,
-) -> Response {
-    let invitation = Invitation::find_by_token(&app.db_session, token.into_inner()).await?;
-    let user = EmailUser::maybe_find_first_by_email(invitation.email.clone())
-        .execute(&app.db_session)
-        .await?;
-    let invite_for_different_email = if let Some(user) = opt_cu.0 {
-        user.email != invitation.email
-    } else {
-        false
-    };
+#[put("/reject")]
+pub async fn reject_invitation(data: RequestData, invitation: web::Json<Invitation>) -> Response {
+    let mut invitation = invitation.find_by_primary_key().execute(data.db_session()).await?;
 
-    Ok(HttpResponse::Ok().json(json!({
-        "invitation": invitation,
-        "hasUser": user.is_some(),
-        "inviteForDifferentEmail": invite_for_different_email
-    })))
+    invitation.auth_update(&data).await?;
+
+    invitation.status = InvitationStatus::Rejected.to_string();
+    invitation.update_cb(&data).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().finish())
 }

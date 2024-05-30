@@ -63,17 +63,11 @@ impl Node {
     pub fn validate_root(&mut self) -> Result<(), NodecosmosError> {
         if self.is_root {
             if self.root_id != self.id {
-                return Err(NodecosmosError::ValidationError((
-                    "root_id".to_string(),
-                    "must be equal to id".to_string(),
-                )));
+                return Err(NodecosmosError::ValidationError(("root_id", "must be equal to id")));
             }
         } else {
             if self.root_id == Uuid::default() || self.root_id == self.id {
-                return Err(NodecosmosError::ValidationError((
-                    "root_id".to_string(),
-                    "is invalid".to_string(),
-                )));
+                return Err(NodecosmosError::ValidationError(("root_id", "is invalid")));
             }
         }
 
@@ -82,10 +76,7 @@ impl Node {
 
     pub fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
         if self.owner_id.is_none() || self.owner.is_none() {
-            return Err(NodecosmosError::ValidationError((
-                "owner_id".to_string(),
-                "must be present".to_string(),
-            )));
+            return Err(NodecosmosError::ValidationError(("owner_id", "must be present")));
         }
 
         Ok(())
