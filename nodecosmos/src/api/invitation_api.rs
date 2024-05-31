@@ -5,8 +5,8 @@ use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::invitation::{Invitation, InvitationContext, InvitationStatus};
 use crate::models::traits::Authorization;
-use actix_web::{get, post, put, web, HttpResponse};
-use charybdis::operations::{Find, InsertWithCallbacks, UpdateWithCallbacks};
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use serde::Deserialize;
 use serde_json::json;
@@ -23,7 +23,7 @@ pub async fn get_invitation_by_token(
         if let Some(invitee) = &invitee {
             invitee.id != current_user.id
         } else {
-            false
+            true
         }
     } else {
         false
@@ -96,6 +96,21 @@ pub async fn reject_invitation(data: RequestData, invitation: web::Json<Invitati
 
     invitation.status = InvitationStatus::Rejected.to_string();
     invitation.update_cb(&data).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[delete("/{nodeId}/{branchId}/{usernameOrEmail}")]
+pub async fn delete_invitation(data: RequestData, path: web::Path<(Uuid, Uuid, String)>) -> Response {
+    let (node_id, branch_id, username_or_email) = path.into_inner();
+    let mut invitation =
+        Invitation::find_by_branch_id_and_node_id_and_username_or_email(branch_id, node_id, username_or_email)
+            .execute(data.db_session())
+            .await?;
+
+    invitation.auth_creation(&data).await?;
+
+    invitation.delete_cb(&data).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
