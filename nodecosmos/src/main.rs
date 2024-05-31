@@ -154,7 +154,8 @@ fn main() {
                                 .service(get_invitations)
                                 .service(get_invitation_by_token)
                                 .service(confirm_invitation)
-                                .service(reject_invitation),
+                                .service(reject_invitation)
+                                .service(delete_invitation),
                         )
                 })
                 .keep_alive(std::time::Duration::from_secs(15))
