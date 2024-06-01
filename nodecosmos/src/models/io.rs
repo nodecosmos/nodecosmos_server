@@ -5,7 +5,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
 use charybdis::scylla::SerializeCql;
 use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{Set, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,9 @@ pub struct Io {
 
     pub flow_id: Option<Uuid>,
 
+    #[serde(default)]
+    pub initial_input: Boolean,
+
     /// outputted by flow step
     pub flow_step_id: Option<Uuid>,
     pub inputted_by_flow_steps: Option<Set<Uuid>>,
@@ -68,6 +71,10 @@ pub struct Io {
     #[charybdis(ignore)]
     #[serde(skip)]
     pub ctx: Context,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub delete_dangling: Option<Boolean>,
 }
 
 impl Callbacks for Io {
@@ -99,9 +106,10 @@ impl Callbacks for Io {
 
     async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
-        if self.is_main() {
+        if !self.delete_dangling.map_or(false, |v| v) && self.is_main() && self.flow_step_id.is_some() {
             // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
             // keep the main io in the database as it can be later used by flow steps where it was deleted.
+            self.flow_step_id = None;
             self.insert().execute(db_session).await?;
         }
 

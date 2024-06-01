@@ -83,7 +83,7 @@ pub async fn logout(client_session: Session) -> Response {
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/search")]
+#[get("/search/user")]
 pub async fn search_users(data: RequestData, query: web::Query<UserSearchQuery>) -> Response {
     let users = User::search(data, &query).await?;
 
