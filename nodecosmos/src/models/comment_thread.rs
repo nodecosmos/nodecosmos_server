@@ -22,9 +22,11 @@ pub enum ThreadObjectType {
 pub enum ContributionRequestThreadType {
     #[default]
     MainThread,
-    NodeAddition,
-    NodeDeletion,
-    NodeDescription,
+    ObjectDescription,
+    Node,
+    Flow,
+    FlowStep,
+    InputOutput,
 }
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
@@ -53,6 +55,7 @@ pub struct CommentThread {
     pub id: Uuid,
     #[serde(default)]
     pub root_id: Uuid,
+    pub title: Text,
     pub author_id: Option<Uuid>,
     pub author: Option<Profile>,
     pub object_type: Text,

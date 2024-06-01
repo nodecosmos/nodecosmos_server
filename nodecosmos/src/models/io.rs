@@ -375,3 +375,5 @@ impl UpdateTitleIo {
 partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_id, flow_step_id);
 
 partial_io!(BaseIo, branch_id, node_id, root_id, id);
+
+partial_io!(TitleIo, root_id, node_id, branch_id, id, title);
