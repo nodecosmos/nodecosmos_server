@@ -37,7 +37,7 @@ pub struct SearchUser {
 
 #[derive(Deserialize)]
 pub struct UserSearchQuery {
-    query: String,
+    q: String,
 
     #[serde(default = "default_to_opt_0")]
     page: i16,
@@ -49,12 +49,12 @@ pub fn default_to_opt_0() -> i16 {
 
 pub struct UserSearch<'a> {
     pub elastic_client: &'a Elasticsearch,
-    pub q: &'a UserSearchQuery,
+    pub query: &'a UserSearchQuery,
 }
 
 impl<'a> UserSearch<'a> {
-    pub fn new(elastic_client: &'a Elasticsearch, q: &'a UserSearchQuery) -> Self {
-        Self { elastic_client, q }
+    pub fn new(elastic_client: &'a Elasticsearch, query: &'a UserSearchQuery) -> Self {
+        Self { elastic_client, query }
     }
 
     pub async fn index(&self) -> Result<Vec<SearchUser>, NodecosmosError> {
@@ -82,14 +82,14 @@ impl<'a> UserSearch<'a> {
 
     fn search_json(&self) -> Value {
         let mut data = json!({
-            "from": self.q.page * PAGE_SIZE,
+            "from": self.query.page * PAGE_SIZE,
             "size": PAGE_SIZE
         });
 
         data["query"]["bool"]["should"] = json!([
-            { "match": { "username": { "query": &&self.q.query, "boost": 2 } } },
-            { "match": { "firstName": &&self.q.query } },
-            { "match": { "lastName": &&self.q.query } },
+            { "match": { "username": { "query": &&self.query.q, "boost": 2 } } },
+            { "match": { "firstName": &&self.query.q } },
+            { "match": { "lastName": &&self.query.q } },
         ]);
         data["query"]["bool"]["minimum_should_match"] = json!(1);
 
