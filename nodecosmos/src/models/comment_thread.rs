@@ -40,12 +40,6 @@ pub enum CommentObject {
 /// **objectId** corresponds to the following:
 /// * **`ContributionRequest['id']`** for ContributionRequest related comments
 /// * **`Topic['id']`**  for Topic related comments
-///
-/// **thread_node_id** if provided corresponds to Node of the following
-/// * `ContributionRequestThreadType::NodeAddition`,
-/// * `ContributionRequestThreadType::NodeDeletion`,
-/// * `ContributionRequestThreadType::NodeDescription`
-///
 #[charybdis_model(
     table_name = comment_threads,
     partition_keys = [object_id],
@@ -64,7 +58,7 @@ pub struct CommentThread {
     pub object_type: Text,
     pub object_node_id: Option<Uuid>,
     pub thread_type: Text,
-    pub thread_node_id: Option<Uuid>,
+    pub thread_object_id: Option<Uuid>,
     pub line_number: Option<Int>,
     pub line_content: Option<Text>,
 
