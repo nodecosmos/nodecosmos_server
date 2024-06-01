@@ -196,3 +196,14 @@ impl Callbacks for UpdateTitleFlow {
 }
 
 partial_flow!(PkFlow, node_id, branch_id, start_index, vertical_index, id, root_id);
+
+partial_flow!(
+    TitleFlow,
+    node_id,
+    branch_id,
+    start_index,
+    vertical_index,
+    id,
+    root_id,
+    title
+);

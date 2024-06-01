@@ -77,6 +77,7 @@ fn main() {
                         .service(
                             web::scope("/workflows")
                                 .service(get_workflow)
+                                .service(get_workflow_branch_commit_data)
                                 .service(update_initial_inputs)
                                 .service(update_workflow_title),
                         )
