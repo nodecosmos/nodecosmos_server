@@ -15,6 +15,7 @@ pub struct MergeWorkflows {
     created_workflow_initial_inputs: HashMap<Uuid, Vec<Uuid>>,
     deleted_workflow_initial_inputs: HashMap<Uuid, Vec<Uuid>>,
     combined: Vec<(Uuid, Vec<Uuid>)>,
+    original_id: Uuid,
     branch_id: Uuid,
 }
 
@@ -32,13 +33,14 @@ impl MergeWorkflows {
             created_workflow_initial_inputs,
             deleted_workflow_initial_inputs,
             combined,
+            original_id: branch.original_id(),
             branch_id: branch.id,
         }
     }
 
-    pub async fn update_initial_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn update_initial_inputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         for (node_id, _) in &self.combined {
-            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.branch_id, *node_id)
+            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.original_id, *node_id)
                 .execute(data.db_session())
                 .await?;
 
@@ -46,14 +48,17 @@ impl MergeWorkflows {
                 workflow.initial_input_ids.merge(Some(created_inputs.clone()));
             }
 
-            if let Some(deleted_inputs) = self.deleted_workflow_initial_inputs.get(node_id) {
+            if let Some(deleted_inputs) = self.deleted_workflow_initial_inputs.get_mut(node_id) {
                 if let Some(initial_input_ids) = &mut workflow.initial_input_ids {
+                    // calculate already deleted inputs and update self.deleted_workflow_initial_inputs
+                    deleted_inputs.retain(|id| initial_input_ids.contains(id));
+
+                    // remove deleted inputs from initial_input_ids
                     initial_input_ids.retain(|id| !deleted_inputs.contains(id));
                 }
             }
 
             workflow.set_merge_context();
-            workflow.set_original_id();
             workflow.update().execute(data.db_session()).await?;
         }
 
@@ -62,7 +67,7 @@ impl MergeWorkflows {
 
     pub async fn undo_update_initial_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         for (node_id, _) in &self.combined {
-            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.branch_id, *node_id)
+            let mut workflow = UpdateInitialInputsWorkflow::find_by_branch_id_and_node_id(self.original_id, *node_id)
                 .execute(data.db_session())
                 .await?;
 

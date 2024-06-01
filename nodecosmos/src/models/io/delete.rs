@@ -1,4 +1,4 @@
-use scylla::CachingSession;
+use charybdis::operations::{Find, UpdateWithCallbacks};
 
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
@@ -6,19 +6,27 @@ use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext};
-use crate::models::workflow::Workflow;
+use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 impl Io {
-    pub async fn pull_from_initial_input_ids(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        Workflow {
-            root_id: self.root_id,
-            branch_id: self.branch_id,
-            node_id: self.node_id,
-            ..Default::default()
+    pub async fn pull_from_initial_input_ids(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.initial_input && !self.is_merge_context() {
+            let mut wf = UpdateInitialInputsWorkflow {
+                branch_id: self.branch_id,
+                node_id: self.node_id,
+                ..Default::default()
+            }
+            .find_by_primary_key()
+            .execute(data.db_session())
+            .await?;
+
+            if let Some(initial_input_ids) = &mut wf.initial_input_ids {
+                initial_input_ids.retain(|id| id != &self.id);
+            }
+
+            wf.update_cb(data).execute(data.db_session()).await?;
+            wf.update_branch_with_deleted_io(data.db_session(), self.id).await?;
         }
-        .pull_initial_input_ids(&vec![self.id])
-        .execute(db_session)
-        .await?;
 
         Ok(())
     }

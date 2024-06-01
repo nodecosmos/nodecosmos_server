@@ -1,18 +1,18 @@
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::DeleteWithCallbacks;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use nodecosmos_macros::Branchable;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::io::Io;
-use crate::models::traits::{Branchable, Context, Merge, ModelContext, NodeBranchParams};
+use crate::models::branch::update::BranchUpdate;
+use crate::models::branch::Branch;
+use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams};
 
 mod update_initial_inputs;
 
@@ -123,34 +123,21 @@ partial_workflow!(
 );
 
 impl UpdateInitialInputsWorkflow {
-    pub async fn delete_removed_inputs_ios(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let current_io_ids = if self.is_original() {
-            GetInitialInputsWorkflow::find_by_branch_id_and_node_id(self.branch_id, self.node_id)
-                .execute(data.db_session())
-                .await?
-                .initial_input_ids
-        } else {
-            None
-        };
+    pub async fn update_branch_with_deleted_io(
+        &mut self,
+        db_session: &CachingSession,
+        input_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
+        if self.is_branch() {
+            let mut inputs = HashMap::new();
+            inputs.insert(self.node_id, vec![input_id]);
 
-        if let Some(current_io_ids) = current_io_ids {
-            for io_id in current_io_ids {
-                if self.initial_input_ids.is_none()
-                    || self.initial_input_ids.as_ref().is_some_and(|ids| !ids.contains(&io_id))
-                {
-                    let mut output = Io {
-                        root_id: self.root_id,
-                        branch_id: self.branch_id,
-                        node_id: self.node_id,
-                        id: io_id,
-
-                        ..Default::default()
-                    };
-
-                    output.set_parent_delete_context();
-                    output.delete_cb(data).execute(data.db_session()).await?;
-                }
-            }
+            Branch::update(
+                db_session,
+                self.branch_id,
+                BranchUpdate::DeleteWorkflowInitialInputs(inputs),
+            )
+            .await?;
         }
 
         Ok(())
@@ -164,11 +151,6 @@ impl Callbacks for UpdateInitialInputsWorkflow {
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             self.update_branch(data).await?;
-        }
-
-        // In merge context, outputs will be deleted in the next step.
-        if !self.is_merge_context() {
-            self.delete_removed_inputs_ios(data).await?;
         }
 
         Ok(())
