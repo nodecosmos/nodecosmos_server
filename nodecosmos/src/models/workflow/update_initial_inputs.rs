@@ -39,27 +39,6 @@ impl UpdateInitialInputsWorkflow {
                 BranchUpdate::CreatedWorkflowInitialInputs(inputs),
             )
             .await?;
-
-            let removed_input_ids = original_input_ids
-                .iter()
-                .filter_map(|id| {
-                    if !self.initial_input_ids.clone().unwrap_or_default().contains(id) {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let mut inputs = HashMap::new();
-            inputs.insert(self.node_id, removed_input_ids);
-
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::DeleteWorkflowInitialInputs(inputs),
-            )
-            .await?;
         } else {
             // wf is created within a branch
             let mut inputs = HashMap::new();

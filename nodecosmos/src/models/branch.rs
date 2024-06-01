@@ -418,12 +418,3 @@ partial_branch!(UpdateRestoredIosBranch, id, restored_ios);
 partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
 
 partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
-
-partial_branch!(
-    DeletedDataBranch,
-    id,
-    deleted_nodes,
-    deleted_flows,
-    deleted_flow_steps,
-    deleted_ios
-);
