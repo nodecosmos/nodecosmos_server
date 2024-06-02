@@ -1,7 +1,7 @@
 use charybdis::batch::{CharybdisBatch, CharybdisModelBatch};
 use charybdis::errors::CharybdisError;
 use charybdis::operations::Update;
-use charybdis::types::{Frozen, List, Map, Set, Uuid};
+use charybdis::types::{Frozen, Map, Set, Uuid};
 use log::error;
 use scylla::{CachingSession, QueryResult};
 
@@ -29,8 +29,8 @@ pub enum BranchUpdate {
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
     EditNode(Uuid),
-    CreateWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
-    DeleteWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
+    CreateWorkflowInitialInputs(Set<Uuid>),
+    DeleteWorkflowInitialInputs(Set<Uuid>),
     CreateFlow(Uuid),
     DeleteFlow(Uuid),
     UndoDeleteFlow(Uuid),
@@ -175,21 +175,21 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::CreateWorkflowInitialInputs(created_workflow_initial_inputs) => {
+            BranchUpdate::CreateWorkflowInitialInputs(created_initial_inputs) => {
                 res = UpdateCreateWorkflowInitialInputsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_created_workflow_initial_inputs(created_workflow_initial_inputs)
+                .push_created_initial_inputs(created_initial_inputs)
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeleteWorkflowInitialInputs(deleted_workflow_initial_inputs) => {
+            BranchUpdate::DeleteWorkflowInitialInputs(deleted_initial_inputs) => {
                 res = UpdateDeletedWorkflowInitialInputsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
-                .push_deleted_workflow_initial_inputs(deleted_workflow_initial_inputs)
+                .push_deleted_initial_inputs(deleted_initial_inputs)
                 .execute(db_session)
                 .await;
             }
