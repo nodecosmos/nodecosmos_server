@@ -220,23 +220,6 @@ pub async fn undo_delete_initial_io(data: RequestData, params: web::Path<(Uuid, 
     Ok(HttpResponse::Ok().json(branch))
 }
 
-#[put("/undo_delete_input/{branch_id}/{fs_id}/{fs_node_id}/{io_id}")]
-pub async fn undo_delete_input(data: RequestData, params: web::Path<(Uuid, Uuid, Uuid, Uuid)>) -> Response {
-    let (branch_id, fs_id, fs_node_id, io_id) = params.into_inner();
-    let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
-
-    branch.auth_update(&data).await?;
-
-    let branch = Branch::update(
-        data.db_session(),
-        branch_id,
-        BranchUpdate::UndoDeleteInput((fs_id, fs_node_id, io_id)),
-    )
-    .await?;
-
-    Ok(HttpResponse::Ok().json(branch))
-}
-
 #[get("/editors/{branchId}")]
 pub async fn get_branch_editors(db_session: web::Data<CachingSession>, pk: web::Path<Uuid>) -> Response {
     let branch = Branch::find_by_id(pk.into_inner()).execute(&db_session).await?;
