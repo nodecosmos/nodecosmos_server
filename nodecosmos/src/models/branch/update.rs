@@ -7,14 +7,13 @@ use scylla::{CachingSession, QueryResult};
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
-    Branch, UpdateCreateFlowStepInputsByNodeBranch, UpdateCreateFlowStepNodesBranch,
-    UpdateCreateFlowStepOutputsByNodeBranch, UpdateCreateWorkflowInitialInputsBranch, UpdateCreatedFlowStepsBranch,
-    UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateDeleteFlowStepInputsByNodeBranch,
-    UpdateDeleteFlowStepNodesBranch, UpdateDeleteFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
-    UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
+    Branch, UpdateCreateFlowStepNodesBranch, UpdateCreateWorkflowInitialInputsBranch, UpdateCreatedFlowStepsBranch,
+    UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateDeleteFlowStepNodesBranch,
+    UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
     UpdateDeletedWorkflowInitialInputsBranch, UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch,
     UpdateEditedDescriptionNodesBranch, UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch,
-    UpdateEditedNodesBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch,
+    UpdateEditedNodesBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch,
+    UpdateFlowStepInputsByNodeBranch, UpdateFlowStepOutputsByNodeBranch, UpdateKeptFlowStepsBranch,
     UpdateReorderedNodes, UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch,
     UpdateRestoredNodesBranch,
 };
@@ -32,6 +31,7 @@ pub enum BranchUpdate {
     EditNode(Uuid),
     CreateWorkflowInitialInputs(Set<Uuid>),
     DeleteWorkflowInitialInputs(Set<Uuid>),
+    UndoDeleteWorkflowInitialInputs(Set<Uuid>),
     CreateFlow(Uuid),
     DeleteFlow(Uuid),
     UndoDeleteFlow(Uuid),
@@ -45,9 +45,9 @@ pub enum BranchUpdate {
     KeepFlowStep(Uuid),
     CreateFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
     DeleteFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
-    CreateFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreateFlowStepInputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
     DeleteFlowStepInputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
-    CreateFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreateFlowStepOutputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
     DeletedFlowStepOutputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
     EditFlowStepDescription(Uuid),
     CreateIo(Uuid),
@@ -55,6 +55,7 @@ pub enum BranchUpdate {
     UndoDeleteIo(Uuid),
     // flow_step_id, node_id, input_id
     UndoDeleteInput((Uuid, Uuid, Uuid)),
+    UndoDeleteOutput((Uuid, Uuid, Uuid)),
     RestoreIo(Uuid),
     EditIoTitle(Uuid),
     EditIoDescription(Uuid),
@@ -193,6 +194,15 @@ impl Branch {
                     ..Default::default()
                 }
                 .push_deleted_initial_inputs(deleted_initial_inputs)
+                .execute(db_session)
+                .await;
+            }
+            BranchUpdate::UndoDeleteWorkflowInitialInputs(undone_initial_inputs) => {
+                res = UpdateDeletedWorkflowInitialInputsBranch {
+                    id: branch_id,
+                    ..Default::default()
+                }
+                .pull_deleted_initial_inputs(undone_initial_inputs)
                 .execute(db_session)
                 .await;
             }
@@ -335,51 +345,123 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::CreateFlowStepInputs(created_flow_step_inputs_by_node) => {
-                res = UpdateCreateFlowStepInputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_created_flow_step_inputs_by_node(created_flow_step_inputs_by_node)
-                .execute(db_session)
-                .await;
-            }
-            BranchUpdate::DeleteFlowStepInputs((fs_id, deleted_flow_step_inputs_by_node)) => {
-                let mut branch = UpdateDeleteFlowStepInputsByNodeBranch::find_by_id(branch_id)
+            BranchUpdate::CreateFlowStepInputs((fs_id, created_flow_step_inputs_by_node)) => {
+                let mut branch = UpdateFlowStepInputsByNodeBranch::find_by_id(branch_id)
                     .execute(db_session)
                     .await?;
 
-                // nested collections are frozen so we need to manually merge them
+                // remove from deleted inputs if exists
                 branch
                     .deleted_flow_step_inputs_by_node
                     .get_or_insert_with(Map::new)
                     .entry(fs_id)
-                    .and_modify(|inputs| inputs.merge_unique(deleted_flow_step_inputs_by_node.clone()))
-                    .or_insert(deleted_flow_step_inputs_by_node);
+                    .and_modify(|inputs| {
+                        for (node_id, input_ids) in &created_flow_step_inputs_by_node {
+                            inputs.get_mut(node_id).map(|ids| {
+                                for id in input_ids {
+                                    ids.remove(id);
+                                }
+                            });
+                        }
+                    });
+
+                // add to deleted
+                branch
+                    .created_flow_step_inputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|inputs| inputs.merge_unique(created_flow_step_inputs_by_node.clone()))
+                    .or_insert(created_flow_step_inputs_by_node);
 
                 res = branch.update().execute(db_session).await;
             }
-            BranchUpdate::CreateFlowStepOutputs(created_flow_step_outputs_by_node) => {
-                res = UpdateCreateFlowStepOutputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_created_flow_step_outputs_by_node(created_flow_step_outputs_by_node)
-                .execute(db_session)
-                .await;
-            }
-            BranchUpdate::DeletedFlowStepOutputs((fs_id, deleted_flow_step_outputs_by_node)) => {
-                let mut branch = UpdateDeleteFlowStepOutputsByNodeBranch::find_by_id(branch_id)
+            BranchUpdate::DeleteFlowStepInputs((fs_id, deleted_fs_inputs_by_node_delta)) => {
+                let mut branch = UpdateFlowStepInputsByNodeBranch::find_by_id(branch_id)
                     .execute(db_session)
                     .await?;
 
-                // nested collections are frozen so we need to manually merge them
+                // remove from created
+                branch
+                    .created_flow_step_inputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|inputs| {
+                        for (node_id, input_ids) in &deleted_fs_inputs_by_node_delta {
+                            inputs.get_mut(node_id).map(|ids| {
+                                for id in input_ids {
+                                    ids.remove(id);
+                                }
+                            });
+                        }
+                    });
+
+                // add to deleted
+                branch
+                    .deleted_flow_step_inputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|inputs| inputs.merge_unique(deleted_fs_inputs_by_node_delta.clone()))
+                    .or_insert(deleted_fs_inputs_by_node_delta);
+
+                res = branch.update().execute(db_session).await;
+            }
+            BranchUpdate::CreateFlowStepOutputs((fs_id, created_fs_outputs_by_node_delta)) => {
+                let mut branch = UpdateFlowStepOutputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                // remove from deleted outputs if exists
                 branch
                     .deleted_flow_step_outputs_by_node
                     .get_or_insert_with(Map::new)
                     .entry(fs_id)
-                    .and_modify(|outputs| outputs.merge_unique(deleted_flow_step_outputs_by_node.clone()))
-                    .or_insert(deleted_flow_step_outputs_by_node);
+                    .and_modify(|outputs| {
+                        for (node_id, output_ids) in &created_fs_outputs_by_node_delta {
+                            outputs.get_mut(node_id).map(|ids| {
+                                for id in output_ids {
+                                    ids.remove(id);
+                                }
+                            });
+                        }
+                    });
+
+                // add to created
+                branch
+                    .created_flow_step_outputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|outputs| outputs.merge_unique(created_fs_outputs_by_node_delta.clone()))
+                    .or_insert(created_fs_outputs_by_node_delta);
+
+                res = branch.update().execute(db_session).await;
+            }
+            BranchUpdate::DeletedFlowStepOutputs((fs_id, deleted_fs_outputs_by_node_delta)) => {
+                let mut branch = UpdateFlowStepOutputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                // remove from created
+                branch
+                    .created_flow_step_outputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|outputs| {
+                        for (node_id, output_ids) in &deleted_fs_outputs_by_node_delta {
+                            outputs.get_mut(node_id).map(|ids| {
+                                for id in output_ids {
+                                    ids.remove(id);
+                                }
+                            });
+                        }
+                    });
+
+                // add to deleted
+                branch
+                    .deleted_flow_step_outputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|outputs| outputs.merge_unique(deleted_fs_outputs_by_node_delta.clone()))
+                    .or_insert(deleted_fs_outputs_by_node_delta);
 
                 res = branch.update().execute(db_session).await;
             }
@@ -425,7 +507,7 @@ impl Branch {
                 .await;
             }
             BranchUpdate::UndoDeleteInput((fs_id, node_id, input_id)) => {
-                let mut branch = UpdateDeleteFlowStepInputsByNodeBranch::find_by_id(branch_id)
+                let mut branch = UpdateFlowStepInputsByNodeBranch::find_by_id(branch_id)
                     .execute(db_session)
                     .await?;
 
@@ -437,6 +519,23 @@ impl Branch {
                         inputs
                             .get_mut(&node_id)
                             .and_then(|inputs| Some(inputs.remove(&input_id)));
+                    });
+
+                res = branch.update().execute(db_session).await;
+            }
+            BranchUpdate::UndoDeleteOutput((fs_id, node_id, output_id)) => {
+                let mut branch = UpdateFlowStepOutputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                branch
+                    .deleted_flow_step_outputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|outputs| {
+                        outputs
+                            .get_mut(&node_id)
+                            .and_then(|outputs| Some(outputs.remove(&output_id)));
                     });
 
                 res = branch.update().execute(db_session).await;

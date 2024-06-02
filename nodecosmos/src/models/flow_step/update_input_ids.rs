@@ -180,13 +180,10 @@ impl UpdateInputIdsFlowStep {
             }
         }
 
-        let mut created_node_inputs_by_fow_step = HashMap::new();
-        created_node_inputs_by_fow_step.insert(self.id, created_input_ids_by_node_id);
-
         Branch::update(
             data.db_session(),
             self.branch_id,
-            BranchUpdate::CreateFlowStepInputs(created_node_inputs_by_fow_step),
+            BranchUpdate::CreateFlowStepInputs((self.id, created_input_ids_by_node_id)),
         )
         .await?;
 
