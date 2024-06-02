@@ -29,6 +29,18 @@ impl<T: Model + Id> GroupById<T> for CharybdisModelStream<T> {
     }
 }
 
+impl<T: Model + Id> GroupById<T> for Vec<T> {
+    async fn group_by_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError> {
+        let mut map: HashMap<Uuid, T> = HashMap::new();
+
+        for item in self {
+            map.insert(item.id(), item);
+        }
+
+        Ok(map)
+    }
+}
+
 pub trait GroupByObjectId<T: Model + ObjectId> {
     async fn group_by_object_id(self) -> Result<HashMap<Uuid, T>, NodecosmosError>;
 }
