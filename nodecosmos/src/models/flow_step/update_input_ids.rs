@@ -11,7 +11,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, HashMapVecToSet, ModelBranchParams};
+use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, HashMapVecToSet, ModelBranchParams};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -68,6 +68,36 @@ impl UpdateInputIdsFlowStep {
 
         let added_input_ids: HashSet<Uuid> = update_input_ids.difference(&new_input_ids).cloned().collect();
         let removed_input_ids: HashSet<Uuid> = new_input_ids.difference(&update_input_ids).cloned().collect();
+        let io_ids: Vec<Uuid> = added_input_ids
+            .clone()
+            .into_iter()
+            .chain(removed_input_ids.clone().into_iter())
+            .collect();
+        let mut ios_by_id =
+            Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.branch_id, self.root_id, &io_ids)
+                .await?
+                .group_by_id()
+                .await?;
+
+        if self.is_branch() {
+            // add ios that do not exist in the branch
+            let ios_to_add =
+                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
+                    .await?
+                    .into_iter()
+                    .filter(|io| !ios_by_id.contains_key(&io.id))
+                    .map(|mut io| {
+                        io.branch_id = self.branch_id;
+                        io
+                    })
+                    .collect();
+
+            Io::unlogged_batch()
+                .chunked_insert(data.db_session(), &ios_to_add, 100)
+                .await?;
+
+            ios_by_id.extend(ios_to_add.into_iter().map(|io| (io.id, io)));
+        }
 
         let mut batch = Io::statement_batch();
 
