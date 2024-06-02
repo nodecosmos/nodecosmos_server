@@ -3,9 +3,7 @@ use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWith
 
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::flow_step::{
-    FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
-};
+use crate::models::flow_step::{FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep};
 use crate::models::node::AuthNode;
 use crate::models::traits::{Branchable, FindBranchedOrOriginal, ModelBranchParams};
 
@@ -32,18 +30,6 @@ pub async fn create_flow_step(data: RequestData, mut flow_step: web::Json<FlowSt
 
 #[put("/nodes")]
 pub async fn update_flow_step_nodes(data: RequestData, mut flow_step: web::Json<UpdateNodeIdsFlowStep>) -> Response {
-    AuthNode::auth_update(&data, flow_step.branch_id, flow_step.node_id, flow_step.root_id).await?;
-
-    flow_step.update_cb(&data).execute(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(flow_step))
-}
-
-#[put("/outputs")]
-pub async fn update_flow_step_outputs(
-    data: RequestData,
-    mut flow_step: web::Json<UpdateOutputIdsFlowStep>,
-) -> Response {
     AuthNode::auth_update(&data, flow_step.branch_id, flow_step.node_id, flow_step.root_id).await?;
 
     flow_step.update_cb(&data).execute(data.db_session()).await?;

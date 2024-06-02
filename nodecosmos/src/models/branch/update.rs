@@ -7,16 +7,16 @@ use scylla::{CachingSession, QueryResult};
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
-    Branch, UpdateCreatedFlowStepInputsByNodeBranch, UpdateCreatedFlowStepNodesBranch,
-    UpdateCreatedFlowStepOutputsByNodeBranch, UpdateCreatedFlowStepsBranch, UpdateCreatedFlowsBranch,
-    UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateCreatedWorkflowInitialInputsBranch,
-    UpdateDeletedFlowStepInputsByNodeBranch, UpdateDeletedFlowStepNodesBranch,
-    UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch, UpdateDeletedFlowsBranch,
-    UpdateDeletedIosBranch, UpdateDeletedNodesBranch, UpdateDeletedWorkflowInitialInputsBranch,
-    UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch, UpdateEditedDescriptionNodesBranch,
-    UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch, UpdateEditedNodesBranch,
-    UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch, UpdateReorderedNodes,
-    UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch, UpdateRestoredNodesBranch,
+    Branch, UpdateCreateFlowStepInputsByNodeBranch, UpdateCreateFlowStepNodesBranch,
+    UpdateCreateFlowStepOutputsByNodeBranch, UpdateCreateWorkflowInitialInputsBranch, UpdateCreatedFlowStepsBranch,
+    UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateDeleteFlowStepInputsByNodeBranch,
+    UpdateDeleteFlowStepNodesBranch, UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
+    UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
+    UpdateDeletedWorkflowInitialInputsBranch, UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch,
+    UpdateEditedDescriptionNodesBranch, UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch,
+    UpdateEditedNodesBranch, UpdateEditedTitleIosBranch, UpdateEditedTitleNodesBranch, UpdateKeptFlowStepsBranch,
+    UpdateReorderedNodes, UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch,
+    UpdateRestoredNodesBranch,
 };
 use crate::models::udts::BranchReorderData;
 
@@ -29,7 +29,7 @@ pub enum BranchUpdate {
     EditNodeDescription(Uuid),
     ReorderNode(BranchReorderData),
     EditNode(Uuid),
-    CreatedWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
+    CreateWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     DeleteWorkflowInitialInputs(Map<Uuid, Frozen<List<Uuid>>>),
     CreateFlow(Uuid),
     DeleteFlow(Uuid),
@@ -42,11 +42,11 @@ pub enum BranchUpdate {
     UndoDeleteFlowStep(Uuid),
     RestoreFlowStep(Uuid),
     KeepFlowStep(Uuid),
-    CreatedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
-    DeletedFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
-    CreatedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
-    DeletedFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
-    CreatedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreateFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    DeleteFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
+    CreateFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeleteFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    CreateFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
     DeletedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
     EditFlowStepDescription(Uuid),
     CreateIo(Uuid),
@@ -175,8 +175,8 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::CreatedWorkflowInitialInputs(created_workflow_initial_inputs) => {
-                res = UpdateCreatedWorkflowInitialInputsBranch {
+            BranchUpdate::CreateWorkflowInitialInputs(created_workflow_initial_inputs) => {
+                res = UpdateCreateWorkflowInitialInputsBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -314,26 +314,46 @@ impl Branch {
 
                 check_conflicts = true;
             }
-            BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes) => {
-                res = UpdateCreatedFlowStepNodesBranch {
+            BranchUpdate::CreateFlowStepNodes(created_flow_step_nodes) => {
+                let update_created = UpdateCreateFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
-                }
-                .push_created_flow_step_nodes(created_flow_step_nodes)
-                .execute(db_session)
-                .await;
-            }
-            BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes) => {
-                res = UpdateDeletedFlowStepNodesBranch {
+                };
+
+                let update_deleted = UpdateDeleteFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
-                }
-                .push_deleted_flow_step_nodes(deleted_flow_step_nodes)
-                .execute(db_session)
-                .await;
+                };
+
+                let mut batch = CharybdisBatch::new();
+
+                batch
+                    .append(update_created.push_created_flow_step_nodes(created_flow_step_nodes.clone()))
+                    .append(update_deleted.pull_deleted_flow_step_nodes(created_flow_step_nodes));
+
+                res = batch.execute(db_session).await;
             }
-            BranchUpdate::CreatedFlowStepInputs(created_flow_step_inputs_by_node) => {
-                res = UpdateCreatedFlowStepInputsByNodeBranch {
+            BranchUpdate::DeleteFlowStepNodes(deleted_flow_step_nodes) => {
+                let update_deleted = UpdateDeleteFlowStepNodesBranch {
+                    id: branch_id,
+                    ..Default::default()
+                };
+
+                let update_created = UpdateCreateFlowStepNodesBranch {
+                    id: branch_id,
+                    ..Default::default()
+                };
+
+                let mut batch = CharybdisBatch::new();
+
+                batch
+                    .append(update_deleted.push_deleted_flow_step_nodes(deleted_flow_step_nodes.clone()))
+                    .append(update_created.pull_created_flow_step_nodes(deleted_flow_step_nodes));
+
+                res = batch.execute(db_session).await;
+            }
+            BranchUpdate::CreateFlowStepInputs(created_flow_step_inputs_by_node) => {
+                res = UpdateCreateFlowStepInputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -341,8 +361,8 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeletedFlowStepInputs(deleted_flow_step_inputs_by_node) => {
-                res = UpdateDeletedFlowStepInputsByNodeBranch {
+            BranchUpdate::DeleteFlowStepInputs(deleted_flow_step_inputs_by_node) => {
+                res = UpdateDeleteFlowStepInputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }
@@ -350,8 +370,8 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::CreatedFlowStepOutputs(created_flow_step_outputs_by_node) => {
-                res = UpdateCreatedFlowStepOutputsByNodeBranch {
+            BranchUpdate::CreateFlowStepOutputs(created_flow_step_outputs_by_node) => {
+                res = UpdateCreateFlowStepOutputsByNodeBranch {
                     id: branch_id,
                     ..Default::default()
                 }

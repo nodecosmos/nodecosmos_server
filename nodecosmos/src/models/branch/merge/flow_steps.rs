@@ -9,9 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::flow_step::{
-    FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep, UpdateOutputIdsFlowStep,
-};
+use crate::models::flow_step::{FlowStep, PkFlowStep, UpdateInputIdsFlowStep, UpdateNodeIdsFlowStep};
 use crate::models::traits::{Branchable, FindForBranchMerge, FlowId, Id, IncrementFraction, NodeId, Reload};
 use crate::models::traits::{ModelContext, PluckFromStream};
 
@@ -26,9 +24,6 @@ pub struct MergeFlowSteps {
     pub created_fs_inputs_flow_steps: Option<Vec<UpdateInputIdsFlowStep>>,
     pub branched_created_fs_inputs_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
     pub deleted_fs_inputs_flow_steps: Option<Vec<UpdateInputIdsFlowStep>>,
-    pub created_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
-    pub branched_created_fs_outputs_flow_steps: Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>,
-    pub deleted_fs_outputs_flow_steps: Option<Vec<UpdateOutputIdsFlowStep>>,
     // Delta fields that are calculated during merge
     pub added_node_ids_by_flow_step: Option<HashMap<Uuid, Vec<Uuid>>>,
     pub removed_node_ids_by_flow_step: Option<HashMap<Uuid, Vec<Uuid>>>,
@@ -235,61 +230,6 @@ impl MergeFlowSteps {
         Ok(None)
     }
 
-    // Returns original flow steps
-    pub async fn created_fs_outputs_flow_steps(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
-            let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
-            let flow_steps =
-                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
-                    .await?
-                    .try_collect()
-                    .await?;
-
-            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
-        }
-
-        Ok(None)
-    }
-
-    pub async fn branched_created_fs_outputs_flow_steps(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<HashMap<Uuid, UpdateNodeIdsFlowStep>>, NodecosmosError> {
-        if let Some(created_flow_step_outputs_by_node) = &branch.created_flow_step_outputs_by_node {
-            let flow_step_ids: Set<Uuid> = created_flow_step_outputs_by_node.keys().cloned().collect();
-            let flow_steps = UpdateNodeIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.id, &flow_step_ids)
-                .await?
-                .try_collect()
-                .await?;
-
-            return Ok(Some(flow_steps.into_iter().map(|fs| (fs.id, fs)).collect()));
-        }
-
-        Ok(None)
-    }
-
-    // Returns original flow steps
-    pub async fn deleted_fs_outputs_flow_steps(
-        db_session: &CachingSession,
-        branch: &Branch,
-    ) -> Result<Option<Vec<UpdateOutputIdsFlowStep>>, NodecosmosError> {
-        if let Some(deleted_flow_step_outputs_by_node) = &branch.deleted_flow_step_outputs_by_node {
-            let flow_step_ids: Set<Uuid> = deleted_flow_step_outputs_by_node.keys().cloned().collect();
-            let flow_steps =
-                UpdateOutputIdsFlowStep::find_by_branch_id_and_ids(db_session, branch.original_id(), &flow_step_ids)
-                    .await?
-                    .try_collect()
-                    .await?;
-
-            return Ok(Some(Self::filter_out_deleted_flow_steps(branch, flow_steps)));
-        }
-
-        Ok(None)
-    }
-
     pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
         let restored_flow_steps = Self::restored_flow_steps(&db_session, branch).await?;
         let created_flow_steps = Self::created_flow_steps(&db_session, branch).await?;
@@ -302,10 +242,6 @@ impl MergeFlowSteps {
         let branched_created_fs_inputs_flow_steps =
             Self::branched_created_fs_inputs_flow_steps(&db_session, branch).await?;
         let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&db_session, branch).await?;
-        let created_fs_outputs_flow_steps = Self::created_fs_outputs_flow_steps(&db_session, branch).await?;
-        let branched_created_fs_outputs_flow_steps =
-            Self::branched_created_fs_outputs_flow_steps(&db_session, branch).await?;
-        let deleted_fs_outputs_flow_steps = Self::deleted_fs_outputs_flow_steps(&db_session, branch).await?;
 
         Ok(Self {
             restored_flow_steps,
@@ -317,9 +253,6 @@ impl MergeFlowSteps {
             created_fs_inputs_flow_steps,
             branched_created_fs_inputs_flow_steps,
             deleted_fs_inputs_flow_steps,
-            created_fs_outputs_flow_steps,
-            branched_created_fs_outputs_flow_steps,
-            deleted_fs_outputs_flow_steps,
             // Delta fields
             added_node_ids_by_flow_step: None,
             removed_node_ids_by_flow_step: None,
@@ -750,176 +683,6 @@ impl MergeFlowSteps {
                         .execute(data.db_session())
                         .await
                         .context("Error undoing delete inputs")?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn create_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(created_fs_outputs_flow_steps) = &mut self.created_fs_outputs_flow_steps {
-            for original_flow_step in created_fs_outputs_flow_steps {
-                let branched_fs = self
-                    .branched_created_fs_outputs_flow_steps
-                    .as_ref()
-                    .and_then(|m| m.get(&original_flow_step.id));
-
-                // Calculate added delta so we don't add outputs that may be already added outside of the current branch.
-
-                if let Some(branched_fs) = branched_fs {
-                    let mut added_outputs_delta = HashMap::default();
-                    if let Some(output_ids_by_node_id) = branched_fs.output_ids_by_node_id.as_ref() {
-                        output_ids_by_node_id.iter().for_each(|(node_id, output_ids)| {
-                            let original_node_outputs = original_flow_step
-                                .output_ids_by_node_id
-                                .as_ref()
-                                .and_then(|m| m.get(node_id));
-
-                            let added_delta = output_ids
-                                .into_iter()
-                                .filter_map(|output_id| {
-                                    if original_node_outputs.is_none()
-                                        || !original_node_outputs.is_some_and(|outputs| outputs.contains(output_id))
-                                    {
-                                        Some(*output_id)
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect();
-
-                            added_outputs_delta.insert(*node_id, added_delta);
-                        });
-                    }
-
-                    if added_outputs_delta.is_empty() {
-                        continue;
-                    }
-
-                    // run update
-                    original_flow_step.append_outputs(&added_outputs_delta);
-                    original_flow_step.set_merge_context();
-                    original_flow_step
-                        .update_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Error creating outputs")?;
-
-                    // save added delta for undo
-                    self.added_output_ids_by_flow_step
-                        .get_or_insert_with(HashMap::default)
-                        .insert(original_flow_step.id, added_outputs_delta);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_create_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(created_fs_outputs_flow_steps) = &mut self.created_fs_outputs_flow_steps {
-            for original_flow_step in created_fs_outputs_flow_steps {
-                if let Some(added_output_ids_by_node_id) = self
-                    .added_output_ids_by_flow_step
-                    .as_ref()
-                    .map_or(None, |added_output_ids_by_flow_step| {
-                        added_output_ids_by_flow_step.get(&original_flow_step.id)
-                    })
-                {
-                    original_flow_step.remove_outputs(&added_output_ids_by_node_id);
-
-                    original_flow_step.set_merge_context();
-                    original_flow_step
-                        .update_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Error undoing create outputs")?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn delete_outputs(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
-        if let (Some(deleted_fs_outputs_flow_steps), Some(deleted_flow_step_outputs_by_node)) = (
-            &mut self.deleted_fs_outputs_flow_steps,
-            &branch.deleted_flow_step_outputs_by_node,
-        ) {
-            for original_flow_step in deleted_fs_outputs_flow_steps {
-                let deleted_outputs_by_node = deleted_flow_step_outputs_by_node.get(&original_flow_step.id);
-                // Check and reload original flow step if it's present in created flow step outputs so we don't
-                // overwrite changes made in this merge.
-                if let Some(deleted_outputs_by_node) = deleted_outputs_by_node {
-                    if branch
-                        .created_flow_step_outputs_by_node
-                        .as_ref()
-                        .is_some_and(|cfs| cfs.contains_key(&original_flow_step.id))
-                    {
-                        original_flow_step.reload(data.db_session()).await?;
-                    }
-
-                    // Calculate removed delta so we don't remove outputs that may be already removed outside of the
-                    // current branch.
-                    let mut deleted_outputs_delta = HashMap::default();
-                    deleted_outputs_by_node.iter().for_each(|(node_id, output_ids)| {
-                        if let Some(original_output_ids) = original_flow_step
-                            .output_ids_by_node_id
-                            .as_ref()
-                            .and_then(|m| m.get(node_id))
-                        {
-                            let mut removed_delta = vec![];
-                            output_ids.iter().for_each(|output_id| {
-                                if original_output_ids.contains(output_id) {
-                                    removed_delta.push(*output_id);
-                                }
-                            });
-
-                            deleted_outputs_delta.insert(*node_id, removed_delta);
-                        }
-                    });
-
-                    if deleted_outputs_delta.is_empty() {
-                        continue;
-                    }
-
-                    original_flow_step.remove_outputs(&deleted_outputs_delta);
-                    original_flow_step.set_merge_context();
-                    original_flow_step
-                        .update_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Error deleting outputs")?;
-
-                    self.removed_output_ids_by_flow_step
-                        .get_or_insert_with(HashMap::default)
-                        .insert(original_flow_step.id, deleted_outputs_delta);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn undo_delete_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Some(deleted_fs_outputs_flow_steps) = &mut self.deleted_fs_outputs_flow_steps {
-            for original_flow_step in deleted_fs_outputs_flow_steps {
-                if let Some(removed_output_ids_by_node) = self
-                    .removed_output_ids_by_flow_step
-                    .as_ref()
-                    .map_or(None, |removed_output_ids_by_flow_step| {
-                        removed_output_ids_by_flow_step.get(&original_flow_step.id)
-                    })
-                {
-                    original_flow_step.append_outputs(&removed_output_ids_by_node);
-
-                    original_flow_step.set_merge_context();
-                    original_flow_step
-                        .update_cb(data)
-                        .execute(data.db_session())
-                        .await
-                        .context("Error undoing delete outputs")?;
                 }
             }
         }

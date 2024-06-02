@@ -8,18 +8,6 @@ use crate::models::io::Io;
 use crate::models::traits::ModelContext;
 
 impl FlowStep {
-    pub async fn pull_output_id(&mut self, data: &RequestData, output_id: Uuid) -> Result<(), NodecosmosError> {
-        if let Some(output_ids_by_node_id) = self.output_ids_by_node_id.as_mut() {
-            for (_, input_ids) in output_ids_by_node_id.iter_mut() {
-                input_ids.retain(|id| id != &output_id);
-            }
-
-            self.update_cb(data).execute(data.db_session()).await?;
-        }
-
-        Ok(())
-    }
-
     pub async fn pull_input_id(&mut self, data: &RequestData, input_id: Uuid) -> Result<(), NodecosmosError> {
         if let Some(input_ids_by_node_id) = self.input_ids_by_node_id.as_mut() {
             for (_, input_ids) in input_ids_by_node_id.iter_mut() {
@@ -32,20 +20,15 @@ impl FlowStep {
         Ok(())
     }
 
-    pub async fn delete_fs_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let output_ids_by_node_id = self.output_ids_by_node_id.clone();
-        let id = self.id;
-
-        if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-            let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-
-            for output_id in output_ids {
+    pub async fn delete_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
+            for output_id in output_ids_by_node_id.values().flatten() {
                 let mut output = Io {
                     root_id: self.root_id,
                     branch_id: self.branch_id,
                     node_id: self.node_id,
-                    id: output_id,
-                    flow_step_id: Some(id),
+                    id: *output_id,
+                    flow_step_id: Some(self.id),
 
                     ..Default::default()
                 };

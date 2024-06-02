@@ -1,4 +1,3 @@
-use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
@@ -8,13 +7,10 @@ use std::collections::{HashMap, HashSet};
 
 use nodecosmos_macros::Branchable;
 
-use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams};
-
-mod update_initial_inputs;
 
 /// ### Workflow structure
 /// - Each `Workflow` has multiple `Flows`
@@ -118,16 +114,39 @@ partial_workflow!(
     branch_id,
     root_id,
     initial_input_ids,
-    updated_at,
     ctx
 );
 
 impl UpdateInitialInputsWorkflow {
-    pub async fn update_branch_with_deleted_io(
+    pub async fn push_initial_input(
         &mut self,
         db_session: &CachingSession,
         input_id: Uuid,
     ) -> Result<(), NodecosmosError> {
+        self.push_initial_input_ids(vec![input_id]).execute(db_session).await?;
+
+        if self.is_branch() {
+            let mut inputs = HashMap::new();
+            inputs.insert(self.node_id, vec![input_id]);
+
+            Branch::update(
+                db_session,
+                self.branch_id,
+                BranchUpdate::CreateWorkflowInitialInputs(inputs),
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn pull_initial_input(
+        &mut self,
+        db_session: &CachingSession,
+        input_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
+        self.pull_initial_input_ids(vec![input_id]).execute(db_session).await?;
+
         if self.is_branch() {
             let mut inputs = HashMap::new();
             inputs.insert(self.node_id, vec![input_id]);
@@ -138,19 +157,6 @@ impl UpdateInitialInputsWorkflow {
                 BranchUpdate::DeleteWorkflowInitialInputs(inputs),
             )
             .await?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Callbacks for UpdateInitialInputsWorkflow {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
-            self.update_branch(data).await?;
         }
 
         Ok(())

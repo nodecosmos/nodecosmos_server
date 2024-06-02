@@ -78,7 +78,6 @@ fn main() {
                             web::scope("/workflows")
                                 .service(get_workflow)
                                 .service(get_workflow_branch_commit_data)
-                                .service(update_initial_inputs)
                                 .service(update_workflow_title),
                         )
                         .service(
@@ -92,7 +91,6 @@ fn main() {
                                 .service(create_flow_step)
                                 .service(update_flow_step_nodes)
                                 .service(update_flow_step_inputs)
-                                .service(update_flow_step_outputs)
                                 .service(delete_flow_step),
                         )
                         .service(

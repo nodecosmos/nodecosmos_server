@@ -206,13 +206,9 @@ impl<'a> MergeConflicts<'a> {
                 edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
             });
 
-        self.branch_merge
-            .flow_steps
-            .branched_created_fs_outputs_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
-            });
+        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
+            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
+        });
 
         self.branch_merge
             .flow_steps
@@ -303,21 +299,11 @@ impl<'a> MergeConflicts<'a> {
                 edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id));
             });
 
-        self.branch_merge
-            .flow_steps
-            .branched_created_fs_outputs_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id));
-            });
+        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
+            edited_flow_step_ids.extend(ios.maybe_pluck_flow_step_id());
+        });
 
         edited_flow_step_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_id_set());
-        edited_flow_step_ids.extend(
-            self.branch_merge
-                .flow_steps
-                .created_fs_outputs_flow_steps
-                .pluck_id_set(),
-        );
         edited_flow_step_ids.extend(self.branch_merge.ios.created_ios.maybe_pluck_flow_step_id());
 
         let original_edited_flow_step_ids = edited_flow_step_ids

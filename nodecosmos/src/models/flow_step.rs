@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::{Find, Insert};
+use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
 use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
@@ -86,7 +86,7 @@ impl Callbacks for FlowStep {
     updated_at_cb_fn!();
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.delete_fs_outputs(data).await?;
+        self.delete_outputs(data).await?;
         self.preserve_branch_flow(data).await?;
         self.update_branch_with_deletion(data).await?;
 
@@ -191,21 +191,6 @@ impl FlowStep {
         Ok(flow_steps)
     }
 
-    pub async fn maybe_find_original(
-        &mut self,
-        db_session: &CachingSession,
-    ) -> Result<Option<FlowStep>, NodecosmosError> {
-        let original = Self {
-            branch_id: self.original_id(),
-            ..self.clone()
-        }
-        .maybe_find_by_primary_key()
-        .execute(db_session)
-        .await?;
-
-        Ok(original)
-    }
-
     pub async fn preserve_flow_step_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             let output_ids_by_node_id = self.output_ids_by_node_id.clone();
@@ -252,6 +237,8 @@ impl Callbacks for UpdateInputIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = chrono::Utc::now();
+
         if self.is_branch() {
             Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             FlowStep::find_or_insert_branched(
@@ -311,6 +298,8 @@ impl Callbacks for UpdateNodeIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = chrono::Utc::now();
+
         if self.is_branch() {
             let flow_step = FlowStep::find_or_insert_branched(
                 data,
@@ -377,6 +366,8 @@ impl Callbacks for UpdateOutputIdsFlowStep {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = chrono::Utc::now();
+
         if self.is_branch() {
             Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
             let flow_step = FlowStep::find_or_insert_branched(
@@ -400,18 +391,37 @@ impl Callbacks for UpdateOutputIdsFlowStep {
 }
 
 impl UpdateOutputIdsFlowStep {
-    pub fn append_outputs(&mut self, outputs: &HashMap<Uuid, Vec<Uuid>>) {
-        self.output_ids_by_node_id.merge_unique(Some(outputs.clone()));
+    pub async fn push_output(
+        &mut self,
+        data: &RequestData,
+        node_id: Uuid,
+        output_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
+        let mut map = HashMap::new();
+        map.insert(node_id, vec![output_id]);
+
+        self.output_ids_by_node_id.merge_unique(Some(map));
+
+        self.update_cb(data).execute(data.db_session()).await?;
+
+        Ok(())
     }
 
-    pub fn remove_outputs(&mut self, ids: &HashMap<Uuid, Vec<Uuid>>) {
+    pub async fn pull_output(
+        &mut self,
+        data: &RequestData,
+        node_id: Uuid,
+        output_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         if let Some(output_ids_by_node_id) = &mut self.output_ids_by_node_id {
-            for (node_id, output_ids) in output_ids_by_node_id.iter_mut() {
-                if let Some(ids) = ids.get(node_id) {
-                    output_ids.retain(|output_id| !ids.contains(output_id));
-                }
+            if let Some(output_ids) = output_ids_by_node_id.get_mut(&node_id) {
+                output_ids.retain(|id| id != &output_id);
             }
         }
+
+        self.update_cb(data).execute(data.db_session()).await?;
+
+        Ok(())
     }
 }
 

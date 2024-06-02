@@ -52,6 +52,8 @@ pub struct Io {
 
     /// outputted by flow step
     pub flow_step_id: Option<Uuid>,
+    pub flow_step_node_id: Option<Uuid>,
+
     pub inputted_by_flow_steps: Option<Set<Uuid>>,
     pub title: Option<Text>,
     pub unit: Option<Text>,
@@ -90,6 +92,13 @@ impl Callbacks for Io {
         self.preserve_branch_node(data).await?;
         self.preserve_branch_flow_step(data).await?;
         self.update_branch_with_creation(data).await?;
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        self.push_to_initial_input_ids(data).await?;
+        self.push_to_flow_step_outputs(data).await?;
 
         Ok(())
     }

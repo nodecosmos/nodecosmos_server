@@ -1,31 +1,35 @@
-use charybdis::operations::{Find, UpdateWithCallbacks};
-
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
 use crate::errors::NodecosmosError;
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::{FlowStep, UpdateOutputIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext};
+use crate::models::traits::ModelContext;
 use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 impl Io {
     pub async fn pull_from_initial_input_ids(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.initial_input && !self.is_merge_context() {
-            let mut wf = UpdateInitialInputsWorkflow {
+        if self.initial_input && !self.is_parent_delete_context() {
+            UpdateInitialInputsWorkflow {
                 branch_id: self.branch_id,
                 node_id: self.node_id,
                 ..Default::default()
             }
-            .find_by_primary_key()
-            .execute(data.db_session())
+            .pull_initial_input(data.db_session(), self.id)
             .await?;
+        }
 
-            if let Some(initial_input_ids) = &mut wf.initial_input_ids {
-                initial_input_ids.retain(|id| id != &self.id);
+        Ok(())
+    }
+
+    pub async fn pull_from_flow_step_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !self.is_parent_delete_context() {
+            if let (Some(flow_step_id), Some(flow_step_node_id)) = (self.flow_step_id, self.flow_step_node_id) {
+                UpdateOutputIdsFlowStep::find_first_by_branch_id_and_id(self.branch_id, flow_step_id)
+                    .execute(data.db_session())
+                    .await?
+                    .pull_output(data, flow_step_node_id, self.id)
+                    .await?;
             }
-
-            wf.update_cb(data).execute(data.db_session()).await?;
-            wf.update_branch_with_deleted_io(data.db_session(), self.id).await?;
         }
 
         Ok(())
@@ -51,28 +55,6 @@ impl Io {
                 }
 
                 futures::future::try_join_all(futures).await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn pull_from_flow_step_outputs(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let id = self.id;
-
-        if !self.is_parent_delete_context() {
-            if let Some(flow_step_id) = self.flow_step_id {
-                let mut fs = FlowStep::find_or_insert_branched(
-                    data,
-                    ModelBranchParams {
-                        original_id: self.original_id(),
-                        branch_id: self.branch_id,
-                        node_id: self.node_id,
-                        id: flow_step_id,
-                    },
-                )
-                .await?;
-                fs.pull_output_id(data, id).await?;
             }
         }
 
