@@ -8,7 +8,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateNodeIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindBranchedOrOriginal, ModelBranchParams, ModelContext, ToHashSet};
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext, ToHashSet};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(
@@ -54,8 +54,10 @@ impl UpdateNodeIdsFlowStep {
     }
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let maybe_current = FlowStep::maybe_find_branched_or_original(
-            data.db_session(),
+        Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
+
+        let current = FlowStep::find_or_insert_branched(
+            data,
             ModelBranchParams {
                 original_id: self.original_id(),
                 branch_id: self.branch_id,
@@ -65,64 +67,66 @@ impl UpdateNodeIdsFlowStep {
         )
         .await?;
 
-        if let Some(current) = maybe_current {
-            let current_node_ids = current.node_ids.clone();
-            let updated_node_ids = self.node_ids.clone();
+        current.preserve_flow_step_outputs(data).await?;
 
-            let mut created_node_ids = HashSet::new();
-            let mut deleted_node_ids = HashSet::new();
+        let current_db_node_ids = current.node_ids.clone();
+        let new_node_ids = self.node_ids.clone();
 
-            match (current_node_ids, updated_node_ids) {
-                (Some(current_node_ids), Some(updated_node_ids)) => {
-                    // Calculate created and deleted nodes
-                    let created: HashSet<_> = updated_node_ids
-                        .iter()
-                        .filter(|id| !current_node_ids.contains(id))
-                        .cloned()
-                        .collect();
+        let mut created_node_ids = HashSet::new();
+        let mut deleted_node_ids = HashSet::new();
 
-                    let deleted: HashSet<_> = current_node_ids
-                        .iter()
-                        .filter(|id| !updated_node_ids.contains(id))
-                        .cloned()
-                        .collect();
+        match (current_db_node_ids, new_node_ids) {
+            (Some(current_db_node_ids), Some(new_node_ids)) => {
+                // Calculate created and deleted nodes
+                let created: HashSet<_> = new_node_ids
+                    .iter()
+                    .filter(|id| !current_db_node_ids.contains(id))
+                    .cloned()
+                    .collect();
 
-                    if !created.is_empty() {
-                        created_node_ids = created;
-                    }
-                    if !deleted.is_empty() {
-                        deleted_node_ids = deleted;
-                    }
+                let deleted: HashSet<_> = current_db_node_ids
+                    .iter()
+                    .filter(|id| !new_node_ids.contains(id))
+                    .cloned()
+                    .collect();
+
+                if !created.is_empty() {
+                    created_node_ids = created;
                 }
-                (Some(current_node_ids), None) => {
-                    deleted_node_ids = current_node_ids.to_hash_set();
+                if !deleted.is_empty() {
+                    deleted_node_ids = deleted;
                 }
-                (None, Some(updated_node_ids)) => {
-                    created_node_ids = updated_node_ids.to_hash_set();
-                }
-                (None, None) => {}
             }
-
-            let mut created_flow_step_nodes = HashMap::new();
-            created_flow_step_nodes.insert(self.id, created_node_ids);
-
-            let mut deleted_flow_step_nodes = HashMap::new();
-            deleted_flow_step_nodes.insert(self.id, deleted_node_ids);
-
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::CreateFlowStepNodes(created_flow_step_nodes),
-            )
-            .await?;
-
-            Branch::update(
-                data.db_session(),
-                self.branch_id,
-                BranchUpdate::DeleteFlowStepNodes(deleted_flow_step_nodes),
-            )
-            .await?;
+            (Some(current_db_node_ids), None) => {
+                // all current db node ids are considered deleted
+                deleted_node_ids = current_db_node_ids.to_hash_set();
+            }
+            (None, Some(new_node_ids)) => {
+                // all new node ids are considered created
+                created_node_ids = new_node_ids.to_hash_set();
+            }
+            (None, None) => {}
         }
+
+        let mut created_flow_step_nodes = HashMap::new();
+        created_flow_step_nodes.insert(self.id, created_node_ids);
+
+        let mut deleted_flow_step_nodes = HashMap::new();
+        deleted_flow_step_nodes.insert(self.id, deleted_node_ids);
+
+        Branch::update(
+            data.db_session(),
+            self.branch_id,
+            BranchUpdate::CreateFlowStepNodes(created_flow_step_nodes),
+        )
+        .await?;
+
+        Branch::update(
+            data.db_session(),
+            self.branch_id,
+            BranchUpdate::DeleteFlowStepNodes(deleted_flow_step_nodes),
+        )
+        .await?;
 
         Ok(())
     }

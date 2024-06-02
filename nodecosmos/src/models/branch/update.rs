@@ -315,42 +315,22 @@ impl Branch {
                 check_conflicts = true;
             }
             BranchUpdate::CreateFlowStepNodes(created_flow_step_nodes) => {
-                let update_created = UpdateCreateFlowStepNodesBranch {
+                res = UpdateCreateFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
-                };
-
-                let update_deleted = UpdateDeleteFlowStepNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                };
-
-                let mut batch = CharybdisBatch::new();
-
-                batch
-                    .append(update_created.push_created_flow_step_nodes(created_flow_step_nodes.clone()))
-                    .append(update_deleted.pull_deleted_flow_step_nodes(created_flow_step_nodes));
-
-                res = batch.execute(db_session).await;
+                }
+                .push_created_flow_step_nodes(created_flow_step_nodes)
+                .execute(db_session)
+                .await;
             }
             BranchUpdate::DeleteFlowStepNodes(deleted_flow_step_nodes) => {
-                let update_deleted = UpdateDeleteFlowStepNodesBranch {
+                res = UpdateDeleteFlowStepNodesBranch {
                     id: branch_id,
                     ..Default::default()
-                };
-
-                let update_created = UpdateCreateFlowStepNodesBranch {
-                    id: branch_id,
-                    ..Default::default()
-                };
-
-                let mut batch = CharybdisBatch::new();
-
-                batch
-                    .append(update_deleted.push_deleted_flow_step_nodes(deleted_flow_step_nodes.clone()))
-                    .append(update_created.pull_created_flow_step_nodes(deleted_flow_step_nodes));
-
-                res = batch.execute(db_session).await;
+                }
+                .push_deleted_flow_step_nodes(deleted_flow_step_nodes)
+                .execute(db_session)
+                .await;
             }
             BranchUpdate::CreateFlowStepInputs(created_flow_step_inputs_by_node) => {
                 res = UpdateCreateFlowStepInputsByNodeBranch {

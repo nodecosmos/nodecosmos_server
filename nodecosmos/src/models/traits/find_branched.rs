@@ -68,11 +68,6 @@ pub trait FindBranchedOrOriginal: Model {
         db_session: &CachingSession,
         params: crate::models::traits::ModelBranchParams,
     ) -> Result<Self, NodecosmosError>;
-
-    async fn maybe_find_branched_or_original(
-        db_session: &CachingSession,
-        params: crate::models::traits::ModelBranchParams,
-    ) -> Result<Option<Self>, NodecosmosError>;
 }
 
 macro_rules! impl_find_branched_or_original {
@@ -100,38 +95,6 @@ macro_rules! impl_find_branched_or_original {
                                 .execute(db_session)
                                 .await?;
                             model.branch_id = params.branch_id;
-
-                            Ok(model)
-                        }
-                    };
-                }
-            }
-
-            async fn maybe_find_branched_or_original(
-                db_session: &CachingSession,
-                params: crate::models::traits::ModelBranchParams,
-            ) -> Result<Option<Self>, NodecosmosError> {
-                use crate::models::traits::Branchable;
-
-                if params.is_original() {
-                    return Self::maybe_find_first_by_branch_id_and_id(params.branch_id, params.id)
-                        .execute(db_session)
-                        .await
-                        .map_err(NodecosmosError::from);
-                } else {
-                    return match Self::maybe_find_first_by_branch_id_and_id(params.branch_id, params.id)
-                        .execute(db_session)
-                        .await?
-                    {
-                        Some(model) => Ok(Some(model)),
-                        None => {
-                            let mut model = Self::maybe_find_first_by_branch_id_and_id(params.original_id, params.id)
-                                .execute(db_session)
-                                .await?;
-
-                            if let Some(model) = &mut model {
-                                model.branch_id = params.branch_id;
-                            }
 
                             Ok(model)
                         }

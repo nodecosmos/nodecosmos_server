@@ -13,10 +13,8 @@ use nodecosmos_macros::{Branchable, FlowId, Id, NodeId};
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
-use crate::models::branch::update::BranchUpdate;
-use crate::models::branch::Branch;
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams};
+use crate::models::traits::{Branchable, GroupById, Merge, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
 
@@ -240,20 +238,7 @@ impl Callbacks for UpdateInputIdsFlowStep {
         self.updated_at = chrono::Utc::now();
 
         if self.is_branch() {
-            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
-            FlowStep::find_or_insert_branched(
-                data,
-                ModelBranchParams {
-                    original_id: self.original_id(),
-                    branch_id: self.branch_id,
-                    node_id: self.node_id,
-                    id: self.id,
-                },
-            )
-            .await?;
-
             self.update_branch(data).await?;
-            self.preserve_branch_ios(data).await?;
         }
 
         self.update_ios(data).await?;
@@ -301,35 +286,17 @@ impl Callbacks for UpdateNodeIdsFlowStep {
         self.updated_at = chrono::Utc::now();
 
         if self.is_branch() {
-            let flow_step = FlowStep::find_or_insert_branched(
-                data,
-                ModelBranchParams {
-                    original_id: self.original_id(),
-                    branch_id: self.branch_id,
-                    node_id: self.node_id,
-                    id: self.id,
-                },
-            )
-            .await?;
+            self.update_branch(data).await?;
+        } else {
+            let node_ids = self.node_ids.take();
 
-            flow_step.preserve_flow_step_outputs(data).await?;
-        }
+            *self = self.find_by_primary_key().execute(data.db_session()).await?;
 
-        let node_ids = self.node_ids.take();
+            self.node_ids = node_ids;
 
-        *self = self.find_by_primary_key().execute(data.db_session()).await?;
-
-        self.node_ids = node_ids;
-
-        if self.is_original() {
             self.delete_output_records_from_removed_nodes(data).await?;
             self.remove_output_references_from_removed_nodes().await?;
             self.remove_input_references_from_removed_nodes().await?;
-        }
-
-        if self.is_branch() {
-            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
-            self.update_branch(data).await?;
         }
 
         Ok(())
@@ -369,20 +336,6 @@ impl Callbacks for UpdateOutputIdsFlowStep {
         self.updated_at = chrono::Utc::now();
 
         if self.is_branch() {
-            Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
-            let flow_step = FlowStep::find_or_insert_branched(
-                data,
-                ModelBranchParams {
-                    original_id: self.original_id(),
-                    branch_id: self.branch_id,
-                    node_id: self.node_id,
-                    id: self.id,
-                },
-            )
-            .await?;
-
-            flow_step.preserve_flow_step_outputs(data).await?;
-
             self.update_branch(data).await?;
         }
 
