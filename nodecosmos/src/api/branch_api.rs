@@ -179,11 +179,8 @@ pub async fn restore_io(data: RequestData, params: web::Json<BranchPayload>) -> 
     Ok(HttpResponse::Ok().json(branch))
 }
 
-#[put("/undo_delete_io/{branch_id}/{fs_id}/{fs_node_id}/{io_id}")]
-pub async fn undo_delete_io(
-    data: RequestData,
-    params: web::Path<(Uuid, Option<Uuid>, Option<Uuid>, Uuid)>,
-) -> Response {
+#[put("/undo_delete_flow_step_io/{branch_id}/{fs_id}/{fs_node_id}/{io_id}")]
+pub async fn undo_delete_flow_step_io(data: RequestData, params: web::Path<(Uuid, Uuid, Uuid, Uuid)>) -> Response {
     let (branch_id, fs_id, fs_node_id, io_id) = params.into_inner();
     let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
 
@@ -191,24 +188,34 @@ pub async fn undo_delete_io(
 
     Branch::update(data.db_session(), branch_id, BranchUpdate::UndoDeleteIo(io_id)).await?;
 
-    if let (Some(fs_id), Some(fs_node_id)) = (fs_id, fs_node_id) {
-        branch = Branch::update(
-            data.db_session(),
-            branch_id,
-            BranchUpdate::UndoDeleteOutput((fs_id, fs_node_id, io_id)),
-        )
-        .await?;
-    } else {
-        let mut set = HashSet::new();
-        set.insert(io_id);
+    branch = Branch::update(
+        data.db_session(),
+        branch_id,
+        BranchUpdate::UndoDeleteOutput((fs_id, fs_node_id, io_id)),
+    )
+    .await?;
 
-        branch = Branch::update(
-            data.db_session(),
-            branch_id,
-            BranchUpdate::UndoDeleteWorkflowInitialInputs(set),
-        )
-        .await?;
-    }
+    Ok(HttpResponse::Ok().json(branch))
+}
+
+#[put("/undo_delete_initial_io/{branch_id}/{io_id}")]
+pub async fn undo_delete_initial_io(data: RequestData, params: web::Path<(Uuid, Uuid)>) -> Response {
+    let (branch_id, io_id) = params.into_inner();
+    let mut branch = Branch::find_by_id(branch_id).execute(data.db_session()).await?;
+
+    branch.auth_update(&data).await?;
+
+    Branch::update(data.db_session(), branch_id, BranchUpdate::UndoDeleteIo(io_id)).await?;
+
+    let mut set = HashSet::new();
+    set.insert(io_id);
+
+    branch = Branch::update(
+        data.db_session(),
+        branch_id,
+        BranchUpdate::UndoDeleteWorkflowInitialInputs(set),
+    )
+    .await?;
 
     Ok(HttpResponse::Ok().json(branch))
 }
