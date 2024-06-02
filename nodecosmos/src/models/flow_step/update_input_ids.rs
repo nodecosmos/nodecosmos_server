@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use charybdis::batch::ModelBatch;
-use charybdis::model::AsNative;
 use charybdis::operations::Find;
 use charybdis::types::Uuid;
 
@@ -10,9 +9,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::flow_step::UpdateInputIdsFlowStep;
+use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, HashMapVecToSet};
+use crate::models::traits::{Branchable, FindBranchedOrOriginal, HashMapVecToSet, ModelBranchParams};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -96,10 +95,19 @@ impl UpdateInputIdsFlowStep {
     }
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let maybe_original = self.as_native().maybe_find_original(data.db_session()).await?;
+        let maybe_current = FlowStep::maybe_find_branched_or_original(
+            data.db_session(),
+            ModelBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                node_id: self.node_id,
+                id: self.id,
+            },
+        )
+        .await?;
 
-        if let Some(original) = maybe_original {
-            let original_node_inputs: Option<HashMap<Uuid, HashSet<Uuid>>> = original
+        if let Some(current) = maybe_current {
+            let current_node_inputs: Option<HashMap<Uuid, HashSet<Uuid>>> = current
                 .input_ids_by_node_id
                 .clone()
                 .map(|input_ids_by_node_id| input_ids_by_node_id.hash_map_vec_to_set());
@@ -112,19 +120,19 @@ impl UpdateInputIdsFlowStep {
             let mut created_input_ids_by_node_id = HashMap::new();
             let mut removed_input_ids_by_node_id = HashMap::new();
 
-            match (original_node_inputs, branched_node_inputs) {
-                (Some(original_node_inputs), Some(branched_node_inputs)) => {
-                    for (node_id, original_input_ids) in &original_node_inputs {
+            match (current_node_inputs, branched_node_inputs) {
+                (Some(current_node_inputs), Some(branched_node_inputs)) => {
+                    for (node_id, current_input_ids) in &current_node_inputs {
                         match branched_node_inputs.get(node_id) {
                             Some(current_input_ids) => {
                                 // Calculate created and removed inputs.
                                 let created: HashSet<Uuid> = current_input_ids
                                     .iter()
-                                    .filter(|id| !original_input_ids.contains(id))
+                                    .filter(|id| !current_input_ids.contains(id))
                                     .cloned()
                                     .collect();
 
-                                let removed: HashSet<Uuid> = original_input_ids
+                                let removed: HashSet<Uuid> = current_input_ids
                                     .iter()
                                     .filter(|id| !current_input_ids.contains(id))
                                     .cloned()
@@ -138,15 +146,15 @@ impl UpdateInputIdsFlowStep {
                                 }
                             }
                             None => {
-                                // All original inputs for this node_id are considered removed.
-                                removed_input_ids_by_node_id.insert(*node_id, original_input_ids.clone());
+                                // All current inputs for this node_id are considered removed.
+                                removed_input_ids_by_node_id.insert(*node_id, current_input_ids.clone());
                             }
                         }
                     }
 
                     // Check for created inputs for node IDs only in the current map.
                     for (node_id, current_input_ids) in &branched_node_inputs {
-                        if !original_node_inputs.contains_key(node_id) {
+                        if !current_node_inputs.contains_key(node_id) {
                             created_input_ids_by_node_id.insert(*node_id, current_input_ids.clone());
                         }
                     }
@@ -157,10 +165,10 @@ impl UpdateInputIdsFlowStep {
                         created_input_ids_by_node_id.insert(*node_id, current_input_ids.clone());
                     }
                 }
-                (Some(original_node_inputs), None) => {
-                    // All original inputs are considered removed.
-                    for (node_id, original_input_ids) in &original_node_inputs {
-                        removed_input_ids_by_node_id.insert(*node_id, original_input_ids.clone());
+                (Some(current_node_inputs), None) => {
+                    // All current inputs are considered removed.
+                    for (node_id, current_input_ids) in &current_node_inputs {
+                        removed_input_ids_by_node_id.insert(*node_id, current_input_ids.clone());
                     }
                 }
                 (None, None) => {
@@ -177,14 +185,14 @@ impl UpdateInputIdsFlowStep {
             Branch::update(
                 data.db_session(),
                 self.branch_id,
-                BranchUpdate::CreatedFlowStepInputs(created_node_inputs_by_fow_step),
+                BranchUpdate::CreateFlowStepInputs(created_node_inputs_by_fow_step),
             )
             .await?;
 
             Branch::update(
                 data.db_session(),
                 self.branch_id,
-                BranchUpdate::DeletedFlowStepInputs(deleted_node_inputs_by_flow_step),
+                BranchUpdate::DeleteFlowStepInputs(deleted_node_inputs_by_flow_step),
             )
             .await?;
         }

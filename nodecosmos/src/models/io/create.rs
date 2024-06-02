@@ -6,12 +6,39 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::flow_step::FlowStep;
+use crate::models::flow_step::{FlowStep, UpdateOutputIdsFlowStep};
 use crate::models::io::Io;
 use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext, NodeBranchParams};
+use crate::models::workflow::UpdateInitialInputsWorkflow;
 
 impl Io {
+    pub async fn push_to_initial_input_ids(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.initial_input {
+            UpdateInitialInputsWorkflow {
+                branch_id: self.branch_id,
+                node_id: self.node_id,
+                ..Default::default()
+            }
+            .push_initial_input(data.db_session(), self.id)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn push_to_flow_step_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if let (Some(flow_step_id), Some(flow_step_node_id)) = (self.flow_step_id, self.flow_step_node_id) {
+            UpdateOutputIdsFlowStep::find_first_by_branch_id_and_id(self.branch_id, flow_step_id)
+                .execute(data.db_session())
+                .await?
+                .push_output(data, flow_step_node_id, self.id)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn create_branched_if_original_exists(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             let mut maybe_original = Io {
@@ -104,7 +131,7 @@ impl Io {
     }
 
     pub async fn preserve_branch_flow_step(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
+        if self.is_branch() && !self.is_parent_delete_context() {
             if let Some(flow_step_id) = self.flow_step_id {
                 FlowStep::find_or_insert_branched(
                     data,

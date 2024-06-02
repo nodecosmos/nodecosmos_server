@@ -20,7 +20,7 @@ use crate::models::traits::SanitizeDescription;
 use crate::models::utils::DescriptionXmlParser;
 
 mod save;
-
+// TODO: fix flow step deletions
 #[charybdis_model(
     table_name = description,
     partition_keys = [branch_id],

@@ -346,7 +346,7 @@ partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 partial_branch!(UpdateEditedNodesBranch, id, edited_nodes);
 
 partial_branch!(
-    UpdateCreatedWorkflowInitialInputsBranch,
+    UpdateCreateWorkflowInitialInputsBranch,
     id,
     created_workflow_initial_inputs
 );
@@ -381,24 +381,24 @@ partial_branch!(UpdateRestoredFlowStepsBranch, id, restored_flow_steps);
 
 partial_branch!(UpdateKeptFlowStepsBranch, id, kept_flow_steps);
 
-partial_branch!(UpdateCreatedFlowStepNodesBranch, id, created_flow_step_nodes);
+partial_branch!(UpdateCreateFlowStepNodesBranch, id, created_flow_step_nodes);
 
-partial_branch!(UpdateDeletedFlowStepNodesBranch, id, deleted_flow_step_nodes);
+partial_branch!(UpdateDeleteFlowStepNodesBranch, id, deleted_flow_step_nodes);
 
 partial_branch!(
-    UpdateCreatedFlowStepInputsByNodeBranch,
+    UpdateCreateFlowStepInputsByNodeBranch,
     id,
     created_flow_step_inputs_by_node
 );
 
 partial_branch!(
-    UpdateDeletedFlowStepInputsByNodeBranch,
+    UpdateDeleteFlowStepInputsByNodeBranch,
     id,
     deleted_flow_step_inputs_by_node
 );
 
 partial_branch!(
-    UpdateCreatedFlowStepOutputsByNodeBranch,
+    UpdateCreateFlowStepOutputsByNodeBranch,
     id,
     created_flow_step_outputs_by_node
 );

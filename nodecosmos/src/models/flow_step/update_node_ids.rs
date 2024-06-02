@@ -1,15 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use charybdis::model::AsNative;
 use charybdis::operations::DeleteWithCallbacks;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::flow_step::UpdateNodeIdsFlowStep;
+use crate::models::flow_step::{FlowStep, UpdateNodeIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{ModelContext, ToHashSet};
+use crate::models::traits::{Branchable, FindBranchedOrOriginal, ModelBranchParams, ModelContext, ToHashSet};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(
@@ -55,27 +54,36 @@ impl UpdateNodeIdsFlowStep {
     }
 
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let maybe_original = self.as_native().maybe_find_original(data.db_session()).await?;
+        let maybe_current = FlowStep::maybe_find_branched_or_original(
+            data.db_session(),
+            ModelBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                node_id: self.node_id,
+                id: self.id,
+            },
+        )
+        .await?;
 
-        if let Some(original) = maybe_original {
-            let original_node_ids = original.node_ids.clone();
-            let current_node_ids = self.node_ids.clone();
+        if let Some(current) = maybe_current {
+            let current_node_ids = current.node_ids.clone();
+            let updated_node_ids = self.node_ids.clone();
 
             let mut created_node_ids = HashSet::new();
             let mut deleted_node_ids = HashSet::new();
 
-            match (original_node_ids, current_node_ids) {
-                (Some(original_node_ids), Some(current_node_ids)) => {
+            match (current_node_ids, updated_node_ids) {
+                (Some(current_node_ids), Some(updated_node_ids)) => {
                     // Calculate created and deleted nodes
-                    let created: HashSet<_> = current_node_ids
+                    let created: HashSet<_> = updated_node_ids
                         .iter()
-                        .filter(|id| !original_node_ids.contains(id))
+                        .filter(|id| !current_node_ids.contains(id))
                         .cloned()
                         .collect();
 
-                    let deleted: HashSet<_> = original_node_ids
+                    let deleted: HashSet<_> = current_node_ids
                         .iter()
-                        .filter(|id| !current_node_ids.contains(id))
+                        .filter(|id| !updated_node_ids.contains(id))
                         .cloned()
                         .collect();
 
@@ -86,11 +94,11 @@ impl UpdateNodeIdsFlowStep {
                         deleted_node_ids = deleted;
                     }
                 }
-                (Some(original_node_ids), None) => {
-                    deleted_node_ids = original_node_ids.to_hash_set();
+                (Some(current_node_ids), None) => {
+                    deleted_node_ids = current_node_ids.to_hash_set();
                 }
-                (None, Some(current_node_ids)) => {
-                    created_node_ids = current_node_ids.to_hash_set();
+                (None, Some(updated_node_ids)) => {
+                    created_node_ids = updated_node_ids.to_hash_set();
                 }
                 (None, None) => {}
             }
@@ -104,14 +112,14 @@ impl UpdateNodeIdsFlowStep {
             Branch::update(
                 data.db_session(),
                 self.branch_id,
-                BranchUpdate::CreatedFlowStepNodes(created_flow_step_nodes),
+                BranchUpdate::CreateFlowStepNodes(created_flow_step_nodes),
             )
             .await?;
 
             Branch::update(
                 data.db_session(),
                 self.branch_id,
-                BranchUpdate::DeletedFlowStepNodes(deleted_flow_step_nodes),
+                BranchUpdate::DeleteFlowStepNodes(deleted_flow_step_nodes),
             )
             .await?;
         }

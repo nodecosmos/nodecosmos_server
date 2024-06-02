@@ -1,6 +1,6 @@
 use actix_web::{get, put, web, HttpResponse};
 use anyhow::Context;
-use charybdis::operations::{Update, UpdateWithCallbacks};
+use charybdis::operations::Update;
 use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde_json::json;
@@ -13,7 +13,7 @@ use crate::models::flow_step::{FlowStep, PkFlowStep};
 use crate::models::io::{Io, TitleIo};
 use crate::models::node::AuthNode;
 use crate::models::traits::NodeBranchParams;
-use crate::models::workflow::{UpdateInitialInputsWorkflow, UpdateWorkflowTitle, Workflow};
+use crate::models::workflow::{UpdateWorkflowTitle, Workflow};
 
 #[get("/{root_id}/{branch_id}/{node_id}")]
 pub async fn get_workflow(
@@ -83,18 +83,6 @@ pub async fn get_workflow_branch_commit_data(
         "flowSteps": flow_steps,
         "inputOutputs": input_outputs,
     })))
-}
-
-#[put("/initial_input_ids")]
-pub async fn update_initial_inputs(
-    data: RequestData,
-    mut workflow: web::Json<UpdateInitialInputsWorkflow>,
-) -> Response {
-    AuthNode::auth_update(&data, workflow.branch_id, workflow.node_id, workflow.root_id).await?;
-
-    workflow.update_cb(&data).execute(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(workflow))
 }
 
 #[put("/title")]
