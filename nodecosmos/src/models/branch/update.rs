@@ -53,8 +53,6 @@ pub enum BranchUpdate {
     CreateIo(Uuid),
     DeleteIo(Uuid),
     UndoDeleteIo(Uuid),
-    // flow_step_id, node_id, input_id
-    UndoDeleteInput((Uuid, Uuid, Uuid)),
     UndoDeleteOutput((Uuid, Uuid, Uuid)),
     RestoreIo(Uuid),
     EditIoTitle(Uuid),
@@ -505,23 +503,6 @@ impl Branch {
                 .pull_deleted_ios(&vec![id])
                 .execute(db_session)
                 .await;
-            }
-            BranchUpdate::UndoDeleteInput((fs_id, node_id, input_id)) => {
-                let mut branch = UpdateFlowStepInputsByNodeBranch::find_by_id(branch_id)
-                    .execute(db_session)
-                    .await?;
-
-                branch
-                    .deleted_flow_step_inputs_by_node
-                    .get_or_insert_with(Map::new)
-                    .entry(fs_id)
-                    .and_modify(|inputs| {
-                        inputs
-                            .get_mut(&node_id)
-                            .and_then(|inputs| Some(inputs.remove(&input_id)));
-                    });
-
-                res = branch.update().execute(db_session).await;
             }
             BranchUpdate::UndoDeleteOutput((fs_id, node_id, output_id)) => {
                 let mut branch = UpdateFlowStepOutputsByNodeBranch::find_by_id(branch_id)
