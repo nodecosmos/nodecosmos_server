@@ -344,7 +344,7 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeleteFlowStepInputs((fsId, deleted_flow_step_inputs_by_node)) => {
+            BranchUpdate::DeleteFlowStepInputs((fs_id, deleted_flow_step_inputs_by_node)) => {
                 let mut branch = UpdateDeleteFlowStepInputsByNodeBranch::find_by_id(branch_id)
                     .execute(db_session)
                     .await?;
@@ -353,7 +353,7 @@ impl Branch {
                 branch
                     .deleted_flow_step_inputs_by_node
                     .get_or_insert_with(Map::new)
-                    .entry(fsId)
+                    .entry(fs_id)
                     .and_modify(|inputs| inputs.merge_unique(deleted_flow_step_inputs_by_node.clone()))
                     .or_insert(deleted_flow_step_inputs_by_node);
 
@@ -368,7 +368,7 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeletedFlowStepOutputs((fsId, deleted_flow_step_outputs_by_node)) => {
+            BranchUpdate::DeletedFlowStepOutputs((fs_id, deleted_flow_step_outputs_by_node)) => {
                 let mut branch = UpdateDeleteFlowStepOutputsByNodeBranch::find_by_id(branch_id)
                     .execute(db_session)
                     .await?;
@@ -377,7 +377,7 @@ impl Branch {
                 branch
                     .deleted_flow_step_outputs_by_node
                     .get_or_insert_with(Map::new)
-                    .entry(fsId)
+                    .entry(fs_id)
                     .and_modify(|outputs| outputs.merge_unique(deleted_flow_step_outputs_by_node.clone()))
                     .or_insert(deleted_flow_step_outputs_by_node);
 
