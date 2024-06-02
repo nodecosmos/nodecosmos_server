@@ -2251,7 +2251,7 @@
           false
         ],
         [
-          "created_workflow_initial_inputs",
+          "created_initial_inputs",
           "map<uuid, frozen<list<uuid>>>",
           false
         ],
@@ -2291,7 +2291,7 @@
           false
         ],
         [
-          "deleted_workflow_initial_inputs",
+          "deleted_initial_inputs",
           "map<uuid, frozen<list<uuid>>>",
           false
         ],
@@ -2458,14 +2458,14 @@
         "node_id",
         "description",
         "created_ios",
-        "deleted_workflow_initial_inputs",
+        "deleted_initial_inputs",
         "id",
         "created_flow_step_nodes",
         "description_change_by_object",
         "is_contribution_request",
         "created_flow_step_outputs_by_node",
         "created_flow_steps",
-        "created_workflow_initial_inputs",
+        "created_initial_inputs",
         "restored_flow_steps",
         "created_nodes",
         "created_flow_step_inputs_by_node",
@@ -2491,7 +2491,7 @@
         "is_public": "boolean",
         "restored_ios": "set<uuid>",
         "deleted_flow_step_outputs_by_node": "map<uuid, frozen<map<uuid, frozen<set<uuid>>>>>",
-        "created_workflow_initial_inputs": "map<uuid, frozen<list<uuid>>>",
+        "created_initial_inputs": "map<uuid, frozen<list<uuid>>>",
         "status": "text",
         "root_id": "uuid",
         "deleted_flow_steps": "set<uuid>",
@@ -2526,7 +2526,7 @@
         "created_flow_step_inputs_by_node": "map<uuid, frozen<map<uuid, frozen<set<uuid>>>>>",
         "edited_title_nodes": "set<uuid>",
         "created_ios": "set<uuid>",
-        "deleted_workflow_initial_inputs": "map<uuid, frozen<list<uuid>>>",
+        "deleted_initial_inputs": "map<uuid, frozen<list<uuid>>>",
         "restored_nodes": "set<uuid>",
         "deleted_flow_step_inputs_by_node": "map<uuid, frozen<map<uuid, frozen<set<uuid>>>>>"
       },

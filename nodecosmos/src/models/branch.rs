@@ -68,9 +68,9 @@ pub struct Branch {
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
     pub edited_nodes: Option<Set<Uuid>>,
     /// node_id -> initial_input_ids
-    pub created_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
+    pub created_initial_inputs: Option<Set<Uuid>>,
     /// node_id -> initial_input_ids
-    pub deleted_workflow_initial_inputs: Option<Map<Uuid, Frozen<List<Uuid>>>>,
+    pub deleted_initial_inputs: Option<Set<Uuid>>,
     // flows
     pub created_flows: Option<Set<Uuid>>,
     pub deleted_flows: Option<Set<Uuid>>,
@@ -341,17 +341,9 @@ partial_branch!(UpdateReorderedNodes, id, reordered_nodes);
 
 partial_branch!(UpdateEditedNodesBranch, id, edited_nodes);
 
-partial_branch!(
-    UpdateCreateWorkflowInitialInputsBranch,
-    id,
-    created_workflow_initial_inputs
-);
+partial_branch!(UpdateCreateWorkflowInitialInputsBranch, id, created_initial_inputs);
 
-partial_branch!(
-    UpdateDeletedWorkflowInitialInputsBranch,
-    id,
-    deleted_workflow_initial_inputs
-);
+partial_branch!(UpdateDeletedWorkflowInitialInputsBranch, id, deleted_initial_inputs);
 
 partial_branch!(UpdateCreatedFlowsBranch, id, created_flows);
 

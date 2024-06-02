@@ -3,7 +3,7 @@ use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use nodecosmos_macros::Branchable;
 
@@ -126,13 +126,13 @@ impl UpdateInitialInputsWorkflow {
         self.push_initial_input_ids(vec![input_id]).execute(db_session).await?;
 
         if self.is_branch() {
-            let mut inputs = HashMap::new();
-            inputs.insert(self.node_id, vec![input_id]);
+            let mut set = HashSet::new();
+            set.insert(input_id);
 
             Branch::update(
                 db_session,
                 self.branch_id,
-                BranchUpdate::CreateWorkflowInitialInputs(inputs),
+                BranchUpdate::CreateWorkflowInitialInputs(set),
             )
             .await?;
         }
@@ -148,13 +148,13 @@ impl UpdateInitialInputsWorkflow {
         self.pull_initial_input_ids(vec![input_id]).execute(db_session).await?;
 
         if self.is_branch() {
-            let mut inputs = HashMap::new();
-            inputs.insert(self.node_id, vec![input_id]);
+            let mut set = HashSet::new();
+            set.insert(input_id);
 
             Branch::update(
                 db_session,
                 self.branch_id,
-                BranchUpdate::DeleteWorkflowInitialInputs(inputs),
+                BranchUpdate::DeleteWorkflowInitialInputs(set),
             )
             .await?;
         }
