@@ -374,26 +374,16 @@ partial_branch!(UpdateCreateFlowStepNodesBranch, id, created_flow_step_nodes);
 partial_branch!(UpdateDeleteFlowStepNodesBranch, id, deleted_flow_step_nodes);
 
 partial_branch!(
-    UpdateCreateFlowStepInputsByNodeBranch,
+    UpdateFlowStepInputsByNodeBranch,
     id,
+    deleted_flow_step_inputs_by_node,
     created_flow_step_inputs_by_node
 );
 
 partial_branch!(
-    UpdateDeleteFlowStepInputsByNodeBranch,
+    UpdateFlowStepOutputsByNodeBranch,
     id,
-    deleted_flow_step_inputs_by_node
-);
-
-partial_branch!(
-    UpdateCreateFlowStepOutputsByNodeBranch,
-    id,
-    created_flow_step_outputs_by_node
-);
-
-partial_branch!(
-    UpdateDeleteFlowStepOutputsByNodeBranch,
-    id,
+    created_flow_step_outputs_by_node,
     deleted_flow_step_outputs_by_node
 );
 
