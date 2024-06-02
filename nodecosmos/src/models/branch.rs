@@ -273,7 +273,7 @@ impl Branch {
         let mut flow_steps = vec![];
 
         while let Some(flow_step) = records.next().await {
-            let flow_step = flow_step.unwrap();
+            let flow_step = flow_step?;
 
             if self
                 .deleted_flows
@@ -314,10 +314,6 @@ impl Branch {
                 }
 
                 if self.deleted_nodes.as_ref().is_some_and(|ids| ids.contains(&io.node_id)) {
-                    return false;
-                }
-
-                if self.deleted_ios.as_ref().is_some_and(|ids| ids.contains(&io.id)) {
                     return false;
                 }
 
