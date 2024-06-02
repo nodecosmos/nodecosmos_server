@@ -12,6 +12,7 @@ impl Io {
             UpdateInitialInputsWorkflow {
                 branch_id: self.branch_id,
                 node_id: self.node_id,
+                root_id: self.root_id,
                 ..Default::default()
             }
             .pull_initial_input(data.db_session(), self.id)
