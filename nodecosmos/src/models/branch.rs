@@ -392,7 +392,7 @@ partial_branch!(
 );
 
 partial_branch!(
-    UpdateDeletedFlowStepOutputsByNodeBranch,
+    UpdateDeleteFlowStepOutputsByNodeBranch,
     id,
     deleted_flow_step_outputs_by_node
 );

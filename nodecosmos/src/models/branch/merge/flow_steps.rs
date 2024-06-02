@@ -631,8 +631,18 @@ impl MergeFlowSteps {
                             .as_ref()
                             .and_then(|m| m.get(node_id))
                         {
+                            let created_node_inputs = branch
+                                .created_flow_step_inputs_by_node
+                                .as_ref()
+                                .and_then(|m| m.get(&original_flow_step.id))
+                                .and_then(|m| m.get(node_id));
                             let mut removed_delta = vec![];
                             input_ids.iter().for_each(|input_id| {
+                                // skip if it's in created inputs
+                                if created_node_inputs.is_some_and(|ios| ios.contains(input_id)) {
+                                    return;
+                                }
+
                                 if original_input_ids.contains(input_id) {
                                     removed_delta.push(*input_id);
                                 }

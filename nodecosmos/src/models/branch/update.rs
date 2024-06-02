@@ -10,7 +10,7 @@ use crate::models::branch::{
     Branch, UpdateCreateFlowStepInputsByNodeBranch, UpdateCreateFlowStepNodesBranch,
     UpdateCreateFlowStepOutputsByNodeBranch, UpdateCreateWorkflowInitialInputsBranch, UpdateCreatedFlowStepsBranch,
     UpdateCreatedFlowsBranch, UpdateCreatedIosBranch, UpdateCreatedNodesBranch, UpdateDeleteFlowStepInputsByNodeBranch,
-    UpdateDeleteFlowStepNodesBranch, UpdateDeletedFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
+    UpdateDeleteFlowStepNodesBranch, UpdateDeleteFlowStepOutputsByNodeBranch, UpdateDeletedFlowStepsBranch,
     UpdateDeletedFlowsBranch, UpdateDeletedIosBranch, UpdateDeletedNodesBranch,
     UpdateDeletedWorkflowInitialInputsBranch, UpdateEditedDescriptionFlowStepsBranch, UpdateEditedDescriptionIosBranch,
     UpdateEditedDescriptionNodesBranch, UpdateEditedFlowDescriptionBranch, UpdateEditedFlowTitleBranch,
@@ -18,6 +18,7 @@ use crate::models::branch::{
     UpdateReorderedNodes, UpdateRestoredFlowStepsBranch, UpdateRestoredFlowsBranch, UpdateRestoredIosBranch,
     UpdateRestoredNodesBranch,
 };
+use crate::models::traits::Merge;
 use crate::models::udts::BranchReorderData;
 
 pub enum BranchUpdate {
@@ -45,13 +46,15 @@ pub enum BranchUpdate {
     CreateFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
     DeleteFlowStepNodes(Map<Uuid, Frozen<Set<Uuid>>>),
     CreateFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
-    DeleteFlowStepInputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeleteFlowStepInputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
     CreateFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
-    DeletedFlowStepOutputs(Map<Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>>),
+    DeletedFlowStepOutputs((Uuid, Frozen<Map<Uuid, Frozen<Set<Uuid>>>>)),
     EditFlowStepDescription(Uuid),
     CreateIo(Uuid),
     DeleteIo(Uuid),
     UndoDeleteIo(Uuid),
+    // flow_step_id, node_id, input_id
+    UndoDeleteInput((Uuid, Uuid, Uuid)),
     RestoreIo(Uuid),
     EditIoTitle(Uuid),
     EditIoDescription(Uuid),
@@ -341,14 +344,20 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeleteFlowStepInputs(deleted_flow_step_inputs_by_node) => {
-                res = UpdateDeleteFlowStepInputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_flow_step_inputs_by_node(deleted_flow_step_inputs_by_node)
-                .execute(db_session)
-                .await;
+            BranchUpdate::DeleteFlowStepInputs((fsId, deleted_flow_step_inputs_by_node)) => {
+                let mut branch = UpdateDeleteFlowStepInputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                // nested collections are frozen so we need to manually merge them
+                branch
+                    .deleted_flow_step_inputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fsId)
+                    .and_modify(|inputs| inputs.merge_unique(deleted_flow_step_inputs_by_node.clone()))
+                    .or_insert(deleted_flow_step_inputs_by_node);
+
+                res = branch.update().execute(db_session).await;
             }
             BranchUpdate::CreateFlowStepOutputs(created_flow_step_outputs_by_node) => {
                 res = UpdateCreateFlowStepOutputsByNodeBranch {
@@ -359,14 +368,20 @@ impl Branch {
                 .execute(db_session)
                 .await;
             }
-            BranchUpdate::DeletedFlowStepOutputs(deleted_flow_step_outputs_by_node) => {
-                res = UpdateDeletedFlowStepOutputsByNodeBranch {
-                    id: branch_id,
-                    ..Default::default()
-                }
-                .push_deleted_flow_step_outputs_by_node(deleted_flow_step_outputs_by_node)
-                .execute(db_session)
-                .await;
+            BranchUpdate::DeletedFlowStepOutputs((fsId, deleted_flow_step_outputs_by_node)) => {
+                let mut branch = UpdateDeleteFlowStepOutputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                // nested collections are frozen so we need to manually merge them
+                branch
+                    .deleted_flow_step_outputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fsId)
+                    .and_modify(|outputs| outputs.merge_unique(deleted_flow_step_outputs_by_node.clone()))
+                    .or_insert(deleted_flow_step_outputs_by_node);
+
+                res = branch.update().execute(db_session).await;
             }
             BranchUpdate::EditFlowStepDescription(id) => {
                 res = UpdateEditedDescriptionFlowStepsBranch {
@@ -408,6 +423,23 @@ impl Branch {
                 .pull_deleted_ios(&vec![id])
                 .execute(db_session)
                 .await;
+            }
+            BranchUpdate::UndoDeleteInput((fs_id, node_id, input_id)) => {
+                let mut branch = UpdateDeleteFlowStepInputsByNodeBranch::find_by_id(branch_id)
+                    .execute(db_session)
+                    .await?;
+
+                branch
+                    .deleted_flow_step_inputs_by_node
+                    .get_or_insert_with(Map::new)
+                    .entry(fs_id)
+                    .and_modify(|inputs| {
+                        inputs
+                            .get_mut(&node_id)
+                            .and_then(|inputs| Some(inputs.remove(&input_id)));
+                    });
+
+                res = branch.update().execute(db_session).await;
             }
             BranchUpdate::RestoreIo(id) => {
                 let mut batch: CharybdisModelBatch<&(Vec<Uuid>, Uuid), Branch> = CharybdisModelBatch::new();

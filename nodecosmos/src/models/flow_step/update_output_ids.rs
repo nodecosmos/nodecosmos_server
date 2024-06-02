@@ -99,9 +99,6 @@ impl UpdateOutputIdsFlowStep {
         let mut created_node_outputs_by_fow_step = HashMap::new();
         created_node_outputs_by_fow_step.insert(self.id, created_output_ids_by_node_id);
 
-        let mut deleted_node_outputs_by_flow_step = HashMap::new();
-        deleted_node_outputs_by_flow_step.insert(self.id, removed_output_ids_by_node_id);
-
         Branch::update(
             data.db_session(),
             self.branch_id,
@@ -112,7 +109,7 @@ impl UpdateOutputIdsFlowStep {
         Branch::update(
             data.db_session(),
             self.branch_id,
-            BranchUpdate::DeletedFlowStepOutputs(deleted_node_outputs_by_flow_step),
+            BranchUpdate::DeletedFlowStepOutputs((self.id, removed_output_ids_by_node_id)),
         )
         .await?;
 

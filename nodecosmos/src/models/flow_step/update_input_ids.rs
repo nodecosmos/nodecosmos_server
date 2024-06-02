@@ -183,9 +183,6 @@ impl UpdateInputIdsFlowStep {
         let mut created_node_inputs_by_fow_step = HashMap::new();
         created_node_inputs_by_fow_step.insert(self.id, created_input_ids_by_node_id);
 
-        let mut deleted_node_inputs_by_flow_step = HashMap::new();
-        deleted_node_inputs_by_flow_step.insert(self.id, removed_input_ids_by_node_id);
-
         Branch::update(
             data.db_session(),
             self.branch_id,
@@ -196,7 +193,7 @@ impl UpdateInputIdsFlowStep {
         Branch::update(
             data.db_session(),
             self.branch_id,
-            BranchUpdate::DeleteFlowStepInputs(deleted_node_inputs_by_flow_step),
+            BranchUpdate::DeleteFlowStepInputs((self.id, removed_input_ids_by_node_id)),
         )
         .await?;
 

@@ -124,6 +124,7 @@ fn main() {
                                 .service(undo_delete_node)
                                 .service(restore_io)
                                 .service(undo_delete_io)
+                                .service(undo_delete_input)
                                 .service(restore_flow)
                                 .service(undo_delete_flow)
                                 .service(restore_flow_step)
