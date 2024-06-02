@@ -124,6 +124,7 @@ impl UpdateInputIdsFlowStep {
         Ok(())
     }
 
+    // FIXME: for some reason it appends deleted inputs as created
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
 
