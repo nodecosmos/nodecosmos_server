@@ -140,13 +140,3 @@ impl<'a, T> ChainOptRef<'a, T> for Option<Vec<T>> {
         }
     }
 }
-
-pub trait HashMapVecToSet<T> {
-    fn hash_map_vec_to_set(self) -> HashMap<T, HashSet<T>>;
-}
-
-impl<T: Hash + Eq> HashMapVecToSet<T> for HashMap<T, Vec<T>> {
-    fn hash_map_vec_to_set(self) -> HashMap<T, HashSet<T>> {
-        self.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
-    }
-}

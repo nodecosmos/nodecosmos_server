@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
@@ -107,6 +107,9 @@ impl Callbacks for FlowStep {
     }
 }
 
+type IoIdsByNodeList = Frozen<Map<Uuid, Frozen<List<Uuid>>>>;
+type IoIdsByNodeSet = Frozen<Map<Uuid, Frozen<Set<Uuid>>>>;
+
 impl FlowStep {
     pub async fn branched(
         db_session: &CachingSession,
@@ -187,6 +190,71 @@ impl FlowStep {
         .await?;
 
         Ok(flow_steps)
+    }
+
+    pub fn ios_diff(current_db_ios: Option<IoIdsByNodeList>, new_ios: &Option<IoIdsByNodeList>) -> [IoIdsByNodeSet; 2] {
+        let mut created_io_ids_by_node_id = HashMap::new();
+        let mut removed_io_ids_by_node_id = HashMap::new();
+
+        match (current_db_ios, &new_ios) {
+            (Some(current_db_ios), Some(new_node_ios)) => {
+                // handle new ios that are not in current db ios
+                for (node_id, new_io_ids) in new_node_ios {
+                    if !current_db_ios.contains_key(node_id) {
+                        created_io_ids_by_node_id.insert(*node_id, new_io_ids.clone().into_iter().collect());
+                    }
+                }
+
+                // handle current db ios delta
+                for (node_id, current_db_io_ids) in current_db_ios {
+                    match new_node_ios.get(&node_id) {
+                        Some(new_io_ids) => {
+                            // Calculate created and removed ios.
+                            let created: HashSet<Uuid> = new_io_ids
+                                .iter()
+                                .filter(|id| !current_db_io_ids.contains(id))
+                                .cloned()
+                                .collect();
+
+                            let removed: HashSet<Uuid> = current_db_io_ids
+                                .iter()
+                                .filter(|id| !new_io_ids.contains(id))
+                                .cloned()
+                                .collect();
+
+                            if !created.is_empty() {
+                                created_io_ids_by_node_id.insert(node_id, created);
+                            }
+
+                            if !removed.is_empty() {
+                                removed_io_ids_by_node_id.insert(node_id, removed);
+                            }
+                        }
+                        None => {
+                            // All original ios for this node_id are considered removed.
+                            removed_io_ids_by_node_id.insert(node_id, current_db_io_ids.into_iter().collect());
+                        }
+                    }
+                }
+            }
+            (None, Some(new_node_ios)) => {
+                // All new_io_ids ios are considered created.
+                for (node_id, new_io_ids) in new_node_ios {
+                    created_io_ids_by_node_id.insert(*node_id, new_io_ids.clone().into_iter().collect());
+                }
+            }
+            (Some(current_db_ios), None) => {
+                // All current_db ios are considered removed.
+                for (node_id, current_db_io_ids) in current_db_ios {
+                    removed_io_ids_by_node_id.insert(node_id, current_db_io_ids.into_iter().collect());
+                }
+            }
+            (None, None) => {
+                // No ios to update.
+            }
+        }
+
+        [created_io_ids_by_node_id, removed_io_ids_by_node_id]
     }
 
     pub async fn preserve_flow_step_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
