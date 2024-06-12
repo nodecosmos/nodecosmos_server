@@ -19,7 +19,10 @@ pub enum NotificationType {
     table_name = notifications,
     partition_keys = [user_id],
     clustering_keys = [created_at, id],
-    local_secondary_indexes = [seen]
+    local_secondary_indexes = [seen],
+    table_options = r#"
+        CLUSTERING ORDER BY (created_at DESC)
+    "#
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
