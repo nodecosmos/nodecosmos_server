@@ -60,6 +60,8 @@ impl Callbacks for Comment {
         self.validate_author(data).await?;
         self.validate_url(data).await?;
 
+        self.content.sanitize()?;
+
         Ok(())
     }
 
@@ -97,12 +99,17 @@ impl Callbacks for Comment {
                                 }
                                 _ => {}
                             }
-                            let _ = Notification::new(NotificationType::NewComment, notification_text, self_clone.url)
-                                .create_for_receivers(&data, receiver_ids)
-                                .await
-                                .map_err(|e| {
-                                    error!("Error while creating notification: {}", e);
-                                });
+                            let _ = Notification::new(
+                                NotificationType::NewComment,
+                                notification_text,
+                                self_clone.url,
+                                self_clone.author,
+                            )
+                            .create_for_receivers(&data, receiver_ids)
+                            .await
+                            .map_err(|e| {
+                                error!("Error while creating notification: {}", e);
+                            });
                         }
                         Err(e) => error!("Error getting thread_type while updating thread participants: {}", e),
                     }

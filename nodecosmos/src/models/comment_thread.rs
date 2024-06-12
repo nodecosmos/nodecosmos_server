@@ -60,12 +60,12 @@ impl FromStr for ThreadType {
 impl ContributionRequestThreadType {
     pub fn notification_text(&self) -> &str {
         match self {
-            ContributionRequestThreadType::MainThread => "added a new comment to the main contribution request thread",
-            ContributionRequestThreadType::ObjectDescription => "added a new comment to the object description",
-            ContributionRequestThreadType::Node => "added a new comment to the node",
-            ContributionRequestThreadType::Flow => "added a new comment to the flow",
-            ContributionRequestThreadType::FlowStep => "added a new comment to the flow step",
-            ContributionRequestThreadType::InputOutput => "added a new comment to the input/output",
+            ContributionRequestThreadType::MainThread => "commented on the main contribution request thread",
+            ContributionRequestThreadType::ObjectDescription => "commented on the object description",
+            ContributionRequestThreadType::Node => "commented on the node",
+            ContributionRequestThreadType::Flow => "commented on the flow",
+            ContributionRequestThreadType::FlowStep => "commented on the flow step",
+            ContributionRequestThreadType::InputOutput => "commented on the input/output",
         }
     }
 }
@@ -73,7 +73,7 @@ impl ContributionRequestThreadType {
 impl ThreadType {
     pub fn notification_text(&self) -> &str {
         match self {
-            ThreadType::Topic => "added a new comment to the topic",
+            ThreadType::Topic => "commented on the topic",
             ThreadType::ContributionRequest(contribution_request_thread_type) => {
                 contribution_request_thread_type.notification_text()
             }
