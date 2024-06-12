@@ -1,5 +1,6 @@
 use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::constants::PAGE_SIZE;
 use crate::models::notification::Notification;
 use actix_web::{get, post, web, HttpResponse};
 use base64::engine::general_purpose::URL_SAFE;
@@ -9,32 +10,24 @@ use charybdis::operations::Find;
 use serde::Deserialize;
 use serde_json::json;
 
-#[get("/")]
-pub async fn get_notifications(data: RequestData) -> Response {
-    let notifications = Notification::find_by_user_id_and_seen(data.current_user.id, false)
-        .execute(data.db_session())
-        .await?
-        .try_collect()
-        .await?;
-
-    Ok(HttpResponse::Ok().json(notifications))
-}
-
 #[derive(Deserialize)]
 pub struct PagedQuery {
     pub paging_state: Option<String>,
 }
 
-#[get("/all_paged")]
-pub async fn get_all_paged(data: RequestData, q: web::Query<PagedQuery>) -> Response {
-    let query = Notification::find_by_partition_key_value_paged((data.current_user.id,)).page_size(50);
-    if let Some(q) = q.paging_state.as_ref() {
-        let paging_state = URL_SAFE.decode(&q)?;
-        query.paging_state(Some(scylla::Bytes::from(paging_state)));
-    }
+#[get("/")]
+pub async fn get_notifications(data: RequestData, q: web::Query<PagedQuery>) -> Response {
+    let query = Notification::find_by_partition_key_value_paged((data.current_user.id,));
 
-    let (notification_res, paging_state) = Notification::find_by_partition_key_value_paged((data.current_user.id,))
-        .page_size(10)
+    let paging_state = if let Some(q) = q.paging_state.as_ref() {
+        Some(scylla::Bytes::from(URL_SAFE.decode(&q)?))
+    } else {
+        None
+    };
+
+    let (notification_res, paging_state) = query
+        .page_size(PAGE_SIZE)
+        .paging_state(paging_state)
         .execute(data.db_session())
         .await?;
 
