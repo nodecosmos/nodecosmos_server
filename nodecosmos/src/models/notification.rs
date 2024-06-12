@@ -1,8 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::udts::Profile;
 use charybdis::batch::ModelBatch;
 use charybdis::macros::charybdis_model;
-use charybdis::types::{Boolean, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Frozen, Text, Timestamp, Uuid};
 use futures::TryStreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -33,12 +34,18 @@ pub struct Notification {
     pub text: Text,
     pub url: Text,
     pub seen: Boolean,
+    pub author: Option<Frozen<Profile>>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
 
 impl Notification {
-    pub fn new(notification_type: NotificationType, text: String, url: String) -> Notification {
+    pub fn new(
+        notification_type: NotificationType,
+        text: String,
+        url: String,
+        author: Option<Frozen<Profile>>,
+    ) -> Notification {
         Notification {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
@@ -46,6 +53,7 @@ impl Notification {
             text,
             url,
             seen: false,
+            author,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }
