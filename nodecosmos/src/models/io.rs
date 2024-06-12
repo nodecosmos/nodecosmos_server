@@ -119,6 +119,7 @@ impl Callbacks for Io {
             // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
             // keep the main io in the database as it can be later used by flow steps where it was deleted.
             self.flow_step_id = None;
+            self.flow_step_node_id = None;
             self.insert().execute(db_session).await?;
         }
 
@@ -385,4 +386,4 @@ partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_id, flow_step_id);
 
 partial_io!(BaseIo, branch_id, node_id, root_id, id);
 
-partial_io!(TitleIo, root_id, node_id, branch_id, id, title);
+partial_io!(TitleIo, root_id, node_id, branch_id, id, title, created_at);

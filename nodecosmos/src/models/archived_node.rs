@@ -41,7 +41,7 @@ pub struct ArchivedNode {
     pub title: Text,
     pub parent_id: Option<Uuid>,
     pub ancestor_ids: Option<Set<Uuid>>,
-    pub owner_id: Option<Uuid>,
+    pub owner_id: Uuid,
     pub owner: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
     pub viewer_ids: Option<Set<Uuid>>,

@@ -189,7 +189,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
 
             fn owner_id(&self) -> Option<Uuid> {
                 if self.is_original() {
-                    return self.owner_id;
+                    return Some(self.owner_id);
                 }
 
                 return match &self.auth_branch {
@@ -237,7 +237,7 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
             async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
                  if self.is_original() {
                     // auth info is already initialized
-                    if self.owner_id.is_some() {
+                    if self.owner_id != Uuid::default() {
                         return Ok(());
                     }
 

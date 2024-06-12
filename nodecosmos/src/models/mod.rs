@@ -20,6 +20,7 @@ pub mod materialized_views;
 pub mod node;
 pub mod node_counter;
 pub mod node_descendant;
+pub mod notification;
 pub mod recovery;
 pub mod token;
 pub mod traits;

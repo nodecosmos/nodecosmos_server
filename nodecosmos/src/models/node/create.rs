@@ -45,7 +45,7 @@ impl Node {
             self.owner_id = owner_id;
             self.owner = owner;
         } else {
-            self.owner_id = Some(data.current_user.id);
+            self.owner_id = data.current_user.id;
             self.owner = Some(Profile::init_from_current_user(&data.current_user));
             self.root_id = self.id;
             self.parent_id = None;
@@ -75,7 +75,7 @@ impl Node {
     }
 
     pub fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
-        if self.owner_id.is_none() || self.owner.is_none() {
+        if self.owner_id == Uuid::default() {
             return Err(NodecosmosError::ValidationError(("owner_id", "must be present")));
         }
 

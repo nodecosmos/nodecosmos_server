@@ -205,5 +205,6 @@ partial_flow!(
     vertical_index,
     id,
     root_id,
-    title
+    title,
+    created_at
 );

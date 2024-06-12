@@ -27,8 +27,6 @@ pub mod update_cover_image;
 mod update_owner;
 mod update_title;
 
-/// Note: All derives implemented bellow `charybdis_model` macro are automatically implemented for all partial models.
-/// So `Branchable` derive is automatically applied to all partial_node models.
 #[charybdis_model(
     table_name = nodes,
     partition_keys = [branch_id],
@@ -58,10 +56,13 @@ pub struct Node {
     #[serde(default)]
     pub order_index: Double,
 
+    #[serde(default)]
+    pub owner_id: Uuid,
+
     pub title: Text,
+
     pub parent_id: Option<Uuid>,
     pub ancestor_ids: Option<Set<Uuid>>,
-    pub owner_id: Option<Uuid>,
     pub owner: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
     pub viewer_ids: Option<Set<Uuid>>,

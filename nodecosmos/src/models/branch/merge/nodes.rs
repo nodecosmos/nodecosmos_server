@@ -285,7 +285,7 @@ impl MergeNodes {
     pub async fn reorder_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(reordered_nodes_data) = &self.reordered_nodes_data {
             for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(branch.root_id, reorder_node_data.id))
+                let node = Node::find_by_primary_key_value((branch.root_id, reorder_node_data.id))
                     .execute(data.db_session())
                     .await;
 
@@ -342,7 +342,7 @@ impl MergeNodes {
     pub async fn undo_reorder_nodes(&mut self, data: &RequestData, branch: &Branch) -> Result<(), NodecosmosError> {
         if let Some(reordered_nodes_data) = &self.reordered_nodes_data {
             for reorder_node_data in reordered_nodes_data {
-                let node = Node::find_by_primary_key_value(&(branch.root_id, reorder_node_data.id))
+                let node = Node::find_by_primary_key_value((branch.root_id, reorder_node_data.id))
                     .execute(data.db_session())
                     .await;
 

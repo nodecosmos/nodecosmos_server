@@ -122,14 +122,14 @@ impl FindOrInsertBranched for Node {
     ) -> Result<Self, NodecosmosError> {
         use charybdis::operations::{Find, InsertWithCallbacks};
 
-        let node = Self::maybe_find_by_primary_key_value(&(params.branch_id, params.id))
+        let node = Self::maybe_find_by_primary_key_value((params.branch_id, params.id))
             .execute(data.db_session())
             .await?;
 
         return match node {
             Some(node) => Ok(node),
             None => {
-                let mut node = Self::find_by_primary_key_value(&(params.original_id, params.id))
+                let mut node = Self::find_by_primary_key_value((params.original_id, params.id))
                     .execute(data.db_session())
                     .await?;
 

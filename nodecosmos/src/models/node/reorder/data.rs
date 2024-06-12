@@ -27,8 +27,8 @@ pub struct ReorderData {
     pub old_ancestor_ids: Set<Uuid>,
     pub new_ancestor_ids: Set<Uuid>,
 
-    pub removed_ancestor_ids: Vec<Uuid>,
-    pub added_ancestor_ids: Vec<Uuid>,
+    pub removed_ancestor_ids: Set<Uuid>,
+    pub added_ancestor_ids: Set<Uuid>,
 
     pub new_upper_sibling_id: Option<Uuid>,
     pub new_lower_sibling_id: Option<Uuid>,
@@ -128,7 +128,7 @@ impl ReorderData {
         (upper_sibling_index + lower_sibling_index) / 2.0
     }
 
-    fn extract_removed_ancestor_ids(old_ancestor_ids: &Set<Uuid>, new_ancestor_ids: &Set<Uuid>) -> Vec<Uuid> {
+    fn extract_removed_ancestor_ids(old_ancestor_ids: &Set<Uuid>, new_ancestor_ids: &Set<Uuid>) -> Set<Uuid> {
         old_ancestor_ids
             .iter()
             .filter(|&id| !new_ancestor_ids.contains(id))
@@ -136,7 +136,7 @@ impl ReorderData {
             .collect()
     }
 
-    fn extract_added_ancestor_ids(old_ancestor_ids: &Set<Uuid>, new_ancestor_ids: &Set<Uuid>) -> Vec<Uuid> {
+    fn extract_added_ancestor_ids(old_ancestor_ids: &Set<Uuid>, new_ancestor_ids: &Set<Uuid>) -> Set<Uuid> {
         new_ancestor_ids
             .iter()
             .filter(|&id| !old_ancestor_ids.contains(id))

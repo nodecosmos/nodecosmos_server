@@ -29,11 +29,27 @@ impl Comment {
         }
 
         self.id = Uuid::new_v4();
-        self.author_id = Some(data.current_user.id);
+        self.author_id = data.current_user.id;
         self.author = Some(Profile::init_from_current_user(&data.current_user));
         self.content.sanitize()?;
         self.created_at = now;
         self.updated_at = now;
+
+        Ok(())
+    }
+
+    pub async fn validate_author(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.author_id != data.current_user.id {
+            return Err(NodecosmosError::BadRequest("Invalid author".to_string()));
+        }
+
+        Ok(())
+    }
+
+    pub async fn validate_url(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !self.url.starts_with(&data.app.config.client_url) {
+            return Err(NodecosmosError::BadRequest("Invalid URL".to_string()));
+        }
 
         Ok(())
     }

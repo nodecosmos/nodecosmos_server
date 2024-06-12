@@ -13,12 +13,12 @@ use crate::models::traits::Authorization;
 
 #[get("/{objectId}")]
 pub async fn get_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
-    let comments = Comment::find_by_partition_key_value(&(pk.object_id,))
+    let comments = Comment::find_by_partition_key_value((pk.object_id,))
         .execute(&db_session)
         .await?
         .try_collect()
         .await?;
-    let threads = CommentThread::find_by_partition_key_value(&(pk.object_id,))
+    let threads = CommentThread::find_by_partition_key_value((pk.object_id,))
         .execute(&db_session)
         .await?
         .try_collect()

@@ -1,10 +1,11 @@
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
-use charybdis::types::{Int, Text, Timestamp, Uuid};
+use charybdis::types::{Int, Set, Text, Timestamp, Uuid};
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
@@ -29,10 +30,55 @@ pub enum ContributionRequestThreadType {
     InputOutput,
 }
 
-#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Deserialize)]
 pub enum ThreadType {
     Topic,
     ContributionRequest(ContributionRequestThreadType),
+}
+
+impl FromStr for ThreadType {
+    type Err = NodecosmosError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Topic" => Ok(ThreadType::Topic),
+            _ => {
+                let parts: Vec<&str> = s.split("::").collect();
+                if parts.len() == 2 && parts[0] == "ContributionRequest" {
+                    let cr_type = parts[1].parse::<ContributionRequestThreadType>().map_err(|_| {
+                        NodecosmosError::InternalServerError("Invalid ContributionRequestThreadType".to_string())
+                    })?;
+                    Ok(ThreadType::ContributionRequest(cr_type))
+                } else {
+                    Err(NodecosmosError::InternalServerError("Invalid ThreadType".to_string()))
+                }
+            }
+        }
+    }
+}
+
+impl ContributionRequestThreadType {
+    pub fn notification_text(&self) -> &str {
+        match self {
+            ContributionRequestThreadType::MainThread => "added a new comment to the main contribution request thread",
+            ContributionRequestThreadType::ObjectDescription => "added a new comment to the object description",
+            ContributionRequestThreadType::Node => "added a new comment to the node",
+            ContributionRequestThreadType::Flow => "added a new comment to the flow",
+            ContributionRequestThreadType::FlowStep => "added a new comment to the flow step",
+            ContributionRequestThreadType::InputOutput => "added a new comment to the input/output",
+        }
+    }
+}
+
+impl ThreadType {
+    pub fn notification_text(&self) -> &str {
+        match self {
+            ThreadType::Topic => "added a new comment to the topic",
+            ThreadType::ContributionRequest(contribution_request_thread_type) => {
+                contribution_request_thread_type.notification_text()
+            }
+        }
+    }
 }
 
 pub enum CommentObject {
@@ -64,12 +110,36 @@ pub struct CommentThread {
     pub thread_object_id: Option<Uuid>,
     pub line_number: Option<Int>,
     pub line_content: Option<Text>,
+    pub participant_ids: Option<Set<Uuid>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
 
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
+}
+
+impl Callbacks for CommentThread {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        let now = chrono::Utc::now();
+
+        self.author_id = Some(data.current_user.id);
+        self.author = Some(Profile::init_from_current_user(&data.current_user));
+
+        // here is safe to allow client to provide id as request is authenticated with `object_id`
+        // we provide `id` to separate main threads from others
+        if self.id.is_nil() {
+            self.id = Uuid::new_v4();
+        }
+
+        self.created_at = now;
+        self.updated_at = now;
+
+        Ok(())
+    }
 }
 
 impl CommentThread {
@@ -104,31 +174,9 @@ impl CommentThread {
             }
         }
     }
-}
 
-impl Callbacks for CommentThread {
-    type Extension = RequestData;
-    type Error = NodecosmosError;
-
-    async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        let now = chrono::Utc::now();
-
-        self.author_id = Some(data.current_user.id);
-        self.author = Some(Profile::init_from_current_user(&data.current_user));
-
-        // here is safe to allow client to provide id as request is authenticated with `object_id`
-        // we provide `id` to separate main threads from others
-        if self.id.is_nil() {
-            self.id = Uuid::new_v4();
-        }
-
-        self.root_id = match self.object(data.db_session()).await? {
-            CommentObject::ContributionRequest(contribution_request) => contribution_request.root_id,
-        };
-
-        self.created_at = now;
-        self.updated_at = now;
-
-        Ok(())
+    pub fn thread_type(&self) -> Result<ThreadType, NodecosmosError> {
+        ThreadType::from_str(&self.thread_type)
+            .map_err(|e| NodecosmosError::NotFound(format!("Error getting thread_type {}: {}", self.thread_type, e)))
     }
 }

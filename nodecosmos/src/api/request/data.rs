@@ -40,7 +40,7 @@ impl RequestData {
     }
 
     pub fn s3_bucket(&self) -> &String {
-        &self.app.s3_bucket
+        &self.app.config.aws.bucket
     }
 
     pub fn mailer(&self) -> &crate::resources::mailer::Mailer {

@@ -1,4 +1,5 @@
 use charybdis::batch::CharybdisBatch;
+use std::collections::HashSet;
 use std::fmt;
 
 use charybdis::callbacks::Callbacks;
@@ -16,6 +17,7 @@ use crate::models::flow::PkFlow;
 use crate::models::flow_step::PkFlowStep;
 use crate::models::io::DeleteIo;
 use crate::models::node::{Node, PkNode};
+use crate::models::notification::{Notification, NotificationType};
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
 use crate::models::utils::{impl_updated_at_cb, sanitize_description_cb, updated_at_cb_fn};
@@ -67,7 +69,10 @@ pub struct ContributionRequest {
     pub root_id: Uuid,
 
     pub editor_ids: Option<Set<Uuid>>,
-    pub title: Option<Text>,
+
+    #[serde(default)]
+    pub title: Text,
+
     pub description: Option<Text>,
 
     #[serde(default = "chrono::Utc::now")]
@@ -101,6 +106,12 @@ impl Callbacks for ContributionRequest {
         self.set_defaults(data);
         self.create_branch(data).await?;
         self.create_branch_node(data).await?;
+
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        self.send_create_notifications(session, data).await?;
 
         Ok(())
     }
@@ -208,6 +219,37 @@ impl ContributionRequest {
                 return Err(merge_error.inner);
             }
         }
+
+        Ok(())
+    }
+
+    pub async fn send_create_notifications(
+        &mut self,
+        db_session: &CachingSession,
+        data: &RequestData,
+    ) -> Result<(), NodecosmosError> {
+        let id = self.id;
+        let title = self.title.clone();
+        let node = self.node(db_session).await?;
+        let notification = Notification::new(
+            NotificationType::NewContributionRequest,
+            title,
+            format!(
+                "{client_url}/nodes/{original_id}/{node_id}/contribution_requests/{id}",
+                client_url = &data.app.config.client_url,
+                original_id = node.original_id(),
+                node_id = node.id,
+                id = id
+            ),
+        );
+        let mut receiver_ids = HashSet::new();
+        receiver_ids.insert(node.owner_id);
+
+        if let Some(editor_ids) = &node.editor_ids {
+            receiver_ids.extend(editor_ids);
+        }
+
+        notification.create_for_receivers(data, receiver_ids).await?;
 
         Ok(())
     }

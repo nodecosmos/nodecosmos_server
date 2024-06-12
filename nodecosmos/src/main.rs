@@ -157,6 +157,11 @@ fn main() {
                                 .service(reject_invitation)
                                 .service(delete_invitation),
                         )
+                        .service(
+                            web::scope("notifications")
+                                .service(get_notifications)
+                                .service(mark_all_as_read),
+                        )
                 })
                 .keep_alive(std::time::Duration::from_secs(15))
                 .bind(("0.0.0.0", port))

@@ -140,7 +140,7 @@ impl AuthorizationFields for CommentThread {
 
 impl AuthorizationFields for Comment {
     fn owner_id(&self) -> Option<Uuid> {
-        self.author_id
+        Some(self.author_id)
     }
 
     fn editor_ids(&self) -> &Option<Set<Uuid>> {
@@ -162,7 +162,7 @@ impl AuthorizationFields for Comment {
 
 impl AuthorizationFields for Invitation {
     fn owner_id(&self) -> Option<Uuid> {
-        return self.node.as_ref().and_then(|node| node.owner_id);
+        return self.node.as_ref().and_then(|node| Some(node.owner_id));
     }
 
     fn editor_ids(&self) -> &Option<Set<Uuid>> {

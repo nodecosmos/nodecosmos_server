@@ -75,7 +75,7 @@ pub async fn confirm_invitation(data: RequestData, invitation: web::Json<Invitat
     let inviter_id = invitation.inviter_id;
     let node = invitation.node(data.db_session()).await?.clone();
 
-    if node.owner_id == Some(inviter_id) || node.editor_ids.as_ref().is_some_and(|ids| ids.contains(&inviter_id)) {
+    if node.owner_id == inviter_id || node.editor_ids.as_ref().is_some_and(|ids| ids.contains(&inviter_id)) {
         invitation.ctx = InvitationContext::Confirm;
         invitation.status = InvitationStatus::Accepted.to_string();
         invitation.update_cb(&data).execute(data.db_session()).await?;
