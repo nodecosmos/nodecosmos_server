@@ -9,7 +9,7 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionTypes, Response};
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::comment::Comment;
+use crate::models::comment::BaseComment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{
     BaseContributionRequest, ContributionRequest, UpdateContributionRequestDescription, UpdateContributionRequestTitle,
@@ -39,7 +39,7 @@ pub async fn get_contribution_request(
 ) -> Response {
     let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
     let branch = Branch::find_by_id(contribution_request.id).execute(&db_session).await?;
-    let comments = Comment::find_by_object_id(contribution_request.id)
+    let comments = BaseComment::find_by_object_id(contribution_request.id)
         .execute(&db_session)
         .await?
         .try_collect()

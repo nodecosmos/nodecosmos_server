@@ -44,9 +44,7 @@ impl ContributionRequest {
             editor_ids = ids.clone();
         }
 
-        if let Some(id) = node.owner_id {
-            editor_ids.insert(id);
-        }
+        editor_ids.insert(node.owner_id);
 
         let branch = Branch {
             id: self.id, //

@@ -446,7 +446,7 @@ impl UpdateOutputIdsFlowStep {
     }
 }
 
-partial_flow_step!(PkFlowStep, node_id, branch_id, root_id, flow_id, step_index, id);
+partial_flow_step!(PkFlowStep, node_id, branch_id, root_id, flow_id, step_index, id, created_at);
 
 impl PkFlowStep {
     pub async fn maybe_find_by_index(self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
@@ -479,6 +479,7 @@ impl From<&FlowStep> for PkFlowStep {
             flow_id: fs.flow_id,
             step_index: fs.step_index.clone(),
             id: fs.id,
+            created_at: fs.created_at,
         }
     }
 }

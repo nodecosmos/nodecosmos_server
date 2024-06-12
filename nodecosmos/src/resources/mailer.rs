@@ -1,8 +1,8 @@
+use crate::app::Config;
 use crate::errors::NodecosmosError;
 use charybdis::types::Uuid;
 use handlebars::Handlebars;
 use std::collections::HashMap;
-use toml::Value;
 
 const CONFIRM_EMAIL: &str = "confirm_email";
 const INVITATION_EMAIL: &str = "invitation_email";
@@ -17,9 +17,8 @@ pub struct Mailer {
 }
 
 impl Mailer {
-    pub fn new(ses_client: aws_sdk_ses::Client, config: &Value) -> Self {
+    pub fn new(ses_client: aws_sdk_ses::Client, config: &Config) -> Self {
         let mut templates = Handlebars::new();
-        let client_url = config["client_url"].as_str().expect("Missing client url").to_string();
 
         templates
             .register_template_string(CONFIRM_EMAIL, include_str!("./mailer/confirm_email.html"))
@@ -49,7 +48,7 @@ impl Mailer {
 
         Self {
             templates,
-            client_url,
+            client_url: config.client_url.clone(),
             ses_client,
         }
     }

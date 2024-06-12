@@ -104,7 +104,7 @@ impl UpdateInputIdsFlowStep {
         if added_input_ids.len() > 0 {
             for added_io in added_input_ids {
                 batch.append_statement(
-                    Io::PUSH_INPUTTED_BY_FLOW_STEPS_QUERY,
+                    Io::PUSH_INPUTTED_BY_FLOW_STEPS_IF_EXISTS_QUERY,
                     (vec![self.id], self.branch_id, self.root_id, added_io),
                 );
             }
@@ -113,7 +113,7 @@ impl UpdateInputIdsFlowStep {
         if removed_input_ids.len() > 0 {
             for removed_io in removed_input_ids {
                 batch.append_statement(
-                    Io::PULL_INPUTTED_BY_FLOW_STEPS_QUERY,
+                    Io::PULL_INPUTTED_BY_FLOW_STEPS_IF_EXISTS_QUERY,
                     (vec![self.id], self.branch_id, self.root_id, removed_io),
                 );
             }

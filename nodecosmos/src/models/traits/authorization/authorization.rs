@@ -1,5 +1,6 @@
 use charybdis::operations::Find;
 use scylla::CachingSession;
+use uuid::Uuid;
 
 use crate::api::data::RequestData;
 use crate::api::request::current_user::OptCurrentUser;
@@ -161,7 +162,7 @@ impl Authorization for CommentThread {
 
 impl Authorization for Comment {
     async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        if self.author_id.is_none() {
+        if self.author_id == Uuid::default() {
             *self = self.find_by_primary_key().execute(db_session).await?;
         }
 

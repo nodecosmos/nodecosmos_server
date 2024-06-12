@@ -170,7 +170,7 @@ macro_rules! find_branched {
             pub async fn find_branched(&mut self, db_session: &CachingSession) -> Result<&mut Self, NodecosmosError> {
                 use anyhow::Context;
 
-                let branch_self = Self::maybe_find_by_primary_key_value(&(self.branch_id, self.object_id))
+                let branch_self = Self::maybe_find_by_primary_key_value((self.branch_id, self.object_id))
                     .execute(db_session)
                     .await
                     .context("Failed to find branched description")?;
@@ -182,7 +182,7 @@ macro_rules! find_branched {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value(&(self.original_id(), self.object_id))
+                        *self = Self::find_by_primary_key_value((self.original_id(), self.object_id))
                             .execute(db_session)
                             .await?;
 

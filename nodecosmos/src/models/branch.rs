@@ -48,7 +48,7 @@ pub struct Branch {
     // where branch is created
     pub node_id: Uuid,
     pub root_id: Uuid,
-    pub title: Option<Text>,
+    pub title: Text,
     pub description: Option<Text>,
 
     #[serde(default = "BranchStatus::default")]

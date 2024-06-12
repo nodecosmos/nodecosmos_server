@@ -175,7 +175,7 @@ impl Invitation {
                 username_or_email = token.email;
             }
 
-            let invitation = Self::find_by_primary_key_value(&(node_pk.0, node_pk.1, username_or_email))
+            let invitation = Self::find_by_primary_key_value((node_pk.0, node_pk.1, username_or_email))
                 .execute(db_session)
                 .await?;
 

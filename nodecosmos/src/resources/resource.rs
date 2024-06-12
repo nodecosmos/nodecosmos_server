@@ -1,11 +1,11 @@
 use std::time::Duration;
 
+use crate::app::Config;
 use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use scylla::{CachingSession, Session, SessionBuilder};
-use toml::Value;
 
 use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::mailer::Mailer;
@@ -23,19 +23,15 @@ pub trait Resource<'a> {
 }
 
 impl<'a> Resource<'a> for CachingSession {
-    type Cfg = &'a Value;
+    type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let hosts = config["scylla"]["hosts"].as_array().expect("Missing hosts");
-
-        let keyspace = config["scylla"]["keyspace"].as_str().expect("Missing keyspace");
-
-        let known_nodes: Vec<&str> = hosts.iter().map(|x| x.as_str().unwrap()).collect();
+        let known_nodes: Vec<&str> = config.scylla.hosts.iter().map(|x| x.as_str()).collect();
 
         let db_session: Session = SessionBuilder::new()
             .known_nodes(&known_nodes)
             .connection_timeout(Duration::from_secs(3))
-            .use_keyspace(keyspace, false)
+            .use_keyspace(&config.scylla.keyspace, false)
             .build()
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
@@ -45,15 +41,13 @@ impl<'a> Resource<'a> for CachingSession {
 }
 
 impl<'a> Resource<'a> for Elasticsearch {
-    type Cfg = &'a Value;
+    type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let host = config["elasticsearch"]["host"].as_str().expect("Missing elastic host");
-
-        let transport = Transport::single_node(host).unwrap_or_else(|e| {
+        let transport = Transport::single_node(&config.elasticsearch.host).unwrap_or_else(|e| {
             panic!(
                 "Unable to connect to elastic host: {}. \nError: {}",
-                config["elasticsearch"]["host"], e
+                &config.elasticsearch.host, e
             )
         });
 
@@ -62,12 +56,10 @@ impl<'a> Resource<'a> for Elasticsearch {
 }
 
 impl<'a> Resource<'a> for Pool {
-    type Cfg = &'a Value;
+    type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let redis_url = config["redis"]["url"].as_str().expect("Missing redis url");
-
-        let cfg = deadpool_redis::Config::from_url(redis_url);
+        let cfg = deadpool_redis::Config::from_url(&config.redis.url);
 
         cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))
             .expect("Failed to create pool.")
@@ -99,7 +91,7 @@ impl<'a> Resource<'a> for aws_sdk_ses::Client {
 }
 
 impl<'a> Resource<'a> for Mailer {
-    type Cfg = (aws_sdk_ses::Client, &'a Value);
+    type Cfg = (aws_sdk_ses::Client, &'a Config);
 
     async fn init_resource(cfg: Self::Cfg) -> Self {
         Mailer::new(cfg.0, cfg.1)
