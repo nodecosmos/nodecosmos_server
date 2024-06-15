@@ -17,6 +17,7 @@ use crate::models::flow::PkFlow;
 use crate::models::flow_step::PkFlowStep;
 use crate::models::io::DeleteIo;
 use crate::models::node::{Node, PkNode};
+use crate::models::node_counter::NodeCounter;
 use crate::models::notification::{Notification, NotificationType};
 use crate::models::traits::Branchable;
 use crate::models::udts::Profile;
@@ -112,6 +113,7 @@ impl Callbacks for ContributionRequest {
 
     async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         let id = self.id;
+        let root_id = self.root_id;
         let title = self.title.clone();
         let owner = self.owner.clone();
         let data = data.clone();
@@ -147,6 +149,12 @@ impl Callbacks for ContributionRequest {
                 .map_err(|e| {
                     log::error!("Error creating notification for new contribution request: {:?}", e);
                 });
+
+            let _ = NodeCounter::increment_cr_count(&data, root_id, node_id)
+                .await
+                .map_err(|e| {
+                    log::error!("Error incrementing contribution request count: {:?}", e);
+                });
         });
 
         Ok(())
@@ -154,7 +162,7 @@ impl Callbacks for ContributionRequest {
 
     updated_at_cb_fn!();
 
-    async fn after_delete(&mut self, db_session: &CachingSession, _: &RequestData) -> Result<(), Self::Error> {
+    async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         self.branch(db_session).await?.delete().execute(db_session).await?;
 
         // delete branch data
@@ -201,6 +209,12 @@ impl Callbacks for ContributionRequest {
             .await
             .map_err(|e| {
                 log::error!("Error deleting branch data: {:?}", e);
+            });
+
+        let _ = NodeCounter::decrement_cr_count(data, self.root_id, self.node_id)
+            .await
+            .map_err(|e| {
+                log::error!("Error decrementing contribution request count: {:?}", e);
             });
 
         Ok(())

@@ -143,6 +143,9 @@ impl ElasticIndex for Node {
                     "analyzer": "english_with_html_strip",
                 },
                 "likeCount": { "type": "integer" },
+                "descendantsCount": { "type": "integer" },
+                "contributionRequestsCount": { "type": "integer" },
+                "threadsCount": { "type": "integer" },
                 "isRoot": { "type": "boolean" },
                 "isPublic": { "type": "boolean" },
                 "createdAt": { "type": "date" },
@@ -228,18 +231,27 @@ pub struct UpdateNodeDescriptionElasticIdx {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UpdateLikeCountNodeElasticIdx {
+pub struct UpdateCounterNodeElasticIdx {
     pub id: Uuid,
 
     #[serde(rename = "likeCount")]
     pub likes_count: i32,
+
+    #[serde(rename = "descendantsCount")]
+    pub descendants_count: i32,
+
+    #[serde(rename = "contributionRequestsCount")]
+    pub contribution_requests_count: i32,
+
+    #[serde(rename = "threadsCount")]
+    pub threads_count: i32,
 }
 
 // node
 impl_elastic_index!(UpdateNodeDescriptionElasticIdx, Node);
 impl_elastic_index!(UpdateTitleNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
-impl_elastic_index!(UpdateLikeCountNodeElasticIdx, Node);
+impl_elastic_index!(UpdateCounterNodeElasticIdx, Node);
 impl_elastic_index!(UpdateOwnerNode, Node);
 // user
 impl_elastic_index!(UpdateUser, User);
