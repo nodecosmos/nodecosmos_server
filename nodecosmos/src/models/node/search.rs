@@ -9,7 +9,7 @@ use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::udts::Profile;
 
-const PAGE_SIZE: i16 = 10;
+const PAGE_SIZE: i16 = 20;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +22,7 @@ pub struct IndexNode {
     pub short_description: Option<String>,
     pub description: Option<String>,
     pub like_count: Option<BigInt>,
+    pub contribution_requests_count: Option<BigInt>,
     pub cover_image_url: Option<String>,
     pub is_root: bool,
     pub is_public: bool,

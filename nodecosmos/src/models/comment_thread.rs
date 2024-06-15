@@ -16,7 +16,7 @@ use crate::models::udts::Profile;
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ThreadObjectType {
     ContributionRequest,
-    Topic,
+    Thread,
 }
 
 #[derive(Default, Deserialize, strum_macros::Display, strum_macros::EnumString)]
@@ -32,7 +32,7 @@ pub enum ContributionRequestThreadType {
 
 #[derive(Deserialize)]
 pub enum ThreadType {
-    Topic,
+    Thread,
     ContributionRequest(ContributionRequestThreadType),
 }
 
@@ -41,7 +41,7 @@ impl FromStr for ThreadType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Topic" => Ok(ThreadType::Topic),
+            "Thread" => Ok(ThreadType::Thread),
             _ => {
                 let parts: Vec<&str> = s.split("::").collect();
                 if parts.len() == 2 && parts[0] == "ContributionRequest" {
@@ -73,7 +73,7 @@ impl ContributionRequestThreadType {
 impl ThreadType {
     pub fn notification_text(&self) -> &str {
         match self {
-            ThreadType::Topic => "commented on the topic",
+            ThreadType::Thread => "commented on the Thread",
             ThreadType::ContributionRequest(contribution_request_thread_type) => {
                 contribution_request_thread_type.notification_text()
             }
@@ -82,12 +82,12 @@ impl ThreadType {
 }
 
 pub enum CommentObject {
-    ContributionRequest(ContributionRequest), // Topic(Topic)
+    ContributionRequest(ContributionRequest), // Thread(Thread)
 }
 
 /// **objectId** corresponds to the following:
 /// * **`ContributionRequest['id']`** for ContributionRequest related comments
-/// * **`Topic['id']`**  for Topic related comments
+/// * **`Thread['id']`**  for Thread related comments
 #[charybdis_model(
     table_name = comment_threads,
     partition_keys = [object_id],
