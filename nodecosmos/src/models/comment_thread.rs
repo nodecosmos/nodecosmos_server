@@ -208,7 +208,10 @@ impl CommentThread {
 
     pub fn thread_location(&self) -> Result<ThreadLocation, NodecosmosError> {
         ThreadLocation::from_str(&self.thread_location).map_err(|e| {
-            NodecosmosError::NotFound(format!("Error getting thread_location {}: {}", self.thread_location, e))
+            NodecosmosError::NotFound(format!(
+                "Error getting thread_location '{}': {}",
+                self.thread_location, e
+            ))
         })
     }
 }
