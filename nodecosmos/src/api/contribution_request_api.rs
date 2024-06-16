@@ -39,12 +39,12 @@ pub async fn get_contribution_request(
 ) -> Response {
     let contribution_request = contribution_request.find_by_primary_key().execute(&db_session).await?;
     let branch = Branch::find_by_id(contribution_request.id).execute(&db_session).await?;
-    let comments = BaseComment::find_by_object_id(contribution_request.id)
+    let comments = BaseComment::find_by_branch_id(contribution_request.id)
         .execute(&db_session)
         .await?
         .try_collect()
         .await?;
-    let threads = CommentThread::find_by_object_id(contribution_request.id)
+    let threads = CommentThread::find_by_branch_id(contribution_request.id)
         .execute(&db_session)
         .await?
         .try_collect()

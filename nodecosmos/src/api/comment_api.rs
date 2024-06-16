@@ -11,14 +11,14 @@ use crate::models::comment::{Comment, DeleteComment, PkComment, UpdateContentCom
 use crate::models::comment_thread::CommentThread;
 use crate::models::traits::Authorization;
 
-#[get("/{objectId}")]
+#[get("/{branchId}")]
 pub async fn get_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
-    let comments = Comment::find_by_partition_key_value((pk.object_id,))
+    let comments = Comment::find_by_partition_key_value((pk.branch_id,))
         .execute(&db_session)
         .await?
         .try_collect()
         .await?;
-    let threads = CommentThread::find_by_partition_key_value((pk.object_id,))
+    let threads = CommentThread::find_by_partition_key_value((pk.branch_id,))
         .execute(&db_session)
         .await?
         .try_collect()
@@ -32,9 +32,9 @@ pub async fn get_comments(db_session: web::Data<CachingSession>, pk: web::Path<P
     }))
 }
 
-#[get("/{objectId}/{threadId}")]
+#[get("/{branchId}/{threadId}")]
 pub async fn get_thread_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
-    let comments = Comment::find_by_object_id_and_thread_id(pk.object_id, pk.thread_id)
+    let comments = Comment::find_by_branch_id_and_thread_id(pk.branch_id, pk.thread_id)
         .execute(&db_session)
         .await?
         .try_collect()
@@ -82,7 +82,7 @@ pub async fn update_comment_content(data: RequestData, mut comment: web::Json<Up
     Ok(HttpResponse::Ok().json(comment))
 }
 
-#[delete("/{objectId}/{threadId}/{id}")]
+#[delete("/{branchId}/{threadId}/{id}")]
 pub async fn delete_comment(data: RequestData, mut comment: web::Path<DeleteComment>) -> Response {
     comment.as_native().auth_update(&data).await?;
 

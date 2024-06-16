@@ -134,7 +134,10 @@ impl Branch {
             self.node = Some(node);
         }
 
-        Ok(self.node.as_ref().unwrap())
+        Ok(self
+            .node
+            .as_ref()
+            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))?)
     }
 
     pub fn all_edited_description_ids(&self) -> HashSet<Uuid> {

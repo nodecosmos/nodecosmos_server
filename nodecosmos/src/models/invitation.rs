@@ -193,7 +193,10 @@ impl Invitation {
             self.node = Some(node);
         }
 
-        Ok(self.node.as_mut().unwrap())
+        Ok(self
+            .node
+            .as_mut()
+            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))?)
     }
 
     pub async fn inviter(&self, db_session: &CachingSession) -> Result<User, NodecosmosError> {
