@@ -16,10 +16,12 @@ impl Comment {
 
         match thread {
             Some(thread) => {
-                let object_id = thread.object_id;
+                let branch_id = thread.branch_id;
                 let thread_id = thread.id;
+                let object_id = thread.object_id;
 
                 self.object_id = object_id;
+                self.branch_id = branch_id;
                 self.thread_id = thread_id;
             }
             None => {

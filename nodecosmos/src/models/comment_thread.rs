@@ -9,8 +9,9 @@ use std::str::FromStr;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::comment::{find_first_pk_comment, PkComment};
-use crate::models::contribution_request::ContributionRequest;
+use crate::models::branch::Branch;
+use crate::models::comment::PkComment;
+use crate::models::node::Node;
 use crate::models::udts::Profile;
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
@@ -20,7 +21,7 @@ pub enum ThreadObjectType {
 }
 
 #[derive(Default, Deserialize, strum_macros::Display, strum_macros::EnumString)]
-pub enum ContributionRequestThreadType {
+pub enum ContributionRequestThreadLocation {
     #[default]
     MainThread,
     ObjectDescription,
@@ -31,71 +32,56 @@ pub enum ContributionRequestThreadType {
 }
 
 #[derive(Deserialize)]
-pub enum ThreadType {
+pub enum ThreadLocation {
     Thread,
-    ContributionRequest(ContributionRequestThreadType),
+    ContributionRequest(ContributionRequestThreadLocation),
 }
 
-impl FromStr for ThreadType {
+impl FromStr for ThreadLocation {
     type Err = NodecosmosError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Thread" => Ok(ThreadType::Thread),
+            "Thread" => Ok(ThreadLocation::Thread),
             _ => {
                 let parts: Vec<&str> = s.split("::").collect();
                 if parts.len() == 2 && parts[0] == "ContributionRequest" {
-                    let cr_type = parts[1].parse::<ContributionRequestThreadType>().map_err(|_| {
-                        NodecosmosError::InternalServerError("Invalid ContributionRequestThreadType".to_string())
+                    let cr_type = parts[1].parse::<ContributionRequestThreadLocation>().map_err(|_| {
+                        NodecosmosError::InternalServerError("Invalid ContributionRequestThreadLocation".to_string())
                     })?;
-                    Ok(ThreadType::ContributionRequest(cr_type))
+                    Ok(ThreadLocation::ContributionRequest(cr_type))
                 } else {
-                    Err(NodecosmosError::InternalServerError("Invalid ThreadType".to_string()))
+                    Err(NodecosmosError::InternalServerError(
+                        "Invalid ThreadLocation".to_string(),
+                    ))
                 }
             }
         }
     }
 }
 
-impl ContributionRequestThreadType {
+impl ContributionRequestThreadLocation {
     pub fn notification_text(&self) -> &str {
         match self {
-            ContributionRequestThreadType::MainThread => "commented on the main contribution request thread",
-            ContributionRequestThreadType::ObjectDescription => "commented on the object description",
-            ContributionRequestThreadType::Node => "commented on the node",
-            ContributionRequestThreadType::Flow => "commented on the flow",
-            ContributionRequestThreadType::FlowStep => "commented on the flow step",
-            ContributionRequestThreadType::InputOutput => "commented on the input/output",
+            ContributionRequestThreadLocation::MainThread => "commented on the main contribution request thread",
+            ContributionRequestThreadLocation::ObjectDescription => "commented on the object description",
+            ContributionRequestThreadLocation::Node => "commented on the node",
+            ContributionRequestThreadLocation::Flow => "commented on the flow",
+            ContributionRequestThreadLocation::FlowStep => "commented on the flow step",
+            ContributionRequestThreadLocation::InputOutput => "commented on the input/output",
         }
     }
 }
 
-impl ThreadType {
-    pub fn notification_text(&self) -> &str {
-        match self {
-            ThreadType::Thread => "commented on the Thread",
-            ThreadType::ContributionRequest(contribution_request_thread_type) => {
-                contribution_request_thread_type.notification_text()
-            }
-        }
-    }
-}
-
-pub enum CommentObject {
-    ContributionRequest(ContributionRequest), // Thread(Thread)
-}
-
-/// **objectId** corresponds to the following:
-/// * **`ContributionRequest['id']`** for ContributionRequest related comments
-/// * **`Thread['id']`**  for Thread related comments
 #[charybdis_model(
     table_name = comment_threads,
-    partition_keys = [object_id],
-    clustering_keys = [id],
+    partition_keys = [branch_id],
+    clustering_keys = [object_id, id],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommentThread {
+    pub branch_id: Uuid,
     pub object_id: Uuid,
     #[serde(default)]
     pub id: Uuid,
@@ -105,9 +91,7 @@ pub struct CommentThread {
     pub author_id: Option<Uuid>,
     pub author: Option<Profile>,
     pub object_type: Text,
-    pub object_node_id: Option<Uuid>,
-    pub thread_type: Text,
-    pub thread_object_id: Option<Uuid>,
+    pub thread_location: Text,
     pub line_number: Option<Int>,
     pub line_content: Option<Text>,
     pub participant_ids: Option<Set<Uuid>>,
@@ -117,6 +101,14 @@ pub struct CommentThread {
 
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub branch: Option<Branch>,
+
+    #[charybdis(ignore)]
+    #[serde(skip)]
+    pub node: Option<Node>,
 }
 
 impl Callbacks for CommentThread {
@@ -129,10 +121,13 @@ impl Callbacks for CommentThread {
         self.author_id = Some(data.current_user.id);
         self.author = Some(Profile::init_from_current_user(&data.current_user));
 
-        // here is safe to allow client to provide id as request is authenticated with `object_id`
-        // we provide `id` to separate main threads from others
-        if self.id.is_nil() {
-            self.id = Uuid::new_v4();
+        match self.thread_location() {
+            Ok(ThreadLocation::ContributionRequest(ContributionRequestThreadLocation::MainThread)) => {
+                self.id = self.branch_id;
+            }
+            _ => {
+                self.id = Uuid::new_v4();
+            }
         }
 
         self.created_at = now;
@@ -143,40 +138,77 @@ impl Callbacks for CommentThread {
 }
 
 impl CommentThread {
-    pub async fn object(&self, db_session: &CachingSession) -> Result<CommentObject, NodecosmosError> {
-        match ThreadObjectType::from(self.object_type.parse()?) {
-            ThreadObjectType::ContributionRequest => {
-                return match self.object_node_id {
-                    Some(node_id) => {
-                        let contribution_request = ContributionRequest::find_by_node_id_and_id(node_id, self.object_id)
-                            .execute(db_session)
-                            .await?;
-                        Ok(CommentObject::ContributionRequest(contribution_request))
-                    }
-                    None => Err(NodecosmosError::NotFound("[object] node_id is empty".to_string())),
-                };
+    pub async fn branch(&mut self, db_session: &CachingSession) -> Result<&mut Branch, NodecosmosError> {
+        match self.thread_location()? {
+            ThreadLocation::ContributionRequest(..) => {
+                if self.branch.is_none() {
+                    let branch = Branch::find_by_id(self.branch_id).execute(db_session).await?;
+                    self.branch = Some(branch);
+                }
+
+                self.branch
+                    .as_mut()
+                    .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))
             }
-            _ => Err(NodecosmosError::NotFound("Object not found".to_string())),
+            _ => {
+                return Err(NodecosmosError::InternalServerError(
+                    "Branch not found for non-ContributionRequest thread".to_string(),
+                ));
+            }
+        }
+    }
+
+    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
+        match self.thread_location()? {
+            ThreadLocation::Thread => {
+                if self.node.is_none() {
+                    let node = Node::find_by_branch_id_and_id(self.branch_id, self.object_id)
+                        .execute(db_session)
+                        .await?;
+                    self.node = Some(node);
+                }
+
+                self.node
+                    .as_mut()
+                    .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
+            }
+            _ => {
+                return Err(NodecosmosError::InternalServerError(
+                    "Node not found for non-Node thread".to_string(),
+                ));
+            }
         }
     }
 
     pub async fn delete_if_no_comments(&self, db_session: &CachingSession) {
-        let comment_res = find_first_pk_comment!("object_id = ? AND thread_id = ?", (&self.object_id, &self.id))
+        let comment_res = PkComment::maybe_find_first_by_branch_id_and_thread_id(self.branch_id, self.id)
             .execute(db_session)
-            .await
-            .ok();
+            .await;
 
-        if comment_res.is_none() {
-            let res = self.delete().execute(db_session).await;
+        match comment_res {
+            Ok(Some(_)) => return,
+            Ok(None) => {
+                let res = self.delete().execute(db_session).await;
 
-            if let Err(e) = res {
-                error!("Error while deleting thread: {}", e);
+                if let Err(e) = res {
+                    error!("Error while deleting thread: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Error while checking for comments: {}", e);
+                return;
             }
         }
     }
 
-    pub fn thread_type(&self) -> Result<ThreadType, NodecosmosError> {
-        ThreadType::from_str(&self.thread_type)
-            .map_err(|e| NodecosmosError::NotFound(format!("Error getting thread_type {}: {}", self.thread_type, e)))
+    pub fn thread_object_type(&self) -> Result<ThreadObjectType, NodecosmosError> {
+        ThreadObjectType::from_str(&self.object_type)
+            .map_err(|e| NodecosmosError::NotFound(format!("Error getting object_type {}: {}", self.object_type, e)))
+    }
+
+    pub fn thread_location(&self) -> Result<ThreadLocation, NodecosmosError> {
+        ThreadLocation::from_str(&self.thread_location).map_err(|e| {
+            NodecosmosError::NotFound(format!("Error getting thread_location {}: {}", self.thread_location, e))
+        })
     }
 }

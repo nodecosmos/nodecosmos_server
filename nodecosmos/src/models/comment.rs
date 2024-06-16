@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::comment_thread::{CommentObject, CommentThread};
+use crate::models::comment_thread::{CommentThread, ThreadLocation};
 use crate::models::notification::{Notification, NotificationType};
 use crate::models::traits::SanitizeDescription;
 use crate::models::udts::Profile;
@@ -17,13 +17,16 @@ mod create;
 
 #[charybdis_model(
     table_name = comments,
-    partition_keys = [object_id],
-    clustering_keys = [thread_id, id],
+    partition_keys = [branch_id],
+    clustering_keys = [thread_id, object_id, id],
     local_secondary_indexes = [],
 )]
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Comment {
+    #[serde(default)]
+    pub branch_id: Uuid,
+
     #[serde(default)]
     pub object_id: Uuid,
 
@@ -86,14 +89,14 @@ impl Callbacks for Comment {
                             error!("Error while updating thread participants: {}", e);
                         });
 
-                    match thread.thread_type() {
-                        Ok(thread_type) => {
-                            let notification_text = thread_type.notification_text().to_string();
+                    match thread.thread_location() {
+                        Ok(ThreadLocation::ContributionRequest(thread_location)) => {
+                            let notification_text = thread_location.notification_text().to_string();
                             let mut receiver_ids = thread.participant_ids.get_or_insert_with(|| HashSet::new()).clone();
-                            match thread.object(data.db_session()).await {
-                                Ok(CommentObject::ContributionRequest(cr)) => {
-                                    receiver_ids.insert(cr.owner_id);
-                                    if let Some(editor_ids) = cr.editor_ids {
+                            match thread.branch(data.db_session()).await {
+                                Ok(branch) => {
+                                    receiver_ids.insert(branch.owner_id);
+                                    if let Some(editor_ids) = &branch.editor_ids {
                                         receiver_ids.extend(editor_ids);
                                     }
                                 }
@@ -111,7 +114,11 @@ impl Callbacks for Comment {
                                 error!("Error while creating notification: {}", e);
                             });
                         }
-                        Err(e) => error!("Error getting thread_type while updating thread participants: {}", e),
+                        Err(e) => error!(
+                            "Error getting thread_location while updating thread participants: {}",
+                            e
+                        ),
+                        _ => {}
                     }
                 }
                 Err(e) => error!("Error while updating thread participants: {}", e),
@@ -131,7 +138,7 @@ impl Comment {
     pub async fn thread(&mut self, db_session: &CachingSession) -> Result<Option<&mut CommentThread>, NodecosmosError> {
         if self.thread.is_none() {
             self.thread = Some(
-                CommentThread::find_by_object_id_and_id(self.object_id, self.thread_id)
+                CommentThread::find_by_branch_id_and_object_id_and_id(self.branch_id, self.object_id, self.thread_id)
                     .execute(db_session)
                     .await?,
             );
@@ -143,8 +150,9 @@ impl Comment {
 
 partial_comment!(
     BaseComment,
-    object_id,
+    branch_id,
     thread_id,
+    object_id,
     id,
     content,
     author_id,
@@ -153,9 +161,17 @@ partial_comment!(
     updated_at
 );
 
-partial_comment!(PkComment, object_id, thread_id, id);
+partial_comment!(PkComment, branch_id, thread_id, object_id, id);
 
-partial_comment!(UpdateContentComment, object_id, thread_id, id, content, updated_at);
+partial_comment!(
+    UpdateContentComment,
+    branch_id,
+    thread_id,
+    object_id,
+    id,
+    content,
+    updated_at
+);
 
 impl Callbacks for UpdateContentComment {
     type Extension = Option<()>;
@@ -174,7 +190,7 @@ impl Callbacks for UpdateContentComment {
     }
 }
 
-partial_comment!(DeleteComment, object_id, thread_id, id);
+partial_comment!(DeleteComment, branch_id, thread_id, object_id, id);
 
 impl Callbacks for DeleteComment {
     type Extension = RequestData;
@@ -185,9 +201,13 @@ impl Callbacks for DeleteComment {
         let data = data.clone();
 
         tokio::spawn(async move {
-            let thread = CommentThread::find_by_object_id_and_id(self_clone.object_id, self_clone.thread_id)
-                .execute(data.db_session())
-                .await;
+            let thread = CommentThread::find_by_branch_id_and_object_id_and_id(
+                self_clone.branch_id,
+                self_clone.object_id,
+                self_clone.thread_id,
+            )
+            .execute(data.db_session())
+            .await;
 
             match thread {
                 Ok(thread) => {

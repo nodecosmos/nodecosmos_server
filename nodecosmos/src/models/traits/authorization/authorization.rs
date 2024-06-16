@@ -7,7 +7,7 @@ use crate::api::request::current_user::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::comment::Comment;
-use crate::models::comment_thread::{CommentObject, CommentThread};
+use crate::models::comment_thread::{CommentThread, ThreadObjectType};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::invitation::{Invitation, InvitationStatus};
 use crate::models::traits::AuthorizationFields;
@@ -144,19 +144,30 @@ impl Authorization for CommentThread {
             return Err(NodecosmosError::Unauthorized("User is blocked"));
         }
 
-        let object = self.object(data.db_session()).await?;
-        match object {
-            CommentObject::ContributionRequest(mut contribution_request) => {
-                contribution_request
+        return match self.thread_object_type() {
+            Ok(ThreadObjectType::ContributionRequest) => {
+                let branch = self.branch(data.db_session()).await?;
+                branch
                     .auth_view(
                         data.db_session(),
                         &OptCurrentUser(Option::from(data.current_user.clone())),
                     )
-                    .await?;
-
-                Ok(())
+                    .await
             }
-        }
+            Ok(ThreadObjectType::Thread) => {
+                let node = self.node(data.db_session()).await?;
+
+                node.auth_view(
+                    data.db_session(),
+                    &OptCurrentUser(Option::from(data.current_user.clone())),
+                )
+                .await
+            }
+            Err(e) => Err(NodecosmosError::NotFound(format!(
+                "Error getting thread object_type: {}",
+                e
+            ))),
+        };
     }
 }
 
