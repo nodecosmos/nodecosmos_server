@@ -118,7 +118,29 @@ impl Callbacks for Comment {
                             "Error getting thread_location while updating thread participants: {}",
                             e
                         ),
-                        _ => {}
+                        Ok(ThreadLocation::Thread) => {
+                            let notification_text = format!("commented thread: {}", thread.title);
+                            let mut receiver_ids = thread.participant_ids.get_or_insert_with(|| HashSet::new()).clone();
+                            match thread.node(data.db_session()).await {
+                                Ok(node) => {
+                                    receiver_ids.insert(node.owner_id);
+                                    receiver_ids.extend(node.editor_ids.clone().unwrap_or_default());
+                                }
+                                _ => {}
+                            }
+
+                            let _ = Notification::new(
+                                NotificationType::NewComment,
+                                notification_text,
+                                self_clone.url,
+                                self_clone.author,
+                            )
+                            .create_for_receivers(&data, receiver_ids)
+                            .await
+                            .map_err(|e| {
+                                error!("Error while creating notification: {}", e);
+                            });
+                        }
                     }
                 }
                 Err(e) => error!("Error while updating thread participants: {}", e),

@@ -1,4 +1,4 @@
-use charybdis::types::{BigInt, Timestamp};
+use charybdis::types::{BigInt, Int, Timestamp};
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -22,7 +22,8 @@ pub struct IndexNode {
     pub short_description: Option<String>,
     pub description: Option<String>,
     pub like_count: Option<BigInt>,
-    pub contribution_requests_count: Option<BigInt>,
+    pub contribution_requests_count: Option<Int>,
+    pub threads_count: Option<Int>,
     pub cover_image_url: Option<String>,
     pub is_root: bool,
     pub is_public: bool,

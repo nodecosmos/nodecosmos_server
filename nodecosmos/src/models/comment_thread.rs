@@ -12,6 +12,7 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::comment::{Comment, PkComment};
 use crate::models::node::Node;
+use crate::models::node_counter::NodeCounter;
 use crate::models::udts::Profile;
 
 #[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
@@ -136,10 +137,18 @@ impl Callbacks for CommentThread {
         Ok(())
     }
 
-    async fn after_delete(&mut self, session: &CachingSession, _extension: &RequestData) -> Result<(), Self::Error> {
+    async fn after_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        NodeCounter::increment_thread_count(data, self.branch_id, self.object_id).await?;
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         Comment::delete_by_branch_id_and_thread_id(self.branch_id, self.id)
             .execute(session)
             .await?;
+
+        NodeCounter::decrement_thread_count(data, self.branch_id, self.object_id).await?;
 
         Ok(())
     }
