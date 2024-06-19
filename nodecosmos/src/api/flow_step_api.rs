@@ -59,7 +59,6 @@ pub async fn delete_flow_step(data: RequestData, fs: web::Json<PkFlowStep>) -> R
         ModelBranchParams {
             original_id: fs.original_id(),
             branch_id: fs.branch_id,
-            node_id: fs.node_id,
             id: fs.id,
         },
     )

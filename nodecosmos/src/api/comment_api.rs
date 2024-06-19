@@ -1,46 +1,61 @@
+use crate::api::current_user::OptCurrentUser;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::Uuid;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::models::comment::{Comment, DeleteComment, PkComment, UpdateContentComment};
+use crate::models::comment::{Comment, DeleteComment, UpdateContentComment};
 use crate::models::comment_thread::CommentThread;
+use crate::models::node::AuthNode;
 use crate::models::traits::Authorization;
 
-#[get("/{branchId}")]
-pub async fn get_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
-    let comments = Comment::find_by_partition_key_value((pk.branch_id,))
+#[get("/threads/{root_id}/{branch_id}/{object_id}")]
+pub async fn get_threads(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    pk: web::Path<(Uuid, Uuid, Uuid)>,
+) -> Response {
+    let (root_id, branch_id, object_id) = pk.into_inner();
+    AuthNode::auth_view(&db_session, &opt_cu, branch_id, object_id, root_id).await?;
+
+    let threads = CommentThread::find_by_branch_id_and_object_id(branch_id, object_id)
         .execute(&db_session)
         .await?
         .try_collect()
         .await?;
-    let threads = CommentThread::find_by_partition_key_value((pk.branch_id,))
+
+    Ok(HttpResponse::Ok().json(threads))
+}
+
+#[get("/{root_id}/{branch_id}/{object_id}/{thread_id}")]
+pub async fn get_thread_comments(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    pk: web::Path<(Uuid, Uuid, Uuid, Uuid)>,
+) -> Response {
+    let (root_id, branch_id, object_id, thread_id) = pk.into_inner();
+    AuthNode::auth_view(&db_session, &opt_cu, branch_id, object_id, root_id).await?;
+
+    let comments = Comment::find_by_branch_id_and_thread_id(branch_id, thread_id)
         .execute(&db_session)
         .await?
         .try_collect()
+        .await?;
+    let thread = CommentThread::find_by_branch_id_and_object_id_and_id(branch_id, object_id, thread_id)
+        .execute(&db_session)
         .await?;
 
     Ok(HttpResponse::Ok().json(json! {
         {
             "comments": comments,
-            "threads": threads,
+            "thread": thread,
         }
     }))
-}
-
-#[get("/{branchId}/{threadId}")]
-pub async fn get_thread_comments(db_session: web::Data<CachingSession>, pk: web::Path<PkComment>) -> Response {
-    let comments = Comment::find_by_branch_id_and_thread_id(pk.branch_id, pk.thread_id)
-        .execute(&db_session)
-        .await?
-        .try_collect()
-        .await?;
-
-    Ok(HttpResponse::Ok().json(comments))
 }
 
 #[derive(Deserialize)]
@@ -80,6 +95,21 @@ pub async fn update_comment_content(data: RequestData, mut comment: web::Json<Up
     comment.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(comment))
+}
+
+#[delete("/thread/{branch_id}/{object_id}/{thread_id}")]
+pub async fn delete_thread(data: RequestData, pk: web::Path<(Uuid, Uuid, Uuid)>) -> Response {
+    let (branch_id, object_id, thread_id) = pk.into_inner();
+
+    let mut thread = CommentThread::find_by_branch_id_and_object_id_and_id(branch_id, object_id, thread_id)
+        .execute(data.db_session())
+        .await?;
+
+    thread.auth_update(&data).await?;
+
+    thread.delete_cb(&data).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 #[delete("/{branchId}/{threadId}/{id}")]

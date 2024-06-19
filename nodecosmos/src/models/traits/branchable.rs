@@ -84,6 +84,5 @@ pub struct ModelBranchParams {
     #[branch(original_id)]
     pub original_id: Uuid,
     pub branch_id: Uuid,
-    pub node_id: Uuid,
     pub id: Uuid,
 }

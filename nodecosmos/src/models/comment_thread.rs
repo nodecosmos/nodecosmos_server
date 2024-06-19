@@ -10,7 +10,7 @@ use std::str::FromStr;
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
-use crate::models::comment::PkComment;
+use crate::models::comment::{Comment, PkComment};
 use crate::models::node::Node;
 use crate::models::udts::Profile;
 
@@ -132,6 +132,14 @@ impl Callbacks for CommentThread {
 
         self.created_at = now;
         self.updated_at = now;
+
+        Ok(())
+    }
+
+    async fn after_delete(&mut self, session: &CachingSession, _extension: &RequestData) -> Result<(), Self::Error> {
+        Comment::delete_by_branch_id_and_thread_id(self.branch_id, self.id)
+            .execute(session)
+            .await?;
 
         Ok(())
     }

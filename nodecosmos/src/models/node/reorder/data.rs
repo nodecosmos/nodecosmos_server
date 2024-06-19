@@ -150,7 +150,6 @@ impl ReorderData {
             ModelBranchParams {
                 original_id: params.original_id(),
                 branch_id: params.branch_id,
-                node_id: params.id,
                 id: params.id,
             },
         )
