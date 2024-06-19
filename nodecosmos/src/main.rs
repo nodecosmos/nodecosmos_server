@@ -65,7 +65,8 @@ fn main() {
                                 .service(upload_cover_image)
                                 .service(delete_cover_image)
                                 .service(listen_node_events)
-                                .service(get_node_editors),
+                                .service(get_node_editors)
+                                .service(delete_node_editor),
                         )
                         .service(
                             web::scope("/likes")

@@ -281,3 +281,33 @@ pub async fn get_node_editors(db_session: web::Data<CachingSession>, pk: web::Pa
 
     Ok(HttpResponse::Ok().json(users))
 }
+
+#[delete("/{branchId}/{id}/editors/{editorId}")]
+pub async fn delete_node_editor(
+    db_session: web::Data<CachingSession>,
+    data: RequestData,
+    params: web::Path<(Uuid, Uuid, Uuid)>,
+) -> Response {
+    let (branch_id, id, editor_id) = params.into_inner();
+
+    let node = AuthNode::find_by_branch_id_and_id(branch_id, id)
+        .execute(&db_session)
+        .await?;
+
+    if node.owner_id != data.current_user.id {
+        return Err(NodecosmosError::Forbidden(
+            "Only the owner can remove editors".to_string(),
+        ));
+    }
+
+    UpdateEditorNode {
+        branch_id,
+        id,
+        ..Default::default()
+    }
+    .pull_editor_ids(vec![editor_id])
+    .execute(&db_session)
+    .await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
