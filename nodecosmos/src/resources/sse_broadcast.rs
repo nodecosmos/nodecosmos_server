@@ -87,8 +87,6 @@ impl<'a, M: BaseModel + Serialize> ModelEvent<'a, M> {
         let sse_broadcast = data.sse_broadcast();
         let msg = self.to_sse()?;
 
-        println!("Sending message: {:?}", msg);
-
         sse_broadcast.send_message(self.root_id, msg).await
     }
 
