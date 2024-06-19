@@ -61,7 +61,6 @@ impl UpdateNodeIdsFlowStep {
             ModelBranchParams {
                 original_id: self.original_id(),
                 branch_id: self.branch_id,
-                node_id: self.node_id,
                 id: self.id,
             },
         )

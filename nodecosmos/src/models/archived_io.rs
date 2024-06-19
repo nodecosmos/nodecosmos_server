@@ -1,6 +1,3 @@
-use crate::models::node::Node;
-use crate::models::traits::Context;
-
 use crate::models::io::Io;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Set, Text, Timestamp, Uuid};
@@ -52,14 +49,6 @@ pub struct ArchivedIo {
 
     #[serde(default = "chrono::Utc::now")]
     pub updated_at: Timestamp,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub node: Option<Node>,
-
-    #[charybdis(ignore)]
-    #[serde(skip)]
-    pub ctx: Context,
 }
 
 impl From<&Io> for ArchivedIo {
@@ -79,8 +68,6 @@ impl From<&Io> for ArchivedIo {
             value: io.value.clone(),
             created_at: io.created_at,
             updated_at: io.updated_at,
-            node: io.node.clone(),
-            ctx: io.ctx,
         }
     }
 }

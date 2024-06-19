@@ -169,6 +169,32 @@ impl Authorization for CommentThread {
             ))),
         };
     }
+
+    async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !data.current_user.is_confirmed {
+            return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+        }
+
+        if data.current_user.is_blocked {
+            return Err(NodecosmosError::Unauthorized("User is blocked"));
+        }
+
+        return match self.thread_object_type() {
+            Ok(ThreadObjectType::ContributionRequest) => {
+                let branch = self.branch(data.db_session()).await?;
+                branch.auth_update(data).await
+            }
+            Ok(ThreadObjectType::Thread) => {
+                let node = self.node(data.db_session()).await?;
+
+                node.auth_update(data).await
+            }
+            Err(e) => Err(NodecosmosError::NotFound(format!(
+                "Error getting thread object_type: {}",
+                e
+            ))),
+        };
+    }
 }
 
 impl Authorization for Comment {

@@ -277,7 +277,16 @@ impl ContributionRequest {
     }
 }
 
-partial_contribution_request!(BaseContributionRequest, node_id, id, owner, title, created_at, status);
+partial_contribution_request!(
+    BaseContributionRequest,
+    node_id,
+    id,
+    root_id,
+    owner,
+    title,
+    created_at,
+    status
+);
 
 partial_contribution_request!(UpdateContributionRequestTitle, node_id, id, title, updated_at);
 

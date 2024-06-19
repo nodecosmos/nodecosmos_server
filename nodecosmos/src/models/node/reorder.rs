@@ -158,7 +158,6 @@ impl Reorder {
                     ModelBranchParams {
                         original_id: self.reorder_data.original_id(),
                         branch_id: self.reorder_data.branch_id,
-                        node_id: *ancestor_id,
                         id: *ancestor_id,
                     },
                 );
@@ -172,7 +171,6 @@ impl Reorder {
                     ModelBranchParams {
                         original_id: self.reorder_data.original_id(),
                         branch_id: self.reorder_data.branch_id,
-                        node_id: *ancestor_id,
                         id: *ancestor_id,
                     },
                 );
@@ -186,7 +184,6 @@ impl Reorder {
                     ModelBranchParams {
                         original_id: self.reorder_data.original_id(),
                         branch_id: self.reorder_data.branch_id,
-                        node_id: *descendant_id,
                         id: *descendant_id,
                     },
                 );
