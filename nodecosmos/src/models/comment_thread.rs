@@ -137,8 +137,13 @@ impl Callbacks for CommentThread {
         Ok(())
     }
 
-    async fn after_insert(&mut self, _session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        NodeCounter::increment_thread_count(data, self.branch_id, self.object_id).await?;
+    async fn after_insert(&mut self, session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        let node_id = match self.thread_location()? {
+            ThreadLocation::Thread => self.object_id,
+            ThreadLocation::ContributionRequest(..) => self.branch(session).await?.node_id,
+        };
+
+        NodeCounter::increment_thread_count(data, self.branch_id, node_id).await?;
 
         Ok(())
     }
