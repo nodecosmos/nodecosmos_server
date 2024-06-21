@@ -356,10 +356,12 @@ impl RecoveryLog<'_> for BranchMerge {
 }
 
 impl Branch {
-    pub async fn merge(mut self, data: &RequestData) -> Result<Self, MergeError> {
-        if let Err(e) = self.validate_no_existing_conflicts().await {
-            return Err(MergeError { inner: e, branch: self });
-        }
+    pub async fn merge(self, data: &RequestData) -> Result<Self, MergeError> {
+        // There are scenarios where we want to check for conflicts again before merging,
+        // and this will disallow merging even in the case of resolved conflicts.
+        // if let Err(e) = self.validate_no_existing_conflicts().await {
+        //     return Err(MergeError { inner: e, branch: self });
+        // }
 
         let merge = BranchMerge::new(data.db_session(), self)
             .await?
@@ -380,6 +382,7 @@ impl Branch {
         Ok(merge.branch)
     }
 
+    #[allow(unused)]
     pub async fn validate_no_existing_conflicts(&mut self) -> Result<(), NodecosmosError> {
         if self.conflict.is_some() {
             return Err(NodecosmosError::Conflict("Conflicts not resolved".to_string()));
@@ -387,6 +390,7 @@ impl Branch {
 
         Ok(())
     }
+
     pub async fn check_conflicts(self, db_session: &CachingSession) -> Result<Self, MergeError> {
         let merge = BranchMerge::new(db_session, self)
             .await?
