@@ -14,6 +14,7 @@ pub enum NotificationType {
     NewContributionRequest,
     MergeContributionRequest,
     NewComment,
+    NewInvitation,
 }
 
 #[charybdis_model(

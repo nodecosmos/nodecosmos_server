@@ -112,7 +112,7 @@ pub async fn delete_thread(data: RequestData, pk: web::Path<(Uuid, Uuid, Uuid)>)
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[delete("/{branchId}/{threadId}/{id}")]
+#[delete("/{branchId}/{threadId}/{objectId}/{id}")]
 pub async fn delete_comment(data: RequestData, mut comment: web::Path<DeleteComment>) -> Response {
     comment.as_native().auth_update(&data).await?;
 
