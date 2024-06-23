@@ -1,8 +1,10 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
+use crate::models::notification::{Notification, NotificationType};
 use crate::models::token::Token;
 use crate::models::traits::Descendants;
+use crate::models::udts::Profile;
 use crate::models::user::User;
 use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
@@ -12,8 +14,10 @@ use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use email_address::EmailAddress;
 use futures::StreamExt;
+use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Default, PartialEq)]
 pub enum InvitationContext {
@@ -86,19 +90,27 @@ impl Callbacks for Invitation {
         self.inviter_id = data.current_user.id;
         self.expires_at = Utc::now() + chrono::Duration::weeks(1);
 
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         let mut username = None;
         let email;
 
+        let user;
         if EmailAddress::is_valid(&self.username_or_email) {
-            email = self.username_or_email.clone()
+            email = self.username_or_email.clone();
+            user = User::maybe_find_first_by_email(self.username_or_email.clone())
+                .execute(data.db_session())
+                .await?;
         } else {
-            let user = User::maybe_find_first_by_username(self.username_or_email.clone())
+            user = User::maybe_find_first_by_username(self.username_or_email.clone())
                 .execute(data.db_session())
                 .await?;
 
-            if let Some(user) = user {
-                email = user.email;
-                username = Some(user.username);
+            if let Some(user) = &user {
+                email = user.email.clone();
+                username = Some(user.username.clone());
             } else {
                 return Err(NodecosmosError::ValidationError((
                     "usernameOrEmail",
@@ -113,8 +125,25 @@ impl Callbacks for Invitation {
         token.insert().execute(data.db_session()).await?;
 
         data.mailer()
-            .send_invitation_email(email, &data.current_user.username, &node.title, token.id)
+            .send_invitation_email(email, &data.current_user.username, &node.title, token.id.clone())
             .await?;
+
+        if let Some(user) = user {
+            let mut receiver_ids = HashSet::new();
+            receiver_ids.insert(user.id);
+
+            let _ = Notification::new(
+                NotificationType::NewInvitation,
+                format!("invited you to collaborate on the node {}", node.title),
+                format!("{}/invitations?token={}", data.app.config.client_url, token.id),
+                Some(Profile::init_from_current_user(&data.current_user)),
+            )
+            .create_for_receivers(&data, receiver_ids)
+            .await
+            .map_err(|e| {
+                error!("Error while creating notification: {}", e);
+            });
+        }
 
         Ok(())
     }
