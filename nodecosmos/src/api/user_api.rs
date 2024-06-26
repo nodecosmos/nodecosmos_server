@@ -11,7 +11,9 @@ use serde_json::json;
 use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
+use crate::api::user_likes;
 use crate::errors::NodecosmosError;
+use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::token::{Token, TokenType};
 use crate::models::traits::Authorization;
 use crate::models::user::search::UserSearchQuery;
@@ -62,13 +64,27 @@ pub async fn login(
 }
 
 #[get("/session/sync")]
-pub async fn sync(data: RequestData, client_session: Session) -> Response {
+pub async fn sync(data: RequestData, client_session: Session, db_session: web::Data<CachingSession>) -> Response {
     let current_user = data.current_user.find_by_primary_key().execute(data.db_session()).await;
 
     match current_user {
         Ok(user) => {
             set_current_user(&client_session, &user)?;
-            Ok(HttpResponse::Ok().json(user))
+
+            let likes = LikesByUser {
+                user_id: user.id,
+                ..Default::default()
+            }
+            .find_by_partition_key()
+            .execute(&db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+            Ok(HttpResponse::Ok().json(json!({
+                "user": user,
+                "likes": likes
+            })))
         }
         Err(_) => {
             remove_current_user(&client_session);
