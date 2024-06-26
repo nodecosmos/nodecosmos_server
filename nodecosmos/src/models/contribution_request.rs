@@ -126,7 +126,7 @@ impl Callbacks for ContributionRequest {
         tokio::spawn(async move {
             let notification = Notification::new(
                 NotificationType::NewContributionRequest,
-                format!("created new contribution request - {}", title),
+                format!("created contribution request - {}", title),
                 format!(
                     "{client_url}/nodes/{original_id}/{node_id}/contribution_requests/{id}",
                     client_url = &data.app.config.client_url,
@@ -266,12 +266,69 @@ impl ContributionRequest {
             Ok(updated_branch) => {
                 self.branch.replace(updated_branch);
                 self.update_status(data, ContributionRequestStatus::Merged).await?;
+                self.create_merge_notification(data).await?;
             }
             Err(merge_error) => {
                 self.branch.replace(merge_error.branch);
                 return Err(merge_error.inner);
             }
         }
+
+        Ok(())
+    }
+
+    async fn create_merge_notification(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        let id = self.id;
+        let root_id = self.root_id;
+        let title = self.title.clone();
+        let owner = self.owner.clone();
+        let owner_id = self.owner_id;
+        let editor_ids = self.editor_ids.clone();
+        let data = data.clone();
+        let node = self.node(data.db_session()).await?;
+        let node_original_id = node.original_id();
+        let node_id = node.id;
+        let node_owner_id = node.owner_id;
+        let node_editor_ids = node.editor_ids.clone();
+
+        tokio::spawn(async move {
+            let notification = Notification::new(
+                NotificationType::MergeContributionRequest,
+                format!("merged contribution request - {}", title),
+                format!(
+                    "{client_url}/nodes/{original_id}/{node_id}/contribution_requests/{id}",
+                    client_url = &data.app.config.client_url,
+                    original_id = node_original_id,
+                    node_id = node_id,
+                    id = id
+                ),
+                owner,
+            );
+            let mut receiver_ids = HashSet::new();
+            receiver_ids.insert(owner_id);
+            receiver_ids.insert(node_owner_id);
+
+            if let Some(editor_ids) = editor_ids {
+                receiver_ids.extend(editor_ids);
+            }
+
+            if let Some(editor_ids) = node_editor_ids {
+                receiver_ids.extend(editor_ids);
+            }
+
+            let _ = notification
+                .create_for_receivers(&data, receiver_ids)
+                .await
+                .map_err(|e| {
+                    log::error!("Error creating notification for new contribution request: {:?}", e);
+                });
+
+            let _ = NodeCounter::increment_cr_count(&data, root_id, node_id)
+                .await
+                .map_err(|e| {
+                    log::error!("Error incrementing contribution request count: {:?}", e);
+                });
+        });
 
         Ok(())
     }
