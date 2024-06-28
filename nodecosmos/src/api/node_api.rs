@@ -14,6 +14,7 @@ use crate::api::request::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
 use crate::errors::NodecosmosError;
+use crate::models::invitation::Invitation;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
@@ -308,6 +309,8 @@ pub async fn delete_node_editor(
     .pull_editor_ids(vec![editor_id])
     .execute(&db_session)
     .await?;
+
+    Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

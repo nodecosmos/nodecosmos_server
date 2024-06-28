@@ -214,6 +214,39 @@ impl Invitation {
         Err(NodecosmosError::NotFound("Invitation not found".to_string()))
     }
 
+    pub async fn delete_by_editor_id(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        node_id: Uuid,
+        editor_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
+        let editor = User::maybe_find_first_by_id(editor_id).execute(&db_session).await?;
+
+        if let Some(editor) = editor {
+            let mut batch = DeleteIvitation::delete_batch();
+
+            let by_username = DeleteIvitation {
+                branch_id,
+                node_id,
+                username_or_email: editor.username,
+            };
+
+            let by_email = DeleteIvitation {
+                branch_id,
+                node_id,
+                username_or_email: editor.email,
+            };
+
+            batch
+                .append_delete(&by_username)
+                .append_delete(&by_email)
+                .execute(&db_session)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn node(&mut self, db_session: &CachingSession) -> Result<&mut Node, NodecosmosError> {
         if self.node.is_none() {
             let node = Node::find_by_branch_id_and_id(self.branch_id, self.node_id)
@@ -249,3 +282,5 @@ impl Invitation {
         };
     }
 }
+
+partial_invitation!(DeleteIvitation, branch_id, node_id, username_or_email);

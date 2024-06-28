@@ -11,7 +11,6 @@ use serde_json::json;
 use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
-use crate::api::user_likes;
 use crate::errors::NodecosmosError;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::token::{Token, TokenType};
