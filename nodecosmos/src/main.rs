@@ -165,7 +165,8 @@ fn main() {
                                 .service(mark_all_as_read),
                         )
                 })
-                .keep_alive(std::time::Duration::from_secs(15))
+                .keep_alive(std::time::Duration::from_secs(60))
+                .max_connections(50_000)
                 .bind(("0.0.0.0", port))
                 .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
                 .run()
