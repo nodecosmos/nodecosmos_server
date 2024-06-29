@@ -20,6 +20,7 @@ use crate::models::user::{
     ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdatePasswordUser, UpdateProfileImageUser, User, UserContext,
 };
 use crate::models::user_counter::UserCounter;
+use crate::models::utils::validate_recaptcha;
 use crate::App;
 
 #[derive(Deserialize)]
@@ -27,14 +28,21 @@ pub struct LoginForm {
     #[serde(rename = "usernameOrEmail")]
     pub username_or_email: String,
     pub password: String,
+
+    /// Recaptcha token
+    #[serde(rename = "rToken")]
+    pub r_token: Option<String>,
 }
 
 #[post("/session/login")]
 pub async fn login(
     client_session: Session,
+    app: web::Data<App>,
     db_session: web::Data<CachingSession>,
     login_form: web::Json<LoginForm>,
 ) -> Response {
+    validate_recaptcha(&app, &login_form.r_token).await?;
+
     let user;
 
     if let Some(user_by_username) = User::maybe_find_first_by_username(login_form.username_or_email.clone())
@@ -124,6 +132,10 @@ pub async fn get_user_by_username(db_session: web::Data<CachingSession>, usernam
 #[derive(Deserialize)]
 pub struct PostQ {
     pub token: Option<String>,
+
+    /// Recaptcha token
+    #[serde(rename = "rToken")]
+    pub r_token: Option<String>,
 }
 
 #[post("")]
@@ -133,6 +145,8 @@ pub async fn create_user(
     mut user: web::Json<User>,
     q: web::Query<PostQ>,
 ) -> Response {
+    validate_recaptcha(&app, &q.r_token).await?;
+
     let token = if let Some(token) = &q.token {
         Token::find_by_id(token.clone()).execute(&app.db_session).await.ok()
     } else {

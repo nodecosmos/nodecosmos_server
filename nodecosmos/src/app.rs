@@ -65,6 +65,8 @@ pub struct Config {
 #[derive(Clone)]
 pub struct App {
     pub config: Config,
+    pub recaptcha_enabled: bool,
+    pub recaptcha_secret: String,
     pub db_session: Arc<CachingSession>,
     pub elastic_client: Arc<Elasticsearch>,
     pub s3_client: Arc<aws_sdk_s3::Client>,
@@ -79,6 +81,8 @@ impl App {
         dotenv::dotenv().ok();
 
         let env = env::var("ENV").expect("ENV must be set");
+        let recaptcha_enabled = env::var("RECAPTCHA_ENABLED").expect("RECAPTCHA_ENABLED must be set");
+        let recaptcha_secret = env::var("RECAPTCHA_SECRET").expect("RECAPTCHA_SECRET must be set");
         let config_file = format!("config.{}.toml", env);
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let config_val = contents.parse::<Value>().expect("Unable to parse TOML");
@@ -98,6 +102,8 @@ impl App {
 
         Self {
             config,
+            recaptcha_enabled: recaptcha_enabled == "true",
+            recaptcha_secret,
             db_session: Arc::new(db_session),
             elastic_client: Arc::new(elastic_client),
             mailer: Arc::new(mailer),
