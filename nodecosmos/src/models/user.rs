@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::app::App;
+use crate::constants::BLACKLIST_USERNAMES;
 use crate::errors::NodecosmosError;
 use crate::models::token::Token;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
@@ -84,6 +85,10 @@ impl Callbacks for User {
             .is_some()
         {
             return Err(NodecosmosError::ValidationError(("username", "is taken")));
+        }
+
+        if BLACKLIST_USERNAMES.contains(&self.username.as_str()) {
+            return Err(NodecosmosError::ValidationError(("username", "is not allowed")));
         }
 
         self.id = Uuid::new_v4();
