@@ -8,6 +8,7 @@ use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use log::error;
+use rustrict::CensorStr;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -87,8 +88,27 @@ impl Callbacks for User {
             return Err(NodecosmosError::ValidationError(("username", "is taken")));
         }
 
+        if self.username.len() < 3 {
+            return Err(NodecosmosError::ValidationError((
+                "username",
+                "must be at least 3 characters",
+            )));
+        }
+
         if BLACKLIST_USERNAMES.contains(&self.username.as_str()) {
             return Err(NodecosmosError::ValidationError(("username", "is not allowed")));
+        }
+
+        if self.username.is_inappropriate() {
+            return Err(NodecosmosError::ValidationError(("username", "is inappropriate")));
+        }
+
+        if self.first_name.is_inappropriate() {
+            return Err(NodecosmosError::ValidationError(("firstName", "is inappropriate")));
+        }
+
+        if self.last_name.is_inappropriate() {
+            return Err(NodecosmosError::ValidationError(("lastName", "is inappropriate")));
         }
 
         self.id = Uuid::new_v4();
