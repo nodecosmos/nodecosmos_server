@@ -1,5 +1,10 @@
+use crate::api::current_user::OptCurrentUser;
+use crate::errors::NodecosmosError;
 use charybdis::macros::charybdis_view_model;
-use charybdis::types::Uuid;
+use charybdis::operations::Find;
+use charybdis::stream::CharybdisModelStream;
+use charybdis::types::{Boolean, Text, Uuid};
+use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_view_model(
@@ -15,4 +20,35 @@ pub struct NodesByOwner {
     pub id: Uuid,
     pub branch_id: Uuid,
     pub root_id: Uuid,
+    pub title: Text,
+    pub is_root: Boolean,
+    pub is_public: Boolean,
+}
+
+impl NodesByOwner {
+    pub async fn root_nodes(
+        db_session: &CachingSession,
+        opt_cu: &OptCurrentUser,
+        owner_id: Uuid,
+    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+        let nodes = if opt_cu.0.as_ref().is_some_and(|cu| cu.id == owner_id) {
+            // list all nodes regardless of visibility
+            NodesByOwner::find(
+                find_nodes_by_owner_query!("owner_id = ? AND is_root = ? ALLOW FILTERING"),
+                (owner_id, true),
+            )
+            .execute(db_session)
+            .await?
+        } else {
+            // list only public nodes
+            NodesByOwner::find(
+                find_nodes_by_owner_query!("owner_id = ? AND is_root = ? AND is_public = ? ALLOW FILTERING"),
+                (owner_id, true, true),
+            )
+            .execute(db_session)
+            .await?
+        };
+
+        Ok(nodes)
+    }
 }
