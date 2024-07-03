@@ -171,8 +171,12 @@ impl Mailer {
             .render(CONTACT_US_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email("goran@nodecosmos.com".to_string(), "New contact us request", message)
-            .await?;
+        self.send_email(
+            "goran@nodecosmos.com".to_string(),
+            format!("New contact us request from: {}", contact.id).as_str(),
+            message,
+        )
+        .await?;
 
         Ok(())
     }
