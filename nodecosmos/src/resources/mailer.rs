@@ -1,5 +1,6 @@
 use crate::app::Config;
 use crate::errors::NodecosmosError;
+use crate::models::contact::Contact;
 use charybdis::types::Uuid;
 use handlebars::Handlebars;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ const INVITATION_EMAIL: &str = "invitation_email";
 const INVITATION_ACCEPTED_EMAIL: &str = "invitation_accepted_email";
 const RESET_PASSWORD_EMAIL: &str = "reset_password_email";
 const PASSWORD_CHANGED_EMAIL: &str = "password_changed_email";
+const CONTACT_US_EMAIL: &str = "contact_us_email";
 
 pub struct Mailer {
     pub templates: Handlebars<'static>,
@@ -44,6 +46,10 @@ impl Mailer {
                 PASSWORD_CHANGED_EMAIL,
                 include_str!("./mailer/password_changed_email.html"),
             )
+            .expect("Template should be valid");
+
+        templates
+            .register_template_string(CONTACT_US_EMAIL, include_str!("./mailer/contact_us_email.html"))
             .expect("Template should be valid");
 
         Self {
@@ -149,6 +155,26 @@ impl Mailer {
 
         self.send_email(to, "Your nodecosmos password has been changed", message)
             .await
+    }
+
+    pub async fn send_contact_us_email(&self, contact: &Contact) -> Result<(), NodecosmosError> {
+        let mut ctx = HashMap::<&str, &str>::new();
+        ctx.insert("first_name", &contact.first_name);
+        ctx.insert("last_name", &contact.last_name);
+        ctx.insert("email", &contact.email);
+        ctx.insert("company_name", &contact.company_name);
+        ctx.insert("phone", &contact.phone);
+        ctx.insert("message", &contact.message);
+
+        let message = self
+            .templates
+            .render(CONTACT_US_EMAIL, &ctx)
+            .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
+
+        self.send_email("goran@nodecosmos.com".to_string(), "New contact us request", message)
+            .await?;
+
+        Ok(())
     }
 
     async fn send_email(&self, to: String, subject: &str, message: String) -> Result<(), NodecosmosError> {

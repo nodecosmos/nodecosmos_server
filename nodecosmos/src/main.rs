@@ -164,7 +164,7 @@ fn main() {
                                 .service(get_notifications)
                                 .service(mark_all_as_read),
                         )
-                        // health check
+                        .service(web::scope("contacts").service(create_contact_us))
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
                 .keep_alive(std::time::Duration::from_secs(60))

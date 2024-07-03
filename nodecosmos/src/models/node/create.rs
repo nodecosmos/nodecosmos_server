@@ -82,6 +82,16 @@ impl Node {
         Ok(())
     }
 
+    pub fn validate_visibility(&mut self) -> Result<(), NodecosmosError> {
+        if !self.is_public {
+            return Err(NodecosmosError::Forbidden(
+                "Currently only public nodes are allowed".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     pub async fn append_to_ancestors(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         if let Some(ancestor_ids) = self.ancestor_ids.as_ref() {
             let mut descendants = Vec::with_capacity(ancestor_ids.len());
