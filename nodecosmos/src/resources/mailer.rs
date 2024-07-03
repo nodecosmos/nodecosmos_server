@@ -173,7 +173,7 @@ impl Mailer {
 
         self.send_email(
             "goran@nodecosmos.com".to_string(),
-            format!("New contact us request from: {}", contact.id).as_str(),
+            format!("New contact us request: ID {}", contact.id).as_str(),
             message,
         )
         .await?;
