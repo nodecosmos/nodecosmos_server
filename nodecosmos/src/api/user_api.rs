@@ -4,15 +4,17 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
+use futures::TryStreamExt;
 use scylla::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user};
+use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user, OptCurrentUser};
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
+use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
 use crate::models::token::{Token, TokenType};
 use crate::models::traits::Authorization;
 use crate::models::user::search::UserSearchQuery;
@@ -121,12 +123,30 @@ pub async fn get_user(db_session: web::Data<CachingSession>, id: web::Path<Uuid>
 }
 
 #[get("/{username}/username")]
-pub async fn get_user_by_username(db_session: web::Data<CachingSession>, username: web::Path<String>) -> Response {
+pub async fn get_user_by_username(
+    db_session: web::Data<CachingSession>,
+    opt_cu: OptCurrentUser,
+    username: web::Path<String>,
+) -> Response {
     let user = ShowUser::find_first_by_username(username.into_inner())
         .execute(&db_session)
         .await?;
+    let root_nodes = NodesByOwner::root_nodes(&db_session, &opt_cu, user.id)
+        .await?
+        .try_filter_map(|node| async move {
+            if node.branch_id == node.root_id {
+                Ok(Some(node))
+            } else {
+                Ok(None)
+            }
+        })
+        .try_collect::<Vec<NodesByOwner>>()
+        .await?;
 
-    Ok(HttpResponse::Ok().json(user))
+    Ok(HttpResponse::Ok().json(json!({
+        "user": user,
+        "rootNodes": root_nodes,
+    })))
 }
 
 #[derive(Deserialize)]

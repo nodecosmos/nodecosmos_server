@@ -11,14 +11,20 @@ pub async fn recovery_task(data: RequestData) {
 
     tokio::spawn(async move {
         loop {
-            recovery_interval.tick().await;
-
-            let _ = crate::models::recovery::Recovery::run_recovery_task(&data.clone())
-                .await
-                .map_err(|e| {
-                    log::error!("Recovery task failed: {:?}", e);
-                });
-            info!("Recovery task ran");
+            tokio::select! {
+                _ = recovery_interval.tick() => {
+                    let _ = crate::models::recovery::Recovery::run_recovery_task(&data.clone())
+                        .await
+                        .map_err(|e| {
+                            log::error!("Recovery task failed: {:?}", e);
+                        });
+                    info!("Recovery task ran");
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Recovery task is shutting down due to Ctrl-C.");
+                    break;
+                }
+            }
         }
     });
 }
@@ -29,11 +35,17 @@ pub async fn cleanup_rooms_task(sse_broadcast: Arc<SseBroadcast>) {
 
     tokio::spawn(async move {
         loop {
-            cleanup_interval.tick().await;
-
-            sse_broadcast_clone.ping_channels();
-            sse_broadcast_clone.cleanup_rooms();
-            info!("Cleanup task ran");
+            tokio::select! {
+                _ = cleanup_interval.tick() => {
+                    sse_broadcast_clone.ping_channels();
+                    sse_broadcast_clone.cleanup_rooms();
+                    info!("Cleanup task ran");
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Recovery task is shutting down due to Ctrl-C.");
+                    break;
+                }
+            }
         }
     });
 }

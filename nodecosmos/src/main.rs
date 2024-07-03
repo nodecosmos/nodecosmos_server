@@ -168,6 +168,7 @@ fn main() {
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
                 .keep_alive(std::time::Duration::from_secs(60))
+                .shutdown_timeout(30)
                 .max_connections(50_000)
                 .bind(("0.0.0.0", port))
                 .unwrap_or_else(|e| panic!("Could not bind to port {}.\n{}", port, e))
