@@ -105,6 +105,7 @@ impl Callbacks for Node {
             self.set_defaults(data).await?;
             self.validate_root()?;
             self.validate_owner()?;
+            self.validate_visibility()?;
             self.update_branch_with_creation(data)
                 .await
                 .context("Failed to update branch")?;

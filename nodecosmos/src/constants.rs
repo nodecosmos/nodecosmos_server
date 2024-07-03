@@ -2,7 +2,7 @@ pub const MAX_PARALLEL_REQUESTS: usize = 25;
 pub const BATCH_CHUNK_SIZE: usize = 100;
 pub const PAGE_SIZE: i32 = 51;
 
-pub const BLACKLIST_USERNAMES_SORTED: [&str; 25] = [
+pub const BLACKLIST_USERNAMES: [&str; 26] = [
     "404",
     "about",
     "admin",
@@ -10,6 +10,7 @@ pub const BLACKLIST_USERNAMES_SORTED: [&str; 25] = [
     "auth",
     "blacklist",
     "contact",
+    "contact-us",
     "doc",
     "home",
     "invitations",

@@ -9,6 +9,7 @@ pub mod branch;
 pub mod comment;
 pub mod comment_thread;
 pub mod commit;
+pub mod contact;
 pub mod contribution_request;
 pub mod description;
 pub mod flow;
