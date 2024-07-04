@@ -5,6 +5,7 @@ use crate::api::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::comment::Comment;
+use crate::models::comment_thread::ThreadObjectType;
 use crate::models::traits::SanitizeDescription;
 use crate::models::udts::Profile;
 use crate::resources::sse_broadcast::ModelEvent;
@@ -17,8 +18,16 @@ impl Comment {
         match thread {
             Some(thread) => {
                 let branch_id = thread.branch_id;
-                let thread_id = thread.id;
                 let object_id = thread.object_id;
+                let thread_id = thread.id;
+
+                // for new thread we need to set the URL based on the thread_id
+                if thread.thread_object_type()? == ThreadObjectType::Thread {
+                    self.url = format!(
+                        "{}/nodes/{}/{}/threads/{}",
+                        data.app.config.client_url, branch_id, object_id, thread_id
+                    );
+                }
 
                 self.object_id = object_id;
                 self.branch_id = branch_id;
