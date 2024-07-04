@@ -1,7 +1,6 @@
-use charybdis::batch::CharybdisBatch;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
-use charybdis::types::{Counter, Set, Uuid};
+use charybdis::types::{Counter, Uuid};
 use nodecosmos_macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -10,7 +9,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
 use crate::models::like::Like;
-use crate::models::traits::{Branchable, ElasticDocument, UpdateCounterNodeElasticIdx};
+use crate::models::traits::{ElasticDocument, UpdateCounterNodeElasticIdx};
 
 #[charybdis_model(
     table_name = node_counters,
@@ -33,15 +32,23 @@ pub struct NodeCounter {
 }
 
 impl NodeCounter {
-    pub async fn spawn_update_elastic_document(data: &RequestData, branch_id: Uuid, id: Uuid) {
+    pub async fn spawn_update_elastic_document(data: &RequestData, root_id: Uuid, branch_id: Uuid, id: Uuid) {
+        if root_id != branch_id {
+            return;
+        }
+
         let data = data.clone();
 
         tokio::spawn(async move {
-            Self::update_elastic_document(&data, branch_id, id).await;
+            Self::update_elastic_document(&data, root_id, branch_id, id).await;
         });
     }
 
-    pub async fn update_elastic_document(data: &RequestData, branch_id: Uuid, id: Uuid) {
+    pub async fn update_elastic_document(data: &RequestData, root_id: Uuid, branch_id: Uuid, id: Uuid) {
+        if root_id != branch_id {
+            return;
+        }
+
         let counter = Self::find_by_primary_key_value((branch_id, id))
             .execute(data.db_session())
             .await;
@@ -65,44 +72,12 @@ impl NodeCounter {
         };
     }
 
-    #[allow(dead_code)]
-    async fn increment_descendants(
+    pub async fn increment_cr_count(
         data: &RequestData,
-        ancestor_ids: Set<Uuid>,
+        root_id: Uuid,
         branch_id: Uuid,
+        id: Uuid,
     ) -> Result<(), NodecosmosError> {
-        let mut counters = Vec::new();
-        let mut batch = CharybdisBatch::new();
-
-        for ancestor_id in ancestor_ids.iter() {
-            let counter = Self {
-                branch_id,
-                id: *ancestor_id,
-                ..Default::default()
-            };
-            counters.push(counter);
-        }
-
-        for counter in counters.iter() {
-            let q = counter.increment_descendants_count(1);
-            batch.append(q);
-        }
-
-        batch.execute(data.db_session()).await?;
-
-        let mut futures = vec![];
-        for counter in counters.iter() {
-            let future = Self::update_elastic_document(data, branch_id, counter.id);
-
-            futures.push(future);
-        }
-
-        futures::future::join_all(futures).await;
-
-        Ok(())
-    }
-
-    pub async fn increment_cr_count(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<(), NodecosmosError> {
         Self {
             branch_id,
             id,
@@ -112,12 +87,17 @@ impl NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        Self::update_elastic_document(data, branch_id, id).await;
+        Self::update_elastic_document(data, root_id, branch_id, id).await;
 
         Ok(())
     }
 
-    pub async fn decrement_cr_count(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<(), NodecosmosError> {
+    pub async fn decrement_cr_count(
+        data: &RequestData,
+        root_id: Uuid,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         Self {
             branch_id,
             id,
@@ -127,12 +107,17 @@ impl NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        Self::update_elastic_document(data, branch_id, id).await;
+        Self::update_elastic_document(data, root_id, branch_id, id).await;
 
         Ok(())
     }
 
-    pub async fn increment_thread_count(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<(), NodecosmosError> {
+    pub async fn increment_thread_count(
+        data: &RequestData,
+        root_id: Uuid,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         Self {
             branch_id,
             id,
@@ -142,12 +127,17 @@ impl NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        Self::spawn_update_elastic_document(data, branch_id, id).await;
+        Self::spawn_update_elastic_document(data, root_id, branch_id, id).await;
 
         Ok(())
     }
 
-    pub async fn decrement_thread_count(data: &RequestData, branch_id: Uuid, id: Uuid) -> Result<(), NodecosmosError> {
+    pub async fn decrement_thread_count(
+        data: &RequestData,
+        root_id: Uuid,
+        branch_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), NodecosmosError> {
         Self {
             branch_id,
             id,
@@ -157,7 +147,7 @@ impl NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        Self::spawn_update_elastic_document(data, branch_id, id).await;
+        Self::spawn_update_elastic_document(data, root_id, branch_id, id).await;
 
         Ok(())
     }
@@ -174,8 +164,8 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        if like.is_original() {
-            Self::spawn_update_elastic_document(data, like.branch_id, like.object_id).await;
+        if let Some(root_id) = like.root_id {
+            Self::spawn_update_elastic_document(data, root_id, like.branch_id, like.object_id).await;
         }
 
         Ok(())
@@ -191,8 +181,8 @@ impl Likeable for NodeCounter {
         .execute(data.db_session())
         .await?;
 
-        if like.is_original() {
-            Self::spawn_update_elastic_document(data, like.branch_id, like.object_id).await;
+        if let Some(root_id) = like.root_id {
+            Self::spawn_update_elastic_document(data, root_id, like.branch_id, like.object_id).await;
         }
 
         Ok(())

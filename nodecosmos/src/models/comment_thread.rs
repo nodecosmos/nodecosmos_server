@@ -15,7 +15,7 @@ use crate::models::node::Node;
 use crate::models::node_counter::NodeCounter;
 use crate::models::udts::Profile;
 
-#[derive(Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[derive(PartialEq, Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ThreadObjectType {
     ContributionRequest,
     Thread,
@@ -143,7 +143,7 @@ impl Callbacks for CommentThread {
             ThreadLocation::ContributionRequest(..) => self.branch(session).await?.node_id,
         };
 
-        NodeCounter::increment_thread_count(data, self.branch_id, node_id).await?;
+        NodeCounter::increment_thread_count(data, self.root_id, self.branch_id, node_id).await?;
 
         Ok(())
     }
@@ -153,7 +153,7 @@ impl Callbacks for CommentThread {
             .execute(session)
             .await?;
 
-        NodeCounter::decrement_thread_count(data, self.branch_id, self.object_id).await?;
+        NodeCounter::decrement_thread_count(data, self.root_id, self.branch_id, self.object_id).await?;
 
         Ok(())
     }

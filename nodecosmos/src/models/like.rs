@@ -4,8 +4,6 @@ use charybdis::types::{Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use nodecosmos_macros::Branchable;
-
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::like::likeable::Likeable;
@@ -29,13 +27,15 @@ pub enum LikeObjectType {
     clustering_keys = [branch_id, user_id],
     global_secondary_indexes = []
 )]
-#[derive(Branchable, Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Like {
-    #[branch(original_id)]
     pub object_id: Uuid,
 
     pub branch_id: Uuid,
+
+    #[serde(default)]
+    pub root_id: Option<Uuid>,
 
     pub object_type: Text,
 
@@ -64,22 +64,36 @@ impl Callbacks for Like {
     }
 
     async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut self_clone = self.clone();
+        let self_clone = self.clone();
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.increment_like_count(&data).await;
+            match self_clone.object_type.parse() {
+                Ok(LikeObjectType::Node) => {
+                    let _ = NodeCounter::increment_like(&data, &self_clone).await.map_err(|e| {
+                        log::error!("Error incrementing like count: {:?}", e);
+                    });
+                }
+                _ => log::error!("Like Object type not supported"),
+            }
         });
 
         Ok(())
     }
 
     async fn after_delete(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        let mut self_clone = self.clone();
+        let self_clone = self.clone();
         let data = data.clone();
 
         tokio::spawn(async move {
-            self_clone.decrement_like_count(&data).await;
+            match self_clone.object_type.parse() {
+                Ok(LikeObjectType::Node) => {
+                    let _ = NodeCounter::decrement_like(&data, &self_clone).await.map_err(|e| {
+                        log::error!("Error decrementing like count: {:?}", e);
+                    });
+                }
+                _ => log::error!("Like Object type not supported"),
+            }
         });
 
         Ok(())

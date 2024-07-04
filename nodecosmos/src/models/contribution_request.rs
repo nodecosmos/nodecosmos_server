@@ -150,7 +150,7 @@ impl Callbacks for ContributionRequest {
                     log::error!("Error creating notification for new contribution request: {:?}", e);
                 });
 
-            let _ = NodeCounter::increment_cr_count(&data, root_id, node_id)
+            let _ = NodeCounter::increment_cr_count(&data, root_id, root_id, node_id)
                 .await
                 .map_err(|e| {
                     log::error!("Error incrementing contribution request count: {:?}", e);
@@ -211,7 +211,7 @@ impl Callbacks for ContributionRequest {
                 log::error!("Error deleting branch data: {:?}", e);
             });
 
-        let _ = NodeCounter::decrement_cr_count(data, self.root_id, self.node_id)
+        let _ = NodeCounter::decrement_cr_count(data, self.root_id, self.root_id, self.node_id)
             .await
             .map_err(|e| {
                 log::error!("Error decrementing contribution request count: {:?}", e);
@@ -279,7 +279,6 @@ impl ContributionRequest {
 
     async fn create_merge_notification(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let id = self.id;
-        let root_id = self.root_id;
         let title = self.title.clone();
         let owner = self.owner.clone();
         let owner_id = self.owner_id;
@@ -321,12 +320,6 @@ impl ContributionRequest {
                 .await
                 .map_err(|e| {
                     log::error!("Error creating notification for new contribution request: {:?}", e);
-                });
-
-            let _ = NodeCounter::increment_cr_count(&data, root_id, node_id)
-                .await
-                .map_err(|e| {
-                    log::error!("Error incrementing contribution request count: {:?}", e);
                 });
         });
 
