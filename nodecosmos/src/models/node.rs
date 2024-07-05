@@ -357,4 +357,4 @@ impl Callbacks for UpdateCoverImageNode {
 
 partial_node!(UpdateEditorNode, branch_id, id, root_id, editor_ids, updated_at);
 
-partial_node!(FindCoverImageUrlNode, branch_id, id, root_id, cover_image_url);
+partial_node!(FindCoverImageNode, branch_id, id, root_id, cover_image_url);
