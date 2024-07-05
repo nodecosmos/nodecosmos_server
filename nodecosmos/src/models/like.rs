@@ -101,7 +101,7 @@ impl Callbacks for Like {
 }
 
 impl Like {
-    pub async fn like_count(&mut self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
+    pub async fn like_count(&self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
         match LikeObjectType::from(self.object_type.parse()?) {
             LikeObjectType::Node => {
                 let lc = NodeCounter::like_count(db_session, self.branch_id, self.object_id).await?;

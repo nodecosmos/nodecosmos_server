@@ -11,16 +11,24 @@ use crate::models::user::CurrentUser;
 
 #[get("/{objectId}/{branchId}")]
 pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Path<PkLike>) -> Response {
-    let like_count = Like::find_first_by_object_id_and_branch_id(like.object_id, like.branch_id)
+    let first_like = Like::maybe_find_first_by_object_id_and_branch_id(like.object_id, like.branch_id)
         .execute(&db_session)
-        .await?
-        .like_count(&db_session)
         .await?;
+
+    if let Some(first_like) = first_like {
+        let like_count = first_like.like_count(&db_session).await?;
+
+        return Ok(HttpResponse::Ok().json(json!({
+            "id": like.object_id,
+            "branchId": like.branch_id,
+            "likeCount": like_count,
+        })));
+    }
 
     Ok(HttpResponse::Ok().json(json!({
         "id": like.object_id,
         "branchId": like.branch_id,
-        "likeCount": like_count,
+        "likeCount": 0,
     })))
 }
 
