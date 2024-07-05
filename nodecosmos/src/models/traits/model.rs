@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::errors::NodecosmosError;
 
-#[derive(Copy, Clone, Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Copy, Clone, PartialEq, Deserialize, strum_macros::Display, strum_macros::EnumString)]
 pub enum ObjectType {
     Node,
     Workflow,
