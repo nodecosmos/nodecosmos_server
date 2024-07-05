@@ -1,18 +1,20 @@
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
-use actix_web_actors::ws::WsResponseBuilder;
-use charybdis::operations::InsertWithCallbacks;
-use charybdis::types::Uuid;
-use scylla::CachingSession;
-use serde::Deserialize;
-
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::description::{BaseDescription, Description};
-use crate::models::node::AuthNode;
-use crate::models::traits::Branchable;
+use crate::models::node::{AuthNode, FindCoverImageUrlNode};
+use crate::models::traits::{Branchable, ObjectType};
 use crate::resources::description_ws_pool::DescriptionWsConnection;
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web_actors::ws::WsResponseBuilder;
+use charybdis::errors::CharybdisError;
+use charybdis::operations::InsertWithCallbacks;
+use charybdis::types::Uuid;
+use scylla::CachingSession;
+use serde::Deserialize;
+use serde_json::json;
+use std::str::FromStr;
 
 #[get("/{branchId}/{objectId}/{rootId}/{objectType}/{nodeId}/base")]
 pub async fn get_description(
@@ -29,9 +31,25 @@ pub async fn get_description(
     )
     .await?;
 
-    let description = description.find_branched(&db_session).await?;
+    let cover_image_url = if ObjectType::from_str(&description.object_type)? == ObjectType::Node {
+        let node = FindCoverImageUrlNode::find_by_branch_id_and_id(description.branch_id, description.object_id)
+            .execute(&db_session)
+            .await?;
+        Some(node.cover_image_url)
+    } else {
+        None
+    };
 
-    Ok(HttpResponse::Ok().json(description))
+    let description = match description.find_branched(&db_session).await {
+        Ok(_) => Some(description.into_inner()),
+        Err(NodecosmosError::CharybdisError(CharybdisError::NotFoundError(_))) => None,
+        Err(e) => return Err(e),
+    };
+
+    Ok(HttpResponse::Ok().json(json!({
+        "description": description,
+        "coverImageUrl": cover_image_url,
+    })))
 }
 
 #[get("/{branchId}/{objectId}/{rootId}/{objectType}/{nodeId}/base64")]
