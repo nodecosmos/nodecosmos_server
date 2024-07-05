@@ -36,13 +36,7 @@ pub async fn get_like_count(db_session: web::Data<CachingSession>, like: web::Pa
 pub async fn create_like(data: RequestData, mut like: web::Json<Like>) -> Response {
     like.insert_cb(&data).execute(data.db_session()).await?;
 
-    let like_count = like.like_count(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "id": like.object_id,
-        "branchId": like.branch_id,
-        "likeCount": like_count,
-    })))
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[delete("/{objectId}/{branchId}/{userId}")]
@@ -57,13 +51,7 @@ pub async fn delete_like(data: RequestData, like: web::Path<PkLike>) -> Response
 
     like.delete_cb(&data).execute(data.db_session()).await?;
 
-    let like_count = like.like_count(data.db_session()).await?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "id": like.object_id,
-        "branchId": like.branch_id,
-        "likeCount": like_count,
-    })))
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[get("/user_likes")]
