@@ -3,7 +3,7 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::description::{BaseDescription, Description};
-use crate::models::node::{AuthNode, FindCoverImageUrlNode};
+use crate::models::node::{AuthNode, FindCoverImageNode};
 use crate::models::traits::{Branchable, ObjectType};
 use crate::resources::description_ws_pool::DescriptionWsConnection;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
@@ -32,10 +32,10 @@ pub async fn get_description(
     .await?;
 
     let cover_image_url = if ObjectType::from_str(&description.object_type)? == ObjectType::Node {
-        let node = FindCoverImageUrlNode::find_by_branch_id_and_id(description.branch_id, description.object_id)
+        let node = FindCoverImageNode::maybe_find_first_by_branch_id_and_id(description.root_id, description.object_id)
             .execute(&db_session)
             .await?;
-        Some(node.cover_image_url)
+        node.map(|node| node.cover_image_url)
     } else {
         None
     };
