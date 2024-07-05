@@ -69,7 +69,20 @@ pub async fn login(
 
     set_current_user(&client_session, &current_user)?;
 
-    Ok(HttpResponse::Ok().json(current_user))
+    let likes = LikesByUser {
+        user_id: current_user.id,
+        ..Default::default()
+    }
+    .find_by_partition_key()
+    .execute(&db_session)
+    .await?
+    .try_collect()
+    .await?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "user": current_user,
+        "likes": likes
+    })))
 }
 
 #[get("/session/sync")]
