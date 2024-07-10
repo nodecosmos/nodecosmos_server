@@ -1,0 +1,85 @@
+name: Build and Deploy Rust Application to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUCKET_NAME: aws-nodecosmos-bucket
+  AWS_REGION: us-east-1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v4
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::714215625955:role/github-actions
+          role-session-name: s3session
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: rustup toolchain install ${{inputs.toolchain || 'stable'}}
+        env:
+          toolchain: ${{inputs.toolchain}}
+          targets: ${{inputs.target}}
+          components: ${{inputs.components}}
+        shell: bash
+        run: |
+          if [[ -z "$toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml" ) ]]
+          then
+            rustup show
+            if [[ -n $components ]]; then
+              rustup component add ${components//,/ }
+            fi
+            if [[ -n $targets ]]; then
+              rustup target add ${targets//,/ }
+            fi
+          else
+            if [[ -z "$toolchain" ]]
+            then
+              toolchain=stable
+            fi
+            rustup toolchain install $toolchain${{steps.flags.outputs.targets}}${{steps.flags.outputs.components}} --profile minimal${{steps.flags.outputs.downgrade}} --no-self-update
+            rustup override set $toolchain
+          fi
+      - name: Cargo Cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo
+
+      - name: Cargo Target Cache
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-target
+      - name: Build
+        run: cargo build --release --verbose
+      - name: Zip the binary appspec.yml and scripts
+        run: |
+          zip -r nodecosmos.zip target/release/nodecosmos appspec.yml scripts
+      - name: Upload to S3
+        run: |
+          aws s3 cp nodecosmos.zip s3://$BUCKET_NAME/nodecosmos.zip
+      - name: Deploy to EC2
+        run: |
+          aws deploy create-deployment \
+            --application-name nodecosmos \
+            --s3-location bucket=$BUCKET_NAME,key=nodecosmos.zip,bundleType=zip \
+            --deployment-group-name nodecosmos-deployment-group \
+            --deployment-config-name CodeDeployDefault.OneAtATime \
+            --description "Deploying nodecosmos"
