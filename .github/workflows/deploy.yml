@@ -9,6 +9,8 @@ env:
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
+  OPENSSL_VERSION: openssl-1.1.1l
+  OPENSSL_INSTALL_DIR: /usr/local/openssl-aarch64
 
 jobs:
   deploy:
