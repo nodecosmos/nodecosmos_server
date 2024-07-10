@@ -1,4 +1,4 @@
-use actix_web::middleware::Logger;
+use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
 
 use api::*;
@@ -30,6 +30,7 @@ fn main() {
                     let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
 
                     ActixWebApp::new()
+                        .wrap(Compress::default())
                         .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
                         .wrap(app_web_data.cors())
                         .wrap(app_web_data.session_middleware())
