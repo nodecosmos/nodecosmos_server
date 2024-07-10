@@ -53,7 +53,6 @@ pub struct Config {
     pub port: u16,
     pub allowed_origin: String,
     pub client_url: String,
-    pub secret_key: String,
     pub session_expiration_in_days: i64,
     pub ssl: bool,
     pub scylla: ScyllaConfig,
@@ -74,20 +73,20 @@ pub struct App {
     pub description_ws_pool: Arc<DescriptionWsPool>,
     pub sse_broadcast: Arc<SseBroadcast>,
     pub mailer: Arc<Mailer>,
+    pub secret_key: String,
 }
 
 impl App {
     pub async fn new() -> Self {
         dotenv::dotenv().ok();
 
-        let env = env::var("ENV").expect("ENV must be set");
-        let recaptcha_enabled = env::var("RECAPTCHA_ENABLED").expect("RECAPTCHA_ENABLED must be set");
-        let recaptcha_secret = env::var("RECAPTCHA_SECRET").expect("RECAPTCHA_SECRET must be set");
-        let config_file = format!("config.{}.toml", env);
+        let secret_key = env::var("SECRET_KEY").expect("SECRET_KEY must be set");
+        let config_file = env::var("CONFIG_FILE").expect("CONFIG_FILE must be set");
         let contents = fs::read_to_string(config_file).expect("Unable to read file");
         let config_val = contents.parse::<Value>().expect("Unable to parse TOML");
         let config = config_val.try_into::<Config>().expect("Unable to parse config");
-
+        let recaptcha_enabled = env::var("RECAPTCHA_ENABLED").unwrap_or_default() == "true";
+        let recaptcha_secret = env::var("RECAPTCHA_SECRET").unwrap_or_default();
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
         let ses_client = aws_sdk_ses::Client::init_resource(()).await;
         let db_session = CachingSession::init_resource(&config).await;
@@ -102,7 +101,7 @@ impl App {
 
         Self {
             config,
-            recaptcha_enabled: recaptcha_enabled == "true",
+            recaptcha_enabled,
             recaptcha_secret,
             db_session: Arc::new(db_session),
             elastic_client: Arc::new(elastic_client),
@@ -111,6 +110,7 @@ impl App {
             resource_locker: Arc::new(resource_locker),
             description_ws_pool,
             sse_broadcast,
+            secret_key,
         }
     }
 
@@ -155,7 +155,7 @@ impl App {
     }
 
     pub fn session_middleware(&self) -> SessionMiddleware<RedisActorSessionStore> {
-        let secret_key = Key::from(self.config.secret_key.as_ref());
+        let secret_key = Key::from(self.secret_key.as_ref());
         let redis_actor_session_store = self.redis_actor_session_store();
         let expiration = self.config.session_expiration_in_days;
         let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
