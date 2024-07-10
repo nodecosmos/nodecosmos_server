@@ -10,7 +10,7 @@ env:
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
   OPENSSL_VERSION: openssl-1.1.1l
-  OPENSSL_INSTALL_DIR: /usr/local/openssl-aarch64
+  OPENSSL_INSTALL_DIR: ${{ github.workspace }}/openssl-aarch64
   ENV: production
 
 jobs:

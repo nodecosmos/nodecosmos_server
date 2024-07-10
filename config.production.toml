@@ -1,13 +1,14 @@
 port = 80
 allowed_origin = "https://nodecosmos.com"
 client_url = "https://nodecosmos.com"
-secret_key = "${SECRET_KEY}"
 session_expiration_in_days = 30
-ssl = true
+ssl = false
 
 [scylla]
 hosts = ["172.31.21.157"]
 keyspace = "nodecosmos"
+username = ""
+password = ""
 
 [redis]
 host = "172.31.41.3:6379"
@@ -18,4 +19,3 @@ host = "http://172.31.41.152:9200"
 
 [aws]
 bucket = "nodecosmos-production"
-
