@@ -1,7 +1,7 @@
 version: 0.0
 os: linux
 files:
-  - source: ./target/release/nodecosmos
+  - source: ./nodecosmos
     destination: /usr/local/bin/
 
 hooks:
