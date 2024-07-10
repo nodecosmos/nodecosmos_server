@@ -49,6 +49,9 @@ jobs:
             fi
             rustup toolchain install stable --profile minimal --no-self-update
             rustup default stable
+            rustup target add aarch64-unknown-linux-gnu
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           fi
       - name: Cache dependencies
         uses: actions/cache@v2
@@ -58,11 +61,12 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: cargo build --release --verbose
+      - name: Build for aarch64
+        run: cargo build --release --target aarch64-unknown-linux-gnu --verbose
       - name: Zip the binary appspec.yml and scripts
         run: |
-          zip -r nodecosmos.zip target/release/nodecosmos appspec.yml scripts
+          zip -j nodecosmos.zip target/aarch64-unknown-linux-gnu/release/nodecosmos
+          zip -r nodecosmos.zip appspec.yml scripts
       - name: Upload to S3
         run: |
           aws s3 cp nodecosmos.zip s3://$BUCKET_NAME/nodecosmos.zip
