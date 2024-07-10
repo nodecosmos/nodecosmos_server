@@ -26,11 +26,10 @@ jobs:
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install Toolchain ${{inputs.toolchain || 'stable'}}
+      - name: Install Toolchain
         env:
-          toolchain: ${{inputs.toolchain}}
-          targets: ${{inputs.target}}
-          components: ${{inputs.components}}
+          toolchain: stable
+          targets: aarch64-unknown-linux-gnu
         shell: bash
         run: |
           if [[ -z "$toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml" ) ]]
@@ -53,6 +52,31 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           fi
+      - name: Cache OpenSSL
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.OPENSSL_INSTALL_DIR }}
+          key: ${{ runner.os }}-${{ env.OPENSSL_VERSION }}-${{ hashFiles('**/openssl.md5') }}
+
+      - name: Download and compile OpenSSL
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          wget https://www.openssl.org/source/${{ env.OPENSSL_VERSION }}.tar.gz
+          tar -xzf ${{ env.OPENSSL_VERSION }}.tar.gz
+          cd ${{ env.OPENSSL_VERSION }}
+          ./Configure linux-aarch64 no-shared --prefix=${{ env.OPENSSL_INSTALL_DIR }} --cross-compile-prefix=aarch64-linux-gnu-
+          make
+          sudo make install
+        env:
+          OPENSSL_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
+          OPENSSL_LIB_DIR: ${{ env.OPENSSL_INSTALL_DIR }}/lib
+          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INSTALL_DIR }}/include
+
+      - name: Set environment for OpenSSL
+        run: |
+          echo "OPENSSL_DIR=${{ env.OPENSSL_INSTALL_DIR }}" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=${{ env.OPENSSL_INSTALL_DIR }}/lib" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=${{ env.OPENSSL_INSTALL_DIR }}/include" >> $GITHUB_ENV
       - name: Cache dependencies
         uses: actions/cache@v2
         with:
