@@ -1,1 +1,1 @@
-sudo rm -f /usr/local/bin/app_binary
+sudo rm -f /usr/local/bin/nodecosmos
