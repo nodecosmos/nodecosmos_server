@@ -69,7 +69,7 @@ jobs:
       - name: Deploy to EC2
         run: |
           aws deploy create-deployment \
-            --application-name nodecosmos \
+            --application-name Nodecosmos \
             --s3-location bucket=$BUCKET_NAME,key=nodecosmos.zip,bundleType=zip \
             --deployment-group-name nodecosmos-deployment-group \
             --deployment-config-name CodeDeployDefault.OneAtATime \
