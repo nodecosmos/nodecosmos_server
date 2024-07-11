@@ -26,7 +26,7 @@ use crate::tasks;
 
 #[derive(Clone, Deserialize)]
 pub struct ScyllaConfig {
-    pub hosts: [String; 3],
+    pub hosts: Vec<String>,
     pub keyspace: String,
     pub username: String,
     pub password: String,
