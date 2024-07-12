@@ -9,7 +9,6 @@ env:
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
-  ENV: production
 
 jobs:
   deploy:
@@ -19,11 +18,9 @@ jobs:
       contents: read
     container:
       image: nodecosmos/aarch64_env:latest
+    env:
+      PATH: "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     steps:
-      - name: Print and Export PATH
-        run: |
-          echo "Container's PATH: $PATH"
-          echo "PATH=$PATH" >> $GITHUB_ENV
       - name: Check Rust version
         run: rustc --version
       - name: Checkout code
