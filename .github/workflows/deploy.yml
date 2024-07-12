@@ -16,6 +16,9 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     container:
       image: nodecosmos/aarch64_env:latest
     steps:
@@ -28,7 +31,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::714215625955:role/github-actions
+          role-to-assume: arn:aws:iam::123:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
       - name: Cache dependencies
