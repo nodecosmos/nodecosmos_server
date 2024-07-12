@@ -42,3 +42,5 @@ RUN wget https://www.openssl.org/source/${OPENSSL_VERSION}.tar.gz \
 
 # Add default stable
 RUN rustup default stable
+
+ENV PATH="/usr/bin/aarch64-linux-gnu:${PATH}"
