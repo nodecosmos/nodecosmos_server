@@ -3,6 +3,7 @@ FROM ubuntu:latest as builder
 
 # Install build dependencies and cross-compilers
 RUN apt-get update && apt-get install -y \
+    build-essential \
     gcc-aarch64-linux-gnu \
     g++-aarch64-linux-gnu \
     make \
@@ -24,7 +25,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Add aarch64 target
-RUN rustup target add aarch64-unknown-linux-gnu
+RUN rustup target add aarch64-unknown-linux-gnu5t
 
 # Set environment for cross-compilation
 ENV OPENSSL_VERSION=openssl-3.3.1
@@ -39,8 +40,3 @@ RUN wget https://www.openssl.org/source/${OPENSSL_VERSION}.tar.gz \
     && ./Configure linux-aarch64 no-shared --prefix=${OPENSSL_DIR} --cross-compile-prefix=aarch64-linux-gnu- \
     && make \
     && make install
-
-# Add default stable
-RUN rustup default stable
-
-ENV PATH="/usr/bin/aarch64-linux-gnu:${PATH}"
