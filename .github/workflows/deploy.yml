@@ -21,8 +21,13 @@ jobs:
     env:
       PATH: "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     steps:
-      - name: Check Rust version
-        run: rustc --version
+      - name: Debug environment
+        run: |
+          env
+          echo "PATH: $PATH"
+          /root/.cargo/bin/rustup show
+          /root/.cargo/bin/rustc --version
+          /root/.cargo/bin/cargo --version
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure AWS credentials
