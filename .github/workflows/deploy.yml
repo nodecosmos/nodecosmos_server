@@ -9,13 +9,15 @@ env:
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
-  OPENSSL_VERSION: openssl-1.1.1l
+  OPENSSL_VERSION: openssl-3.1.1
   OPENSSL_INSTALL_DIR: ${{ github.workspace }}/openssl-aarch64
   ENV: production
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    container:
+      image: nodecosmos/rust-aarch64:latest
     permissions:
       id-token: write
       contents: read
@@ -28,45 +30,6 @@ jobs:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
-      - name: Cache Rust toolchain and target
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.rustup/toolchains
-          key: ${{ runner.os }}-rustup-${{ hashFiles('**/Cargo.lock') }}-toolchain-${{ hashFiles('**/*.rs') }}
-      - name: Install Rust toolchain
-        run: |
-          rustup default stable
-          rustup target add aarch64-unknown-linux-gnu
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-      - name: Cache OpenSSL
-        uses: actions/cache@v2
-        with:
-          path: ${{ env.OPENSSL_INSTALL_DIR }}
-          key: ${{ runner.os }}-${{ env.OPENSSL_VERSION }}-${{ hashFiles('**/openssl.md5') }}
-      - name: Download and compile OpenSSL
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          wget https://www.openssl.org/source/${{ env.OPENSSL_VERSION }}.tar.gz
-          tar -xzf ${{ env.OPENSSL_VERSION }}.tar.gz
-          cd ${{ env.OPENSSL_VERSION }}
-          ./Configure linux-aarch64 no-shared --prefix=${{ env.OPENSSL_INSTALL_DIR }} --cross-compile-prefix=aarch64-linux-gnu-
-          make
-          sudo make install
-        env:
-          OPENSSL_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
-          OPENSSL_LIB_DIR: ${{ env.OPENSSL_INSTALL_DIR }}/lib
-          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INSTALL_DIR }}/include
-
-      - name: Set environment for OpenSSL
-        run: |
-          echo "OPENSSL_DIR=${{ env.OPENSSL_INSTALL_DIR }}" >> $GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=${{ env.OPENSSL_INSTALL_DIR }}/lib" >> $GITHUB_ENV
-          echo "OPENSSL_INCLUDE_DIR=${{ env.OPENSSL_INSTALL_DIR }}/include" >> $GITHUB_ENV
       - name: Cache dependencies
         uses: actions/cache@v2
         with:
