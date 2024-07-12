@@ -21,6 +21,8 @@ jobs:
       contents: read
     container:
       image: nodecosmos/aarch64_env:latest
+    env:
+      PATH: /root/.cargo/bin:$PATH
     steps:
       - name: Check Rust version
         run: rustc --version
