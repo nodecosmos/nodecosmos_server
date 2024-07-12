@@ -9,8 +9,6 @@ env:
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
-  OPENSSL_VERSION: openssl-3.1.1
-  OPENSSL_INSTALL_DIR: ${{ github.workspace }}/openssl-aarch64
   ENV: production
 
 jobs:
@@ -21,9 +19,11 @@ jobs:
       contents: read
     container:
       image: nodecosmos/aarch64_env:latest
-    env:
-      PATH: /root/.cargo/bin:$PATH
     steps:
+      - name: Print and Export PATH
+        run: |
+          echo "Container's PATH: $PATH"
+          echo "PATH=$PATH" >> $GITHUB_ENV
       - name: Check Rust version
         run: rustc --version
       - name: Checkout code
