@@ -19,7 +19,9 @@ jobs:
     container:
       image: nodecosmos/aarch64_env:latest
     env:
-      PATH: "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      PATH: /root/.cargo/bin:$PATH
+      RUSTUP_HOME: /root/.rustup
+      CARGO_HOME: /root/.cargo
     steps:
       - name: Debug environment
         run: |
