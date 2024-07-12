@@ -1,8 +1,5 @@
-# Use the official Rust image as the base image
-FROM rust:latest
-
 # Use a Debian base image
-FROM debian:buster as builder
+FROM ubuntu:latest as builder
 
 # Install build dependencies and cross-compilers
 RUN apt-get update && apt-get install -y \
@@ -14,6 +11,20 @@ RUN apt-get update && apt-get install -y \
     perl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Install rustup
+RUN apt-get update && apt-get install -y \
+    curl \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Add cargo to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Add aarch64 target
+RUN rustup target add aarch64-unknown-linux-gnu
 
 # Set environment for cross-compilation
 ENV OPENSSL_VERSION=openssl-3.3.1
