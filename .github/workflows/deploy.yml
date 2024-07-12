@@ -38,6 +38,7 @@ jobs:
           /root/.cargo/bin/rustup show
           /root/.cargo/bin/rustc --version
           /root/.cargo/bin/cargo --version
+          aws --version
       - name: Cache dependencies
         uses: actions/cache@v2
         with:
