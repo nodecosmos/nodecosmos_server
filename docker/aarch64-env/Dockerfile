@@ -25,11 +25,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Add aarch64 target
-RUN rustup target add aarch64-unknown-linux-gnu5t
+RUN rustup target add aarch64-unknown-linux-gnu
+RUN rustup default stable
 
 # Set environment for cross-compilation
 ENV OPENSSL_VERSION=openssl-3.3.1
-ENV CROSS_COMPILE=aarch64-linux-gnu-
 ENV OPENSSL_DIR=/usr/local/openssl
 
 # Download and extract OpenSSL
