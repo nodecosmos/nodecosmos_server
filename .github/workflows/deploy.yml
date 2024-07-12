@@ -23,14 +23,6 @@ jobs:
       RUSTUP_HOME: /root/.rustup
       CARGO_HOME: /root/.cargo
     steps:
-      - name: Debug environment
-        run: |
-          env
-          echo "PATH: $PATH"
-          /root/.cargo/bin/rustup show
-          /root/.cargo/bin/rustc --version
-          /root/.cargo/bin/cargo --version
-          aws --version # Check AWS CLI version
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure AWS credentials
@@ -39,6 +31,13 @@ jobs:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
+      - name: Debug environment
+        run: |
+          env
+          echo "PATH: $PATH"
+          /root/.cargo/bin/rustup show
+          /root/.cargo/bin/rustc --version
+          /root/.cargo/bin/cargo --version
       - name: Cache dependencies
         uses: actions/cache@v2
         with:
