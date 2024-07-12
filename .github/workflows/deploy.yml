@@ -17,7 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     container:
-      image: nodecosmos/rust-aarch64:latest
+      image: nodecosmos/aarch64_env:latest
     permissions:
       id-token: write
       contents: read
