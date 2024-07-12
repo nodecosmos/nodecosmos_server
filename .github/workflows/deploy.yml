@@ -18,10 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: nodecosmos/aarch64_env:latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
+      - name: Print and set PATH
+        run: |
+          echo $PATH
+          echo "PATH=/root/.cargo/bin:/usr/bin/aarch64-linux-gnu:$PATH" >> $GITHUB_ENV
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure AWS credentials
@@ -38,8 +39,6 @@ jobs:
             ~/.cargo/git
             target/aarch64-unknown-linux-gnu
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Set Rust toolchain
-        run: rustup default stable
       - name: Build for aarch64
         run: cargo build --release --target aarch64-unknown-linux-gnu --verbose
       - name: Zip the binary appspec.yml and scripts
