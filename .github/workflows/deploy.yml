@@ -86,9 +86,36 @@ jobs:
           aws s3 cp nodecosmos.zip s3://$BUCKET_NAME/nodecosmos.zip
       - name: Deploy to EC2
         run: |
-          aws deploy create-deployment \
-            --application-name Nodecosmos \
-            --s3-location bucket=$BUCKET_NAME,key=nodecosmos.zip,bundleType=zip \
-            --deployment-group-name nodecosmos-deployment-group \
-            --deployment-config-name CodeDeployDefault.OneAtATime \
-            --description "Deploying nodecosmos"
+          deployment_output=$(aws deploy create-deployment \
+          --application-name Nodecosmos \
+          --s3-location bucket=$BUCKET_NAME,key=nodecosmos.zip,bundleType=zip \
+          --deployment-group-name nodecosmos-deployment-group \
+          --deployment-config-name CodeDeployDefault.OneAtATime \
+          --description "Deploying nodecosmos" \
+          --query 'deploymentId' \
+          --output text)
+          echo "::set-output name=deployment_id::$deployment_output"
+      - name: Check deployment status
+        run: |
+          deployment_id=${{ steps.deploy.outputs.deployment_id }}
+          max_checks=3
+          count=0
+          while [[ $count -lt $max_checks ]]; do
+            status=$(aws deploy get-deployment \
+                  --deployment-id $deployment_id \
+                  --query "deploymentInfo.status" \
+                  --output text)
+            echo "Attempt $(($count + 1)) - Deployment status: $status"
+            if [[ $status == "Succeeded" ]]; then
+              echo "Deployment succeeded."
+              break
+            elif [[ $status == "Failed" ]]; then
+              echo "Deployment failed."
+              exit 1
+            elif [[ $count -eq $(($max_checks - 1)) ]]; then
+              echo "Maximum checks reached without success."
+              exit 1
+            fi
+            sleep 15
+            ((count++))
+          done
