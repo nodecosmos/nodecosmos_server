@@ -20,47 +20,34 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Git clone the repository
+      - name: Checkout code
         uses: actions/checkout@v4
-      - name: Configure aws credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install Toolchain
-        env:
-          toolchain: stable
-          targets: aarch64-unknown-linux-gnu
-        shell: bash
+      - name: Cache Rust toolchain and target
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.rustup/toolchains
+          key: ${{ runner.os }}-rustup-${{ hashFiles('**/Cargo.lock') }}-toolchain-${{ hashFiles('**/*.rs') }}
+      - name: Install Rust toolchain
         run: |
-          if [[ -z "$toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml" ) ]]
-          then
-            rustup show
-            if [[ -n $components ]]; then
-              rustup component add ${components//,/ }
-            fi
-            if [[ -n $targets ]]; then
-              rustup target add ${targets//,/ }
-            fi
-          else
-            if [[ -z "$toolchain" ]]
-            then
-              toolchain=stable
-            fi
-            rustup toolchain install stable --profile minimal --no-self-update
-            rustup default stable
-            rustup target add aarch64-unknown-linux-gnu
-            sudo apt-get update
-            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          fi
+          rustup default stable
+          rustup target add aarch64-unknown-linux-gnu
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
       - name: Cache OpenSSL
         uses: actions/cache@v2
         with:
           path: ${{ env.OPENSSL_INSTALL_DIR }}
           key: ${{ runner.os }}-${{ env.OPENSSL_VERSION }}-${{ hashFiles('**/openssl.md5') }}
-
       - name: Download and compile OpenSSL
         if: steps.cache-openssl.outputs.cache-hit != 'true'
         run: |
