@@ -29,3 +29,17 @@ if $programname == 'scylla' then @@<montoring-stack-ip>:1514;RSYSLOG_SyslogProto
 ```
 
 For now, plan is to add our app and other related services to the stack.
+
+### Rebalancing of data after replication factor change
+
+```cassandraql
+ALTER KEYSPACE nodecosmos WITH REPLICATION = {
+'class' : 'SimpleStrategy',
+'replication_factor' : 3
+};
+
+```
+
+```shell
+nodetool repair nodecosmos
+```
