@@ -39,3 +39,7 @@ RUN wget https://www.openssl.org/source/${OPENSSL_VERSION}.tar.gz \
     && ./Configure linux-aarch64 no-shared --prefix=${OPENSSL_DIR} --cross-compile-prefix=aarch64-linux-gnu- \
     && make \
     && make install
+
+# Add default stable
+RUN rustup default stable
+
