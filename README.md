@@ -116,3 +116,17 @@ on Linux, macOS, and Unix; `%userprofile%\.aws\credentials` on Microsoft Windows
   aws_access_key_id=YOUR-ACCESS-KEY
   aws_secret_access_key=YOUR-SECRET-KEY
 ```
+
+### Rebalancing of data after replication factor change
+
+```cassandraql
+ALTER KEYSPACE nodecosmos WITH REPLICATION = {
+'class' : 'SimpleStrategy',
+'replication_factor' : 3
+};
+
+```
+
+```shell
+nodetool repair nodecosmos
+```
