@@ -19,7 +19,7 @@ jobs:
     container:
       image: nodecosmos/aarch64_env:latest
     env:
-      PATH: "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      PATH: /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       RUSTUP_HOME: /root/.rustup
       CARGO_HOME: /root/.cargo
     steps:
@@ -30,6 +30,7 @@ jobs:
           /root/.cargo/bin/rustup show
           /root/.cargo/bin/rustc --version
           /root/.cargo/bin/cargo --version
+          aws --version # Check AWS CLI version
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure AWS credentials
