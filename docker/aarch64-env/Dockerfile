@@ -1,5 +1,5 @@
 # Use a Debian base image
-FROM ubuntu:latest as builder
+FROM ubuntu:22.04 as builder
 
 # Install build dependencies and cross-compilers
 RUN apt-get update && apt-get install -y \
@@ -12,11 +12,6 @@ RUN apt-get update && apt-get install -y \
     perl \
     zip \
     unzip \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install rustup
-RUN apt-get update && apt-get install -y \
     curl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
