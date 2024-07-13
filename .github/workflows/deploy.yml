@@ -22,9 +22,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Create or reuse Docker volume
-        run: |
-          docker volume create rust-build-cache
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
