@@ -15,6 +15,12 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# Install rustup
+RUN apt-get update && apt-get install -y \
+    curl \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Add cargo to PATH
@@ -33,7 +39,7 @@ RUN  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv
 RUN aws --version
 
 # Set environment for cross-compilation
-ENV OPENSSL_VERSION=openssl-3.3.1
+ENV OPENSSL_VERSION=openssl-3.0.8
 ENV OPENSSL_DIR=/usr/local/openssl
 
 # Download and extract OpenSSL
