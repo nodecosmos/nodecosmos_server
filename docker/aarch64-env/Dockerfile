@@ -11,12 +11,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     perl \
     zip \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install rustup
-RUN apt-get update && apt-get install -y \
-    curl \
+    unzip \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
@@ -28,6 +23,14 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Add aarch64 target
 RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup default stable
+
+## Install aws
+RUN  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install
+
+# Check installation
+RUN aws --version
 
 # Set environment for cross-compilation
 ENV OPENSSL_VERSION=openssl-3.3.1
