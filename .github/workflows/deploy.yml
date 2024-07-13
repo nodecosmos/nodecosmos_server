@@ -40,9 +40,10 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
+            ~/.cargo/bin
             ~/.cargo/registry
             ~/.cargo/git
-            target/aarch64-unknown-linux-gnu
+            target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build for aarch64
         run: |
