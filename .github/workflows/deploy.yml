@@ -1,15 +1,12 @@
 name: Build and Deploy Rust Application to EC2
-
 on:
   push:
     branches:
       - main
-
 env:
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
