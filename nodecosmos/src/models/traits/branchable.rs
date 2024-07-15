@@ -1,7 +1,7 @@
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use charybdis::types::Uuid;
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 use serde::Deserialize;
 
 use crate::models::node::reorder::data::ReorderData;

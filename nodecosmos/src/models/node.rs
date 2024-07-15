@@ -7,7 +7,7 @@ use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
+use macros::{Branchable, Id, NodeAuthorization, NodeParent};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;

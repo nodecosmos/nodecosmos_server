@@ -1,7 +1,7 @@
 use crate::models::flow::Flow;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Int, Text, Timestamp, Uuid};
-use nodecosmos_macros::{Branchable, Id};
+use macros::{Branchable, Id};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(

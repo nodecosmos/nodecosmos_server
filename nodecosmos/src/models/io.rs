@@ -10,7 +10,7 @@ use futures::StreamExt;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use nodecosmos_macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
+use macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;

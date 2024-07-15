@@ -5,7 +5,7 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;

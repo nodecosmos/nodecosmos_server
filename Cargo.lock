@@ -2838,6 +2838,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
+name = "macros"
+version = "0.0.0"
+dependencies = [
+ "darling 0.20.10",
+ "log",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.71",
+ "uuid",
+]
+
+[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3006,8 +3018,8 @@ dependencies = [
  "image",
  "lettre",
  "log",
+ "macros",
  "mozjpeg",
- "nodecosmos-macros",
  "quick-xml",
  "rand",
  "reqwest 0.12.5",
@@ -3022,18 +3034,6 @@ dependencies = [
  "toml 0.8.14",
  "uuid",
  "yrs",
-]
-
-[[package]]
-name = "nodecosmos-macros"
-version = "0.0.0"
-dependencies = [
- "darling 0.20.10",
- "log",
- "proc-macro2",
- "quote",
- "syn 2.0.71",
- "uuid",
 ]
 
 [[package]]
