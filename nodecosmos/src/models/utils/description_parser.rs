@@ -138,7 +138,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .attributes()
             .find_map(|a| {
                 a.ok().filter(|a| a.key == QName(b"level")).map(|a| {
-                    a.decode_and_unescape_value(&self.reader)
+                    a.decode_and_unescape_value(self.reader.decoder())
                         .expect("Error decoding heading level")
                         .to_string()
                 })
@@ -218,7 +218,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"src"))
-                    .map(|a| a.decode_and_unescape_value(&self.reader).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
             })
             .unwrap_or_default();
         let alt = event
@@ -226,7 +226,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"alt"))
-                    .map(|a| a.decode_and_unescape_value(&self.reader).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
             })
             .unwrap_or_default();
         self.html.push_str(&format!(
@@ -242,7 +242,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"href"))
-                    .map(|a| a.decode_and_unescape_value(&self.reader).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
             })
             .unwrap_or_default();
 
