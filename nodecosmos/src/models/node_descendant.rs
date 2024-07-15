@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::errors::NodecosmosError;
-use nodecosmos_macros::{Id, RootId};
+use macros::{Id, RootId};
 
 #[charybdis_model(
     table_name = node_descendants,

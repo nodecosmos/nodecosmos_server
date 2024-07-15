@@ -1,7 +1,7 @@
 use crate::models::flow_step::FlowStep;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Decimal, Frozen, List, Map, Timestamp, Uuid};
-use nodecosmos_macros::{Branchable, FlowId, Id, NodeId};
+use macros::{Branchable, FlowId, Id, NodeId};
 use serde::{Deserialize, Serialize};
 
 /// Node version acts as snapshot of the current state of the node.

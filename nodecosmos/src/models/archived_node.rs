@@ -2,7 +2,7 @@ use crate::models::node::Node;
 use crate::models::udts::Profile;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
-use nodecosmos_macros::{Branchable, Id, NodeAuthorization, NodeParent};
+use macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(

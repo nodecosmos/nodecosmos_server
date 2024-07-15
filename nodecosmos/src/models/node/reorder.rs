@@ -6,7 +6,7 @@ use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 
 use crate::api::data::RequestData;
 use crate::api::types::ActionTypes;

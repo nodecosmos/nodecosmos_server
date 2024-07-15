@@ -1,7 +1,7 @@
 use crate::models::workflow::Workflow;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(

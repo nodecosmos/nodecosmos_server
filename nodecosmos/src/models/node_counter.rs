@@ -1,7 +1,7 @@
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::types::{Counter, Uuid};
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 

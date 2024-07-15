@@ -1,7 +1,7 @@
 use crate::models::udts::BranchReorderData;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, List, Map, Set, Text, Timestamp, Uuid};
-use nodecosmos_macros::Branchable;
+use macros::Branchable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

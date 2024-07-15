@@ -1,5 +1,5 @@
 [package]
-name = "nodecosmos-macros"
+name = "macros"
 edition = "2021"
 description = "Proc macros for the nodecosmos project"
 license = "MIT"

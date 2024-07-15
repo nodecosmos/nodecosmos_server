@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, Transact, Update};
 
-use nodecosmos_macros::{Branchable, ObjectId};
+use macros::{Branchable, ObjectId};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
