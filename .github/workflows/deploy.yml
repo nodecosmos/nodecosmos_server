@@ -37,7 +37,7 @@ jobs:
           /root/.cargo/bin/cargo --version
           aws --version
       - name: Cache dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin
