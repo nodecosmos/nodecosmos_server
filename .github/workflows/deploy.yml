@@ -28,7 +28,16 @@ jobs:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
-      - name: Cache dependencies
+      - name: Cache OpenSSL and Toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/openssl
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+            ~/.rustup/settings.toml
+          key: ${{ runner.os }}-openssl
+      - name: Cache Dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -36,7 +45,6 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-            /usr/local/openssl
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build for aarch64
         run: |
