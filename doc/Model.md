@@ -17,6 +17,4 @@
 
 ### Exceptions
 
-* For simple models that don't have partials, we define all the logic in main model file and don't
-  create
-  `<model>/<operation>.rs` file.
+* For simple models that don't have partials, we define all the logic in main model file
