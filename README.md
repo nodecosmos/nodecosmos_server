@@ -23,9 +23,6 @@
 ##### TODO:
 
 - [ ] Scylla Monitoring Stack
-- [ ] Nodecosmos
-- [ ] ElasticSearch
-- [ ] Redis
 
 ## Resources-Actions-Segmentation-Models
 
