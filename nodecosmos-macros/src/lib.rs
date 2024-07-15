@@ -69,7 +69,7 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
 
         TokenStream::from(expanded)
     } else {
-        panic!("Branch record requires single #[branch(original_id)] attribute to determine `original_id`");
+        panic!("Branchable requires single #[branch(original_id)] attribute to determine `original_id`");
     }
 }
 
