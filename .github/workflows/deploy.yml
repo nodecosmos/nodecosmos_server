@@ -28,14 +28,6 @@ jobs:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
-      - name: Debug environment
-        run: |
-          env
-          echo "PATH: $PATH"
-          /root/.cargo/bin/rustup show
-          /root/.cargo/bin/rustc --version
-          /root/.cargo/bin/cargo --version
-          aws --version
       - name: Cache dependencies
         uses: actions/cache@v4
         with:

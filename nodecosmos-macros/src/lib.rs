@@ -20,7 +20,6 @@ struct BranchField {
 #[darling(attributes(branch))]
 struct BranchStruct {
     ident: Ident,
-
     data: darling::ast::Data<(), BranchField>,
 }
 
