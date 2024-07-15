@@ -28,14 +28,6 @@ jobs:
           role-to-assume: arn:aws:iam::714215625955:role/github-actions
           role-session-name: s3session
           aws-region: ${{ env.AWS_REGION }}
-      - name: Hash nodecosmos-macros/src/lib.rs before cache restore
-        run: |
-          echo "Hashing nodecosmos-macros/src/lib.rs"
-          sha256sum nodecosmos-macros/src/lib.rs > hash_before.txt
-      - name: Stat nodecosmos-macros/src/lib.rs before cache restore
-        run: |
-          echo "Stat nodecosmos-macros/src/lib.rs"
-          stat nodecosmos-macros/src/lib.rs > stat_before.txt
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
@@ -45,22 +37,9 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Hash nodecosmos-macros/src/lib.rs after cache restore
-        run: |
-          echo "Hashing nodecosmos-macros/src/lib.rs"
-          sha256sum nodecosmos-macros/src/lib.rs > hash_after.txt
       - name: Stat nodecosmos-macros/src/lib.rs after cache restore
         run: |
-          echo "Stat nodecosmos-macros/src/lib.rs"
-          stat nodecosmos-macros/src/lib.rs > stat_after.txt
-      - name: Compare hashes
-        run: |
-          echo "Comparing hashes"
-          diff hash_before.txt hash_after.txt
-      - name: Compare stats
-        run: |
-          echo "Comparing stats"
-          diff stat_before.txt stat_after.txt
+          stat nodecosmos-macros/src/lib.rs
       - name: Cache OpenSSL and Toolchain
         uses: actions/cache@v4
         with:
