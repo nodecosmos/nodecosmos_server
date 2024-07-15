@@ -53,4 +53,3 @@ Represents Rust types. Some common variants of Type include:
 * **`TypeReference`**:  reference type, like &T or &mut T.
 * **`TypeTuple`**:  tuple type, like (i32, f64).
 * **`TypeArray`**: array type, like [i32; 5].
-
