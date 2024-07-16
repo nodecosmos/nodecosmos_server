@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 futures = "0.3.30"
-scylla = "0.13.0"
+scylla = "0.13.1"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -34,7 +34,7 @@ actix-web-actors = "4.3.0"
 actix = "0.13.3"
 dashmap = "6.0.1"
 bytestring = "1.3.1"
-charybdis = "0.7.1"
+charybdis = "0.7.2"
 yrs = "0.19.1"
 base64 = "0.22.1"
 uuid = "1.8.0"
