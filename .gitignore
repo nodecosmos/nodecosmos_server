@@ -6,3 +6,6 @@
 volumes/scylla1
 volumes/scylla2
 volumes/scylla3
+ca.crt
+client.crt
+client.key

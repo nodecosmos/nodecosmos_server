@@ -1307,9 +1307,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "charybdis"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d31b41707fdc6743ce011610b10cc9557970c1bd59cf8c63fd5ddb0c8e60a39"
+checksum = "0b2a25dc45c6f68710903d18635ddd348a6b67ada9cd9c9a8f36bb2d242d129a"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1325,9 +1325,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "0.7.0"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5eeed3f4b08b938ea6d234b5f177922f43c968f23a263fdb3abfc7a42bf9d8c"
+checksum = "22275746377c3263a9154d22c19a08498e8bcf511407175cb20bc3de8b055646"
 dependencies = [
  "charybdis_parser",
  "darling 0.20.10",
@@ -1338,9 +1338,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "0.7.0"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3097e420e990489804ecc072c97d3e71fe6ff6623cc3a305e76cf5cfdfe7ec"
+checksum = "80a6cb30fe0040056e65e175ce03ac7e9d9ffde308ba95ced1be938bbb170dbb"
 dependencies = [
  "colored",
  "darling 0.20.10",
@@ -4090,9 +4090,9 @@ dependencies = [
 
 [[package]]
 name = "scylla"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9439d92eea9f86c07175c819c3a129ca28b02477b47df26db354a1f4ea7ee276"
+checksum = "b20b46cf4ea921ba41121ba9ddf933185cd830cbe2c4fa6272a6e274a6b7368d"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -4121,9 +4121,9 @@ dependencies = [
 
 [[package]]
 name = "scylla-cql"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64037fb9d9c59ae15137fff9a56c4d528908dfd38d09e75b5f8e56e3894966dd"
+checksum = "27ea3cd3ff5bf9d7db7a6d65c54cecf52f7c40b8e3e32c8c2d6da84d23776ea4"
 dependencies = [
  "async-trait",
  "bigdecimal",
@@ -4144,9 +4144,9 @@ dependencies = [
 
 [[package]]
 name = "scylla-macros"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e5fe1d389adebe6a1a27bce18b81a65ff18c25d58a795de490e18b0e7a27b9f"
+checksum = "e50f3e2aec7ea9f495e029fb783eb34c64d26a8f2055e1d6b43d00e04d2fbda6"
 dependencies = [
  "darling 0.20.10",
  "proc-macro2",
