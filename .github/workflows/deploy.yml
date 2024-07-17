@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /usr/local/openssl
+            /usr/local/openssl-aarch64
             ~/.rustup/toolchains
             ~/.rustup/update-hashes
             ~/.rustup/settings.toml

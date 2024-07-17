@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     curl \
+    openssl \
+    libssl-dev \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,7 +37,7 @@ RUN aws --version
 
 # Set environment for cross-compilation
 ENV OPENSSL_VERSION=openssl-3.0.8
-ENV OPENSSL_DIR=/usr/local/openssl
+ENV OPENSSL_DIR=/usr/local/openssl-aarch64
 
 # Download and extract OpenSSL
 WORKDIR /tmp/${OPENSSL_VERSION}
