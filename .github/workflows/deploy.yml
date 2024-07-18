@@ -4,6 +4,7 @@ on:
     branches:
       - main
 env:
+  FORCE_COLOR: 1
   BUCKET_NAME: aws-nodecosmos-bucket
   AWS_REGION: us-east-1
   CARGO_TERM_COLOR: always
