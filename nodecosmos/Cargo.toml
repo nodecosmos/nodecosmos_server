@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 futures = "0.3.30"
-scylla = "0.13.1"
+scylla = { version = "0.13.1", features = ["ssl"] }
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -50,3 +50,4 @@ handlebars = "5.1.2"
 email_address = "0.2.5"
 reqwest = { version = "0.12.5", features = ["json"] }
 rustrict = "0.7.26"
+openssl = "0.10.64"
