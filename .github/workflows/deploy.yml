@@ -48,10 +48,6 @@ jobs:
           key: ${{ runner.os }}-openssl-and-toolchain
       - name: Run migrations
         run: |
-          unset OPENSSL_DIR
-          unset OPENSSL_LIB_DIR
-          unset OPENSSL_INCLUDE_DIR
-          unset PKG_CONFIG_PATH
           cargo install charybdis-migrate
           migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} --drop-and-replace --ca ca.crt --cert client.crt --key client.key
       - name: Build for aarch64
