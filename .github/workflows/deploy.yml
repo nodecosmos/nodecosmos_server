@@ -48,7 +48,6 @@ jobs:
           key: ${{ runner.os }}-openssl-and-toolchain
       - name: Build for aarch64
         run: |
-          export RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           cargo build --release --target aarch64-unknown-linux-gnu --verbose
       - name: Decode SSL Certificate
         run: echo "${{ secrets.SCYLLA_CLIENT_CERT }}" | base64 --decode > client.crt
