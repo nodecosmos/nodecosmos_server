@@ -52,13 +52,13 @@ FROM base as final
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install \
-    && aws --version \
-
-# Install charybdis-migrate using cargo
-RUN cargo install charybdis-migrate
+    && aws --version
 
 # Copy necessary binaries and libraries from the builder stage
 COPY --from=builder ${AARCH_OPENSSL_DIR} ${AARCH_OPENSSL_DIR}
 
 # Set PATH to include Rust binaries
 ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install charybdis-migrate using cargo
+RUN cargo install charybdis-migrate
