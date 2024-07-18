@@ -36,14 +36,14 @@ RUN  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv
 RUN aws --version
 
 # Set environment for cross-compilation
-ENV OPENSSL_VERSION=openssl-3.0.8
-ENV OPENSSL_DIR=/usr/local/openssl-aarch64
+ENV AARCH64_OPENSSL_VERSION=openssl-3.0.8
+ENV AARCH_OPENSSL_DIR=/usr/local/openssl-aarch64
 
 # Download and extract OpenSSL
-WORKDIR /tmp/${OPENSSL_VERSION}
-RUN wget https://www.openssl.org/source/${OPENSSL_VERSION}.tar.gz \
-    && tar -xzf ${OPENSSL_VERSION}.tar.gz \
-    && cd ${OPENSSL_VERSION} \
-    && ./Configure linux-aarch64 no-shared --prefix=${OPENSSL_DIR} --cross-compile-prefix=aarch64-linux-gnu- \
+WORKDIR /tmp/${AARCH64_OPENSSL_VERSION}
+RUN wget https://www.openssl.org/source/${AARCH64_OPENSSL_VERSION}.tar.gz \
+    && tar -xzf ${AARCH64_OPENSSL_VERSION}.tar.gz \
+    && cd ${AARCH64_OPENSSL_VERSION} \
+    && ./Configure linux-aarch64 no-shared --prefix=${AARCH_OPENSSL_DIR} --cross-compile-prefix=aarch64-linux-gnu- \
     && make \
     && make install
