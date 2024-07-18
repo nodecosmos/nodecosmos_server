@@ -56,17 +56,17 @@ jobs:
           unset OPENSSL_LIB_DIR
           unset OPENSSL_INCLUDE_DIR
       - name: Decode SSL Certificate
-        run: echo "${{ secrets.SCYLLA_CLIENT_CERT }}" | base64 --decode > client.crt
+        run: echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
 
       - name: Decode SSL Key
-        run: echo "${{ secrets.SCYLLA_CLIENT_KEY }}" | base64 --decode > client.key
+        run: echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
 
       - name: Decode CA Certificate
-        run: echo "${{ secrets.CA_CERT }}" | base64 --decode > ca.crt
+        run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
 
-      #      - name: Run migrations
-      #        run: |
-      #          migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} --drop-and-replace --ca ca.crt --cert client.crt --key client.key
+      - name: Run migrations
+        run: |
+          migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} --drop-and-replace --ca ca.crt --cert client.crt --key client.key
 
       - name: Zip the binary appspec.yml and scripts
         run: |
