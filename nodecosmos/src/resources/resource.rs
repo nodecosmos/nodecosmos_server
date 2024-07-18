@@ -5,7 +5,8 @@ use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
-use scylla::{CachingSession, Session, SessionBuilder};
+use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
+use scylla::{CachingSession, SessionBuilder};
 
 use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::mailer::Mailer;
@@ -28,10 +29,56 @@ impl<'a> Resource<'a> for CachingSession {
     async fn init_resource(config: Self::Cfg) -> Self {
         let known_nodes: Vec<&str> = config.scylla.hosts.iter().map(|x| x.as_str()).collect();
 
-        let db_session: Session = SessionBuilder::new()
+        let mut builder = SessionBuilder::new()
             .known_nodes(&known_nodes)
             .connection_timeout(Duration::from_secs(3))
-            .use_keyspace(&config.scylla.keyspace, false)
+            .use_keyspace(&config.scylla.keyspace, false);
+
+        if let Some(ca) = &config.scylla.ca {
+            let mut context_builder = SslContextBuilder::new(SslMethod::tls())
+                .map_err(|e| {
+                    eprintln!("Failed to create SSL context: {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            context_builder
+                .set_ca_file(ca)
+                .map_err(|e| {
+                    eprintln!("Failed to set CA file: {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            context_builder.set_verify(SslVerifyMode::PEER);
+
+            if let Some(key) = &config.scylla.cert {
+                context_builder
+                    .set_certificate_file(key, openssl::ssl::SslFiletype::PEM)
+                    .map_err(|e| {
+                        eprintln!("Failed to set certificate file: {}", e);
+                        std::process::exit(1);
+                    })
+                    .unwrap();
+
+                let key = config
+                    .scylla
+                    .key
+                    .as_ref()
+                    .expect("Private key file is required when certificate is provided");
+                context_builder
+                    .set_private_key_file(key, openssl::ssl::SslFiletype::PEM)
+                    .map_err(|e| {
+                        eprintln!("Failed to set private key file: {}", e);
+                        std::process::exit(1);
+                    })
+                    .unwrap();
+            }
+
+            builder = builder.ssl_context(Some(context_builder.build()));
+        }
+
+        let db_session = builder
             .build()
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));

@@ -7,8 +7,9 @@ ssl = false
 [scylla]
 hosts = ["172.31.21.157"]
 keyspace = "nodecosmos"
-username = ""
-password = ""
+ca = "/etc/nodecosmos/ca.cert"
+cert = "/etc/nodecosmos/db_client.cert"
+key = "/etc/nodecosmos/db_client.key"
 
 [redis]
 host = "172.31.41.3:6379"

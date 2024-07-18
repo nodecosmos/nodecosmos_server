@@ -28,8 +28,9 @@ use crate::tasks;
 pub struct ScyllaConfig {
     pub hosts: Vec<String>,
     pub keyspace: String,
-    pub username: String,
-    pub password: String,
+    pub ca: Option<String>,
+    pub cert: Option<String>,
+    pub key: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]

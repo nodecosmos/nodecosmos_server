@@ -7,8 +7,6 @@ ssl = false
 [scylla]
 hosts = ["127.0.0.1:9042", "127.0.0.1:9043", "127.0.0.1:9044"]
 keyspace = "nodecosmos"
-username = ""
-password = ""
 
 [redis]
 host = "127.0.0.1:6379"
