@@ -280,7 +280,6 @@ impl ContributionRequest {
     async fn create_merge_notification(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let id = self.id;
         let title = self.title.clone();
-        let owner = self.owner.clone();
         let owner_id = self.owner_id;
         let editor_ids = self.editor_ids.clone();
         let data = data.clone();
@@ -301,7 +300,7 @@ impl ContributionRequest {
                     node_id = node_id,
                     id = id
                 ),
-                owner,
+                Some(Profile::init_from_current_user(&data.current_user)),
             );
             let mut receiver_ids = HashSet::new();
             receiver_ids.insert(owner_id);
