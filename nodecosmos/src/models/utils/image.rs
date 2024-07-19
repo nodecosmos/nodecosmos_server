@@ -6,8 +6,11 @@ const TARGET_SIZE_IN_BYTES: usize = 30 * 1024;
 
 pub struct Image {
     inner: image::DynamicImage,
+    buffer: Vec<u8>,
     pub width: u32,
     pub height: u32,
+    pub file_size: usize,
+    pub extension: &'static str,
 }
 
 impl Image {
@@ -26,19 +29,23 @@ impl Image {
         let image_format = image::guess_format(buffer)
             .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e)))?;
 
-        if image_format != image::ImageFormat::Png && image_format != image::ImageFormat::Jpeg {
+        if image_format != image::ImageFormat::Png
+            && image_format != image::ImageFormat::Jpeg
+            && image_format != image::ImageFormat::WebP
+        {
             return Err(NodecosmosError::UnsupportedMediaType);
         }
 
         Ok(image_format)
     }
 
-    fn decode_image(format: image::ImageFormat, buffer: Vec<u8>) -> Result<image::DynamicImage, NodecosmosError> {
-        if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg {
+    fn decode_image(format: image::ImageFormat, buffer: &Vec<u8>) -> Result<image::DynamicImage, NodecosmosError> {
+        if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg && format != image::ImageFormat::WebP
+        {
             return Err(NodecosmosError::UnsupportedMediaType);
         }
 
-        let img = image::load_from_memory(&buffer)
+        let img = image::load_from_memory(buffer)
             .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to decode image: {:?}", e)))?;
 
         Ok(img)
@@ -46,15 +53,25 @@ impl Image {
 
     pub async fn from_field(field: &mut actix_multipart::Field) -> Result<Self, NodecosmosError> {
         let buffer = Self::read_image_buffer(field).await?;
+        let file_size = buffer.len();
         let format = Self::read_image_format(&buffer)?;
-        let image = Self::decode_image(format, buffer)?;
+        let image = Self::decode_image(format, &buffer)?;
         let width = image.width();
         let height = image.height();
+        let extension = match format {
+            image::ImageFormat::Png => "png",
+            image::ImageFormat::Jpeg => "jpg",
+            image::ImageFormat::WebP => "webp",
+            _ => return Err(NodecosmosError::UnsupportedMediaType),
+        };
 
         Ok(Self {
             inner: image,
+            buffer,
             width,
             height,
+            file_size,
+            extension,
         })
     }
 
@@ -66,19 +83,22 @@ impl Image {
         self
     }
 
-    pub fn compressed(&mut self) -> Result<Vec<u8>, NodecosmosError> {
-        let img = &self.inner;
+    pub fn compressed(self) -> Result<Vec<u8>, NodecosmosError> {
+        let img = self.inner;
+
+        println!("file size: {}", self.file_size);
+
+        if self.file_size <= TARGET_SIZE_IN_BYTES {
+            return Ok(self.buffer);
+        }
+
         let image_src = match img {
-            image::DynamicImage::ImageRgb8(rgb_img) => rgb_img.clone(),
+            image::DynamicImage::ImageRgb8(rgb_img) => rgb_img,
             _ => {
                 let img = img.to_rgb8();
                 img
             }
         };
-
-        if image_src.len() <= TARGET_SIZE_IN_BYTES {
-            return Ok(image_src.to_vec());
-        }
 
         let compressed: Vec<u8> = Vec::new();
 
