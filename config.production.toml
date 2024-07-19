@@ -5,18 +5,18 @@ session_expiration_in_days = 30
 ssl = false
 
 [scylla]
-hosts = ["172.31.21.157"]
+hosts = []
 keyspace = "nodecosmos"
-ca = "/etc/nodecosmos/ca.crt"
-cert = "/etc/nodecosmos/db_client.crt"
-key = "/etc/nodecosmos/db_client.key"
+ca = ""
+cert = ""
+key = ""
 
 [redis]
 host = "172.31.41.3:6379"
 url = "redis://172.31.41.3:6379/"
 
 [elasticsearch]
-host = "http://172.31.41.152:9200"
+host = ""
 
 [aws]
 bucket = "nodecosmos-production"

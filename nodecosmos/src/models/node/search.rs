@@ -18,6 +18,7 @@ pub struct IndexNode {
     pub root_id: Uuid,
     pub ancestor_ids: Option<Vec<Uuid>>,
     pub owner_id: Uuid,
+    pub creator_id: Option<Uuid>,
     pub title: String,
     pub short_description: Option<String>,
     pub description: Option<String>,
@@ -32,6 +33,7 @@ pub struct IndexNode {
     pub created_at: Timestamp,
 
     pub owner: Profile,
+    pub creator: Option<Profile>,
 }
 
 #[derive(Deserialize)]

@@ -48,6 +48,12 @@ RUN wget https://www.openssl.org/source/${AARCH64_OPENSSL_VERSION}.tar.gz \
 # Final stage for running applications
 FROM base as final
 
+# Set PATH to include Rust binaries
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install charybdis-migrate using cargo
+RUN cargo install charybdis-migrate
+
 # Install AWS CLI
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
@@ -56,9 +62,3 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 
 # Copy necessary binaries and libraries from the builder stage
 COPY --from=builder ${AARCH_OPENSSL_DIR} ${AARCH_OPENSSL_DIR}
-
-# Set PATH to include Rust binaries
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Install charybdis-migrate using cargo
-RUN cargo install charybdis-migrate
