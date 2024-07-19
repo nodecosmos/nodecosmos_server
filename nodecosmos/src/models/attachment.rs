@@ -66,6 +66,7 @@ impl Attachment {
             }
 
             image.resize_image(width, height);
+            let extension = image.extension;
             let compressed = image.compressed()?;
 
             let mut attachment = Attachment::new();
@@ -75,7 +76,7 @@ impl Attachment {
             attachment.user_id = Some(data.current_user.id);
 
             // assign s3 key before url generation & upload
-            attachment.key = attachment.build_s3_key("attachment", "jpg");
+            attachment.key = attachment.build_s3_key("attachment", extension);
             attachment.url = Some(attachment.s3_url(data));
 
             attachment.upload_s3_object(data, compressed).await?;

@@ -26,6 +26,7 @@ impl UpdateCoverImageNode {
 
             let mut image = Image::from_field(&mut field).await?;
             image.resize_image(IMG_WIDTH, IMG_HEIGHT);
+            let extension = image.extension;
             let compressed = image.compressed()?;
 
             if self.cover_image_filename.is_some() {
@@ -33,7 +34,7 @@ impl UpdateCoverImageNode {
             }
 
             // assign s3 key before url generation & upload
-            self.cover_image_filename = Some(self.build_s3_key("cover", "jpg"));
+            self.cover_image_filename = Some(self.build_s3_key("cover", extension));
             self.cover_image_url = Some(self.s3_url(data));
 
             self.upload_s3_object(data, compressed).await?;
