@@ -16,6 +16,7 @@ use crate::api::data::RequestData;
 use crate::app::App;
 use crate::constants::BLACKLIST_USERNAMES;
 use crate::errors::NodecosmosError;
+use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
 use crate::models::traits::{ElasticDocument, SanitizeDescription};
 use crate::models::udts::Address;
@@ -241,6 +242,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
                 tokio::spawn(async move {
                     UpdateOwnerNode::update_owner_records(&data, user_id).await;
+                    UpdateCreatorNode::update_creator_records(&data, user_id).await;
                 });
 
                 Ok(())

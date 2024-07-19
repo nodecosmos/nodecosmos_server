@@ -53,10 +53,17 @@ impl Io {
             .execute(data.db_session())
             .await?;
 
-            if let Some(maybe_original) = maybe_original.as_mut() {
-                maybe_original.branch_id = self.branch_id;
+            if let Some(maybe_branched) = maybe_original.as_mut() {
+                maybe_branched.branch_id = self.branch_id;
 
-                maybe_original.insert_if_not_exists().execute(data.db_session()).await?;
+                if maybe_branched
+                    .maybe_find_by_primary_key()
+                    .execute(data.db_session())
+                    .await?
+                    .is_none()
+                {
+                    maybe_branched.insert().execute(data.db_session()).await?;
+                }
             }
         }
 
@@ -108,7 +115,7 @@ impl Io {
         .collect();
 
         Io::unlogged_batch()
-            .chunked_insert_if_not_exist(db_session, &branched, crate::constants::BATCH_CHUNK_SIZE)
+            .chunked_insert(db_session, &branched, crate::constants::BATCH_CHUNK_SIZE)
             .await?;
 
         Ok(())

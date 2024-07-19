@@ -10,13 +10,12 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateInputIdsFlowStep};
-use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, ModelBranchParams};
+use crate::models::io::{Io, PkIo};
+use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams};
 
 impl UpdateInputIdsFlowStep {
     pub async fn preserve_branch_ios(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
-            // for each input and output create branch io if it does not exist
             let io_ids: Vec<Uuid> = self
                 .input_ids_by_node_id
                 .clone()
@@ -37,8 +36,21 @@ impl UpdateInputIdsFlowStep {
                     })
                     .collect::<Vec<Io>>();
 
+            let branched_ios_ids =
+                PkIo::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.branch_id, self.root_id, &io_ids)
+                    .await?
+                    .into_iter()
+                    .map(|io| io.id)
+                    .collect::<HashSet<Uuid>>();
+
+            // 6.0 does not support LWT so we use this way to filter out branched ios
+            let ios = ios
+                .into_iter()
+                .filter(|io| !branched_ios_ids.contains(&io.id))
+                .collect::<Vec<Io>>();
+
             Io::unlogged_batch()
-                .append_inserts_if_not_exist(&ios)
+                .append_inserts(&ios)
                 .execute(data.db_session())
                 .await
                 .context("Failed to preserve branch ios")?;
@@ -66,46 +78,27 @@ impl UpdateInputIdsFlowStep {
             .flatten()
             .collect();
 
-        let added_input_ids: HashSet<Uuid> = update_input_ids.difference(&new_input_ids).cloned().collect();
+        let added_input_ids: Vec<Uuid> = update_input_ids.difference(&new_input_ids).cloned().collect();
         let removed_input_ids: HashSet<Uuid> = new_input_ids.difference(&update_input_ids).cloned().collect();
-        let io_ids: Vec<Uuid> = added_input_ids
-            .clone()
-            .into_iter()
-            .chain(removed_input_ids.clone().into_iter())
-            .collect();
-        let mut ios_by_id =
-            Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.branch_id, self.root_id, &io_ids)
-                .await?
-                .group_by_id()
-                .await?;
-
-        if self.is_branch() {
-            // add ios that do not exist in the branch
-            let ios_to_add =
-                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
-                    .await?
-                    .into_iter()
-                    .filter(|io| !ios_by_id.contains_key(&io.id))
-                    .map(|mut io| {
-                        io.branch_id = self.branch_id;
-                        io
-                    })
-                    .collect();
-
-            Io::unlogged_batch()
-                .chunked_insert(data.db_session(), &ios_to_add, 100)
-                .await?;
-
-            ios_by_id.extend(ios_to_add.into_iter().map(|io| (io.id, io)));
-        }
-
         let mut batch = Io::statement_batch();
 
         if added_input_ids.len() > 0 {
-            for added_io in added_input_ids {
+            // scylla 6.0 does not support LWT so we need to map existing ios instead of using if exists
+            let existing_io_ids = PkIo::find_by_branch_id_and_root_id_and_ids(
+                data.db_session(),
+                self.branch_id,
+                self.root_id,
+                &added_input_ids,
+            )
+            .await?
+            .into_iter()
+            .map(|io| io.id)
+            .collect::<Vec<Uuid>>();
+
+            for added_io_id in existing_io_ids {
                 batch.append_statement(
-                    Io::PUSH_INPUTTED_BY_FLOW_STEPS_IF_EXISTS_QUERY,
-                    (vec![self.id], self.branch_id, self.root_id, added_io),
+                    Io::PUSH_INPUTTED_BY_FLOW_STEPS_QUERY,
+                    (vec![self.id], self.branch_id, self.root_id, added_io_id),
                 );
             }
         }
@@ -113,7 +106,7 @@ impl UpdateInputIdsFlowStep {
         if removed_input_ids.len() > 0 {
             for removed_io in removed_input_ids {
                 batch.append_statement(
-                    Io::PULL_INPUTTED_BY_FLOW_STEPS_IF_EXISTS_QUERY,
+                    Io::PULL_INPUTTED_BY_FLOW_STEPS_QUERY,
                     (vec![self.id], self.branch_id, self.root_id, removed_io),
                 );
             }

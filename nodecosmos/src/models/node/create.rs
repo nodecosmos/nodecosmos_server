@@ -23,6 +23,8 @@ use crate::models::workflow::Workflow;
 impl Node {
     pub async fn set_defaults(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
+        self.creator_id = Some(data.current_user.id);
+        self.creator = Some(Profile::init_from_current_user(&data.current_user));
 
         if let Some(parent) = self.parent(data.db_session()).await? {
             let editor_ids = parent.editor_ids.clone();

@@ -6,7 +6,7 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::models::node::{Node, UpdateCoverImageNode, UpdateOwnerNode, UpdateTitleNode};
+use crate::models::node::{Node, UpdateCoverImageNode, UpdateCreatorNode, UpdateOwnerNode, UpdateTitleNode};
 use crate::models::user::{ConfirmUser, UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 
 pub trait ElasticIndex {
@@ -136,6 +136,7 @@ impl ElasticIndex for Node {
                     "index": false
                 },
                 "ownerId": { "type": "keyword", "index": false },
+                "creatorId": { "type": "keyword", "index": false },
                 "title": { "type": "text", "analyzer": "english" },
                 "shortDescription": { "type": "text", "index": false  },
                 "description": {
@@ -151,6 +152,14 @@ impl ElasticIndex for Node {
                 "createdAt": { "type": "date" },
                 "coverImageUrl": { "type": "text", "index": false },
                 "owner": {
+                    "properties": {
+                        "id": { "type": "keyword", "index": false },
+                        "name": { "type": "text" },
+                        "username": { "type": "keyword" },
+                        "profileImageURL": { "type": "text", "index": false },
+                    }
+                },
+                "creator": {
                     "properties": {
                         "id": { "type": "keyword", "index": false },
                         "name": { "type": "text" },
@@ -253,6 +262,7 @@ impl_elastic_index!(UpdateTitleNode, Node);
 impl_elastic_index!(UpdateCoverImageNode, Node);
 impl_elastic_index!(UpdateCounterNodeElasticIdx, Node);
 impl_elastic_index!(UpdateOwnerNode, Node);
+impl_elastic_index!(UpdateCreatorNode, Node);
 // user
 impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);

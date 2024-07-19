@@ -24,6 +24,7 @@ pub mod reorder;
 pub mod search;
 pub mod sort;
 pub mod update_cover_image;
+mod update_creator;
 mod update_owner;
 mod update_title;
 
@@ -59,11 +60,15 @@ pub struct Node {
     #[serde(default)]
     pub owner_id: Uuid,
 
+    #[serde(default)]
+    pub creator_id: Option<Uuid>,
+
     pub title: Text,
 
     pub parent_id: Option<Uuid>,
     pub ancestor_ids: Option<Set<Uuid>>,
     pub owner: Option<Frozen<Profile>>,
+    pub creator: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
     pub viewer_ids: Option<Set<Uuid>>,
     pub cover_image_filename: Option<Text>,
@@ -329,6 +334,15 @@ partial_node!(
 );
 
 partial_node!(UpdateOwnerNode, branch_id, id, root_id, owner_id, owner, updated_at);
+partial_node!(
+    UpdateCreatorNode,
+    branch_id,
+    id,
+    root_id,
+    creator_id,
+    creator,
+    updated_at
+);
 
 partial_node!(
     UpdateCoverImageNode,
