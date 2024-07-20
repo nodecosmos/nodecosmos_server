@@ -118,9 +118,10 @@ impl Callbacks for Io {
         if !self.delete_dangling.map_or(false, |v| v) && self.is_main() && self.flow_step_id.is_some() {
             // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
             // keep the main io in the database as it can be later used by flow steps where it was deleted.
-            self.flow_step_id = None;
-            self.flow_step_node_id = None;
-            self.insert().execute(db_session).await?;
+            let mut self_clone = self.clone();
+            self_clone.flow_step_id = None;
+            self_clone.flow_step_node_id = None;
+            self_clone.insert().execute(db_session).await?;
         }
 
         let _ = ArchivedIo::from(&*self)
