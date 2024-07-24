@@ -20,6 +20,7 @@ enum ProseMirrorXmlTag {
     Link,
     HardBreak,
     Html,
+    Unknown,
 }
 
 impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
@@ -43,7 +44,10 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
             QName(b"link") => ProseMirrorXmlTag::Link,
             QName(b"hardBreak") => ProseMirrorXmlTag::HardBreak,
             QName(b"html") => ProseMirrorXmlTag::Html,
-            _ => panic!("Unknown tag"),
+            _ => {
+                log::error!("Unknown tag: {:?}", value);
+                ProseMirrorXmlTag::Unknown
+            }
         }
     }
 }
@@ -104,6 +108,7 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Link => self.open_link(&e),
                     ProseMirrorXmlTag::HardBreak => self.open_hard_break(),
                     ProseMirrorXmlTag::Html => (),
+                    ProseMirrorXmlTag::Unknown => (),
                 },
                 Ok(Event::Text(e)) => self.text(e)?,
                 Ok(Event::End(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
@@ -122,6 +127,7 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::Link => self.close_link(),
                     ProseMirrorXmlTag::HardBreak => (),
                     ProseMirrorXmlTag::Html => (),
+                    ProseMirrorXmlTag::Unknown => (),
                 },
                 Ok(Event::Eof) => {
                     break;
