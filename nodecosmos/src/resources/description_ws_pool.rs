@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use actix::prelude::*;
 use actix_web_actors::ws;
-use charybdis::types::Uuid;
 use dashmap::DashMap;
 use log::error;
 
-type RoomId = Uuid;
+type RoomId = String; // BranchId + RoomId
 
 #[derive(Default)]
 pub struct DescriptionWsPool {
@@ -15,7 +14,7 @@ pub struct DescriptionWsPool {
 
 #[derive(Clone)]
 pub struct DescriptionWsConnection {
-    pub room_id: Uuid,
+    pub room_id: RoomId,
     pub pool: Arc<DescriptionWsPool>,
 }
 
