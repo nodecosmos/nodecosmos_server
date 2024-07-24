@@ -52,7 +52,8 @@ pub struct RedisConfig {
 #[derive(Clone, Deserialize)]
 pub struct Config {
     pub port: u16,
-    pub allowed_origin: String,
+    pub allowed_origin_1: String,
+    pub allowed_origin_2: Option<String>,
     pub client_url: String,
     pub session_expiration_in_days: i64,
     pub ssl: bool,
@@ -134,9 +135,13 @@ impl App {
     }
 
     pub fn cors(&self) -> Cors {
-        Cors::default()
-            .allowed_origin(self.config.allowed_origin.as_str())
-            .supports_credentials()
+        let mut cors = Cors::default().allowed_origin(self.config.allowed_origin_1.as_str());
+
+        if let Some(allowed_origin_2) = self.config.allowed_origin_2.as_ref() {
+            cors = cors.allowed_origin(allowed_origin_2);
+        }
+
+        cors.supports_credentials()
             .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
             .allowed_headers(vec![
                 http::header::AUTHORIZATION,
