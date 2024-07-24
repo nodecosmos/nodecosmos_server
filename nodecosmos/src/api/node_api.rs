@@ -1,5 +1,6 @@
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
@@ -291,7 +292,7 @@ pub async fn delete_node_editor(
 ) -> Response {
     let (branch_id, id, editor_id) = params.into_inner();
 
-    let node = AuthNode::find_by_branch_id_and_id(branch_id, id)
+    let node = Node::find_by_branch_id_and_id(branch_id, id)
         .execute(&db_session)
         .await?;
 
@@ -301,14 +302,23 @@ pub async fn delete_node_editor(
         ));
     }
 
-    UpdateEditorNode {
-        branch_id,
-        id,
-        ..Default::default()
+    let mut descendants = node.descendants(data.db_session()).await?;
+
+    let mut statement_vals = vec![(vec![editor_id], node.branch_id, node.id)];
+
+    while let Some(descendant) = descendants.next().await {
+        let descendant = descendant?;
+
+        statement_vals.push((vec![editor_id], descendant.branch_id, descendant.id));
     }
-    .pull_editor_ids(vec![editor_id])
-    .execute(&db_session)
-    .await?;
+
+    Node::statement_batch()
+        .chunked_statements(&db_session, Node::PULL_EDITOR_IDS_QUERY, statement_vals.clone(), 100)
+        .await?;
+
+    Node::statement_batch()
+        .chunked_statements(&db_session, Node::PULL_VIEWER_IDS_QUERY, statement_vals, 100)
+        .await?;
 
     Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
 

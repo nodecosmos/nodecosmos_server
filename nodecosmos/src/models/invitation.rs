@@ -67,7 +67,15 @@ pub struct Invitation {
 
     #[serde(skip)]
     #[charybdis(ignore)]
+    pub user: Option<User>,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
     pub ctx: InvitationContext,
+
+    #[serde(skip)]
+    #[charybdis(ignore)]
+    pub email: Option<Text>,
 }
 
 impl Callbacks for Invitation {
@@ -90,27 +98,18 @@ impl Callbacks for Invitation {
         self.inviter_id = data.current_user.id;
         self.expires_at = Utc::now() + chrono::Duration::weeks(1);
 
-        Ok(())
-    }
-
-    async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
-        let mut username = None;
-        let email;
-
-        let user;
         if EmailAddress::is_valid(&self.username_or_email) {
-            email = self.username_or_email.clone();
-            user = User::maybe_find_first_by_email(self.username_or_email.clone())
+            self.email = Some(self.username_or_email.clone());
+            self.user = User::maybe_find_first_by_email(self.username_or_email.clone())
                 .execute(data.db_session())
                 .await?;
         } else {
-            user = User::maybe_find_first_by_username(self.username_or_email.clone())
+            self.user = User::maybe_find_first_by_username(self.username_or_email.clone())
                 .execute(data.db_session())
                 .await?;
 
-            if let Some(user) = &user {
-                email = user.email.clone();
-                username = Some(user.username.clone());
+            if let Some(user) = &self.user {
+                self.email = Some(user.email.clone());
             } else {
                 return Err(NodecosmosError::ValidationError((
                     "usernameOrEmail",
@@ -119,30 +118,61 @@ impl Callbacks for Invitation {
             }
         };
 
+        Ok(())
+    }
+
+    async fn after_insert(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         let node = self.node(data.db_session()).await?;
-        let token = Token::new_invitation(email.clone(), username, (node.branch_id, node.id));
+        let node_title = node.title.clone();
+        let branch_id = node.branch_id;
+        let node_id = node.id;
+        let token;
+
+        if EmailAddress::is_valid(&self.username_or_email) {
+            // invite by email
+            token = Token::new_invitation(self.username_or_email.clone(), None, (branch_id, node_id));
+        } else {
+            // invite by username
+            if let Some(email) = &self.email {
+                token = Token::new_invitation(
+                    email.clone(),
+                    Some(self.username_or_email.clone()),
+                    (branch_id, node_id),
+                );
+            } else {
+                error!("[after_insert] email must be present if username is not found");
+                return Err(NodecosmosError::ValidationError(("usernameOrEmail", "email not found")));
+            }
+        }
 
         token.insert().execute(data.db_session()).await?;
 
-        data.mailer()
-            .send_invitation_email(email, &data.current_user.username, &node.title, token.id.clone())
-            .await?;
+        if let Some(email) = &self.email {
+            data.mailer()
+                .send_invitation_email(
+                    email.clone(),
+                    &data.current_user.username,
+                    &node_title,
+                    token.id.clone(),
+                )
+                .await?;
 
-        if let Some(user) = user {
-            let mut receiver_ids = HashSet::new();
-            receiver_ids.insert(user.id);
+            if let Some(user) = self.user.as_ref() {
+                let mut receiver_ids = HashSet::new();
+                receiver_ids.insert(user.id);
 
-            let _ = Notification::new(
-                NotificationType::NewInvitation,
-                format!("invited you to collaborate on the node {}", node.title),
-                format!("{}/invitations?token={}", data.app.config.client_url, token.id),
-                Some(Profile::init_from_current_user(&data.current_user)),
-            )
-            .create_for_receivers(&data, receiver_ids)
-            .await
-            .map_err(|e| {
-                error!("Error while creating notification: {}", e);
-            });
+                let _ = Notification::new(
+                    NotificationType::NewInvitation,
+                    format!("invited you to collaborate on the node {}", node_title),
+                    format!("{}/invitations?token={}", data.app.config.client_url, token.id),
+                    Some(Profile::init_from_current_user(&data.current_user)),
+                )
+                .create_for_receivers(&data, receiver_ids)
+                .await
+                .map_err(|e| {
+                    error!("Error while creating notification: {}", e);
+                });
+            }
         }
 
         Ok(())
@@ -203,6 +233,9 @@ impl Invitation {
             } else {
                 username_or_email = token.email;
             }
+
+            println!("node_pk: {:?}", node_pk);
+            println!("username_or_email: {:?}", username_or_email);
 
             let invitation = Self::find_by_primary_key_value((node_pk.0, node_pk.1, username_or_email))
                 .execute(db_session)
