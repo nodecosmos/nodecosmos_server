@@ -138,7 +138,7 @@ pub async fn description_ws(
     AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
 
     let ws_desc_conn = DescriptionWsConnection {
-        room_id: params.room_id,
+        room_id: format!("{}{}", params.branch_id, params.room_id),
         pool: data.description_ws_pool(),
     };
     let ws_builder = WsResponseBuilder::new(ws_desc_conn.clone(), &req, stream);
@@ -149,7 +149,7 @@ pub async fn description_ws(
     let ws_desc_conn_pool = ws_desc_conn.pool;
     ws_desc_conn_pool
         .connections
-        .entry(params.room_id)
+        .entry(format!("{}{}", params.branch_id, params.room_id))
         .or_default()
         .push(addr);
 
