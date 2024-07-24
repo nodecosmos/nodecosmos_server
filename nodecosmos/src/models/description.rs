@@ -147,7 +147,8 @@ impl Description {
         transaction.apply_update(current);
         transaction.apply_update(update);
 
-        let xml_str = &xml.get_string(&transaction);
+        // For some reason encodeStateAsUpdateV2 on front end converts &amp; to & and that will break xml parsing.
+        let xml_str = &xml.get_string(&transaction).replace("&", "&amp;");
 
         let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
         let html = prose_doc.html;
