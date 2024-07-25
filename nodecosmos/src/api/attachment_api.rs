@@ -1,15 +1,15 @@
+use crate::api::current_user::OptCurrentUser;
+use crate::api::data::RequestData;
+use crate::api::types::Response;
+use crate::models::attachment::Attachment;
+use crate::models::node::AuthNode;
+use crate::models::traits::s3::S3;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
 use charybdis::operations::InsertWithCallbacks;
 use charybdis::types::Uuid;
 use serde::Deserialize;
 use serde_json::json;
-
-use crate::api::data::RequestData;
-use crate::api::types::Response;
-use crate::models::attachment::Attachment;
-use crate::models::node::AuthNode;
-use crate::models::traits::s3::S3;
 
 #[derive(Deserialize)]
 pub struct ImageAttachmentParams {
@@ -21,7 +21,15 @@ pub struct ImageAttachmentParams {
 
 #[post("/{branch_id}/{node_id}/{root_id}/{object_id}/upload_image")]
 pub async fn upload_image(params: web::Path<ImageAttachmentParams>, data: RequestData, payload: Multipart) -> Response {
-    AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
+    // we authorize view as image can be uploaded in comment editor
+    AuthNode::auth_view(
+        data.db_session(),
+        &OptCurrentUser(Some(data.current_user.clone())),
+        params.branch_id,
+        params.node_id,
+        params.root_id,
+    )
+    .await?;
 
     let attachment = Attachment::create_image(&params, &data, payload).await?;
 
@@ -40,7 +48,15 @@ pub struct AttachmentParams {
 
 #[get("/presigned_url")]
 pub async fn get_presigned_url(params: web::Query<AttachmentParams>, data: RequestData) -> Response {
-    AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
+    // we authorize view as image can be uploaded in comment editor
+    AuthNode::auth_view(
+        data.db_session(),
+        &OptCurrentUser(Some(data.current_user.clone())),
+        params.branch_id,
+        params.node_id,
+        params.root_id,
+    )
+    .await?;
 
     let url = Attachment::get_presigned_url(&data, &params.object_id, &params.filename).await?;
 
