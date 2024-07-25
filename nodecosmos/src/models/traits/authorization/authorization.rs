@@ -79,6 +79,10 @@ pub trait Authorization: AuthorizationFields {
                         .viewer_ids()
                         .as_ref()
                         .map_or(false, |ids| ids.contains(&current_user.id))
+                    || self
+                        .editor_ids()
+                        .as_ref()
+                        .map_or(false, |ids| ids.contains(&current_user.id))
                 {
                     return Ok(());
                 }
