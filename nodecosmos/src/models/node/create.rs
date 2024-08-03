@@ -214,7 +214,7 @@ impl Node {
     pub async fn preserve_branch_descendants(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             let mut descendants =
-                NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.id, self.id)
+                NodeDescendant::find_by_root_id_and_branch_id_and_node_id(self.root_id, self.original_id(), self.id)
                     .execute(data.db_session())
                     .await?;
 
@@ -225,6 +225,7 @@ impl Node {
                 let descendant_node = Node {
                     id: descendant.id,
                     branch_id: self.branch_id,
+                    root_id: self.root_id,
                     ..Default::default()
                 };
                 let future = descendant_node.create_branched_if_not_exist(&data);

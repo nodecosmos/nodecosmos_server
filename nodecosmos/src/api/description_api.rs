@@ -2,6 +2,7 @@ use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::errors::NodecosmosError;
+use crate::models::archived_description::ArchivedDescription;
 use crate::models::description::{BaseDescription, Description};
 use crate::models::node::{AuthNode, FindCoverImageNode};
 use crate::models::traits::{Branchable, ObjectType};
@@ -89,20 +90,31 @@ pub async fn get_base64_description(data: RequestData, mut description: web::Pat
 pub async fn get_original_description(
     db_session: web::Data<CachingSession>,
     opt_cu: OptCurrentUser,
-    description: web::Path<BaseDescription>,
+    d_params: web::Path<BaseDescription>,
 ) -> Response {
     AuthNode::auth_view(
         &db_session,
         &opt_cu,
-        description.branch_id,
-        description.node_id,
-        description.root_id,
+        d_params.branch_id,
+        d_params.node_id,
+        d_params.root_id,
     )
     .await?;
 
-    let description = Description::find_by_branch_id_and_object_id(description.original_id(), description.object_id)
+    let mut description =
+        Description::maybe_find_first_by_branch_id_and_object_id(d_params.original_id(), d_params.object_id)
+            .execute(&db_session)
+            .await?;
+
+    if description.is_none() {
+        description = ArchivedDescription::maybe_find_first_by_branch_id_and_object_id(
+            d_params.original_id(),
+            d_params.object_id,
+        )
         .execute(&db_session)
-        .await?;
+        .await?
+        .map(|desc| desc.into());
+    }
 
     Ok(HttpResponse::Ok().json(description))
 }
