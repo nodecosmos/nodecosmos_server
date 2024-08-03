@@ -116,6 +116,23 @@ impl Callbacks for Description {
     }
 }
 
+impl From<ArchivedDescription> for Description {
+    fn from(description: ArchivedDescription) -> Self {
+        Self {
+            object_id: description.object_id,
+            branch_id: description.branch_id,
+            node_id: description.node_id,
+            root_id: description.root_id,
+            object_type: description.object_type,
+            short_description: description.short_description,
+            html: description.html,
+            markdown: description.markdown,
+            base64: description.base64,
+            updated_at: description.updated_at,
+        }
+    }
+}
+
 impl Description {
     const DESCRIPTION_ROOT: &'static str = "prosemirror";
 
@@ -165,6 +182,31 @@ impl Description {
     }
 }
 
+partial_description!(
+    BaseDescription,
+    object_id,
+    branch_id,
+    root_id,
+    object_type,
+    node_id,
+    html,
+    markdown
+);
+
+impl From<ArchivedDescription> for BaseDescription {
+    fn from(description: ArchivedDescription) -> Self {
+        Self {
+            object_id: description.object_id,
+            branch_id: description.branch_id,
+            node_id: description.node_id,
+            root_id: description.root_id,
+            object_type: description.object_type,
+            html: description.html,
+            markdown: description.markdown,
+        }
+    }
+}
+
 macro_rules! find_branched {
     ($struct_name:ident) => {
         impl $struct_name {
@@ -183,9 +225,25 @@ macro_rules! find_branched {
                     None => {
                         let branch_id = self.branch_id;
 
-                        *self = Self::find_by_primary_key_value((self.original_id(), self.object_id))
+                        if let Some(desc) = Self::maybe_find_by_primary_key_value((self.original_id(), self.object_id))
                             .execute(db_session)
-                            .await?;
+                            .await?
+                        {
+                            *self = desc;
+                        } else if let Some(desc) =
+                            ArchivedDescription::maybe_find_by_primary_key_value((self.branch_id, self.object_id))
+                                .execute(db_session)
+                                .await?
+                                .map(|desc| desc.into())
+                        {
+                            *self = desc;
+                        } else {
+                            *self =
+                                ArchivedDescription::find_by_primary_key_value((self.original_id(), self.object_id))
+                                    .execute(db_session)
+                                    .await?
+                                    .into();
+                        }
 
                         self.branch_id = branch_id;
                     }
@@ -199,14 +257,3 @@ macro_rules! find_branched {
 
 find_branched!(Description);
 find_branched!(BaseDescription);
-
-partial_description!(
-    BaseDescription,
-    object_id,
-    branch_id,
-    root_id,
-    object_type,
-    node_id,
-    html,
-    markdown
-);
