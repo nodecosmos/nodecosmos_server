@@ -190,7 +190,8 @@ partial_description!(
     object_type,
     node_id,
     html,
-    markdown
+    markdown,
+    short_description
 );
 
 impl From<ArchivedDescription> for BaseDescription {
@@ -203,6 +204,7 @@ impl From<ArchivedDescription> for BaseDescription {
             object_type: description.object_type,
             html: description.html,
             markdown: description.markdown,
+            short_description: description.short_description,
         }
     }
 }
