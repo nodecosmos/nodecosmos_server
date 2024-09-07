@@ -182,17 +182,16 @@ impl ResponseError for NodecosmosError {
                     }))
                 }
                 _ => {
-                    return NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string()))
-                        .error_response();
+                    NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string())).error_response()
                 }
             },
             _ => {
                 error!("InternalServerError: {}", self.to_string());
 
-                return HttpResponse::InternalServerError().json(json!({
+                HttpResponse::InternalServerError().json(json!({
                     "status": 500,
                     "message": "Internal Server Error"
-                }));
+                }))
             }
         }
     }
@@ -266,6 +265,12 @@ impl From<anyhow::Error> for NodecosmosError {
 
 impl From<actix_web::Error> for NodecosmosError {
     fn from(e: actix_web::Error) -> Self {
+        NodecosmosError::InternalServerError(format!("{:?}", e))
+    }
+}
+
+impl From<yrs::error::UpdateError> for NodecosmosError {
+    fn from(e: yrs::error::UpdateError) -> Self {
         NodecosmosError::InternalServerError(format!("{:?}", e))
     }
 }

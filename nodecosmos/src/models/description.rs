@@ -161,8 +161,8 @@ impl Description {
         let xml = doc.get_or_insert_xml_fragment(Self::DESCRIPTION_ROOT);
         let mut transaction = doc.transact_mut();
 
-        transaction.apply_update(current);
-        transaction.apply_update(update);
+        transaction.apply_update(current)?;
+        transaction.apply_update(update)?;
 
         // For some reason encodeStateAsUpdateV2 on front end converts &amp; to & and that will break xml parsing.
         let xml_str = &xml.get_string(&transaction).replace("&", "&amp;");
