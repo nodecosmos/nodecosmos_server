@@ -101,7 +101,7 @@ impl Io {
     }
 
     pub async fn clone_main_ios_to_branch(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-        let branched = Io::branched(
+        let branched: Vec<Io> = Io::branched(
             db_session,
             &NodeBranchParams {
                 root_id: self.root_id,

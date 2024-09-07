@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
-use charybdis::scylla::SerializeCql;
+use charybdis::scylla::SerializeValue;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
@@ -171,7 +171,7 @@ impl Io {
         }
     }
 
-    pub async fn find_by_branch_id_and_root_id_and_ids<I: IntoIterator<Item = Uuid> + SerializeCql>(
+    pub async fn find_by_branch_id_and_root_id_and_ids<I: IntoIterator<Item = Uuid> + SerializeValue>(
         db_session: &CachingSession,
         branch_id: Uuid,
         root_id: Uuid,

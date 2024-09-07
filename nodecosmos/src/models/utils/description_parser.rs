@@ -290,7 +290,7 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_heading(&mut self) {
         self.html.push_str(&format!("</h{}>", self.heading_level));
-        self.markdown.push_str("\n\n");
+        self.markdown.push_str("\n");
     }
 
     fn close_paragraph(&mut self) {
@@ -299,10 +299,10 @@ impl<'a> DescriptionXmlParser<'a> {
             self.markdown.push_str("\n");
         } else if self.blockquote_active {
             self.html.push_str("</p>");
-            self.markdown.push_str("\n>\n");
+            self.markdown.push_str("\n>");
         } else {
             self.html.push_str("</p>");
-            self.markdown.push_str("\n\n");
+            self.markdown.push_str("\n");
         }
 
         self.paragraph_active = false;
@@ -357,13 +357,13 @@ impl<'a> DescriptionXmlParser<'a> {
     fn close_code_block(&mut self) {
         self.html.push_str("</code></pre>");
         self.markdown.push_str("\n```");
-        self.markdown.push_str("\n\n");
+        self.markdown.push_str("\n");
 
         self.code_block_active = false;
     }
 
     fn close_image(&mut self) {
-        self.markdown.push_str("\n\n");
+        self.markdown.push_str("\n");
     }
 
     fn close_link(&mut self) {

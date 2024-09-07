@@ -84,7 +84,7 @@ impl Notification {
         data: &RequestData,
         receiver_ids: HashSet<Uuid>,
     ) -> Result<(), NodecosmosError> {
-        let notifications = receiver_ids
+        let notifications: Vec<Notification> = receiver_ids
             .into_iter()
             .filter_map(|receiver_id| {
                 return if receiver_id != data.current_user.id {
