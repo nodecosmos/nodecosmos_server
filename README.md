@@ -10,7 +10,6 @@
    ```
    For possible problems with max concurrent request check
    this [link](https://sort.veritas.com/public/documents/HSO/2.0/linux/productguides/html/hfo_admin_rhel/ch04s03.htm)
-
 2) **Login to cqlsh**
    ```shell
    docker exec -it scylla1 cqlsh
@@ -19,10 +18,18 @@
     ```cassandraql
     CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 3};
     ```
+4) **Install our automatic migration tool**
+   ```shell
+   cargo install charybdis-migrate
+   ```
+5) **Run migration**
+   ```shell
+   migrate --host localhost:9042 --keyspace nodecosmos
+   ```
 
 ##### TODO:
 
-- [ ] Scylla Monitoring Stack
+- [ ] Scylla Monitoring Stack``
 
 ## Resources-Actions-Segmentation-Models
 

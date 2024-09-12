@@ -2,11 +2,7 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use actix_cors::Cors;
-use actix_session::config::PersistentSession;
-use actix_session::storage::RedisActorSessionStore;
-use actix_session::SessionMiddleware;
-use actix_web::cookie::Key;
-use actix_web::{cookie, http, web};
+use actix_web::{http, web};
 use deadpool_redis::Pool;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
@@ -158,21 +154,5 @@ impl App {
 
     pub fn port(&self) -> u16 {
         self.config.port
-    }
-
-    pub fn session_middleware(&self) -> SessionMiddleware<RedisActorSessionStore> {
-        let secret_key = Key::from(self.secret_key.as_ref());
-        let redis_actor_session_store = self.redis_actor_session_store();
-        let expiration = self.config.session_expiration_in_days;
-        let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
-
-        SessionMiddleware::builder(redis_actor_session_store, secret_key)
-            .session_lifecycle(ttl)
-            .cookie_secure(self.config.ssl)
-            .build()
-    }
-
-    fn redis_actor_session_store(&self) -> RedisActorSessionStore {
-        RedisActorSessionStore::new(&self.config.redis.host)
     }
 }

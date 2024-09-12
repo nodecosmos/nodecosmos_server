@@ -47,6 +47,20 @@ pub fn set_current_user(client_session: &Session, current_user: &CurrentUser) ->
         NodecosmosError::ClientSessionError("Could not set current user.".to_string())
     })?;
 
+    let cu = client_session.get::<CurrentUser>("current_user").map_err(|e| {
+        error!("Could not get current user. {}", e);
+
+        NodecosmosError::ClientSessionError("Could not get current user.".to_string())
+    })?;
+
+    if cu.is_none() {
+        return Err(NodecosmosError::ClientSessionError(
+            "Could not get current user.".to_string(),
+        ));
+    }
+
+    println!("Current user set: {:?}", current_user);
+
     Ok(())
 }
 

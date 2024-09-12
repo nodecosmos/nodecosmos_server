@@ -12,8 +12,8 @@ cert = ""
 key = ""
 
 [redis]
-host = "172.31.41.3:6379"
-url = "redis://172.31.41.3:6379/"
+host = ""
+url = ""
 
 [elasticsearch]
 host = ""

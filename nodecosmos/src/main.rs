@@ -1,6 +1,9 @@
+use actix_session::config::PersistentSession;
+use actix_session::storage::RedisSessionStore;
+use actix_session::SessionMiddleware;
+use actix_web::cookie::{time, Key};
 use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
-
 use api::*;
 use app::App;
 
@@ -20,9 +23,14 @@ fn main() {
         .block_on(async {
             {
                 let app = App::new().await;
-                let port = app.port();
-
                 app.init().await;
+
+                let port = app.port();
+                // session
+                let redis_actor_session_store = RedisSessionStore::new(&app.config.redis.url).await.unwrap();
+                let session_key = Key::from(app.secret_key.as_ref());
+                let session_ttl = time::Duration::days(app.config.session_expiration_in_days);
+                let cookie_secure = app.config.ssl;
                 let app_web_data = web::Data::new(app);
 
                 HttpServer::new(move || {
@@ -33,7 +41,12 @@ fn main() {
                         .wrap(Compress::default())
                         .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
                         .wrap(app_web_data.cors())
-                        .wrap(app_web_data.session_middleware())
+                        .wrap(
+                            SessionMiddleware::builder(redis_actor_session_store.clone(), session_key.clone())
+                                .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
+                                .cookie_secure(cookie_secure)
+                                .build(),
+                        )
                         .app_data(app_web_data.clone())
                         .app_data(db_session_web_data.clone())
                         .service(

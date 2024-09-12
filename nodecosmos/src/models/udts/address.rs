@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::types::Text;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[charybdis_udt_model(type_name = address)]
 pub struct Address {
     pub street: Text,

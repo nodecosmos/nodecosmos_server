@@ -27,7 +27,7 @@ pub mod update_profile_image;
 
 const BCRYPT_COST: u32 = 6;
 
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum UserContext {
     #[default]
     Default,
@@ -40,7 +40,7 @@ pub enum UserContext {
     clustering_keys = [],
     global_secondary_indexes = [username, email],
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     #[serde(default)]
