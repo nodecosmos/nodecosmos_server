@@ -67,7 +67,7 @@ impl FromRequest for RequestData {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let client_session = req.get_session();
 
-        return match get_current_user(&client_session) {
+        match get_current_user(&client_session) {
             Some(current_user) => {
                 let app = req.app_data::<web::Data<App>>();
 
@@ -91,6 +91,6 @@ impl FromRequest for RequestData {
                 let error_response = NodecosmosError::Unauthorized("You must be logged in to perform this action!");
                 ready(Err(error_response))
             }
-        };
+        }
     }
 }

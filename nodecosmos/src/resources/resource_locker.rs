@@ -23,7 +23,7 @@ impl ResourceLocker {
     }
 
     /// Lock complete resource
-    pub async fn lock_resource(&self, id: Uuid, branch_id: Uuid, ttl: usize) -> Result<bool, NodecosmosError> {
+    pub async fn lock_resource(&self, id: Uuid, branch_id: Uuid, ttl: usize) -> Result<(), NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
         if let Err(e) = self.validate_resource_unlocked(id, branch_id, true).await {
@@ -39,7 +39,7 @@ impl ResourceLocker {
             .arg("NX")
             .arg("PX")
             .arg(ttl)
-            .query_async(&mut *connection)
+            .query_async::<()>(&mut *connection)
             .await
             .map_err(|e| NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", id, e)))?;
 
@@ -47,7 +47,7 @@ impl ResourceLocker {
             .await
             .map_err(|e| NodecosmosError::LockerError(format!("Failed to lock resource: {}! Error: {:?}", id, e)))?;
 
-        Ok(true)
+        Ok(())
     }
 
     pub async fn lock_resource_actions(
@@ -56,7 +56,7 @@ impl ResourceLocker {
         branch_id: Uuid,
         actions: &[ActionTypes],
         ttl: usize,
-    ) -> Result<bool, NodecosmosError> {
+    ) -> Result<(), NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
         // Locking particular actions requires resource to be unlocked
@@ -79,7 +79,7 @@ impl ResourceLocker {
                 .arg(ttl);
         }
 
-        pipe.query_async(&mut *connection).await.map_err(|e| {
+        pipe.query_async::<()>(&mut *connection).await.map_err(|e| {
             NodecosmosError::LockerError(format!("[query_async] Failed to lock resource: {}! Error: {:?}", id, e))
         })?;
 
@@ -90,7 +90,7 @@ impl ResourceLocker {
             ))
         })?;
 
-        Ok(true)
+        Ok(())
     }
 
     pub async fn unlock_resource_actions(
@@ -98,7 +98,7 @@ impl ResourceLocker {
         id: Uuid,
         branch_id: Uuid,
         actions: &[ActionTypes],
-    ) -> Result<bool, NodecosmosError> {
+    ) -> Result<(), NodecosmosError> {
         let mut connection = self.pool.get().await?;
         let mut pipe = redis::pipe();
 
@@ -106,11 +106,11 @@ impl ResourceLocker {
             pipe.cmd("DEL").arg(self.action_key(&action, id, branch_id));
         }
 
-        pipe.query_async(&mut *connection)
+        pipe.query_async::<()>(&mut *connection)
             .await
             .map_err(|e| NodecosmosError::LockerError(format!("Failed to unlock resource: {}! Error: {:?}", id, e)))?;
 
-        Ok(true)
+        Ok(())
     }
 
     pub async fn unlock_resource(&self, id: Uuid, branch_id: Uuid) -> Result<bool, NodecosmosError> {
