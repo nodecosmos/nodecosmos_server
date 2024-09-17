@@ -8,8 +8,16 @@
    ```shell
    docker exec scylla1 nodetool status
    ```
-   For possible problems with max concurrent request check
-   this [link](https://sort.veritas.com/public/documents/HSO/2.0/linux/productguides/html/hfo_admin_rhel/ch04s03.htm)
+   > **_NOTE:_** For possible problems with max concurrent request try to set the `aio-max-nr`
+   value. Add the following line to the `/etc/sysctl.conf` file:
+   > ```shell
+   > fs.aio-max-nr = 1048576
+   > ```
+   >To
+   > activate the new setting, run:
+   > ```shell
+   > sysctl -p /etc/sysctl.conf
+   > ```
 
 2) **Login to cqlsh**
    ```shell

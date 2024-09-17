@@ -94,8 +94,8 @@ impl<'a> NodeSearch<'a> {
                 }
             },
             "sort": [
-                { "isRoot": { "order": "desc" } },
                 { "likeCount": { "order": "desc" } },
+                { "isRoot": { "order": "desc" } },
                 {
                     "_script": {
                         "type": "number",
