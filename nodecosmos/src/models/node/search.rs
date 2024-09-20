@@ -15,6 +15,7 @@ const PAGE_SIZE: i16 = 20;
 #[serde(rename_all = "camelCase")]
 pub struct IndexNode {
     pub id: Uuid,
+    pub branch_id: Uuid,
     pub root_id: Uuid,
     pub ancestor_ids: Option<Vec<Uuid>>,
     pub owner_id: Uuid,
