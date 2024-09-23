@@ -30,7 +30,6 @@ fn main() {
                     let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
 
                     ActixWebApp::new()
-                        .wrap(Compress::default())
                         .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
                         .wrap(app_web_data.cors())
                         .wrap(app_web_data.session_middleware())
@@ -38,6 +37,7 @@ fn main() {
                         .app_data(db_session_web_data.clone())
                         .service(
                             web::scope("/users")
+                                .wrap(Compress::default())
                                 .service(get_user)
                                 .service(get_user_by_username)
                                 .service(create_user)
@@ -56,6 +56,7 @@ fn main() {
                         )
                         .service(
                             web::scope("/nodes")
+                                .wrap(Compress::default())
                                 .service(get_nodes)
                                 .service(get_node)
                                 .service(get_branched_node)
@@ -65,12 +66,14 @@ fn main() {
                                 .service(reorder_nodes)
                                 .service(upload_cover_image)
                                 .service(delete_cover_image)
-                                .service(listen_node_events)
                                 .service(get_node_editors)
-                                .service(delete_node_editor),
+                                .service(delete_node_editor)
+                                .service(listen_node_events),
                         )
+                        .service(web::scope("/no-compress-nodes").service(listen_node_events))
                         .service(
                             web::scope("/likes")
+                                .wrap(Compress::default())
                                 .service(user_likes)
                                 .service(get_like_count)
                                 .service(create_like)
@@ -78,12 +81,14 @@ fn main() {
                         )
                         .service(
                             web::scope("/workflows")
+                                .wrap(Compress::default())
                                 .service(get_workflow)
                                 .service(get_workflow_branch_commit_data)
                                 .service(update_workflow_title),
                         )
                         .service(
                             web::scope("/flows")
+                                .wrap(Compress::default())
                                 .service(create_flow)
                                 .service(update_flow_title)
                                 .service(delete_flow),
@@ -103,6 +108,7 @@ fn main() {
                         )
                         .service(
                             web::scope("contribution_requests")
+                                .wrap(Compress::default())
                                 .service(get_contribution_requests)
                                 .service(get_contribution_request)
                                 .service(create_contribution_request)
@@ -120,6 +126,7 @@ fn main() {
                         )
                         .service(
                             web::scope("branches")
+                                .wrap(Compress::default())
                                 .service(show_branch)
                                 .service(get_branch_node_id)
                                 .service(restore_node)
@@ -136,6 +143,7 @@ fn main() {
                         )
                         .service(
                             web::scope("comments")
+                                .wrap(Compress::default())
                                 .service(get_threads)
                                 .service(get_thread_comments)
                                 .service(create_comment)
@@ -145,6 +153,7 @@ fn main() {
                         )
                         .service(
                             web::scope("descriptions")
+                                .wrap(Compress::default())
                                 .service(get_description)
                                 .service(get_base64_description)
                                 .service(get_original_description)
@@ -153,6 +162,7 @@ fn main() {
                         .service(web::scope("ws").service(description_ws))
                         .service(
                             web::scope("invitations")
+                                .wrap(Compress::default())
                                 .service(create_invitation)
                                 .service(get_invitations)
                                 .service(get_invitation_by_token)
@@ -162,6 +172,7 @@ fn main() {
                         )
                         .service(
                             web::scope("notifications")
+                                .wrap(Compress::default())
                                 .service(get_notifications)
                                 .service(mark_all_as_read),
                         )

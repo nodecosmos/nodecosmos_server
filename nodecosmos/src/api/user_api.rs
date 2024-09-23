@@ -214,7 +214,7 @@ pub async fn create_user(
                 return Ok(HttpResponse::Ok().json(current_user));
             }
 
-            return Ok(HttpResponse::Ok().finish());
+            Ok(HttpResponse::Ok().finish())
         }
         Err(e) => {
             if let NodecosmosError::EmailAlreadyExists = e {
@@ -305,7 +305,7 @@ pub async fn reset_password_email(app: web::Data<App>, data: web::Json<ResetPass
         Err(_) => {
             // we don't want to leak the fact that the email is not found, we just
             // print that if the email is found, an email will be sent
-            return Ok(HttpResponse::Ok().finish());
+            Ok(HttpResponse::Ok().finish())
         }
     }
 }

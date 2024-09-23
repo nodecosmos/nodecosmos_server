@@ -213,7 +213,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
     // execute reorder
     let res = Node::reorder(&data, &params).await;
 
-    return match res {
+    match res {
         Ok(_) => {
             // unlock complete resource
             data.resource_locker()
@@ -233,7 +233,7 @@ pub async fn reorder_nodes(params: web::Json<ReorderParams>, data: RequestData) 
             }
             Err(e)
         }
-    };
+    }
 }
 
 #[post("/{branchId}/{id}/{rootId}/upload_cover_image")]
@@ -270,7 +270,11 @@ pub async fn listen_node_events(root_id: web::Path<Uuid>, data: RequestData) -> 
         Err(_) => Err(NodecosmosError::InternalServerError("Failed to send event".to_string()).into()),
     });
 
-    Ok(HttpResponse::Ok().content_type("text/event-stream").streaming(stream))
+    Ok(HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .insert_header(("Cache-Control", "no-cache"))
+        .insert_header(("Connection", "keep-alive"))
+        .streaming(stream))
 }
 
 #[get("/{branchId}/{id}/editors")]

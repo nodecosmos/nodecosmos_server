@@ -150,7 +150,6 @@ impl App {
                 http::header::USER_AGENT,
                 http::header::DNT,
                 http::header::CONTENT_TYPE,
-                http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
             ])
             .expose_headers(vec![http::header::LOCATION, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
             .max_age(86400)
