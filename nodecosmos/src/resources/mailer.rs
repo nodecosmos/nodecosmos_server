@@ -1,6 +1,7 @@
 use crate::app::Config;
 use crate::errors::NodecosmosError;
 use crate::models::contact::Contact;
+use crate::resources::email_client::EmailClient;
 use charybdis::types::Uuid;
 use handlebars::Handlebars;
 use std::collections::HashMap;
@@ -15,47 +16,47 @@ const CONTACT_US_EMAIL: &str = "contact_us_email";
 pub struct Mailer {
     pub templates: Handlebars<'static>,
     pub client_url: String,
-    pub ses_client: aws_sdk_ses::Client,
+    pub client: EmailClient,
 }
 
 impl Mailer {
-    pub fn new(ses_client: aws_sdk_ses::Client, config: &Config) -> Self {
+    pub fn new(client: EmailClient, config: &Config) -> Self {
         let mut templates = Handlebars::new();
 
         templates
-            .register_template_string(CONFIRM_EMAIL, include_str!("./mailer/confirm_email.html"))
+            .register_template_string(CONFIRM_EMAIL, include_str!("mailer/confirm_email.html"))
             .expect("Template should be valid");
 
         templates
-            .register_template_string(INVITATION_EMAIL, include_str!("./mailer/invitation_email.html"))
+            .register_template_string(INVITATION_EMAIL, include_str!("mailer/invitation_email.html"))
             .expect("Template should be valid");
 
         templates
             .register_template_string(
                 INVITATION_ACCEPTED_EMAIL,
-                include_str!("./mailer/invitation_accepted_email.html"),
+                include_str!("mailer/invitation_accepted_email.html"),
             )
             .expect("Template should be valid");
 
         templates
-            .register_template_string(RESET_PASSWORD_EMAIL, include_str!("./mailer/reset_password_email.html"))
+            .register_template_string(RESET_PASSWORD_EMAIL, include_str!("mailer/reset_password_email.html"))
             .expect("Template should be valid");
 
         templates
             .register_template_string(
                 PASSWORD_CHANGED_EMAIL,
-                include_str!("./mailer/password_changed_email.html"),
+                include_str!("mailer/password_changed_email.html"),
             )
             .expect("Template should be valid");
 
         templates
-            .register_template_string(CONTACT_US_EMAIL, include_str!("./mailer/contact_us_email.html"))
+            .register_template_string(CONTACT_US_EMAIL, include_str!("mailer/contact_us_email.html"))
             .expect("Template should be valid");
 
         Self {
             templates,
             client_url: config.client_url.clone(),
-            ses_client,
+            client,
         }
     }
 
@@ -75,7 +76,9 @@ impl Mailer {
             .render(CONFIRM_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "Confirm your nodecosmos account", message).await
+        self.client
+            .send_email(to, "Confirm your nodecosmos account", message)
+            .await
     }
 
     pub async fn send_invitation_email(
@@ -97,7 +100,8 @@ impl Mailer {
             .render(INVITATION_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "You have been invited to collaborate on nodecosmos", message)
+        self.client
+            .send_email(to, "You have been invited to collaborate on nodecosmos", message)
             .await
     }
 
@@ -121,7 +125,9 @@ impl Mailer {
             .render(INVITATION_ACCEPTED_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "Your invitation has been accepted", message).await
+        self.client
+            .send_email(to, "Your invitation has been accepted", message)
+            .await
     }
 
     pub async fn send_reset_password_email(
@@ -141,7 +147,9 @@ impl Mailer {
             .render(RESET_PASSWORD_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "Reset your nodecosmos password", message).await
+        self.client
+            .send_email(to, "Reset your nodecosmos password", message)
+            .await
     }
 
     pub async fn send_password_changed_email(&self, to: String, username: String) -> Result<(), NodecosmosError> {
@@ -153,7 +161,8 @@ impl Mailer {
             .render(PASSWORD_CHANGED_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(to, "Your nodecosmos password has been changed", message)
+        self.client
+            .send_email(to, "Your nodecosmos password has been changed", message)
             .await
     }
 
@@ -171,46 +180,13 @@ impl Mailer {
             .render(CONTACT_US_EMAIL, &ctx)
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
-        self.send_email(
-            "goran@nodecosmos.com".to_string(),
-            format!("New contact us request: ID {}", contact.id).as_str(),
-            message,
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    async fn send_email(&self, to: String, subject: &str, message: String) -> Result<(), NodecosmosError> {
-        let mut dest = aws_sdk_ses::types::Destination::builder().build();
-
-        dest.to_addresses = Some(vec![to]);
-
-        let subject_content = aws_sdk_ses::types::Content::builder()
-            .data(subject)
-            .charset("UTF-8")
-            .build()
-            .expect("building Content");
-        let body_content = aws_sdk_ses::types::Content::builder()
-            .data(message)
-            .charset("UTF-8")
-            .build()
-            .expect("building Content");
-        let body = aws_sdk_ses::types::Body::builder().html(body_content).build();
-
-        let msg = aws_sdk_ses::types::Message::builder()
-            .subject(subject_content)
-            .body(body)
-            .build();
-
-        self.ses_client
-            .send_email()
-            .destination(dest)
-            .source("support@nodecosmos.com")
-            .message(msg)
-            .send()
-            .await
-            .map_err(|e| NodecosmosError::AwsSdkError(format!("{:?}", e)))?;
+        self.client
+            .send_email(
+                "goran@nodecosmos.com".to_string(),
+                format!("New contact us request: ID {}", contact.id).as_str(),
+                message,
+            )
+            .await?;
 
         Ok(())
     }

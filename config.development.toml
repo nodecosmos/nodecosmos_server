@@ -18,3 +18,12 @@ host = "http://127.0.0.1:9200"
 
 [aws]
 bucket = "nodecosmos-development"
+
+#[smtp]
+#starttls = true
+#host = ""
+#port = 587
+#username = ""
+#password = ""
+#from_name = ""
+#from_email = ""

@@ -121,3 +121,26 @@ on Linux, macOS, and Unix; `%userprofile%\.aws\credentials` on Microsoft Windows
   aws_access_key_id=YOUR-ACCESS-KEY
   aws_secret_access_key=YOUR-SECRET-KEY
 ```
+
+# Systemd
+
+```shell
+# /etc/systemd/system/nodecosmos.service
+
+[Unit]
+Description=Nodecosmos Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nodecosmos
+Restart=always
+RestartSec=5
+Environment="RECAPTCHA_ENABLED=false"
+Environment="RECAPTCHA_SECRET=secret-key"
+Environment="SECRET_KEY=test"
+Environment="CONFIG_FILE=/etc/nodecosmos/config.toml"
+
+[Install]
+WantedBy=multi-user.target
+```

@@ -9,6 +9,7 @@ use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
 use scylla::{CachingSession, SessionBuilder};
 
 use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::email_client::{EmailClient, SesMailer, Smtp};
 use crate::resources::mailer::Mailer;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
@@ -125,23 +126,23 @@ impl<'a> Resource<'a> for aws_sdk_s3::Client {
     }
 }
 
-impl<'a> Resource<'a> for aws_sdk_ses::Client {
-    type Cfg = ();
-
-    async fn init_resource(_config: ()) -> Self {
-        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
-
-        let client = aws_sdk_ses::Client::new(&config);
-
-        client
-    }
-}
-
 impl<'a> Resource<'a> for Mailer {
-    type Cfg = (aws_sdk_ses::Client, &'a Config);
+    type Cfg = &'a Config;
 
     async fn init_resource(cfg: Self::Cfg) -> Self {
-        Mailer::new(cfg.0, cfg.1)
+        // check if we use smtp or ses
+
+        let client = if let Some(smtp_config) = cfg.smtp.clone() {
+            EmailClient::Smtp(Smtp::new(smtp_config))
+        } else {
+            let ses_cfg = aws_config::defaults(BehaviorVersion::latest()).load().await;
+
+            let client = aws_sdk_ses::Client::new(&ses_cfg);
+
+            EmailClient::Ses(SesMailer::new(client))
+        };
+
+        Mailer::new(client, cfg)
     }
 }
 

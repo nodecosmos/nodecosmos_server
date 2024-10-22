@@ -68,6 +68,7 @@ pub enum NodecosmosError {
     QuickXmlError(quick_xml::Error),
     BroadcastError(String),
     ParseError(strum::ParseError),
+    EmailError(String),
     EmailAlreadyExists,
 }
 
@@ -103,6 +104,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::InternalServerError(e) => write!(f, "InternalServerError: {}", e),
             NodecosmosError::BroadcastError(e) => write!(f, "BroadcastError: {}", e),
             NodecosmosError::ParseError(e) => write!(f, "ParseError: {}", e),
+            NodecosmosError::EmailError(e) => write!(f, "EmailError: {}", e),
             NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
         }
     }
