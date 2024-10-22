@@ -50,6 +50,17 @@ pub struct RedisConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct SmtpConfig {
+    pub host: String,
+    pub port: u16,
+    pub starttls: bool,
+    pub username: String,
+    pub password: String,
+    pub from_name: Option<String>,
+    pub from_email: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub port: u16,
     pub allowed_origin_1: String,
@@ -61,6 +72,7 @@ pub struct Config {
     pub redis: RedisConfig,
     pub elasticsearch: ElasticConfig,
     pub aws: AwsConfig,
+    pub smtp: Option<SmtpConfig>,
 }
 
 #[derive(Clone)]
@@ -90,11 +102,10 @@ impl App {
         let recaptcha_enabled = env::var("RECAPTCHA_ENABLED").unwrap_or_default() == "true";
         let recaptcha_secret = env::var("RECAPTCHA_SECRET").unwrap_or_default();
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
-        let ses_client = aws_sdk_ses::Client::init_resource(()).await;
         let db_session = CachingSession::init_resource(&config).await;
         let elastic_client = Elasticsearch::init_resource(&config).await;
         let redis_pool = Pool::init_resource(&config).await;
-        let mailer = Mailer::init_resource((ses_client.clone(), &config)).await;
+        let mailer = Mailer::init_resource(&config).await;
 
         // app data
         let resource_locker = ResourceLocker::init_resource(&redis_pool).await;
