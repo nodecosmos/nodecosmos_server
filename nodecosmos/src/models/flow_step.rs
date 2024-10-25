@@ -1,22 +1,22 @@
-use std::collections::{HashMap, HashSet};
-
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::archived_flow_step::ArchivedFlowStep;
+use crate::models::io::{Io, PkIo};
+use crate::models::node::Node;
+use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams};
+use crate::models::traits::{Context, ModelContext};
+use crate::models::utils::{process_in_chunks, updated_at_cb_fn};
+use anyhow::Context as AnyhowContext;
+use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
 use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
+use macros::{Branchable, FlowId, Id, NodeId};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-
-use macros::{Branchable, FlowId, Id, NodeId};
-
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::archived_flow_step::ArchivedFlowStep;
-use crate::models::io::Io;
-use crate::models::traits::{Branchable, GroupById, Merge, NodeBranchParams};
-use crate::models::traits::{Context, ModelContext};
-use crate::models::utils::updated_at_cb_fn;
+use std::collections::{HashMap, HashSet};
 
 mod create;
 mod delete;
@@ -257,6 +257,65 @@ impl FlowStep {
         [created_io_ids_by_node_id, removed_io_ids_by_node_id]
     }
 
+    pub async fn preserve_flow_step_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branch() {
+            let input_ids: Vec<Uuid> = self
+                .input_ids_by_node_id
+                .clone()
+                .unwrap_or_default()
+                .into_values()
+                .flatten()
+                .into_iter()
+                .collect();
+
+            let output_ids: Vec<Uuid> = self
+                .output_ids_by_node_id
+                .clone()
+                .unwrap_or_default()
+                .into_values()
+                .flatten()
+                .into_iter()
+                .collect();
+
+            let io_ids = input_ids
+                .into_iter()
+                .chain(output_ids.into_iter())
+                .collect::<Vec<Uuid>>();
+
+            let ios =
+                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
+                    .await?
+                    .into_iter()
+                    .map(|mut io| {
+                        io.branch_id = self.branch_id;
+
+                        io
+                    })
+                    .collect::<Vec<Io>>();
+
+            let branched_ios_ids =
+                PkIo::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.branch_id, self.root_id, &io_ids)
+                    .await?
+                    .into_iter()
+                    .map(|io| io.id)
+                    .collect::<HashSet<Uuid>>();
+
+            // 6.0 does not support LWT so we use this to filter out branched ios
+            let ios = ios
+                .into_iter()
+                .filter(|io| !branched_ios_ids.contains(&io.id))
+                .collect::<Vec<Io>>();
+
+            Io::unlogged_batch()
+                .append_inserts(&ios)
+                .execute(data.db_session())
+                .await
+                .context("Failed to preserve branch ios")?;
+        }
+
+        Ok(())
+    }
+
     pub async fn preserve_flow_step_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             let output_ids_by_node_id = self.output_ids_by_node_id.clone();
@@ -265,7 +324,7 @@ impl FlowStep {
             if let Some(output_ids_by_node_id) = output_ids_by_node_id {
                 let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
 
-                for output_id in output_ids {
+                process_in_chunks(output_ids, |output_id| async move {
                     let mut output = Io {
                         root_id: self.root_id,
                         branch_id: self.branch_id,
@@ -276,9 +335,37 @@ impl FlowStep {
                     };
 
                     output.set_branched_init_context();
-                    output.create_branched_if_original_exists(data).await?;
-                }
+                    output.create_branched_if_original_exists(data).await
+                })
+                .await?;
             }
+        }
+
+        Ok(())
+    }
+
+    pub async fn preserve_flow_step_nodes(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branch() {
+            let node_ids = self
+                .input_ids_by_node_id
+                .clone()
+                .unwrap_or_default()
+                .into_keys()
+                .chain(self.output_ids_by_node_id.clone().unwrap_or_default().into_keys())
+                .collect::<Vec<Uuid>>();
+
+            process_in_chunks(node_ids, |node_id| async move {
+                Node::find_or_insert_branched(
+                    data,
+                    ModelBranchParams {
+                        original_id: self.original_id(),
+                        branch_id: self.branch_id,
+                        id: node_id,
+                    },
+                )
+                .await
+            })
+            .await?;
         }
 
         Ok(())

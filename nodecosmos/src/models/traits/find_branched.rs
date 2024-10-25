@@ -108,6 +108,49 @@ macro_rules! impl_find_branched_or_original {
 impl_find_branched_or_original!(Flow);
 impl_find_branched_or_original!(FlowStep);
 
+pub trait FindOriginalOrBranched: Model {
+    async fn find_original_or_branched(
+        db_session: &CachingSession,
+        params: crate::models::traits::ModelBranchParams,
+    ) -> Result<Self, NodecosmosError>;
+}
+
+macro_rules! impl_find_original_or_branched {
+    ($struct_name:ident) => {
+        impl FindOriginalOrBranched for $struct_name {
+            async fn find_original_or_branched(
+                db_session: &CachingSession,
+                params: crate::models::traits::ModelBranchParams,
+            ) -> Result<Self, NodecosmosError> {
+                use crate::models::traits::Branchable;
+
+                if params.is_original() {
+                    return Self::find_first_by_branch_id_and_id(params.branch_id, params.id)
+                        .execute(db_session)
+                        .await
+                        .map_err(NodecosmosError::from);
+                } else {
+                    return match Self::maybe_find_first_by_branch_id_and_id(params.original_id, params.id)
+                        .execute(db_session)
+                        .await?
+                    {
+                        Some(model) => Ok(model),
+                        None => {
+                            let model = Self::find_first_by_branch_id_and_id(params.branch_id, params.id)
+                                .execute(db_session)
+                                .await?;
+
+                            Ok(model)
+                        }
+                    };
+                }
+            }
+        }
+    };
+}
+
+impl_find_original_or_branched!(FlowStep);
+
 pub trait FindOrInsertBranched: Model {
     async fn find_or_insert_branched(
         data: &RequestData,
@@ -126,7 +169,7 @@ impl FindOrInsertBranched for Node {
             .execute(data.db_session())
             .await?;
 
-        return match node {
+        match node {
             Some(node) => Ok(node),
             None => {
                 let mut node = Self::find_by_primary_key_value((params.original_id, params.id))
@@ -143,7 +186,7 @@ impl FindOrInsertBranched for Node {
 
                 Ok(node)
             }
-        };
+        }
     }
 }
 

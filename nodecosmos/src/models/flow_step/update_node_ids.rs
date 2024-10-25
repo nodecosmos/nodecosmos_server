@@ -8,7 +8,9 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateNodeIdsFlowStep};
 use crate::models::io::Io;
-use crate::models::traits::{Branchable, FindOrInsertBranched, ModelBranchParams, ModelContext, ToHashSet};
+use crate::models::traits::{
+    Branchable, FindOrInsertBranched, FindOriginalOrBranched, ModelBranchParams, ModelContext, ToHashSet,
+};
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(
@@ -56,7 +58,7 @@ impl UpdateNodeIdsFlowStep {
     pub async fn update_branch(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         Branch::update(data.db_session(), self.branch_id, BranchUpdate::EditNode(self.node_id)).await?;
 
-        let current = FlowStep::find_or_insert_branched(
+        let fs = FlowStep::find_or_insert_branched(
             data,
             ModelBranchParams {
                 original_id: self.original_id(),
@@ -66,7 +68,20 @@ impl UpdateNodeIdsFlowStep {
         )
         .await?;
 
-        current.preserve_flow_step_outputs(data).await?;
+        fs.preserve_flow_step_inputs(data).await?;
+        fs.preserve_flow_step_outputs(data).await?;
+        fs.preserve_flow_step_nodes(data).await?;
+
+        // we always compare against original if it exists
+        let current = FlowStep::find_original_or_branched(
+            data.db_session(),
+            ModelBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                id: self.id,
+            },
+        )
+        .await?;
 
         let current_db_node_ids = current.node_ids.clone();
         let new_node_ids = self.node_ids.clone();

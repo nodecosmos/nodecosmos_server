@@ -276,11 +276,11 @@ impl Io {
     /// Main `Io` refers to Io from which we copy values so users don't have to redefine complete IO.
     /// Io description for main and copied remains the same, while properties can be different.
     pub async fn main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
-        return if self.is_original() {
+        if self.is_original() {
             self.original_main_io(db_session).await
         } else {
             self.branched_main_io(db_session).await
-        };
+        }
     }
 
     async fn original_main_io(&self, db_session: &CachingSession) -> Result<Option<Self>, NodecosmosError> {
