@@ -161,6 +161,7 @@ impl Callbacks for Node {
     }
 
     async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
+        // TODO: see nodecosmos/src/models/node/create.rs:258
         self.create_branched_if_original_exist(&data).await?;
 
         Ok(())

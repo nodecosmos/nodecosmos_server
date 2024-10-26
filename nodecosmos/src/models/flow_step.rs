@@ -1,13 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
-use crate::models::io::{Io, PkIo};
-use crate::models::node::Node;
 use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams};
 use crate::models::traits::{Context, ModelContext};
-use crate::models::utils::{process_in_chunks, updated_at_cb_fn};
-use anyhow::Context as AnyhowContext;
-use charybdis::batch::ModelBatch;
+use crate::models::utils::updated_at_cb_fn;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
@@ -92,6 +88,7 @@ impl Callbacks for FlowStep {
     }
 
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        // TODO: see nodecosmos/src/models/node/create.rs:258
         self.create_branched_if_original_exists(data).await?;
 
         let _ = ArchivedFlowStep::from(&*self)
@@ -256,120 +253,6 @@ impl FlowStep {
 
         [created_io_ids_by_node_id, removed_io_ids_by_node_id]
     }
-
-    pub async fn preserve_flow_step_inputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
-            let input_ids: Vec<Uuid> = self
-                .input_ids_by_node_id
-                .clone()
-                .unwrap_or_default()
-                .into_values()
-                .flatten()
-                .into_iter()
-                .collect();
-
-            let output_ids: Vec<Uuid> = self
-                .output_ids_by_node_id
-                .clone()
-                .unwrap_or_default()
-                .into_values()
-                .flatten()
-                .into_iter()
-                .collect();
-
-            let io_ids = input_ids
-                .into_iter()
-                .chain(output_ids.into_iter())
-                .collect::<Vec<Uuid>>();
-
-            let ios =
-                Io::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.original_id(), self.root_id, &io_ids)
-                    .await?
-                    .into_iter()
-                    .map(|mut io| {
-                        io.branch_id = self.branch_id;
-
-                        io
-                    })
-                    .collect::<Vec<Io>>();
-
-            let branched_ios_ids =
-                PkIo::find_by_branch_id_and_root_id_and_ids(data.db_session(), self.branch_id, self.root_id, &io_ids)
-                    .await?
-                    .into_iter()
-                    .map(|io| io.id)
-                    .collect::<HashSet<Uuid>>();
-
-            // 6.0 does not support LWT so we use this to filter out branched ios
-            let ios = ios
-                .into_iter()
-                .filter(|io| !branched_ios_ids.contains(&io.id))
-                .collect::<Vec<Io>>();
-
-            Io::unlogged_batch()
-                .append_inserts(&ios)
-                .execute(data.db_session())
-                .await
-                .context("Failed to preserve branch ios")?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn preserve_flow_step_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
-            let output_ids_by_node_id = self.output_ids_by_node_id.clone();
-            let id = self.id;
-
-            if let Some(output_ids_by_node_id) = output_ids_by_node_id {
-                let output_ids = output_ids_by_node_id.values().flatten().cloned().collect::<Vec<Uuid>>();
-
-                process_in_chunks(output_ids, |output_id| async move {
-                    let mut output = Io {
-                        root_id: self.root_id,
-                        branch_id: self.branch_id,
-                        node_id: self.node_id,
-                        id: output_id,
-                        flow_step_id: Some(id),
-                        ..Default::default()
-                    };
-
-                    output.set_branched_init_context();
-                    output.create_branched_if_original_exists(data).await
-                })
-                .await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn preserve_flow_step_nodes(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_branch() {
-            let node_ids = self
-                .input_ids_by_node_id
-                .clone()
-                .unwrap_or_default()
-                .into_keys()
-                .chain(self.output_ids_by_node_id.clone().unwrap_or_default().into_keys())
-                .collect::<Vec<Uuid>>();
-
-            process_in_chunks(node_ids, |node_id| async move {
-                Node::find_or_insert_branched(
-                    data,
-                    ModelBranchParams {
-                        original_id: self.original_id(),
-                        branch_id: self.branch_id,
-                        id: node_id,
-                    },
-                )
-                .await
-            })
-            .await?;
-        }
-
-        Ok(())
-    }
 }
 
 partial_flow_step!(
@@ -440,15 +323,22 @@ impl Callbacks for UpdateNodeIdsFlowStep {
     async fn before_update(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.updated_at = chrono::Utc::now();
 
+        let fs = FlowStep::find_or_insert_branched(
+            data,
+            ModelBranchParams {
+                original_id: self.original_id(),
+                branch_id: self.branch_id,
+                id: self.id,
+            },
+        )
+        .await?;
+
+        self.output_ids_by_node_id = fs.output_ids_by_node_id;
+        self.input_ids_by_node_id = fs.input_ids_by_node_id;
+
         if self.is_branch() {
             self.update_branch(data).await?;
         } else {
-            let node_ids = self.node_ids.take();
-
-            *self = self.find_by_primary_key().execute(data.db_session()).await?;
-
-            self.node_ids = node_ids;
-
             self.delete_output_records_from_removed_nodes(data).await?;
             self.remove_output_references_from_removed_nodes().await?;
             self.remove_input_references_from_removed_nodes().await?;

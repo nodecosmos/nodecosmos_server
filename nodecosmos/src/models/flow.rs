@@ -97,6 +97,7 @@ impl Callbacks for Flow {
     }
 
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
+        // TODO: see nodecosmos/src/models/node/create.rs:258
         self.create_branched_if_original_exists(data).await?;
 
         let _ = ArchivedFlow::from(&*self)
