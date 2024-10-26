@@ -255,7 +255,8 @@ impl Node {
         Ok(())
     }
 
-    // used to preserve deleted node for branch
+    // TODO: formalize 'create_branched_if_original_exist' for all branchable models, as we need to preserve
+    //  branched version of original models in case they exist
     pub async fn create_branched_if_original_exist(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             let original_node = Node {

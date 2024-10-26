@@ -71,7 +71,7 @@ impl Workflow {
                 .execute(db_session)
                 .await?;
 
-            return match (maybe_original, maybe_branched) {
+            match (maybe_original, maybe_branched) {
                 (Some(mut original), Some(mut branched)) => {
                     // merge original initial input ids with branched initial input ids
                     if let Some(original_initial_input_ids) = original.initial_input_ids.as_mut() {
@@ -90,7 +90,7 @@ impl Workflow {
                 (None, None) => Err(NodecosmosError::NotFound(
                     "Branch related workflow not found".to_string(),
                 )),
-            };
+            }
         }
     }
 
