@@ -72,7 +72,15 @@ impl FlowStep {
             let mut clone = self.clone();
             clone.branch_id = branch_id;
 
-            clone.insert_if_not_exists().execute(data.db_session()).await?;
+            if clone
+                .maybe_find_by_primary_key()
+                .execute(data.db_session())
+                .await?
+                .is_none()
+            {
+                clone.insert().execute(data.db_session()).await?;
+            }
+
             clone.preserve_branch_flow(data).await?;
             clone.preserve_flow_step_ios(data).await?;
             clone.preserve_flow_step_nodes(data).await?;
