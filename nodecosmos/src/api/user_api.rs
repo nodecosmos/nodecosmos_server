@@ -191,7 +191,7 @@ pub async fn create_user(
             return Err(NodecosmosError::Unauthorized("Email from token does not match"));
         }
 
-        if TokenType::from(token.token_type.parse()?) != TokenType::Invitation {
+        if token.token_type.parse::<TokenType>()? != TokenType::Invitation {
             return Err(NodecosmosError::Unauthorized("Invalid token type"));
         }
 

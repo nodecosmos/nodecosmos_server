@@ -1,6 +1,7 @@
+#![allow(clippy::type_complexity)]
+
 use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
-
 use api::*;
 use app::App;
 
@@ -24,15 +25,17 @@ fn main() {
 
                 app.init().await;
                 let app_web_data = web::Data::new(app);
+                let session_store = app_web_data.redis_session_store().await;
 
                 HttpServer::new(move || {
                     // web data
                     let db_session_web_data = web::Data::from(app_web_data.db_session.clone());
+                    let session_middleware = app_web_data.session_middleware(session_store.clone());
 
                     ActixWebApp::new()
                         .wrap(Logger::new("%a %r %s %b %{Referer}i %{User-Agent}i %T"))
                         .wrap(app_web_data.cors())
-                        .wrap(app_web_data.session_middleware())
+                        .wrap(session_middleware)
                         .app_data(app_web_data.clone())
                         .app_data(db_session_web_data.clone())
                         .service(

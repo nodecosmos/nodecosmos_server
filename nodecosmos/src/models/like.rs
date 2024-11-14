@@ -102,13 +102,13 @@ impl Callbacks for Like {
 
 impl Like {
     pub async fn like_count(&self, db_session: &CachingSession) -> Result<i64, NodecosmosError> {
-        match LikeObjectType::from(self.object_type.parse()?) {
+        match self.object_type.parse::<LikeObjectType>()? {
             LikeObjectType::Node => {
                 let lc = NodeCounter::like_count(db_session, self.branch_id, self.object_id).await?;
 
                 Ok(lc)
             }
-            _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string()).into()),
+            _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string())),
         }
     }
 }

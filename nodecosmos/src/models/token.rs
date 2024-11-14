@@ -32,9 +32,9 @@ pub struct Token {
 
 impl Token {
     fn generate_token() -> String {
-        let mut rng = OsRng::default();
+        let mut rng = OsRng;
         let random_bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
-        return URL_SAFE.encode(&random_bytes);
+        URL_SAFE.encode(&random_bytes)
     }
 
     pub fn new_user_confirmation(email: Text) -> Self {

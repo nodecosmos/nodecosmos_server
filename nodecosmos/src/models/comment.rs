@@ -92,15 +92,12 @@ impl Callbacks for Comment {
                     match thread.thread_location() {
                         Ok(ThreadLocation::ContributionRequest(thread_location)) => {
                             let notification_text = thread_location.notification_text().to_string();
-                            let mut receiver_ids = thread.participant_ids.get_or_insert_with(|| HashSet::new()).clone();
-                            match thread.branch(data.db_session()).await {
-                                Ok(branch) => {
-                                    receiver_ids.insert(branch.owner_id);
-                                    if let Some(editor_ids) = &branch.editor_ids {
-                                        receiver_ids.extend(editor_ids);
-                                    }
+                            let mut receiver_ids = thread.participant_ids.get_or_insert_with(HashSet::new).clone();
+                            if let Ok(branch) = thread.branch(data.db_session()).await {
+                                receiver_ids.insert(branch.owner_id);
+                                if let Some(editor_ids) = &branch.editor_ids {
+                                    receiver_ids.extend(editor_ids);
                                 }
-                                _ => {}
                             }
                             let _ = Notification::new(
                                 NotificationType::NewComment,
@@ -120,13 +117,10 @@ impl Callbacks for Comment {
                         ),
                         Ok(ThreadLocation::Thread) => {
                             let notification_text = format!("commented thread: {}", thread.title);
-                            let mut receiver_ids = thread.participant_ids.get_or_insert_with(|| HashSet::new()).clone();
-                            match thread.node(data.db_session()).await {
-                                Ok(node) => {
-                                    receiver_ids.insert(node.owner_id);
-                                    receiver_ids.extend(node.editor_ids.clone().unwrap_or_default());
-                                }
-                                _ => {}
+                            let mut receiver_ids = thread.participant_ids.get_or_insert_with(HashSet::new).clone();
+                            if let Ok(node) = thread.node(data.db_session()).await {
+                                receiver_ids.insert(node.owner_id);
+                                receiver_ids.extend(node.editor_ids.clone().unwrap_or_default());
                             }
 
                             let _ = Notification::new(

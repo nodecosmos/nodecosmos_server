@@ -325,7 +325,7 @@ impl Reorder {
             order_index: self.reorder_data.new_order_index,
         };
 
-        if self.reorder_data.is_original() {}
+        self.reorder_data.is_original();
 
         update_order_node.update().execute(db_session).await?;
 
@@ -367,7 +367,7 @@ impl Reorder {
             .await
             .map_err(|err| {
                 log::error!("remove_node_from_removed_ancestors: {:?}", err);
-                return err;
+                err
             })?;
 
         Ok(())
@@ -398,7 +398,7 @@ impl Reorder {
             .await
             .map_err(|err| {
                 log::error!("undo_remove_node_from_old_ancestors: {:?}", err);
-                return err;
+                err
             })?;
 
         Ok(())
@@ -432,7 +432,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("delete_node_descendants_from_removed_ancestors: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -467,7 +467,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("undo_delete_node_descendants_from_removed_ancestors: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -496,7 +496,7 @@ impl Reorder {
             .await
             .map_err(|err| {
                 log::error!("add_node_to_new_ancestors: {:?}", err);
-                return err;
+                err
             })?;
 
         Ok(())
@@ -524,7 +524,7 @@ impl Reorder {
             .await
             .map_err(|err| {
                 log::error!("undo_add_node_to_new_ancestors: {:?}", err);
-                return err;
+                err
             })?;
 
         Ok(())
@@ -558,7 +558,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("insert_node_descendants_to_added_ancestors: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -593,7 +593,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("undo_insert_node_descendants_to_added_ancestors: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -654,7 +654,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("pull_removed_ancestors_from_descendants: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -688,7 +688,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("undo_pull_removed_ancestors_from_descendants: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -746,7 +746,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("push_added_ancestors_to_descendants: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 
@@ -780,7 +780,7 @@ impl Reorder {
                 .await
                 .map_err(|err| {
                     log::error!("undo_push_added_ancestors_to_descendants: {:?}", err);
-                    return err;
+                    err
                 })?;
         }
 

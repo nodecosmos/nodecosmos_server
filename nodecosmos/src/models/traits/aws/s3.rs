@@ -79,7 +79,7 @@ pub trait S3: Sized {
         Ok(presigned_req.uri().to_string())
     }
 
-    async fn delete_s3_objects(data: &RequestData, s3_objects: &Vec<Self>) {
+    async fn delete_s3_objects(data: &RequestData, s3_objects: &[Self]) {
         let s3_object_ids = s3_objects
             .iter()
             .map(|object| object.s3_object_id())
@@ -168,8 +168,7 @@ impl S3 for Attachment {
 
 impl S3 for UpdateCoverImageNode {
     fn s3_key(&self) -> &String {
-        &self
-            .cover_image_filename
+        self.cover_image_filename
             .as_ref()
             .expect("cover_image_filename should be set")
     }
@@ -181,8 +180,7 @@ impl S3 for UpdateCoverImageNode {
 
 impl S3 for UpdateProfileImageUser {
     fn s3_key(&self) -> &String {
-        &self
-            .profile_image_filename
+        self.profile_image_filename
             .as_ref()
             .expect("profile_image_filename should be set")
     }

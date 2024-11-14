@@ -27,15 +27,15 @@ impl MergeDescriptions {
         let edited_object_ids = branch.all_edited_description_ids();
         let deleted_object_ids = branch.all_deleted_object_ids();
 
-        if edited_object_ids.len() > 0 || deleted_object_ids.len() > 0 {
-            if edited_object_ids.len() > 0 {
+        if !edited_object_ids.is_empty() || !deleted_object_ids.is_empty() {
+            if !edited_object_ids.is_empty() {
                 edited_descriptions = Description::find_by_branch_id_and_ids(db_session, branch.id, &edited_object_ids)
                     .await?
                     .try_collect()
                     .await?;
             }
 
-            if deleted_object_ids.len() > 0 {
+            if !deleted_object_ids.is_empty() {
                 deleted_descriptions =
                     Description::find_by_branch_id_and_ids(db_session, branch.id, &deleted_object_ids)
                         .await?

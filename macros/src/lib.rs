@@ -80,10 +80,10 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let has_parent_field = input.struct_fields().iter().any(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "parent",
             None => false,
-        };
+        }
     });
 
     if !has_parent_field {
@@ -140,10 +140,10 @@ pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let has_auth_branch = input.struct_fields().iter().any(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "auth_branch",
             None => false,
-        };
+        }
     });
 
     if !has_auth_branch {
@@ -295,10 +295,10 @@ pub fn id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "id",
             None => false,
-        };
+        }
     });
 
     if id.is_none() {
@@ -321,10 +321,10 @@ pub fn root_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let root_id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "root_id",
             None => false,
-        };
+        }
     });
 
     if root_id.is_none() {
@@ -347,10 +347,10 @@ pub fn object_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let object_id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "object_id",
             None => false,
-        };
+        }
     });
 
     if object_id.is_none() {
@@ -373,10 +373,10 @@ pub fn node_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let node_id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "node_id",
             None => false,
-        };
+        }
     });
 
     if node_id.is_none() {
@@ -399,10 +399,10 @@ pub fn pluck_flow_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "flow_id",
             None => false,
-        };
+        }
     });
 
     if id.is_none() {
@@ -425,10 +425,10 @@ pub fn maybe_flow_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "flow_id",
             None => false,
-        };
+        }
     });
 
     if id.is_none() {
@@ -452,10 +452,10 @@ pub fn maybe_flow_step_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let id = input.struct_fields().iter().find(|field| {
-        return match field.ident {
+        match field.ident {
             Some(ref ident) => ident == "flow_step_id",
             None => false,
-        };
+        }
     });
 
     if id.is_none() {

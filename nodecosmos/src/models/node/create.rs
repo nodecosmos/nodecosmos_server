@@ -67,10 +67,8 @@ impl Node {
             if self.root_id != self.id {
                 return Err(NodecosmosError::ValidationError(("root_id", "must be equal to id")));
             }
-        } else {
-            if self.root_id == Uuid::default() || self.root_id == self.id {
-                return Err(NodecosmosError::ValidationError(("root_id", "is invalid")));
-            }
+        } else if self.root_id == Uuid::default() || self.root_id == self.id {
+            return Err(NodecosmosError::ValidationError(("root_id", "is invalid")));
         }
 
         Ok(())
@@ -144,7 +142,7 @@ impl Node {
                     root_id: self.root_id,
                     ..Default::default()
                 };
-                let future = ancestor.create_branched_if_not_exist(&data);
+                let future = ancestor.create_branched_if_not_exist(data);
 
                 futures.push(future);
             }
@@ -193,7 +191,7 @@ impl Node {
                     }
 
                     node.append_to_ancestors(data.db_session()).await?;
-                    node.maybe_create_workflow(&data).await?;
+                    node.maybe_create_workflow(data).await?;
                 }
                 Err(e) => {
                     error!(
@@ -228,7 +226,7 @@ impl Node {
                     root_id: self.root_id,
                     ..Default::default()
                 };
-                let future = descendant_node.create_branched_if_not_exist(&data);
+                let future = descendant_node.create_branched_if_not_exist(data);
 
                 futures.push(future);
             }

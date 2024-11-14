@@ -41,7 +41,7 @@ impl FromRequest for OptCurrentUser {
 }
 
 pub fn set_current_user(client_session: &Session, current_user: &CurrentUser) -> Result<(), NodecosmosError> {
-    client_session.insert("current_user", &current_user).map_err(|e| {
+    client_session.insert("current_user", current_user).map_err(|e| {
         error!("Could not set current user. {}", e);
 
         NodecosmosError::ClientSessionError("Could not set current user.".to_string())
@@ -75,12 +75,12 @@ pub async fn refresh_current_user(
     client_session: &Session,
     db_session: &CachingSession,
 ) -> Result<(), NodecosmosError> {
-    let current_user = get_current_user(&client_session);
+    let current_user = get_current_user(client_session);
 
     match current_user {
         Some(user) => {
-            let user = CurrentUser::find_by_id(user.id).execute(&db_session).await?;
-            set_current_user(&client_session, &user)
+            let user = CurrentUser::find_by_id(user.id).execute(db_session).await?;
+            set_current_user(client_session, &user)
         }
         None => Err(NodecosmosError::InternalServerError("Failed to find user".to_string())),
     }

@@ -87,7 +87,7 @@ impl Notification {
         let notifications: Vec<Notification> = receiver_ids
             .into_iter()
             .filter_map(|receiver_id| {
-                return if receiver_id != data.current_user.id {
+                if receiver_id != data.current_user.id {
                     Some(Notification {
                         id: Uuid::new_v4(),
                         user_id: receiver_id,
@@ -95,7 +95,7 @@ impl Notification {
                     })
                 } else {
                     None
-                };
+                }
             })
             .collect();
 
