@@ -19,7 +19,7 @@ where
             break;
         }
 
-        let futures = chunk.into_iter().map(|item| process_fn(item));
+        let futures = chunk.into_iter().map(&mut process_fn);
         try_join_all(futures).await?;
     }
 

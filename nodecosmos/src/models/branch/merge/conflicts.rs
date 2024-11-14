@@ -65,12 +65,12 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if conflict_deleted_ancestor_ids.len() > 0 {
+        if !conflict_deleted_ancestor_ids.is_empty() {
             branch
                 .conflict
-                .get_or_insert_with(|| Conflict::default())
+                .get_or_insert_with(Conflict::default)
                 .deleted_ancestors
-                .get_or_insert_with(|| Set::new())
+                .get_or_insert_with(Set::new)
                 .extend(conflict_deleted_ancestor_ids);
         }
 
@@ -168,11 +168,11 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if deleted_edited_nodes.len() > 0 {
+        if !deleted_edited_nodes.is_empty() {
             self.branch_merge
                 .branch
                 .conflict
-                .get_or_insert_with(|| Conflict::default())
+                .get_or_insert_with(Conflict::default)
                 .deleted_edited_nodes = Some(deleted_edited_nodes);
         }
 
@@ -182,49 +182,31 @@ impl<'a> MergeConflicts<'a> {
     async fn extract_deleted_edited_flows(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut edited_flow_ids = self.branch_merge.branch.edited_description_flows.ref_cloned();
 
-        self.branch_merge
+        if let Some(flow_steps) = self.branch_merge
             .flow_steps
             .created_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_ids.extend(flow_steps.pluck_flow_id());
-            });
+            .as_ref() { edited_flow_ids.extend(flow_steps.pluck_flow_id()); }
 
-        self.branch_merge
+        if let Some(flow_steps) = self.branch_merge
             .flow_steps
             .restored_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_ids.extend(flow_steps.pluck_flow_id());
-            });
+            .as_ref() { edited_flow_ids.extend(flow_steps.pluck_flow_id()); }
 
-        self.branch_merge
+        if let Some(flow_steps) = self.branch_merge
             .flow_steps
             .branched_created_fs_nodes_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
-            });
+            .as_ref() { edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id())); }
 
-        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
-            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
-        });
+        if let Some(ios) = self.branch_merge.ios.created_ios.as_ref() { edited_flow_ids.extend(ios.maybe_pluck_flow_id()); }
 
-        self.branch_merge
+        if let Some(flow_steps) = self.branch_merge
             .flow_steps
             .branched_created_fs_inputs_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id()));
-            });
+            .as_ref() { edited_flow_ids.extend(flow_steps.values().map(|item| item.flow_id())); }
 
-        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
-            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
-        });
+        if let Some(ios) = self.branch_merge.ios.created_ios.as_ref() { edited_flow_ids.extend(ios.maybe_pluck_flow_id()); }
 
-        self.branch_merge.ios.restored_ios.as_ref().map(|ios| {
-            edited_flow_ids.extend(ios.maybe_pluck_flow_id());
-        });
+        if let Some(ios) = self.branch_merge.ios.restored_ios.as_ref() { edited_flow_ids.extend(ios.maybe_pluck_flow_id()); }
 
         let original_edited_flow_ids = edited_flow_ids
             .iter()
@@ -259,7 +241,7 @@ impl<'a> MergeConflicts<'a> {
             let original_flow_ids_set = Flow::find_by_branch_id_and_node_ids(
                 db_session,
                 self.branch_merge.branch.original_id(),
-                &edited_node_ids,
+                edited_node_ids,
             )
             .await?
             .pluck_id_set()
@@ -276,11 +258,11 @@ impl<'a> MergeConflicts<'a> {
                 })
                 .collect::<Set<Uuid>>();
 
-            if conflict_deleted_edited_flows.len() > 0 {
+            if !conflict_deleted_edited_flows.is_empty() {
                 self.branch_merge
                     .branch
                     .conflict
-                    .get_or_insert_with(|| Conflict::default())
+                    .get_or_insert_with(Conflict::default)
                     .deleted_edited_flows = Some(conflict_deleted_edited_flows);
             }
         }
@@ -291,17 +273,12 @@ impl<'a> MergeConflicts<'a> {
     async fn extract_deleted_edited_flow_steps(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let mut edited_flow_step_ids = self.branch_merge.branch.edited_description_flow_steps.ref_cloned();
 
-        self.branch_merge
+        if let Some(flow_steps) = self.branch_merge
             .flow_steps
             .branched_created_fs_nodes_flow_steps
-            .as_ref()
-            .map(|flow_steps| {
-                edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id));
-            });
+            .as_ref() { edited_flow_step_ids.extend(flow_steps.values().map(|item| item.id)); }
 
-        self.branch_merge.ios.created_ios.as_ref().map(|ios| {
-            edited_flow_step_ids.extend(ios.maybe_pluck_flow_step_id());
-        });
+        if let Some(ios) = self.branch_merge.ios.created_ios.as_ref() { edited_flow_step_ids.extend(ios.maybe_pluck_flow_step_id()); }
 
         edited_flow_step_ids.extend(self.branch_merge.flow_steps.created_fs_nodes_flow_steps.pluck_id_set());
         edited_flow_step_ids.extend(self.branch_merge.ios.created_ios.maybe_pluck_flow_step_id());
@@ -339,7 +316,7 @@ impl<'a> MergeConflicts<'a> {
             let original_flow_step_ids_set = FlowStep::find_by_branch_id_and_node_ids(
                 db_session,
                 self.branch_merge.branch.original_id(),
-                &edited_node_ids,
+                edited_node_ids,
             )
             .await?
             .pluck_id_set()
@@ -356,11 +333,11 @@ impl<'a> MergeConflicts<'a> {
                 })
                 .collect::<Set<Uuid>>();
 
-            if conflict_deleted_edited_flow_steps.len() > 0 {
+            if !conflict_deleted_edited_flow_steps.is_empty() {
                 self.branch_merge
                     .branch
                     .conflict
-                    .get_or_insert_with(|| Conflict::default())
+                    .get_or_insert_with(Conflict::default)
                     .deleted_edited_flow_steps = Some(conflict_deleted_edited_flow_steps);
             }
         }
@@ -414,11 +391,11 @@ impl<'a> MergeConflicts<'a> {
                 }
             }
 
-            if conflicting_flow_steps.len() > 0 {
+            if !conflicting_flow_steps.is_empty() {
                 self.branch_merge
                     .branch
                     .conflict
-                    .get_or_insert_with(|| Conflict::default())
+                    .get_or_insert_with(Conflict::default)
                     .conflicting_flow_steps = Some(conflicting_flow_steps);
             }
         }
@@ -463,11 +440,11 @@ impl<'a> MergeConflicts<'a> {
             })
             .collect::<Set<Uuid>>();
 
-        if conflict_deleted_edited_ios.len() > 0 {
+        if !conflict_deleted_edited_ios.is_empty() {
             self.branch_merge
                 .branch
                 .conflict
-                .get_or_insert_with(|| Conflict::default())
+                .get_or_insert_with(Conflict::default)
                 .deleted_edited_ios = Some(conflict_deleted_edited_ios);
         }
 

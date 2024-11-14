@@ -223,7 +223,7 @@ impl BranchMerge {
                 MergeStep::UpdateFlowsTitles => self.flows.update_title(data, &mut self.branch).await?,
                 MergeStep::DeleteFlowSteps => self.flow_steps.delete_flow_steps(data).await?,
                 MergeStep::RestoreFlowSteps => self.flow_steps.restore_flow_steps(data).await?,
-                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &mut self.branch).await?,
+                MergeStep::CreateFlowSteps => self.flow_steps.create_flow_steps(data, &self.branch).await?,
                 MergeStep::CreateFlowStepNodes => self.flow_steps.create_flow_step_nodes(data).await?,
                 MergeStep::DeleteFlowStepNodes => self.flow_steps.delete_flow_step_nodes(data, &self.branch).await?,
                 MergeStep::CreateFlowStepInputs => self.flow_steps.create_inputs(data).await?,

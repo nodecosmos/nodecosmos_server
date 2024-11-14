@@ -355,11 +355,11 @@ impl Branch {
                     .entry(fs_id)
                     .and_modify(|inputs| {
                         for (node_id, input_ids) in &created_flow_step_inputs_by_node {
-                            inputs.get_mut(node_id).map(|ids| {
+                            if let Some(ids) = inputs.get_mut(node_id) {
                                 for id in input_ids {
                                     ids.remove(id);
                                 }
-                            });
+                            }
                         }
                     });
 
@@ -385,11 +385,11 @@ impl Branch {
                     .entry(fs_id)
                     .and_modify(|inputs| {
                         for (node_id, input_ids) in &deleted_fs_inputs_by_node_delta {
-                            inputs.get_mut(node_id).map(|ids| {
+                            if let Some(ids) = inputs.get_mut(node_id) {
                                 for id in input_ids {
                                     ids.remove(id);
                                 }
-                            });
+                            }
                         }
                     });
 
@@ -415,11 +415,11 @@ impl Branch {
                     .entry(fs_id)
                     .and_modify(|outputs| {
                         for (node_id, output_ids) in &created_fs_outputs_by_node_delta {
-                            outputs.get_mut(node_id).map(|ids| {
+                            if let Some(ids) = outputs.get_mut(node_id) {
                                 for id in output_ids {
                                     ids.remove(id);
                                 }
-                            });
+                            }
                         }
                     });
 
@@ -445,11 +445,11 @@ impl Branch {
                     .entry(fs_id)
                     .and_modify(|outputs| {
                         for (node_id, output_ids) in &deleted_fs_outputs_by_node_delta {
-                            outputs.get_mut(node_id).map(|ids| {
+                            if let Some(ids) = outputs.get_mut(node_id) {
                                 for id in output_ids {
                                     ids.remove(id);
                                 }
-                            });
+                            }
                         }
                     });
 
@@ -514,9 +514,7 @@ impl Branch {
                     .get_or_insert_with(Map::new)
                     .entry(fs_id)
                     .and_modify(|outputs| {
-                        outputs
-                            .get_mut(&node_id)
-                            .and_then(|outputs| Some(outputs.remove(&output_id)));
+                        outputs.get_mut(&node_id).map(|outputs| outputs.remove(&output_id));
                     });
 
                 res = branch.update().execute(db_session).await;

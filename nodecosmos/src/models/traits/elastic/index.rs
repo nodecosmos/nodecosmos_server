@@ -25,7 +25,7 @@ pub trait ElasticIndex {
             .await
             .unwrap();
 
-        let status = response.status_code().clone();
+        let status = response.status_code();
 
         status.is_success()
     }
@@ -37,28 +37,25 @@ pub trait BuildIndex: ElasticIndex {
 
 impl<T: ElasticIndex> BuildIndex for T {
     async fn build_index(client: &Elasticsearch) {
-        let response;
-
-        if T::idx_exists(client).await {
+        let response = if T::idx_exists(client).await {
             info!(
                 "{} {}",
                 "Sync elastic index for".bright_green(),
                 Self::ELASTIC_IDX_NAME.bright_yellow()
             );
-
-            response = client
+            client
                 .indices()
                 .put_mapping(IndicesPutMappingParts::Index(&[Self::ELASTIC_IDX_NAME]))
                 .body(Self::mappings_json())
                 .send()
-                .await;
+                .await
         } else {
             info!(
                 "{} {}",
                 "Creating elastic index for".bright_green(),
                 Self::ELASTIC_IDX_NAME.bright_yellow()
             );
-            response = client
+            client
                 .indices()
                 .create(IndicesCreateParts::Index(Self::ELASTIC_IDX_NAME))
                 .body(json!({
@@ -66,8 +63,8 @@ impl<T: ElasticIndex> BuildIndex for T {
                     "mappings": Self::mappings_json()
                 }))
                 .send()
-                .await;
-        }
+                .await
+        };
 
         let response = response.unwrap_or_else(|e| {
             panic!("Failed to send index request: {:#?}", e);

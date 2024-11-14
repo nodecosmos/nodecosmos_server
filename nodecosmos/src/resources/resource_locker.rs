@@ -11,6 +11,7 @@ const LOCK_NAMESPACE: &str = "LOCK";
 #[derive(Clone)]
 pub struct ResourceLocker {
     pool: Pool,
+    replicas: u8,
 }
 
 impl ResourceLocker {
@@ -18,8 +19,15 @@ impl ResourceLocker {
     pub const TWO_SECONDS: usize = 2000;
     pub const FIVE_MINUTES: usize = 1000 * 60 * 5;
 
-    pub fn new(pool: &Pool) -> Self {
-        Self { pool: pool.clone() }
+    const RETRY_LOCK_TIMEOUT: u64 = 1000;
+    const RESOURCE_LOCK_ERROR: NodecosmosError =
+        NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
+
+    pub fn new(pool: &Pool, instances: u8) -> Self {
+        Self {
+            pool: pool.clone(),
+            replicas: instances - 1,
+        }
     }
 
     /// Lock complete resource
@@ -63,16 +71,16 @@ impl ResourceLocker {
         self.validate_resource_unlocked(id, branch_id, true)
             .await
             .map_err(|e| {
-                return NodecosmosError::ResourceAlreadyLocked(format!(
+                NodecosmosError::ResourceAlreadyLocked(format!(
                     "[lock_resource_actions] Resource  is already locked. Error: {}",
                     e
-                ));
+                ))
             })?;
 
         let mut pipe = redis::pipe();
         for action in actions {
             pipe.cmd("SET")
-                .arg(self.action_key(&action, id, branch_id))
+                .arg(self.action_key(action, id, branch_id))
                 .arg("1")
                 .arg("NX")
                 .arg("PX")
@@ -103,7 +111,7 @@ impl ResourceLocker {
         let mut pipe = redis::pipe();
 
         for action in actions {
-            pipe.cmd("DEL").arg(self.action_key(&action, id, branch_id));
+            pipe.cmd("DEL").arg(self.action_key(action, id, branch_id));
         }
 
         pipe.query_async::<()>(&mut *connection)
@@ -182,13 +190,6 @@ impl ResourceLocker {
         Ok(())
     }
 
-    // private
-    const REDIS_INSTANCES: usize = 1;
-    const REPLICAS: usize = Self::REDIS_INSTANCES - 1;
-    const RETRY_LOCK_TIMEOUT: u64 = 1000;
-    const RESOURCE_LOCK_ERROR: NodecosmosError =
-        NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
-
     fn key(&self, id: Uuid, branch_id: Uuid) -> String {
         format!("{}:{}:{}", LOCK_NAMESPACE, id, branch_id)
     }
@@ -208,13 +209,13 @@ impl ResourceLocker {
         let mut connection = self.pool.get().await?;
 
         let wait_result: redis::RedisResult<usize> = redis::cmd("WAIT")
-            .arg(Self::REPLICAS) // Number of replicas to acknowledge the write.
+            .arg(self.replicas) // Number of replicas to acknowledge the write.
             .arg(1000) // Timeout in milliseconds.
             .query_async(&mut *connection)
             .await;
 
-        return match wait_result {
-            Ok(replicas) if replicas >= Self::REPLICAS => Ok(()),
+        match wait_result {
+            Ok(replicas) if replicas >= self.replicas as usize => Ok(()),
             Ok(replicas) => Err(NodecosmosError::LockerError(format!(
                 "Lock not sufficiently replicated! Replicas: {}",
                 replicas
@@ -223,7 +224,7 @@ impl ResourceLocker {
                 "WAIT command failed! Error: {:?}",
                 e
             ))),
-        };
+        }
     }
 
     async fn is_resource_locked(&self, id: Uuid, branch_id: Uuid) -> Result<bool, NodecosmosError> {
@@ -249,7 +250,7 @@ impl ResourceLocker {
         let mut connection = self.pool.get().await?;
 
         let res = connection
-            .exists(self.action_key(&action, id, branch_id))
+            .exists(self.action_key(action, id, branch_id))
             .await
             .map_err(|e| {
                 NodecosmosError::LockerError(format!(

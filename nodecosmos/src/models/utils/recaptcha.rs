@@ -8,7 +8,7 @@ pub async fn validate_recaptcha(app: &App, token: &Option<String>) -> Result<(),
             // https://www.google.com/recaptcha/api/siteverify
             let recaptcha_response = Client::new()
                 .post("https://www.google.com/recaptcha/api/siteverify")
-                .form(&[("secret", &app.recaptcha_secret), ("response", &r_token)])
+                .form(&[("secret", &app.recaptcha_secret), ("response", r_token)])
                 .send()
                 .await
                 .map_err(|e| {

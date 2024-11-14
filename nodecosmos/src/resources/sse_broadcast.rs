@@ -39,7 +39,7 @@ impl SseBroadcast {
     pub fn ping_channels(&self) {
         for channel in self.root_channels.iter() {
             let root_id = channel.key();
-            if let Some(sender) = self.root_channels.get(&root_id) {
+            if let Some(sender) = self.root_channels.get(root_id) {
                 let _ = sender.send(web::Bytes::from("event: PING\ndata: PONG\n\n"));
             }
         }
@@ -63,7 +63,7 @@ impl SseBroadcast {
         self.root_channels.retain(|_, v| {
             log::info!("Cleaning up room: {}", v.receiver_count());
 
-            return v.receiver_count() > 0;
+            v.receiver_count() > 0
         });
     }
 }
@@ -93,7 +93,7 @@ impl<'a, M: BaseModel + Serialize> ModelEvent<'a, M> {
     fn to_sse(&self) -> Result<Bytes, NodecosmosError> {
         let msg = web::Bytes::from(format!(
             "event: {}\ndata: {}\n\n",
-            self.action_type.to_string(),
+            self.action_type,
             self.model.to_json()?
         ));
 

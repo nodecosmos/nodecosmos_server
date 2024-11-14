@@ -13,7 +13,7 @@ use crate::resources::sse_broadcast::ModelEvent;
 impl Comment {
     pub async fn set_default_values(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         let now = chrono::Utc::now();
-        let thread = self.thread(&data.db_session()).await?;
+        let thread = self.thread(data.db_session()).await?;
 
         match thread {
             Some(thread) => {
@@ -66,7 +66,7 @@ impl Comment {
     }
 
     pub async fn emmit_create_event(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        let thread = self.thread(&data.db_session()).await?;
+        let thread = self.thread(data.db_session()).await?;
 
         match thread {
             Some(thread) => {

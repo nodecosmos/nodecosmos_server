@@ -245,10 +245,10 @@ impl ContributionRequest {
             self.branch.replace(branch);
         }
 
-        Ok(self
+        self
             .branch
             .as_ref()
-            .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))?)
+            .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))
     }
 
     pub async fn merge(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

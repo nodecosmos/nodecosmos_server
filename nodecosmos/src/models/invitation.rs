@@ -167,7 +167,7 @@ impl Callbacks for Invitation {
                     format!("{}/invitations?token={}", data.app.config.client_url, token.id),
                     Some(Profile::init_from_current_user(&data.current_user)),
                 )
-                .create_for_receivers(&data, receiver_ids)
+                .create_for_receivers(data, receiver_ids)
                 .await
                 .map_err(|e| {
                     error!("Error while creating notification: {}", e);
@@ -253,7 +253,7 @@ impl Invitation {
         node_id: Uuid,
         editor_id: Uuid,
     ) -> Result<(), NodecosmosError> {
-        let editor = User::maybe_find_first_by_id(editor_id).execute(&db_session).await?;
+        let editor = User::maybe_find_first_by_id(editor_id).execute(db_session).await?;
 
         if let Some(editor) = editor {
             let mut batch = DeleteIvitation::delete_batch();
@@ -273,7 +273,7 @@ impl Invitation {
             batch
                 .append_delete(&by_username)
                 .append_delete(&by_email)
-                .execute(&db_session)
+                .execute(db_session)
                 .await?;
         }
 
@@ -288,10 +288,10 @@ impl Invitation {
             self.node = Some(node);
         }
 
-        Ok(self
+        self
             .node
             .as_mut()
-            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))?)
+            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
     }
 
     pub async fn inviter(&self, db_session: &CachingSession) -> Result<User, NodecosmosError> {
@@ -302,7 +302,7 @@ impl Invitation {
     }
 
     pub async fn invitee(&self, db_session: &CachingSession) -> Result<Option<User>, NodecosmosError> {
-        return if EmailAddress::is_valid(&self.username_or_email) {
+        if EmailAddress::is_valid(&self.username_or_email) {
             User::maybe_find_first_by_email(self.username_or_email.clone())
                 .execute(db_session)
                 .await
@@ -312,7 +312,7 @@ impl Invitation {
                 .execute(db_session)
                 .await
                 .map_err(NodecosmosError::from)
-        };
+        }
     }
 }
 

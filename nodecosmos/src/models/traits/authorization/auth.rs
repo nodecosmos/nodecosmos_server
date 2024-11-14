@@ -66,13 +66,13 @@ pub trait Authorization: AuthorizationFields {
         db_session: &CachingSession,
         current_user: &OptCurrentUser,
     ) -> Result<(), NodecosmosError> {
-        self.init_auth_info(&db_session).await?;
+        self.init_auth_info(db_session).await?;
 
         if self.is_public() {
             return Ok(());
         }
 
-        return match &current_user.0 {
+        match &current_user.0 {
             Some(current_user) => {
                 if self.owner_id() == Some(current_user.id)
                     || self
@@ -94,7 +94,7 @@ pub trait Authorization: AuthorizationFields {
             None => Err(NodecosmosError::Unauthorized(
                 "You are not allowed to view this resource!",
             )),
-        };
+        }
     }
 }
 
@@ -148,7 +148,7 @@ impl Authorization for CommentThread {
             return Err(NodecosmosError::Unauthorized("User is blocked"));
         }
 
-        return match self.thread_object_type() {
+        match self.thread_object_type() {
             Ok(ThreadObjectType::ContributionRequest) => {
                 let branch = self.branch(data.db_session()).await?;
                 branch
@@ -171,7 +171,7 @@ impl Authorization for CommentThread {
                 "Error getting thread object_type: {}",
                 e
             ))),
-        };
+        }
     }
 
     async fn auth_update(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
@@ -183,7 +183,7 @@ impl Authorization for CommentThread {
             return Err(NodecosmosError::Unauthorized("User is blocked"));
         }
 
-        return match self.thread_object_type() {
+        match self.thread_object_type() {
             Ok(ThreadObjectType::ContributionRequest) => {
                 let branch = self.branch(data.db_session()).await?;
                 branch.auth_update(data).await
@@ -197,7 +197,7 @@ impl Authorization for CommentThread {
                 "Error getting thread object_type: {}",
                 e
             ))),
-        };
+        }
     }
 }
 
@@ -211,10 +211,10 @@ impl Authorization for Comment {
     }
 
     async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        return match self.thread(data.db_session()).await? {
+        match self.thread(data.db_session()).await? {
             Some(thread) => thread.auth_creation(data).await,
             None => Err(NodecosmosError::Forbidden("Comment must have a thread!".to_string())),
-        };
+        }
     }
 }
 

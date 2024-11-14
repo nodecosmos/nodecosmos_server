@@ -184,7 +184,7 @@ impl ResponseError for NodecosmosError {
                     }))
                 }
                 _ => {
-                    NodecosmosError::InternalServerError(format!("CharybdisError: {}", e.to_string())).error_response()
+                    NodecosmosError::InternalServerError(format!("CharybdisError: {}", e)).error_response()
                 }
             },
             _ => {

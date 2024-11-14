@@ -181,7 +181,7 @@ impl FindOrInsertBranched for Node {
 
                 node.insert_cb(data)
                     .execute(data.db_session())
-                    .map_err(|err| NodecosmosError::from(err))
+                    .map_err(|err| err)
                     .await?;
 
                 Ok(node)
