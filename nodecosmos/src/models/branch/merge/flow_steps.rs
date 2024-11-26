@@ -231,17 +231,17 @@ impl MergeFlowSteps {
     }
 
     pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
-        let restored_flow_steps = Self::restored_flow_steps(&db_session, branch).await?;
-        let created_flow_steps = Self::created_flow_steps(&db_session, branch).await?;
-        let deleted_flow_steps = Self::deleted_flow_steps(&db_session, branch).await?;
-        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(&db_session, branch).await?;
+        let restored_flow_steps = Self::restored_flow_steps(db_session, branch).await?;
+        let created_flow_steps = Self::created_flow_steps(db_session, branch).await?;
+        let deleted_flow_steps = Self::deleted_flow_steps(db_session, branch).await?;
+        let created_fs_nodes_flow_steps = Self::created_fs_nodes_flow_steps(db_session, branch).await?;
         let branched_created_fs_nodes_flow_steps =
-            Self::branched_created_fs_nodes_flow_steps(&db_session, branch).await?;
-        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(&db_session, branch).await?;
-        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(&db_session, branch).await?;
+            Self::branched_created_fs_nodes_flow_steps(db_session, branch).await?;
+        let deleted_fs_nodes_flow_steps = Self::deleted_fs_nodes_flow_steps(db_session, branch).await?;
+        let created_fs_inputs_flow_steps = Self::created_fs_inputs_flow_steps(db_session, branch).await?;
         let branched_created_fs_inputs_flow_steps =
-            Self::branched_created_fs_inputs_flow_steps(&db_session, branch).await?;
-        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(&db_session, branch).await?;
+            Self::branched_created_fs_inputs_flow_steps(db_session, branch).await?;
+        let deleted_fs_inputs_flow_steps = Self::deleted_fs_inputs_flow_steps(db_session, branch).await?;
 
         Ok(Self {
             restored_flow_steps,
@@ -429,7 +429,7 @@ impl MergeFlowSteps {
         ) {
             for original_flow_step in created_fs_nodes_flow_steps {
                 if let Some(node_ids) = added_node_ids_by_flow_step.get(&original_flow_step.id) {
-                    original_flow_step.remove_nodes(&node_ids);
+                    original_flow_step.remove_nodes(node_ids);
                     original_flow_step.set_merge_context();
                     original_flow_step
                         .update_cb(data)
@@ -502,12 +502,11 @@ impl MergeFlowSteps {
             for original_flow_step in deleted_fs_nodes_flow_steps {
                 if let Some(removed_node_ids) = self
                     .removed_node_ids_by_flow_step
-                    .as_ref()
-                    .map_or(None, |removed_node_ids_by_flow_step| {
+                    .as_ref().and_then(|removed_node_ids_by_flow_step| {
                         removed_node_ids_by_flow_step.get(&original_flow_step.id)
                     })
                 {
-                    original_flow_step.append_nodes(&removed_node_ids);
+                    original_flow_step.append_nodes(removed_node_ids);
                     original_flow_step.set_merge_context();
                     original_flow_step
                         .update_cb(data)
@@ -540,7 +539,7 @@ impl MergeFlowSteps {
                                 .and_then(|m| m.get(node_id));
 
                             let added_delta = input_ids
-                                .into_iter()
+                                .iter()
                                 .filter_map(|input_id| {
                                     if original_node_inputs.is_none()
                                         || !original_node_inputs.is_some_and(|inputs| inputs.contains(input_id))
@@ -585,12 +584,11 @@ impl MergeFlowSteps {
             for original_flow_step in created_fs_inputs_flow_steps {
                 if let Some(added_input_ids_by_node_id) = self
                     .added_input_ids_by_flow_step
-                    .as_ref()
-                    .map_or(None, |added_input_ids_by_flow_step| {
+                    .as_ref().and_then(|added_input_ids_by_flow_step| {
                         added_input_ids_by_flow_step.get(&original_flow_step.id)
                     })
                 {
-                    original_flow_step.remove_inputs(&added_input_ids_by_node_id);
+                    original_flow_step.remove_inputs(added_input_ids_by_node_id);
                     original_flow_step.set_merge_context();
                     original_flow_step
                         .update_cb(data)
@@ -680,12 +678,11 @@ impl MergeFlowSteps {
             for original_flow_step in deleted_fs_inputs_flow_steps {
                 if let Some(removed_input_ids_by_node) = self
                     .removed_input_ids_by_flow_step
-                    .as_ref()
-                    .map_or(None, |removed_input_ids_by_flow_step| {
+                    .as_ref().and_then(|removed_input_ids_by_flow_step| {
                         removed_input_ids_by_flow_step.get(&original_flow_step.id)
                     })
                 {
-                    original_flow_step.append_inputs(&removed_input_ids_by_node);
+                    original_flow_step.append_inputs(removed_input_ids_by_node);
 
                     original_flow_step.set_merge_context();
                     original_flow_step

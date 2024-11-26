@@ -32,7 +32,7 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(restored_node_ids) = &branch.restored_nodes {
-            let mut branched_nodes = Node::find_by_ids(db_session, branch.id, &restored_node_ids)
+            let mut branched_nodes = Node::find_by_ids(db_session, branch.id, restored_node_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -80,7 +80,7 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
-            let mut deleted_nodes = Node::find_by_ids(db_session, branch.original_id(), &deleted_node_ids)
+            let mut deleted_nodes = Node::find_by_ids(db_session, branch.original_id(), deleted_node_ids)
                 .await?
                 .try_collect()
                 .await?;
@@ -94,9 +94,7 @@ impl MergeNodes {
     }
 
     pub fn reordered_nodes_data(branch: &Branch) -> Option<List<Frozen<BranchReorderData>>> {
-        if let Some(reordered_nodes) = branch.reordered_nodes.as_ref() {
-            Some(
-                reordered_nodes
+        branch.reordered_nodes.as_ref().map(|reordered_nodes| reordered_nodes
                     .clone()
                     .into_iter()
                     .filter(|reorder_data| {
@@ -109,11 +107,7 @@ impl MergeNodes {
                                 .as_ref()
                                 .map_or(false, |created_nodes| created_nodes.contains(&reorder_data.id))
                     })
-                    .collect(),
-            )
-        } else {
-            None
-        }
+                    .collect())
     }
 
     pub async fn edited_title_nodes(

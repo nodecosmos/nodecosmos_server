@@ -134,10 +134,10 @@ impl Branch {
             self.node = Some(node);
         }
 
-        Ok(self
+        self
             .node
             .as_ref()
-            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))?)
+            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
     }
 
     pub fn all_edited_description_ids(&self) -> HashSet<Uuid> {
@@ -235,7 +235,7 @@ impl Branch {
             if self.deleted_nodes.as_ref().is_some_and(|deleted_ids| {
                 node.ancestor_ids
                     .as_ref()
-                    .is_some_and(|ancestor_ids| ancestor_ids.iter().any(|id| deleted_ids.contains(&id)))
+                    .is_some_and(|ancestor_ids| ancestor_ids.iter().any(|id| deleted_ids.contains(id)))
             }) {
                 continue;
             }
@@ -320,7 +320,7 @@ impl Branch {
                     return false;
                 }
 
-                return true;
+                true
             })
             .collect()
     }

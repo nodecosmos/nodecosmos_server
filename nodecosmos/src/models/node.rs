@@ -116,7 +116,7 @@ impl Callbacks for Node {
                 .context("Failed to update branch")?;
         }
 
-        self.create_workflow(&data).await?;
+        self.create_workflow(data).await?;
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 
@@ -162,7 +162,7 @@ impl Callbacks for Node {
 
     async fn after_delete(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         // TODO: see nodecosmos/src/models/node/create.rs:258
-        self.create_branched_if_original_exist(&data).await?;
+        self.create_branched_if_original_exist(data).await?;
 
         Ok(())
     }
@@ -279,7 +279,7 @@ impl Callbacks for UpdateTitleNode {
     async fn before_update(&mut self, _: &CachingSession, data: &Self::Extension) -> Result<(), NodecosmosError> {
         if self.is_branch() {
             self.as_native().create_branched_if_not_exist(data).await?;
-            self.update_branch(&data).await?;
+            self.update_branch(data).await?;
         }
 
         if !self.is_merge_context() {

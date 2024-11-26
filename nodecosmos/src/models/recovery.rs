@@ -80,7 +80,7 @@ impl Recovery {
         // and we can recover the data from the log.
         let mut recoveries = find_recovery!("updated_at <= ? ALLOW FILTERING", (from_min_ago,))
             .consistency(Consistency::All)
-            .execute(&data.db_session())
+            .execute(data.db_session())
             .await?;
 
         while let Some(recovery) = recoveries.next().await {
@@ -116,7 +116,7 @@ impl Recovery {
                         serde_json::from_str(&recovery.data).context("Failed to deserialize node delete data")?;
                     node_delete.set_step(recovery.step);
                     node_delete
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover NodeDelete from log")?;
                 }
@@ -125,7 +125,7 @@ impl Recovery {
                         serde_json::from_str(&recovery.data).context("Failed to deserialize reorder data")?;
                     reorder.set_step(recovery.step);
                     reorder
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover Reorder from log")?;
                 }
@@ -136,7 +136,7 @@ impl Recovery {
                     merge.set_step(recovery.step);
 
                     merge
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover BranchMerge from log")?;
                 }
@@ -175,7 +175,7 @@ pub trait RecoveryLog<'a>: Serialize + Deserialize<'a> {
 
     async fn create_recovery_log(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         let data = serde_json::to_string(self).expect("Failed to serialize branch merge data");
-        let recovery = Recovery::new(self.rec_branch_id(), self.rec_object_type(), self.rec_id(), data.into());
+        let recovery = Recovery::new(self.rec_branch_id(), self.rec_object_type(), self.rec_id(), data);
 
         recovery.insert().execute(db_session).await?;
 

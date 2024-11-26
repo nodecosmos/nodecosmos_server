@@ -3,10 +3,10 @@ use std::{env, fs};
 
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
-use actix_session::storage::RedisActorSessionStore;
+use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
-use actix_web::{cookie, http, web};
+use actix_web::{http, web};
 use deadpool_redis::Pool;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
@@ -45,8 +45,8 @@ pub struct AwsConfig {
 
 #[derive(Clone, Deserialize)]
 pub struct RedisConfig {
-    pub host: String,
     pub url: String,
+    pub instances: u8,
 }
 
 #[derive(Clone, Deserialize)]
@@ -108,7 +108,7 @@ impl App {
         let mailer = Mailer::init_resource(&config).await;
 
         // app data
-        let resource_locker = ResourceLocker::init_resource(&redis_pool).await;
+        let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.instances)).await;
         let description_ws_pool = Arc::new(DescriptionWsPool::init_resource(()).await);
         let sse_broadcast = Arc::new(SseBroadcast::init_resource(()).await);
 
@@ -170,19 +170,26 @@ impl App {
         self.config.port
     }
 
-    pub fn session_middleware(&self) -> SessionMiddleware<RedisActorSessionStore> {
-        let secret_key = Key::from(self.secret_key.as_ref());
-        let redis_actor_session_store = self.redis_actor_session_store();
-        let expiration = self.config.session_expiration_in_days;
-        let ttl = PersistentSession::default().session_ttl(cookie::time::Duration::days(expiration));
+    pub async fn redis_session_store(&self) -> RedisSessionStore {
+        RedisSessionStore::new(&self.config.redis.url)
+            .await
+            .map_err(|e| {
+                log::error!("Failed to create Redis session store: {}", e);
 
-        SessionMiddleware::builder(redis_actor_session_store, secret_key)
+                e
+            })
+            .unwrap()
+    }
+
+    pub fn session_middleware(&self, rss: RedisSessionStore) -> SessionMiddleware<RedisSessionStore> {
+        let secret_key = Key::from(self.secret_key.as_ref());
+
+        let expiration = self.config.session_expiration_in_days;
+        let ttl = PersistentSession::default().session_ttl(time::Duration::days(expiration));
+
+        SessionMiddleware::builder(rss, secret_key)
             .session_lifecycle(ttl)
             .cookie_secure(self.config.ssl)
             .build()
-    }
-
-    fn redis_actor_session_store(&self) -> RedisActorSessionStore {
-        RedisActorSessionStore::new(&self.config.redis.host)
     }
 }

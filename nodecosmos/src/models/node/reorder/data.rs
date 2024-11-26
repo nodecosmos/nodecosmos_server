@@ -46,15 +46,15 @@ impl ReorderData {
         params: &ReorderParams,
         node: &Node,
     ) -> Result<Vec<NodeDescendant>, NodecosmosError> {
-        return if params.is_branch() {
-            node.branch_descendants(&db_session).await
+        if params.is_branch() {
+            node.branch_descendants(db_session).await
         } else {
-            node.descendants(&db_session)
+            node.descendants(db_session)
                 .await?
                 .try_collect()
                 .await
                 .map_err(NodecosmosError::from)
-        };
+        }
     }
 
     async fn find_new_parent(data: &RequestData, params: &ReorderParams) -> Result<Node, NodecosmosError> {
@@ -80,9 +80,9 @@ impl ReorderData {
         db_session: &CachingSession,
         params: NodeBranchParams,
     ) -> Result<Option<GetStructureNode>, NodecosmosError> {
-        let node = GetStructureNode::find_branched_or_original(&db_session, params).await?;
+        let node = GetStructureNode::find_branched_or_original(db_session, params).await?;
 
-        return Ok(Some(node));
+        Ok(Some(node))
     }
 
     fn build_new_ancestor_ids(new_parent: &Node) -> Set<Uuid> {

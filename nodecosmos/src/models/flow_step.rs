@@ -349,11 +349,11 @@ impl Callbacks for UpdateNodeIdsFlowStep {
 }
 
 impl UpdateNodeIdsFlowStep {
-    pub fn append_nodes(&mut self, ids: &Vec<Uuid>) {
-        self.node_ids.merge_unique(Some(ids.clone()));
+    pub fn append_nodes(&mut self, ids: &[Uuid]) {
+        self.node_ids.merge_unique(Some(ids.to_owned()));
     }
 
-    pub fn remove_nodes(&mut self, ids: &Vec<Uuid>) {
+    pub fn remove_nodes(&mut self, ids: &[Uuid]) {
         if let Some(node_ids) = &mut self.node_ids {
             node_ids.retain(|node_id| !ids.contains(node_id));
         }

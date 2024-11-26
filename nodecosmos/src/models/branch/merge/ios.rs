@@ -123,7 +123,7 @@ impl MergeIos {
         let created_ios = Self::created_ios(db_session, branch).await?;
         let deleted_ios = Self::deleted_ios(db_session, branch).await?;
         let edited_title_ios = Self::edited_title_ios(db_session, branch).await?;
-        let original_title_ios = Self::original_title_ios(db_session, &branch).await?;
+        let original_title_ios = Self::original_title_ios(db_session, branch).await?;
 
         Ok(Self {
             restored_ios,

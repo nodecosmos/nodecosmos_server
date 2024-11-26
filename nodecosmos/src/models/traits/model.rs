@@ -14,12 +14,18 @@ pub enum ObjectType {
     Io,
 }
 
-pub trait Reload: Model {
-    async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+pub trait Reload: Model
+where
+    Self: 'static,
+{
+    async fn reload(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError>
+    where
+        Self: 'static,
+    {
         *self = self.find_by_primary_key().execute(db_session).await?;
 
         Ok(())
     }
 }
 
-impl<T: Model> Reload for T {}
+impl<T: Model + 'static> Reload for T {}
