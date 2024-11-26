@@ -120,9 +120,7 @@ impl<'a> Resource<'a> for aws_sdk_s3::Client {
     async fn init_resource(_config: ()) -> Self {
         let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
 
-        let client = aws_sdk_s3::Client::new(&config);
-
-        client
+        aws_sdk_s3::Client::new(&config)
     }
 }
 
@@ -161,10 +159,10 @@ impl<'a> Resource<'a> for ammonia::Builder<'a> {
 }
 
 impl<'a> Resource<'a> for ResourceLocker {
-    type Cfg = &'a Pool;
+    type Cfg = (&'a Pool, u8);
 
-    async fn init_resource(pool: &'a Pool) -> Self {
-        ResourceLocker::new(pool)
+    async fn init_resource(cfg: Self::Cfg) -> Self {
+        ResourceLocker::new(cfg.0, cfg.1)
     }
 }
 

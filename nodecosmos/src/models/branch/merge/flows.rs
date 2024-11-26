@@ -108,11 +108,11 @@ impl MergeFlows {
     }
 
     pub async fn new(db_session: &CachingSession, branch: &Branch) -> Result<Self, NodecosmosError> {
-        let restored_flows = Self::restored_flows(&db_session, branch).await?;
-        let created_flows = Self::created_flows(&db_session, branch).await?;
-        let deleted_flows = Self::deleted_flows(&db_session, branch).await?;
-        let edited_title_flows = Self::edited_title_flows(&db_session, branch).await?;
-        let original_title_flows = Self::original_title_flows(&db_session, &branch).await?;
+        let restored_flows = Self::restored_flows(db_session, branch).await?;
+        let created_flows = Self::created_flows(db_session, branch).await?;
+        let deleted_flows = Self::deleted_flows(db_session, branch).await?;
+        let edited_title_flows = Self::edited_title_flows(db_session, branch).await?;
+        let original_title_flows = Self::original_title_flows(db_session, branch).await?;
 
         Ok(Self {
             restored_flows,

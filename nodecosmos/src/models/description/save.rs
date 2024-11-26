@@ -20,7 +20,7 @@ impl Description {
                 id: self.object_id,
             };
 
-            match ObjectType::from(self.object_type.parse()?) {
+            match self.object_type.parse::<ObjectType>()? {
                 ObjectType::Node => {
                     Node::find_or_insert_branched(data, params).await?;
 
@@ -69,19 +69,14 @@ impl Description {
     }
 
     pub async fn update_elastic_index(&self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if self.is_original() {
-            match ObjectType::from(self.object_type.parse()?) {
-                ObjectType::Node => {
-                    UpdateNodeDescriptionElasticIdx {
-                        id: self.object_id,
-                        short_description: self.short_description.clone().unwrap_or_default(),
-                        description: self.html.clone().unwrap_or_default(),
-                    }
-                    .update_elastic_document(data.elastic_client())
-                    .await;
-                }
-                _ => {}
+        if self.is_original() && self.object_type.parse::<ObjectType>()? == ObjectType::Node {
+            UpdateNodeDescriptionElasticIdx {
+                id: self.object_id,
+                short_description: self.short_description.clone().unwrap_or_default(),
+                description: self.html.clone().unwrap_or_default(),
             }
+            .update_elastic_document(data.elastic_client())
+            .await;
         }
 
         Ok(())

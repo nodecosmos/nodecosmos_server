@@ -91,8 +91,8 @@ impl Mailer {
         let url = format!("{}/invitations?token={}", self.client_url, token);
 
         let mut ctx = HashMap::<&str, &str>::new();
-        ctx.insert("username", &username);
-        ctx.insert("node_name", &node_name);
+        ctx.insert("username", username);
+        ctx.insert("node_name", node_name);
         ctx.insert("invitation_url", &url);
 
         let message = self
@@ -116,8 +116,8 @@ impl Mailer {
         let node_url = format!("{}/nodes/{}/{}", self.client_url, branch_id, node_id);
 
         let mut ctx = HashMap::<&str, &str>::new();
-        ctx.insert("username", &username);
-        ctx.insert("node_name", &node_name);
+        ctx.insert("username", username);
+        ctx.insert("node_name", node_name);
         ctx.insert("node_url", &node_url);
 
         let message = self

@@ -1,5 +1,5 @@
-pub use authorization::Authorization;
+pub use auth::Authorization;
 pub use fields::*;
 
-mod authorization;
+mod auth;
 mod fields;

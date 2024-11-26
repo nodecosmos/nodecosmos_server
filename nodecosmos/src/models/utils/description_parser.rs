@@ -93,7 +93,7 @@ impl<'a> DescriptionXmlParser<'a> {
         loop {
             match self.reader.read_event() {
                 Ok(Event::Start(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
-                    ProseMirrorXmlTag::Heading => self.open_heading(&e),
+                    ProseMirrorXmlTag::Heading => self.open_heading(e),
                     ProseMirrorXmlTag::Paragraph => self.open_paragraph(),
                     ProseMirrorXmlTag::Bold => self.open_bold(),
                     ProseMirrorXmlTag::Italic => self.open_italic(),
@@ -104,8 +104,8 @@ impl<'a> DescriptionXmlParser<'a> {
                     ProseMirrorXmlTag::ListItem => self.open_list_item(),
                     ProseMirrorXmlTag::Blockquote => self.open_blockquote(),
                     ProseMirrorXmlTag::CodeBlock => self.open_code_block(),
-                    ProseMirrorXmlTag::Image => self.open_image(&e),
-                    ProseMirrorXmlTag::Link => self.open_link(&e),
+                    ProseMirrorXmlTag::Image => self.open_image(e),
+                    ProseMirrorXmlTag::Link => self.open_link(e),
                     ProseMirrorXmlTag::HardBreak => self.open_hard_break(),
                     ProseMirrorXmlTag::Html => (),
                     ProseMirrorXmlTag::Unknown => (),
@@ -171,7 +171,7 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn open_italic(&mut self) {
         self.html.push_str("<em>");
-        self.markdown.push_str("_");
+        self.markdown.push('_');
     }
 
     fn open_strike(&mut self) {
@@ -181,7 +181,7 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn open_code(&mut self) {
         self.html.push_str("<code spellcheck=\"false\">");
-        self.markdown.push_str("`");
+        self.markdown.push('`');
     }
 
     fn open_bullet_list(&mut self) {
@@ -290,19 +290,19 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_heading(&mut self) {
         self.html.push_str(&format!("</h{}>", self.heading_level));
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
     }
 
     fn close_paragraph(&mut self) {
         if self.ordered_list_active || self.bullet_list_active {
             self.html.push_str("</p>");
-            self.markdown.push_str("\n");
+            self.markdown.push('\n');
         } else if self.blockquote_active {
             self.html.push_str("</p>");
             self.markdown.push_str("\n>");
         } else {
             self.html.push_str("</p>");
-            self.markdown.push_str("\n");
+            self.markdown.push('\n');
         }
 
         self.paragraph_active = false;
@@ -330,12 +330,12 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_list_item(&mut self) {
         self.html.push_str("</li>");
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
     }
 
     fn close_bullet_list(&mut self) {
         self.html.push_str("</ul>");
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
 
         self.bullet_list_active = false;
     }
@@ -344,12 +344,12 @@ impl<'a> DescriptionXmlParser<'a> {
         self.html.push_str("</ol>");
         self.ordered_list_active = false;
         self.ordered_list_counter = 1;
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
     }
 
     fn close_blockquote(&mut self) {
         self.html.push_str("</blockquote>");
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
 
         self.blockquote_active = false;
     }
@@ -357,13 +357,13 @@ impl<'a> DescriptionXmlParser<'a> {
     fn close_code_block(&mut self) {
         self.html.push_str("</code></pre>");
         self.markdown.push_str("\n```");
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
 
         self.code_block_active = false;
     }
 
     fn close_image(&mut self) {
-        self.markdown.push_str("\n");
+        self.markdown.push('\n');
     }
 
     fn close_link(&mut self) {

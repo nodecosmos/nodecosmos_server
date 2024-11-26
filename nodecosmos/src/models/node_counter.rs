@@ -57,10 +57,10 @@ impl NodeCounter {
             Ok(c) => {
                 UpdateCounterNodeElasticIdx {
                     id,
-                    likes_count: c.like_count.unwrap_or_else(|| Counter(0)).0 as i32,
-                    descendants_count: c.descendants_count.unwrap_or_else(|| Counter(0)).0 as i32,
-                    contribution_requests_count: c.contribution_requests_count.unwrap_or_else(|| Counter(0)).0 as i32,
-                    threads_count: c.threads_count.unwrap_or_else(|| Counter(0)).0 as i32,
+                    likes_count: c.like_count.unwrap_or(Counter(0)).0 as i32,
+                    descendants_count: c.descendants_count.unwrap_or(Counter(0)).0 as i32,
+                    contribution_requests_count: c.contribution_requests_count.unwrap_or(Counter(0)).0 as i32,
+                    threads_count: c.threads_count.unwrap_or(Counter(0)).0 as i32,
                 }
                 .update_elastic_document(data.elastic_client())
                 .await;
@@ -196,7 +196,7 @@ impl Likeable for NodeCounter {
 
         match res {
             Some(c) => {
-                let c = c.like_count.unwrap_or_else(|| Counter(0));
+                let c = c.like_count.unwrap_or(Counter(0));
 
                 Ok(c.0)
             }

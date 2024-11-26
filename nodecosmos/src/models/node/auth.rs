@@ -23,7 +23,7 @@ impl AuthNode {
         };
 
         // `NodeAuthorization` derive
-        node.auth_update(&data).await?;
+        node.auth_update(data).await?;
 
         Ok(())
     }

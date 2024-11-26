@@ -77,7 +77,7 @@ impl UpdateInputIdsFlowStep {
 
         let mut batch = Io::statement_batch();
 
-        if added_input_ids.len() > 0 {
+        if !added_input_ids.is_empty() {
             // scylla 6.0 does not support LWT so we need to map existing ios instead of using if exists
             let existing_io_ids = PkIo::find_by_branch_id_and_root_id_and_ids(
                 data.db_session(),
@@ -98,7 +98,7 @@ impl UpdateInputIdsFlowStep {
             }
         }
 
-        if removed_input_ids.len() > 0 {
+        if !removed_input_ids.is_empty() {
             for removed_io in removed_input_ids {
                 batch.append_statement(
                     Io::PULL_INPUTTED_BY_FLOW_STEPS_QUERY,

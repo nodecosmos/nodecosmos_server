@@ -181,7 +181,7 @@ impl FindOrInsertBranched for Node {
 
                 node.insert_cb(data)
                     .execute(data.db_session())
-                    .map_err(|err| NodecosmosError::from(err))
+                    .map_err(|err| err)
                     .await?;
 
                 Ok(node)
@@ -233,7 +233,10 @@ macro_rules! find_or_insert_branched {
 find_or_insert_branched!(Flow);
 find_or_insert_branched!(FlowStep);
 
-pub trait FindForBranchMerge: Model {
+pub trait FindForBranchMerge: Model
+where
+    Self: 'static,
+{
     async fn find_by_branch_id_and_node_ids(
         db_session: &CachingSession,
         branch_id: Uuid,

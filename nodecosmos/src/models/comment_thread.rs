@@ -173,9 +173,9 @@ impl CommentThread {
                     .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))
             }
             _ => {
-                return Err(NodecosmosError::InternalServerError(
+                Err(NodecosmosError::InternalServerError(
                     "Branch not found for non-ContributionRequest thread".to_string(),
-                ));
+                ))
             }
         }
     }
@@ -195,9 +195,9 @@ impl CommentThread {
                     .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
             }
             _ => {
-                return Err(NodecosmosError::InternalServerError(
+                Err(NodecosmosError::InternalServerError(
                     "Node not found for non-Node thread".to_string(),
-                ));
+                ))
             }
         }
     }
@@ -208,7 +208,7 @@ impl CommentThread {
             .await;
 
         match comment_res {
-            Ok(Some(_)) => return,
+            Ok(Some(_)) => (),
             Ok(None) => {
                 let res = self.delete().execute(db_session).await;
 
@@ -218,7 +218,6 @@ impl CommentThread {
             }
             Err(e) => {
                 error!("Error while checking for comments: {}", e);
-                return;
             }
         }
     }

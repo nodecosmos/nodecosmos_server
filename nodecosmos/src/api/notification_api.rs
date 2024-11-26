@@ -21,7 +21,7 @@ pub struct PagedQuery {
 #[get("/")]
 pub async fn get_notifications(data: RequestData, q: web::Query<PagedQuery>) -> Response {
     let paging_state = if let Some(q) = q.paging_state.as_ref() {
-        Some(PagingState::new_from_raw_bytes(URL_SAFE.decode(&q)?))
+        Some(PagingState::new_from_raw_bytes(URL_SAFE.decode(q)?))
     } else {
         None
     };

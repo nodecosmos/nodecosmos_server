@@ -106,7 +106,7 @@ pub async fn get_original_description(
             .execute(&db_session)
             .await?;
 
-    if description.is_none() {
+    if description.is_none() && d_params.is_branch() {
         description = ArchivedDescription::maybe_find_first_by_branch_id_and_object_id(
             d_params.original_id(),
             d_params.object_id,

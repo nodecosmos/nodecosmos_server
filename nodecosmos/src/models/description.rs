@@ -170,7 +170,7 @@ impl Description {
         let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
         let html = prose_doc.html;
         let markdown = prose_doc.markdown;
-        let base64 = STANDARD.encode(&transaction.encode_update_v2());
+        let base64 = STANDARD.encode(transaction.encode_update_v2());
         let short_description = prose_doc.short_description;
 
         self.short_description = Some(short_description);

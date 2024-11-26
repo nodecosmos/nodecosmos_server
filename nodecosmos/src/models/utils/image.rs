@@ -39,7 +39,7 @@ impl Image {
         Ok(image_format)
     }
 
-    fn decode_image(format: image::ImageFormat, buffer: &Vec<u8>) -> Result<image::DynamicImage, NodecosmosError> {
+    fn decode_image(format: image::ImageFormat, buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosError> {
         if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg && format != image::ImageFormat::WebP
         {
             return Err(NodecosmosError::UnsupportedMediaType);
@@ -94,10 +94,7 @@ impl Image {
 
         let image_src = match img {
             image::DynamicImage::ImageRgb8(rgb_img) => rgb_img,
-            _ => {
-                let img = img.to_rgb8();
-                img
-            }
+            _ => img.to_rgb8(),
         };
 
         let compressed: Vec<u8> = Vec::new();
