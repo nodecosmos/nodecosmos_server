@@ -39,7 +39,7 @@ pub async fn cleanup_rooms_task(sse_broadcast: Arc<SseBroadcast>) {
                 _ = cleanup_interval.tick() => {
                     sse_broadcast_clone.ping_channels();
                     sse_broadcast_clone.cleanup_rooms();
-                    info!("Cleanup task ran");
+                    info!("Cleanup rooms task ran");
                 }
                 _ = tokio::signal::ctrl_c() => {
                     info!("Recovery task is shutting down due to Ctrl-C.");
