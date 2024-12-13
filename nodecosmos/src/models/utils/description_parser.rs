@@ -260,7 +260,6 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn open_hard_break(&mut self) {
         self.html.push_str("<br/>");
-        self.markdown.push_str("\n\n");
     }
 
     fn text(&mut self, event: BytesText<'a>) -> Result<(), NodecosmosError> {
@@ -302,7 +301,7 @@ impl<'a> DescriptionXmlParser<'a> {
             self.markdown.push_str("\n>");
         } else {
             self.html.push_str("</p>");
-            self.markdown.push('\n');
+            self.markdown.push_str("\n");
         }
 
         self.paragraph_active = false;
