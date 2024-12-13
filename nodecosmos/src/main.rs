@@ -1,6 +1,9 @@
 #![recursion_limit = "256"]
 #![allow(clippy::type_complexity)]
 
+// TODO: refactor all find_by_ids to chunked queries of max 100 ids
+//  fn .+by*.+ids\( - regex to search methods
+
 use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
