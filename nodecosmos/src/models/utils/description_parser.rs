@@ -255,12 +255,11 @@ impl<'a> DescriptionXmlParser<'a> {
         let link = &format!("<a href=\"{}\">", href);
 
         self.html.push_str(link);
-        self.markdown.push_str(link);
+        self.markdown.push_str(&format!("[{}](", href));
     }
 
     fn open_hard_break(&mut self) {
         self.html.push_str("<br/>");
-        self.markdown.push_str("\n\n");
     }
 
     fn text(&mut self, event: BytesText<'a>) -> Result<(), NodecosmosError> {
@@ -302,7 +301,7 @@ impl<'a> DescriptionXmlParser<'a> {
             self.markdown.push_str("\n>");
         } else {
             self.html.push_str("</p>");
-            self.markdown.push('\n');
+            self.markdown.push_str("\n");
         }
 
         self.paragraph_active = false;
@@ -368,6 +367,6 @@ impl<'a> DescriptionXmlParser<'a> {
 
     fn close_link(&mut self) {
         self.html.push_str("</a>");
-        self.markdown.push_str("</a>");
+        self.markdown.push(')');
     }
 }
