@@ -27,7 +27,6 @@ where
                 match result_stream {
                     Ok(stream) => {
                         select_all.push(stream);
-                        log::info!("Successfully executed a batch query and merged its stream.");
                     }
                     Err(e) => {
                         log::error!("Error executing batch query: {:?}", e);

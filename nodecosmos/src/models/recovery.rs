@@ -73,7 +73,7 @@ impl Recovery {
         }
     }
 
-    pub async fn run_recovery_task(data: RequestData) -> Result<(), NodecosmosError> {
+    pub async fn run_recovery_task(data: &RequestData) -> Result<(), NodecosmosError> {
         let from_min_ago = chrono::Utc::now() - chrono::Duration::minutes(RECOVERY_INTERVAL_MIN);
         // 3 minutes should be enough for main processes to recover from a crash.
         // If the process is still down after 3 minutes, we can assume that the process is dead,
@@ -116,7 +116,7 @@ impl Recovery {
                         serde_json::from_str(&recovery.data).context("Failed to deserialize node delete data")?;
                     node_delete.set_step(recovery.step);
                     node_delete
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover NodeDelete from log")?;
                 }
@@ -125,7 +125,7 @@ impl Recovery {
                         serde_json::from_str(&recovery.data).context("Failed to deserialize reorder data")?;
                     reorder.set_step(recovery.step);
                     reorder
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover Reorder from log")?;
                 }
@@ -136,7 +136,7 @@ impl Recovery {
                     merge.set_step(recovery.step);
 
                     merge
-                        .recover_from_log(&data)
+                        .recover_from_log(data)
                         .await
                         .context("Failed to recover BranchMerge from log")?;
                 }
