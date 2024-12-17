@@ -1,12 +1,12 @@
+use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
+use crate::errors::NodecosmosError;
+use crate::models::traits::ParallelChunksExecutor;
+use crate::stream::MergedModelStream;
 use charybdis::macros::charybdis_model;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Double, Text, Uuid};
+use macros::{Id, RootId};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-
-use crate::errors::NodecosmosError;
-use macros::{Id, RootId};
 
 #[charybdis_model(
     table_name = node_descendants,
@@ -42,14 +42,20 @@ impl NodeDescendant {
         db_session: &CachingSession,
         root_id: Uuid,
         branch_id: Uuid,
-        node_ids: &HashSet<Uuid>,
-    ) -> Result<CharybdisModelStream<NodeDescendant>, NodecosmosError> {
-        find_node_descendant!(
-            "root_id = ? AND branch_id = ? AND node_id IN ?",
-            (root_id, branch_id, node_ids)
-        )
-        .execute(db_session)
-        .await
-        .map_err(NodecosmosError::from)
+        node_ids: &Vec<Uuid>,
+    ) -> MergedModelStream<NodeDescendant> {
+        node_ids
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_node_descendant!(
+                    "root_id = ? AND branch_id = ? AND node_id IN ?",
+                    (root_id, branch_id, ids_chunk)
+                )
+                .execute(&db_session)
+                .await
+                .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
+            .await
     }
 }

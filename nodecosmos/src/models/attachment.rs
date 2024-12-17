@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
+use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::traits::s3::S3;
+use crate::models::traits::ParallelChunksExecutor;
 use crate::models::utils::{impl_default_callbacks, Image};
 
 const MAX_IMAGE_WIDTH: u32 = 852;
@@ -96,12 +98,17 @@ impl Attachment {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?
+        ids.chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
+            .await
             .try_collect()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 

@@ -30,7 +30,7 @@ impl MergeDescriptions {
         if !edited_object_ids.is_empty() || !deleted_object_ids.is_empty() {
             if !edited_object_ids.is_empty() {
                 edited_descriptions = Description::find_by_branch_id_and_ids(db_session, branch.id, &edited_object_ids)
-                    .await?
+                    .await
                     .try_collect()
                     .await?;
             }
@@ -38,7 +38,7 @@ impl MergeDescriptions {
             if !deleted_object_ids.is_empty() {
                 deleted_descriptions =
                     Description::find_by_branch_id_and_ids(db_session, branch.id, &deleted_object_ids)
-                        .await?
+                        .await
                         .try_collect()
                         .await?;
             }
@@ -50,7 +50,7 @@ impl MergeDescriptions {
 
             original_descriptions =
                 Description::find_by_branch_id_and_ids(db_session, branch.original_id(), &combined_ids)
-                    .await?
+                    .await
                     .group_by_object_id()
                     .await?;
         }

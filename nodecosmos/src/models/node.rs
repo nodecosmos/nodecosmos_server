@@ -2,20 +2,22 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
-use macros::{Branchable, Id, NodeAuthorization, NodeParent};
-
 use crate::api::data::RequestData;
+use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
-use crate::models::traits::{Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams};
+use crate::models::traits::{
+    Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, ParallelChunksExecutor,
+};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
+use crate::stream::MergedModelStream;
 
 mod auth;
 mod create;
@@ -182,16 +184,17 @@ impl Node {
         Ok(is_none)
     }
 
-    pub async fn find_by_ids(
-        db_session: &CachingSession,
-        branch_id: Uuid,
-        ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?;
-
-        Ok(res)
+    pub async fn find_by_ids(db_session: &CachingSession, branch_id: Uuid, ids: &Vec<Uuid>) -> MergedModelStream<Node> {
+        ids.chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .into_iter()
+            .map(|ids_chunk| async move {
+                find_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
+            .await
     }
 }
 
@@ -203,13 +206,17 @@ impl PkNode {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?
+        ids.chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
+            .await
             .try_collect()
-            .await?;
-
-        Ok(res)
+            .await
     }
 }
 

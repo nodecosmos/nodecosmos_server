@@ -1,16 +1,16 @@
 use charybdis::macros::charybdis_model;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{List, Text, Timestamp, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use macros::Branchable;
-
+use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams};
+use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams, ParallelChunksExecutor};
+use crate::stream::MergedModelStream;
+use macros::Branchable;
 
 /// ### Workflow structure
 /// - Each `Workflow` has multiple `Flows`
@@ -97,12 +97,18 @@ impl Workflow {
     pub async fn find_by_node_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
-        node_ids: &HashSet<Uuid>,
-    ) -> Result<CharybdisModelStream<Workflow>, NodecosmosError> {
-        find_workflow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+        node_ids: &Vec<Uuid>,
+    ) -> MergedModelStream<Workflow> {
+        node_ids
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_workflow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
