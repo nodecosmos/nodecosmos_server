@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::{Frozen, List, Set, Uuid};
+use charybdis::types::{Frozen, List, Uuid};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
@@ -32,10 +32,11 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(restored_node_ids) = &branch.restored_nodes {
-            let mut branched_nodes = Node::find_by_ids(db_session, branch.id, restored_node_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let mut branched_nodes: Vec<Node> =
+                Node::find_by_ids(db_session, branch.id, &restored_node_ids.iter().cloned().collect())
+                    .await
+                    .try_collect()
+                    .await?;
             let already_restored_ids =
                 PkNode::find_by_ids(db_session, branch.original_id(), &branched_nodes.pluck_id())
                     .await?
@@ -55,16 +56,16 @@ impl MergeNodes {
         db_session: &CachingSession,
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
-        if let Some(mut created_node_ids) = branch.created_nodes.clone() {
+        if let Some(created_node_ids) = &branch.created_nodes {
+            let mut created_node_ids = created_node_ids.iter().cloned().collect::<Vec<Uuid>>();
             if let Some(deleted_node_ids) = &branch.deleted_nodes {
                 created_node_ids = created_node_ids
-                    .iter()
+                    .into_iter()
                     .filter(|id| !deleted_node_ids.contains(id))
-                    .copied()
-                    .collect::<Set<Uuid>>();
+                    .collect();
             }
 
-            let n_stream = Node::find_by_ids(db_session, branch.id, &created_node_ids).await?;
+            let n_stream = Node::find_by_ids(db_session, branch.id, &created_node_ids).await;
             let mut created_nodes = branch.filter_out_nodes_with_deleted_parents(n_stream).await?;
 
             created_nodes.sort_by_depth();
@@ -80,10 +81,14 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<Node>>, NodecosmosError> {
         if let Some(deleted_node_ids) = &branch.deleted_nodes {
-            let mut deleted_nodes = Node::find_by_ids(db_session, branch.original_id(), deleted_node_ids)
-                .await?
-                .try_collect()
-                .await?;
+            let mut deleted_nodes: Vec<Node> = Node::find_by_ids(
+                db_session,
+                branch.original_id(),
+                &deleted_node_ids.iter().cloned().collect(),
+            )
+            .await
+            .try_collect()
+            .await?;
 
             deleted_nodes.sort_by_depth();
 
@@ -94,20 +99,22 @@ impl MergeNodes {
     }
 
     pub fn reordered_nodes_data(branch: &Branch) -> Option<List<Frozen<BranchReorderData>>> {
-        branch.reordered_nodes.as_ref().map(|reordered_nodes| reordered_nodes
-                    .clone()
-                    .into_iter()
-                    .filter(|reorder_data| {
-                        !branch
-                            .deleted_nodes
+        branch.reordered_nodes.as_ref().map(|reordered_nodes| {
+            reordered_nodes
+                .clone()
+                .into_iter()
+                .filter(|reorder_data| {
+                    !branch
+                        .deleted_nodes
+                        .as_ref()
+                        .map_or(false, |deleted_nodes| deleted_nodes.contains(&reorder_data.id))
+                        && !branch
+                            .created_nodes
                             .as_ref()
-                            .map_or(false, |deleted_nodes| deleted_nodes.contains(&reorder_data.id))
-                            && !branch
-                                .created_nodes
-                                .as_ref()
-                                .map_or(false, |created_nodes| created_nodes.contains(&reorder_data.id))
-                    })
-                    .collect())
+                            .map_or(false, |created_nodes| created_nodes.contains(&reorder_data.id))
+                })
+                .collect()
+        })
     }
 
     pub async fn edited_title_nodes(

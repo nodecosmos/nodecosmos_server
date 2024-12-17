@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
 use crate::app::App;
-use crate::constants::BLACKLIST_USERNAMES;
+use crate::constants::{BLACKLIST_USERNAMES, MAX_WHERE_IN_CHUNK_SIZE};
 use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
-use crate::models::traits::{ElasticDocument, SanitizeDescription};
+use crate::models::traits::{ElasticDocument, ParallelChunksExecutor, SanitizeDescription};
 use crate::models::udts::Address;
 use crate::models::user_counter::UserCounter;
 
@@ -271,13 +271,19 @@ partial_user!(
 
 impl ShowUser {
     pub async fn find_by_ids(db_session: &CachingSession, ids: Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
-        let users = find_show_user!("id IN ?", (ids,))
-            .execute(db_session)
-            .await?
+        ids.into_iter()
+            .collect::<Vec<Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_show_user!("id IN ?", (ids_chunk,))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
+            .await
             .try_collect()
-            .await?;
-
-        Ok(users)
+            .await
     }
 }
 

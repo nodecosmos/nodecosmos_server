@@ -1,10 +1,10 @@
 use charybdis::model::Model;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Set, Uuid};
 use futures::TryFutureExt;
 use scylla::CachingSession;
 
 use crate::api::data::RequestData;
+use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::description::{find_description, Description};
 use crate::models::flow::{find_flow, find_update_title_flow, Flow, UpdateTitleFlow};
@@ -14,7 +14,8 @@ use crate::models::flow_step::{
     UpdateOutputIdsFlowStep,
 };
 use crate::models::node::{BaseNode, GetStructureNode, Node, UpdateTitleNode};
-use crate::models::traits::ModelContext;
+use crate::models::traits::{ModelContext, ParallelChunksExecutor};
+use crate::stream::MergedModelStream;
 
 pub trait FindBranchedOrOriginalNode: Model {
     async fn find_branched_or_original(
@@ -241,13 +242,13 @@ where
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError>;
+    ) -> MergedModelStream<Self>;
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError>;
+    ) -> MergedModelStream<Self>;
 }
 
 impl FindForBranchMerge for Flow {
@@ -255,22 +256,39 @@ impl FindForBranchMerge for Flow {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_flow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -279,22 +297,39 @@ impl FindForBranchMerge for UpdateTitleFlow {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_title_flow!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_title_flow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_title_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_title_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -303,22 +338,39 @@ impl FindForBranchMerge for FlowStep {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_flow_step!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -327,22 +379,39 @@ impl FindForBranchMerge for PkFlowStep {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_pk_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_pk_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_pk_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_pk_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -351,22 +420,39 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_input_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_input_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_input_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_input_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -375,22 +461,39 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_output_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_output_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_output_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_output_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -399,22 +502,39 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_node_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        node_ids
+            .iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_node_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 
     async fn find_by_branch_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_update_node_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_update_node_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }
 
@@ -423,7 +543,7 @@ impl FindForBranchMerge for Description {
         _db_session: &CachingSession,
         _branch_id: Uuid,
         _node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
+    ) -> MergedModelStream<Self> {
         unimplemented!("Description is not findable by node_ids");
     }
 
@@ -431,10 +551,18 @@ impl FindForBranchMerge for Description {
         db_session: &CachingSession,
         branch_id: Uuid,
         ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Self>, NodecosmosError> {
-        find_description!("branch_id = ? AND object_id IN ?", (branch_id, ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Self> {
+        ids.iter()
+            .cloned()
+            .collect::<Vec<uuid::Uuid>>()
+            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
+            .map(|ids_chunk| async move {
+                find_description!("branch_id = ? AND object_id IN ?", (branch_id, ids_chunk))
+                    .execute(db_session)
+                    .await
+                    .map_err(NodecosmosError::from)
+            })
+            .exec_chunks_in_parallel()
             .await
-            .map_err(NodecosmosError::from)
     }
 }

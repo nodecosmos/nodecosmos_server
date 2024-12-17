@@ -13,7 +13,7 @@ pub async fn recovery_task(data: RequestData) {
         loop {
             tokio::select! {
                 _ = recovery_interval.tick() => {
-                    let _ = crate::models::recovery::Recovery::run_recovery_task(&data.clone())
+                    let _ = crate::models::recovery::Recovery::run_recovery_task(data.clone())
                         .await
                         .map_err(|e| {
                             log::error!("Recovery task failed: {:?}", e);
