@@ -2,20 +2,21 @@ use anyhow::Context;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use macros::{Branchable, Id, NodeAuthorization, NodeParent};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
-
-use macros::{Branchable, Id, NodeAuthorization, NodeParent};
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
-use crate::models::traits::{Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams};
+use crate::models::traits::{
+    Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
+};
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
+use crate::stream::MergedModelStream;
 
 mod auth;
 mod create;
@@ -182,16 +183,11 @@ impl Node {
         Ok(is_none)
     }
 
-    pub async fn find_by_ids(
-        db_session: &CachingSession,
-        branch_id: Uuid,
-        ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Node>, NodecosmosError> {
-        let res = find_node!("branch_id = ? AND id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?;
-
-        Ok(res)
+    pub async fn find_by_ids(db_session: &CachingSession, branch_id: Uuid, ids: &Vec<Uuid>) -> MergedModelStream<Node> {
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+        })
+        .await
     }
 }
 
@@ -203,13 +199,15 @@ impl PkNode {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        let res = find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?
+        let nodes = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+            })
+            .await
             .try_collect()
             .await?;
 
-        Ok(res)
+        Ok(nodes)
     }
 }
 

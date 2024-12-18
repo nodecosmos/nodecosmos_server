@@ -162,7 +162,7 @@ impl AuthorizationFields for Comment {
 
 impl AuthorizationFields for Invitation {
     fn owner_id(&self) -> Option<Uuid> {
-        return self.node.as_ref().map(|node| node.owner_id);
+        self.node.as_ref().map(|node| node.owner_id)
     }
 
     fn editor_ids(&self) -> &Option<Set<Uuid>> {

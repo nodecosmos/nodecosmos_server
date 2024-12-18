@@ -11,6 +11,7 @@ use crate::api::data::RequestData;
 use crate::api::ImageAttachmentParams;
 use crate::errors::NodecosmosError;
 use crate::models::traits::s3::S3;
+use crate::models::traits::WhereInChunksExec;
 use crate::models::utils::{impl_default_callbacks, Image};
 
 const MAX_IMAGE_WIDTH: u32 = 852;
@@ -96,12 +97,12 @@ impl Attachment {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<Attachment>, NodecosmosError> {
-        find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids))
-            .execute(db_session)
-            .await?
-            .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
+        })
+        .await
+        .try_collect()
+        .await
     }
 }
 

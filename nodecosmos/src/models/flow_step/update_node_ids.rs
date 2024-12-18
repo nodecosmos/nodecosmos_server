@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use charybdis::operations::DeleteWithCallbacks;
-
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
@@ -9,6 +7,8 @@ use crate::models::branch::Branch;
 use crate::models::flow_step::{FlowStep, UpdateNodeIdsFlowStep};
 use crate::models::io::Io;
 use crate::models::traits::{Branchable, FindOriginalOrBranched, Merge, ModelBranchParams, ModelContext, ToHashSet};
+use charybdis::operations::DeleteWithCallbacks;
+use charybdis::types::Uuid;
 
 impl UpdateNodeIdsFlowStep {
     pub async fn delete_output_records_from_removed_nodes(
@@ -22,7 +22,7 @@ impl UpdateNodeIdsFlowStep {
                         data.db_session(),
                         self.branch_id,
                         self.root_id,
-                        output_ids,
+                        &output_ids.iter().cloned().collect::<HashSet<Uuid>>(),
                     )
                     .await?;
 

@@ -1,11 +1,3 @@
-use charybdis::macros::charybdis_model;
-use charybdis::stream::CharybdisModelStream;
-use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
-use futures::stream::StreamExt;
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-
 use crate::errors::NodecosmosError;
 use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
@@ -14,6 +6,13 @@ use crate::models::node::Node;
 use crate::models::traits::{Branchable, Id, ObjectType};
 use crate::models::udts::{BranchReorderData, Conflict};
 use crate::models::udts::{Profile, TextChange};
+use crate::stream::MergedModelStream;
+use charybdis::macros::charybdis_model;
+use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
+use futures::stream::StreamExt;
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 pub mod merge;
 pub mod update;
@@ -134,8 +133,7 @@ impl Branch {
             self.node = Some(node);
         }
 
-        self
-            .node
+        self.node
             .as_ref()
             .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
     }
@@ -225,7 +223,7 @@ impl Branch {
 
     async fn filter_out_nodes_with_deleted_parents(
         &self,
-        mut records: CharybdisModelStream<Node>,
+        mut records: MergedModelStream<Node>,
     ) -> Result<Vec<Node>, NodecosmosError> {
         let mut nodes = vec![];
 
@@ -248,7 +246,7 @@ impl Branch {
 
     async fn filter_out_flows_with_deleted_parents(
         &self,
-        mut records: CharybdisModelStream<Flow>,
+        mut records: MergedModelStream<Flow>,
     ) -> Result<Vec<Flow>, NodecosmosError> {
         let mut flows = vec![];
 
@@ -271,7 +269,7 @@ impl Branch {
 
     async fn filter_out_flow_steps_with_deleted_parents(
         &self,
-        mut records: CharybdisModelStream<FlowStep>,
+        mut records: MergedModelStream<FlowStep>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         let mut flow_steps = vec![];
 

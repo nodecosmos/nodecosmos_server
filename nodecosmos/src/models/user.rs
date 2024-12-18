@@ -18,7 +18,7 @@ use crate::constants::BLACKLIST_USERNAMES;
 use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
-use crate::models::traits::{ElasticDocument, SanitizeDescription};
+use crate::models::traits::{ElasticDocument, SanitizeDescription, WhereInChunksExec};
 use crate::models::udts::Address;
 use crate::models::user_counter::UserCounter;
 
@@ -163,7 +163,7 @@ impl Callbacks for User {
 }
 
 impl User {
-    pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
+    pub async fn verify_password(&self, password: &str) -> Result<bool, NodecosmosError> {
         let res = verify(password, &self.password)
             .map_err(|_| NodecosmosError::ValidationError(("password", "is incorrect")))?;
 
@@ -271,13 +271,10 @@ partial_user!(
 
 impl ShowUser {
     pub async fn find_by_ids(db_session: &CachingSession, ids: Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
-        let users = find_show_user!("id IN ?", (ids,))
-            .execute(db_session)
-            .await?
+        ids.where_in_chunked_query(db_session, |ids_chunk| find_show_user!("id IN ?", (ids_chunk,)))
+            .await
             .try_collect()
-            .await?;
-
-        Ok(users)
+            .await
     }
 }
 

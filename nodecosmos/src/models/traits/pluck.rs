@@ -7,6 +7,7 @@ use futures::StreamExt;
 
 use crate::errors::NodecosmosError;
 use crate::models::traits::{FlowId, Id, MaybeFlowId, MaybeFlowStepId};
+use crate::stream::MergedModelStream;
 
 pub trait Pluck {
     fn pluck_id(&self) -> Vec<Uuid>;
@@ -44,6 +45,23 @@ pub trait PluckFromStream {
 }
 
 impl<T: Id + BaseModel> PluckFromStream for CharybdisModelStream<T> {
+    async fn pluck_id_set(&mut self) -> Result<HashSet<Uuid>, NodecosmosError> {
+        let mut ids = HashSet::new();
+
+        while let Some(result) = self.next().await {
+            match result {
+                Ok(item) => {
+                    ids.insert(item.id());
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+
+        Ok(ids)
+    }
+}
+
+impl<T: Id + BaseModel> PluckFromStream for MergedModelStream<T> {
     async fn pluck_id_set(&mut self) -> Result<HashSet<Uuid>, NodecosmosError> {
         let mut ids = HashSet::new();
 
