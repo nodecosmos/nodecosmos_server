@@ -84,8 +84,8 @@ impl Mailer {
     pub async fn send_invitation_email(
         &self,
         to: String,
-        username: &String,
-        node_name: &String,
+        username: &str,
+        node_name: &str,
         token: String,
     ) -> Result<(), NodecosmosError> {
         let url = format!("{}/invitations?token={}", self.client_url, token);
@@ -108,10 +108,10 @@ impl Mailer {
     pub async fn send_invitation_accepted_email(
         &self,
         to: String,
-        username: &String,
+        username: &str,
         branch_id: Uuid,
         node_id: Uuid,
-        node_name: &String,
+        node_name: &str,
     ) -> Result<(), NodecosmosError> {
         let node_url = format!("{}/nodes/{}/{}", self.client_url, branch_id, node_id);
 

@@ -163,7 +163,7 @@ impl Callbacks for User {
 }
 
 impl User {
-    pub async fn verify_password(&self, password: &String) -> Result<bool, NodecosmosError> {
+    pub async fn verify_password(&self, password: &str) -> Result<bool, NodecosmosError> {
         let res = verify(password, &self.password)
             .map_err(|_| NodecosmosError::ValidationError(("password", "is incorrect")))?;
 
@@ -271,7 +271,7 @@ partial_user!(
 
 impl ShowUser {
     pub async fn find_by_ids(db_session: &CachingSession, ids: Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
-        ids.where_in_chunked_query(db_session, |chunk| find_show_user!("id IN ?", (chunk,)))
+        ids.where_in_chunked_query(db_session, |ids_chunk| find_show_user!("id IN ?", (ids_chunk,)))
             .await
             .try_collect()
             .await

@@ -97,8 +97,8 @@ impl Attachment {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<Attachment>, NodecosmosError> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_attachment!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
         })
         .await
         .try_collect()

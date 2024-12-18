@@ -35,7 +35,7 @@ fn process_with_vec_owned(set: &HashSet<Uuid>) {
 }
 
 fn process_with_to_vec(set: &HashSet<Uuid>) {
-    let vec_of_ids: Vec<Uuid> = set.into_iter().cloned().collect();
+    let vec_of_ids: Vec<Uuid> = set.iter().cloned().collect();
     vec_of_ids.chunks(100).for_each(|chunk| {
         // Simulate processing
         for id in chunk {

@@ -9,9 +9,6 @@ pub async fn recovery_task(data: RequestData) {
     let interval_sec = crate::models::recovery::RECOVERY_INTERVAL_MIN * 60;
     let mut recovery_interval = time::interval(Duration::from_secs(interval_sec as u64));
 
-    // TODO: Here, when using tokio::spawn as we get an error that internal data like session, elastic, etc
-    //  does not implement Send.
-
     tokio::spawn(async move {
         loop {
             tokio::select! {

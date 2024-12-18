@@ -180,10 +180,10 @@ impl FlowStep {
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         let flow_steps = ids
-            .where_in_chunked_query(db_session, |chunk| {
+            .where_in_chunked_query(db_session, |ids_chunk| {
                 find_flow_step!(
                     "branch_id = ? AND node_id = ? AND id IN ? ALLOW FILTERING",
-                    (branch_id, node_id, chunk)
+                    (branch_id, node_id, ids_chunk)
                 )
             })
             .await

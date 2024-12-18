@@ -33,7 +33,7 @@ mozjpeg = "0.10.7"
 actix-web-actors = "4.3.0"
 actix = "0.13.3"
 dashmap = "6.0.1"
-charybdis = { version = "0.7.9", path = "../../charybdis/charybdis" }
+charybdis = "0.7.10"
 yrs = "0.21.1"
 base64 = "0.22.1"
 uuid = "1.8.0"
