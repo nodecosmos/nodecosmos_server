@@ -12,7 +12,7 @@ use crate::models::branch::Branch;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::sort::SortNodes;
 use crate::models::node::{find_update_title_node, Node, PkNode, UpdateTitleNode};
-use crate::models::traits::{Branchable, GroupById, Pluck};
+use crate::models::traits::{Branchable, GroupById, Pluck, WhereInChunksExec};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::{BranchReorderData, TextChange};
 
@@ -122,9 +122,11 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<Vec<UpdateTitleNode>>, NodecosmosError> {
         if let Some(edited_title_nodes) = &branch.edited_title_nodes {
-            let nodes = find_update_title_node!("branch_id = ? AND id IN ?", (branch.id, edited_title_nodes))
-                .execute(db_session)
-                .await?
+            let nodes = edited_title_nodes
+                .where_in_chunked_query(db_session, |ids_chunk| {
+                    find_update_title_node!("branch_id = ? AND id IN ?", (branch.id, ids_chunk))
+                })
+                .await
                 .try_collect()
                 .await?;
 
@@ -147,9 +149,11 @@ impl MergeNodes {
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleNode>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_title_nodes {
-            let nodes_by_id = find_update_title_node!("branch_id = ? AND id IN ?", (branch.original_id(), ids))
-                .execute(db_session)
-                .await?
+            let nodes_by_id = ids
+                .where_in_chunked_query(db_session, |ids_chunk| {
+                    find_update_title_node!("branch_id = ? AND id IN ?", (branch.original_id(), ids_chunk))
+                })
+                .await
                 .group_by_id()
                 .await?;
 

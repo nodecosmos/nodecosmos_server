@@ -1,6 +1,4 @@
-use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
-use crate::errors::NodecosmosError;
-use crate::models::traits::ParallelChunksExecutor;
+use crate::models::traits::WhereInChunksExec;
 use crate::stream::MergedModelStream;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Text, Uuid};
@@ -45,17 +43,12 @@ impl NodeDescendant {
         node_ids: &Vec<Uuid>,
     ) -> MergedModelStream<NodeDescendant> {
         node_ids
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
+            .where_in_chunked_query(db_session, |chunk| {
                 find_node_descendant!(
                     "root_id = ? AND branch_id = ? AND node_id IN ?",
-                    (root_id, branch_id, ids_chunk)
+                    (root_id, branch_id, chunk)
                 )
-                .execute(&db_session)
-                .await
-                .map_err(NodecosmosError::from)
             })
-            .exec_chunks_in_parallel()
             .await
     }
 }

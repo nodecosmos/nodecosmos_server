@@ -8,12 +8,11 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
-use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
 use crate::models::traits::{
-    Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, ParallelChunksExecutor,
+    Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
 };
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
@@ -185,16 +184,10 @@ impl Node {
     }
 
     pub async fn find_by_ids(db_session: &CachingSession, branch_id: Uuid, ids: &Vec<Uuid>) -> MergedModelStream<Node> {
-        ids.chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .into_iter()
-            .map(|ids_chunk| async move {
-                find_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
-                    .execute(db_session)
-                    .await
-                    .map_err(NodecosmosError::from)
-            })
-            .exec_chunks_in_parallel()
-            .await
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+        })
+        .await
     }
 }
 
@@ -206,17 +199,15 @@ impl PkNode {
         branch_id: Uuid,
         ids: &[Uuid],
     ) -> Result<Vec<PkNode>, NodecosmosError> {
-        ids.chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
+        let nodes = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
                 find_pk_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
-                    .execute(db_session)
-                    .await
-                    .map_err(NodecosmosError::from)
             })
-            .exec_chunks_in_parallel()
             .await
             .try_collect()
-            .await
+            .await?;
+
+        Ok(nodes)
     }
 }
 

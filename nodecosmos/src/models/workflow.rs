@@ -4,11 +4,10 @@ use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
-use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams, ParallelChunksExecutor};
+use crate::models::traits::{Branchable, Context, Merge, NodeBranchParams, WhereInChunksExec};
 use crate::stream::MergedModelStream;
 use macros::Branchable;
 
@@ -100,14 +99,9 @@ impl Workflow {
         node_ids: &Vec<Uuid>,
     ) -> MergedModelStream<Workflow> {
         node_ids
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
+            .where_in_chunked_query(db_session, |ids_chunk| {
                 find_workflow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
-                    .execute(db_session)
-                    .await
-                    .map_err(NodecosmosError::from)
             })
-            .exec_chunks_in_parallel()
             .await
     }
 }
