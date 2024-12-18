@@ -43,10 +43,10 @@ impl NodeDescendant {
         node_ids: &Vec<Uuid>,
     ) -> MergedModelStream<NodeDescendant> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
+            .where_in_chunked_query(db_session, |ids_chunk| {
                 find_node_descendant!(
                     "root_id = ? AND branch_id = ? AND node_id IN ?",
-                    (root_id, branch_id, chunk)
+                    (root_id, branch_id, ids_chunk)
                 )
             })
             .await

@@ -59,10 +59,7 @@ impl MergeNodes {
         if let Some(created_node_ids) = &branch.created_nodes {
             let mut created_node_ids = created_node_ids.iter().cloned().collect::<Vec<Uuid>>();
             if let Some(deleted_node_ids) = &branch.deleted_nodes {
-                created_node_ids = created_node_ids
-                    .into_iter()
-                    .filter(|id| !deleted_node_ids.contains(id))
-                    .collect();
+                created_node_ids.retain(|id| !deleted_node_ids.contains(id));
             }
 
             let n_stream = Node::find_by_ids(db_session, branch.id, &created_node_ids).await;

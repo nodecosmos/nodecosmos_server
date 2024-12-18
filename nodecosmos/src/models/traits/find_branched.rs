@@ -257,8 +257,8 @@ impl FindForBranchMerge for Flow {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_flow!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_flow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -268,8 +268,8 @@ impl FindForBranchMerge for Flow {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -282,8 +282,8 @@ impl FindForBranchMerge for UpdateTitleFlow {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_update_title_flow!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_title_flow!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -293,8 +293,8 @@ impl FindForBranchMerge for UpdateTitleFlow {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_update_title_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_update_title_flow!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -307,8 +307,8 @@ impl FindForBranchMerge for FlowStep {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -318,8 +318,8 @@ impl FindForBranchMerge for FlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -332,8 +332,8 @@ impl FindForBranchMerge for PkFlowStep {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_pk_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_pk_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -343,8 +343,8 @@ impl FindForBranchMerge for PkFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_pk_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_pk_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -357,8 +357,8 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_update_input_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_input_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -368,8 +368,8 @@ impl FindForBranchMerge for UpdateInputIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_update_input_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_update_input_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -382,8 +382,8 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_update_output_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_output_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -393,8 +393,8 @@ impl FindForBranchMerge for UpdateOutputIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_update_output_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_update_output_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -407,8 +407,8 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_update_node_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_node_ids_flow_step!("branch_id = ? AND node_id IN ?", (branch_id, ids_chunk))
             })
             .await
     }
@@ -418,8 +418,8 @@ impl FindForBranchMerge for UpdateNodeIdsFlowStep {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_update_node_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_update_node_ids_flow_step!("branch_id = ? AND id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
         })
         .await
     }
@@ -439,8 +439,8 @@ impl FindForBranchMerge for Description {
         branch_id: Uuid,
         ids: &Set<Uuid>,
     ) -> MergedModelStream<Self> {
-        ids.where_in_chunked_query(db_session, |chunk| {
-            find_description!("branch_id = ? AND object_id IN ? ", (branch_id, chunk))
+        ids.where_in_chunked_query(db_session, |ids_chunk| {
+            find_description!("branch_id = ? AND object_id IN ? ", (branch_id, ids_chunk))
         })
         .await
     }

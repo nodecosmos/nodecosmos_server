@@ -177,8 +177,11 @@ impl Io {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
         let ios = ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
             })
             .await
             .try_collect()
@@ -193,8 +196,8 @@ impl Io {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Io> {
         node_ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
             })
             .await
     }
@@ -376,8 +379,11 @@ impl UpdateTitleIo {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let ios = ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_update_title_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_title_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
             })
             .await
             .try_collect()
@@ -397,8 +403,11 @@ impl PkIo {
         ids: &Vec<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let ios = ids
-            .where_in_chunked_query(db_session, |chunk| {
-                find_pk_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_pk_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
             })
             .await
             .try_collect()
