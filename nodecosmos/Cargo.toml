@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 futures = "0.3.30"
-scylla = { version = "0.15.0", features = ["ssl"] }
+scylla = { version = "0.15.1", features = ["ssl"] }
 tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -33,7 +33,7 @@ mozjpeg = "0.10.7"
 actix-web-actors = "4.3.0"
 actix = "0.13.3"
 dashmap = "6.0.1"
-charybdis = "0.7.9"
+charybdis = { version = "0.7.9", path = "../../charybdis/charybdis" }
 yrs = "0.21.1"
 base64 = "0.22.1"
 uuid = "1.8.0"

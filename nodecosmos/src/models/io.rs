@@ -11,11 +11,10 @@ use serde::{Deserialize, Serialize};
 use macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};
 
 use crate::api::data::RequestData;
-use crate::constants::MAX_WHERE_IN_CHUNK_SIZE;
 use crate::errors::NodecosmosError;
 use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams, ParallelChunksExecutor};
+use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec};
 use crate::models::traits::{Context, ModelContext};
 use crate::stream::MergedModelStream;
 
@@ -175,23 +174,12 @@ impl Io {
         db_session: &CachingSession,
         branch_id: Uuid,
         root_id: Uuid,
-        ids: &HashSet<Uuid>,
+        ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
         let ios = ids
-            .iter()
-            .cloned()
-            .collect::<Vec<Uuid>>()
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
-                find_io!(
-                    "branch_id = ? AND root_id = ? AND id IN ?",
-                    (branch_id, root_id, ids_chunk)
-                )
-                .execute(db_session)
-                .await
-                .map_err(NodecosmosError::from)
+            .where_in_chunked_query(db_session, |chunk| {
+                find_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
             })
-            .exec_chunks_in_parallel()
             .await
             .try_collect()
             .await?;
@@ -205,20 +193,9 @@ impl Io {
         node_ids: &Set<Uuid>,
     ) -> MergedModelStream<Io> {
         node_ids
-            .iter()
-            .cloned()
-            .collect::<Vec<uuid::Uuid>>()
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|node_ids_chunk| async move {
-                find_io!(
-                    "branch_id = ? AND node_id IN ? ALLOW FILTERING",
-                    (branch_id, node_ids_chunk)
-                )
-                .execute(db_session)
-                .await
-                .map_err(NodecosmosError::from)
+            .where_in_chunked_query(db_session, |chunk| {
+                find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, chunk))
             })
-            .exec_chunks_in_parallel()
             .await
     }
 
@@ -399,20 +376,9 @@ impl UpdateTitleIo {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let ios = ids
-            .iter()
-            .cloned()
-            .collect::<Vec<uuid::Uuid>>()
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
-                find_update_title_io!(
-                    "branch_id = ? AND root_id = ? AND id IN ?",
-                    (branch_id, root_id, ids_chunk)
-                )
-                .execute(db_session)
-                .await
-                .map_err(NodecosmosError::from)
+            .where_in_chunked_query(db_session, |chunk| {
+                find_update_title_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
             })
-            .exec_chunks_in_parallel()
             .await
             .try_collect()
             .await?;
@@ -431,17 +397,9 @@ impl PkIo {
         ids: &Vec<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
         let ios = ids
-            .chunks(MAX_WHERE_IN_CHUNK_SIZE)
-            .map(|ids_chunk| async move {
-                find_pk_io!(
-                    "branch_id = ? AND root_id = ? AND id IN ?",
-                    (branch_id, root_id, ids_chunk)
-                )
-                .execute(db_session)
-                .await
-                .map_err(NodecosmosError::from)
+            .where_in_chunked_query(db_session, |chunk| {
+                find_pk_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, chunk))
             })
-            .exec_chunks_in_parallel()
             .await
             .try_collect()
             .await?;

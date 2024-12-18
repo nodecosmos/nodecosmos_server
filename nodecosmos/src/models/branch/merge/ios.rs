@@ -10,7 +10,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::io::{find_update_title_io, Io, UpdateTitleIo};
-use crate::models::traits::{Branchable, GroupById, Pluck};
+use crate::models::traits::{Branchable, GroupById, Pluck, WhereInChunksExec};
 use crate::models::traits::{ModelContext, ObjectType};
 use crate::models::udts::TextChange;
 
@@ -103,14 +103,16 @@ impl MergeIos {
         branch: &Branch,
     ) -> Result<Option<HashMap<Uuid, UpdateTitleIo>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_title_ios {
-            let ios_by_id = find_update_title_io!(
-                "root_id = ? AND branch_id = ? AND id IN ?",
-                (branch.root_id, branch.original_id(), ids)
-            )
-            .execute(db_session)
-            .await?
-            .group_by_id()
-            .await?;
+            let ios_by_id = ids
+                .where_in_chunked_query(db_session, |ids_chunk| {
+                    find_update_title_io!(
+                        "root_id = ? AND branch_id = ? AND id IN ?",
+                        (branch.root_id, branch.original_id(), ids_chunk)
+                    )
+                })
+                .await
+                .group_by_id()
+                .await?;
 
             return Ok(Some(ios_by_id));
         }
