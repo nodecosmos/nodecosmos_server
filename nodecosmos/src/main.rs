@@ -15,6 +15,7 @@ mod constants;
 mod errors;
 mod models;
 mod resources;
+mod stream;
 mod tasks;
 
 fn main() {

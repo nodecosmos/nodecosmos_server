@@ -1,7 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
-use crate::models::traits::{Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams};
+use crate::models::traits::{
+    Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams, WhereInChunksExec,
+};
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
 use charybdis::callbacks::Callbacks;
@@ -177,14 +179,16 @@ impl FlowStep {
         node_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
-        let flow_steps = find_flow_step!(
-            "branch_id = ? AND node_id = ? AND id IN ? ALLOW FILTERING",
-            (branch_id, node_id, ids)
-        )
-        .execute(db_session)
-        .await?
-        .try_collect()
-        .await?;
+        let flow_steps = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_flow_step!(
+                    "branch_id = ? AND node_id = ? AND id IN ? ALLOW FILTERING",
+                    (branch_id, node_id, ids_chunk)
+                )
+            })
+            .await
+            .try_collect()
+            .await?;
 
         Ok(flow_steps)
     }

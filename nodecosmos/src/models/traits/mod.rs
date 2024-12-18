@@ -11,6 +11,7 @@ pub use model::*;
 pub use node::*;
 pub use pluck::*;
 pub use primitives::*;
+pub use query::*;
 pub use sanitize_description::*;
 
 mod authorization;
@@ -26,4 +27,5 @@ mod model;
 mod node;
 mod pluck;
 mod primitives;
+mod query;
 mod sanitize_description;

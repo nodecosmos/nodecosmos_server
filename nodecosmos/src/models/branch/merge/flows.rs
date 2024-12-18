@@ -30,7 +30,7 @@ impl MergeFlows {
     ) -> Result<Option<HashMap<Uuid, UpdateTitleFlow>>, NodecosmosError> {
         if let Some(ids) = &branch.edited_title_flows {
             let ios_by_id = UpdateTitleFlow::find_by_branch_id_and_ids(db_session, branch.id, ids)
-                .await?
+                .await
                 .group_by_id()
                 .await?;
 
@@ -45,10 +45,10 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(restored_flow_ids) = &branch.restored_flows {
-            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids).await?;
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, restored_flow_ids).await;
             let already_restored_ids =
                 Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), restored_flow_ids)
-                    .await?
+                    .await
                     .pluck_id_set()
                     .await?;
             let mut flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
@@ -66,7 +66,7 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(created_flow_ids) = &branch.created_flows {
-            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids).await?;
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.id, created_flow_ids).await;
             let flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
 
             return Ok(Some(flows));
@@ -80,7 +80,7 @@ impl MergeFlows {
         branch: &Branch,
     ) -> Result<Option<Vec<Flow>>, NodecosmosError> {
         if let Some(deleted_flow_ids) = &branch.deleted_flows {
-            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids).await?;
+            let f_stream = Flow::find_by_branch_id_and_ids(db_session, branch.original_id(), deleted_flow_ids).await;
             let flows = branch.filter_out_flows_with_deleted_parents(f_stream).await?;
 
             return Ok(Some(flows));
@@ -95,7 +95,7 @@ impl MergeFlows {
     ) -> Result<Option<Vec<UpdateTitleFlow>>, NodecosmosError> {
         if let Some(edited_title_flows) = &branch.edited_title_flows {
             let flows = UpdateTitleFlow::find_by_branch_id_and_ids(db_session, branch.id, edited_title_flows)
-                .await?
+                .await
                 .try_collect()
                 .await?;
 

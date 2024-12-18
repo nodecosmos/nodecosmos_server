@@ -3,8 +3,6 @@ use std::collections::HashSet;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
-use charybdis::scylla::SerializeValue;
-use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
 use scylla::CachingSession;
@@ -16,8 +14,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams};
+use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec};
 use crate::models::traits::{Context, ModelContext};
+use crate::stream::MergedModelStream;
 
 mod create;
 mod delete;
@@ -171,15 +170,20 @@ impl Io {
         }
     }
 
-    pub async fn find_by_branch_id_and_root_id_and_ids<I: IntoIterator<Item = Uuid> + SerializeValue>(
+    pub async fn find_by_branch_id_and_root_id_and_ids(
         db_session: &CachingSession,
         branch_id: Uuid,
         root_id: Uuid,
-        ids: &I,
+        ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
-        let ios = find_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
-            .execute(db_session)
-            .await?
+        let ios = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
+            })
+            .await
             .try_collect()
             .await?;
 
@@ -190,11 +194,12 @@ impl Io {
         db_session: &CachingSession,
         branch_id: Uuid,
         node_ids: &Set<Uuid>,
-    ) -> Result<CharybdisModelStream<Io>, NodecosmosError> {
-        find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, node_ids))
-            .execute(db_session)
+    ) -> MergedModelStream<Io> {
+        node_ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_io!("branch_id = ? AND node_id IN ? ALLOW FILTERING", (branch_id, ids_chunk))
+            })
             .await
-            .map_err(NodecosmosError::from)
     }
 
     pub async fn find_or_insert_branched_main(
@@ -373,9 +378,14 @@ impl UpdateTitleIo {
         root_id: Uuid,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_update_title_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
-            .execute(db_session)
-            .await?
+        let ios = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_title_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
+            })
+            .await
             .try_collect()
             .await?;
 
@@ -392,9 +402,14 @@ impl PkIo {
         root_id: Uuid,
         ids: &Vec<Uuid>,
     ) -> Result<Vec<Self>, NodecosmosError> {
-        let ios = find_pk_io!("branch_id = ? AND root_id = ? AND id IN ?", (branch_id, root_id, ids))
-            .execute(db_session)
-            .await?
+        let ios = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_pk_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
+            })
+            .await
             .try_collect()
             .await?;
 

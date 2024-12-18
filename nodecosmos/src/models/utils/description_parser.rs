@@ -301,7 +301,7 @@ impl<'a> DescriptionXmlParser<'a> {
             self.markdown.push_str("\n>");
         } else {
             self.html.push_str("</p>");
-            self.markdown.push_str("\n");
+            self.markdown.push('\n');
         }
 
         self.paragraph_active = false;

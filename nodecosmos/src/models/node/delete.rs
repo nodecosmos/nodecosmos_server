@@ -148,8 +148,8 @@ impl NodeDelete {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Node>, NodecosmosError> {
-        Node::find_by_ids(db_session, node.branch_id, ids)
-            .await?
+        Node::find_by_ids(db_session, node.branch_id, &ids.iter().cloned().collect())
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
@@ -168,7 +168,7 @@ impl NodeDelete {
             descendants = vec![];
 
             let mut fetched_desc =
-                NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, &query_ids).await?;
+                NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, &query_ids).await;
 
             while let Some(desc) = fetched_desc.next().await {
                 let desc = desc?;
@@ -177,10 +177,15 @@ impl NodeDelete {
                 }
             }
         } else {
-            descendants = NodeDescendant::find_by_node_ids(db_session, node.root_id, node.branch_id, ids)
-                .await?
-                .try_collect()
-                .await?;
+            descendants = NodeDescendant::find_by_node_ids(
+                db_session,
+                node.root_id,
+                node.branch_id,
+                &ids.iter().cloned().collect(),
+            )
+            .await
+            .try_collect()
+            .await?;
         }
 
         Ok(descendants)
@@ -191,8 +196,8 @@ impl NodeDelete {
         node: &Node,
         ids: &Set<Uuid>,
     ) -> Result<Vec<Workflow>, NodecosmosError> {
-        Workflow::find_by_node_ids(db_session, node.branch_id, ids)
-            .await?
+        Workflow::find_by_node_ids(db_session, node.branch_id, &ids.iter().cloned().collect())
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
@@ -204,7 +209,7 @@ impl NodeDelete {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Flow>, NodecosmosError> {
         Flow::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
-            .await?
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
@@ -216,7 +221,7 @@ impl NodeDelete {
         ids: &Set<Uuid>,
     ) -> Result<Vec<FlowStep>, NodecosmosError> {
         FlowStep::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
-            .await?
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
@@ -228,7 +233,7 @@ impl NodeDelete {
         ids: &Set<Uuid>,
     ) -> Result<Vec<Io>, NodecosmosError> {
         Io::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
-            .await?
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
@@ -240,7 +245,7 @@ impl NodeDelete {
         ids_to_del: Set<Uuid>,
     ) -> Result<Vec<Description>, NodecosmosError> {
         Description::find_by_branch_id_and_ids(db_session, branch_id, &ids_to_del)
-            .await?
+            .await
             .try_collect()
             .await
             .map_err(NodecosmosError::from)
