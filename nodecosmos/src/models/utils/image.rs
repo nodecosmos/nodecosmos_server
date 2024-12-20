@@ -2,7 +2,8 @@ use futures::StreamExt;
 
 use crate::errors::NodecosmosError;
 
-const TARGET_SIZE_IN_BYTES: usize = 30 * 1024;
+const TARGET_SIZE_IN_KB: usize = 50;
+const DEFAULT_TARGET_SIZE_IN_BYTES: usize = TARGET_SIZE_IN_KB * 1024;
 
 pub struct Image {
     inner: image::DynamicImage,
@@ -83,12 +84,14 @@ impl Image {
         self
     }
 
-    pub fn compressed(self) -> Result<Vec<u8>, NodecosmosError> {
+    pub fn compressed(self, target_size_in_bytes: Option<usize>) -> Result<Vec<u8>, NodecosmosError> {
         let img = self.inner;
 
         println!("file size: {}", self.file_size);
 
-        if self.file_size <= TARGET_SIZE_IN_BYTES {
+        let target_size_in_bytes = target_size_in_bytes.unwrap_or(DEFAULT_TARGET_SIZE_IN_BYTES);
+
+        if self.file_size <= target_size_in_bytes {
             return Ok(self.buffer);
         }
 

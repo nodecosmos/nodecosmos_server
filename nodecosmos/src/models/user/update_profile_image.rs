@@ -25,7 +25,7 @@ impl UpdateProfileImageUser {
             let mut image = Image::from_field(&mut field).await?;
             image.resize_image(IMG_WIDTH, IMG_HEIGHT);
             let extension = image.extension;
-            let compressed = image.compressed()?;
+            let compressed = image.compressed(None)?;
 
             if self.profile_image_filename.is_some() {
                 self.delete_s3_object(data).await?;
