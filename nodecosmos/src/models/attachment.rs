@@ -15,6 +15,8 @@ use crate::models::traits::WhereInChunksExec;
 use crate::models::utils::{impl_default_callbacks, Image};
 
 const MAX_IMAGE_WIDTH: u32 = 852;
+const MAX_IMAGE_SIZE_IN_KB: usize = 200;
+const MAX_IMAGE_SIZE_IN_BYTES: usize = MAX_IMAGE_SIZE_IN_KB * 1024;
 
 #[charybdis_model(
     table_name = attachments,
@@ -68,7 +70,7 @@ impl Attachment {
 
             image.resize_image(width, height);
             let extension = image.extension;
-            let compressed = image.compressed()?;
+            let compressed = image.compressed(Some(MAX_IMAGE_SIZE_IN_BYTES))?;
 
             let mut attachment = Attachment::new();
             attachment.node_id = params.node_id;
