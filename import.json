@@ -1,59 +1,88 @@
 {
-  "root": {
-    "title": "Root",
-    "description": "",
-    "children": [
-      {
-        "title": "Child 1",
-        "description": "",
-        "children": [
-          {
-            "title": "Child 1.1",
-            "description": "",
-            "children": [],
-            "flows": []
-          },
-          {
-            "title": "Child 1.2",
-            "description": "",
-            "children": [],
-            "flows": []
-          }
-        ],
-        "flows": []
-      },
-      {
-        "title": "Child 2",
-        "description": "",
-        "children": [],
-        "flows": []
-      }
-    ],
-    "initialInputs": [
-      {
-        "title": "Input 1",
-        "description": ""
-      }
-    ],
-    "flows": [
-      {
-        "title": "Flow 1",
-        "description": "",
-        "flowSteps": [
-          {
-            "description": "",
-            "nodes": [],
-            "input_ids_by_node_id": {},
-            "output_ids_by_node_id": {}
-          }
-        ]
-      }
-    ],
-    "ios": [
-      {
-        "title": "iOS",
-        "description": ""
-      }
-    ]
-  }
+  "nodes": [
+    {
+      "id": "root-uuid-1",
+      "title": "Root Node",
+      "order_index": 1,
+      "description": "<description><paragraph>This is the root node.</paragraph></description>",
+      "parent_id": "root",
+      "flows": [
+        {
+          "title": "Root Flow",
+          "description": "<description><heading level=\"1\">Root Flow Description</heading></description>",
+          "flow_steps": [
+            {
+              "node_ids": [
+                "node-uuid-1"
+              ],
+              "input_ids_by_node": {
+                "node-uuid-1": [
+                  "io-uuid-1"
+                ]
+              },
+              "outputs_by_node": {
+                "node-uuid-1": [
+                  {
+                    "id": "io-uuid-2",
+                    "title": "Output IO 1",
+                    "description": "<description><paragraph>Output from Root Flow Step 1.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>First step of the root flow.</paragraph></description>"
+            }
+          ],
+          "initial_inputs": [
+            {
+              "id": "io-uuid-1",
+              "title": "Initial IO 1",
+              "description": "<description><paragraph>Initial input for Root Flow.</paragraph></description>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "node-uuid-1",
+      "title": "Child Node 1",
+      "order_index": 2,
+      "description": "<description><paragraph>This is the first child node.</paragraph></description>",
+      "parent_id": "root-uuid-1",
+      "flows": [
+        {
+          "title": "Child Flow",
+          "description": "<description><heading level=\"2\">Child Flow Description</heading></description>",
+          "flow_steps": [
+            {
+              "node_ids": [
+                "node-uuid-1"
+              ],
+              "input_ids_by_node": {
+                "node-uuid-1": [
+                  "io-uuid-2"
+                ]
+              },
+              "outputs_by_node": {
+                "node-uuid-1": [
+                  {
+                    "id": "io-uuid-3",
+                    "title": "Output IO 2",
+                    "description": "<description><paragraph>Output from Child Flow Step 1.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>First step of the child flow.</paragraph></description>"
+            }
+          ],
+          "initial_inputs": [
+            {
+              "id": "io-uuid-2",
+              "title": "Initial IO 2",
+              "description": "<description><paragraph>Initial input for Child Flow.</paragraph></description>"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
