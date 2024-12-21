@@ -16,6 +16,7 @@ use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
 use crate::errors::NodecosmosError;
 use crate::models::invitation::Invitation;
+use crate::models::node::import::Import;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
@@ -325,6 +326,40 @@ pub async fn delete_node_editor(
         .await?;
 
     Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[put("/{branchId}/{id}/import_nodes")]
+pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::Path<(Uuid, Uuid)>) -> Response {
+    let (branch_id, id) = params.into_inner();
+
+    let mut current_root = Node::find_by_branch_id_and_id(branch_id, id)
+        .execute(data.db_session())
+        .await?;
+
+    let root_id = current_root.root_id;
+
+    current_root.auth_update(&data).await?;
+
+    data.resource_locker()
+        .lock_resource_actions(
+            current_root.root_id,
+            current_root.branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+            ResourceLocker::TWO_SECONDS,
+        )
+        .await?;
+
+    Import::new(current_root, json_file).await?.run(&data).await?;
+
+    data.resource_locker()
+        .unlock_resource_actions(
+            root_id,
+            branch_id,
+            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+        )
+        .await?;
 
     Ok(HttpResponse::Ok().finish())
 }
