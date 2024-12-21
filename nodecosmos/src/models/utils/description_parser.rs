@@ -1,10 +1,12 @@
 use quick_xml::events::{BytesText, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
+use std::borrow::Cow;
 
 use crate::errors::NodecosmosError;
 
 enum ProseMirrorXmlTag {
+    Description,
     Heading,
     Paragraph,
     Bold,
@@ -29,6 +31,7 @@ impl<'a> From<QName<'a>> for ProseMirrorXmlTag {
     // long-term, we need our own implementation of ProseMirror.
     fn from(value: QName<'a>) -> Self {
         match value {
+            QName(b"description") => ProseMirrorXmlTag::Description,
             QName(b"heading") => ProseMirrorXmlTag::Heading,
             QName(b"paragraph") => ProseMirrorXmlTag::Paragraph,
             QName(b"bold") => ProseMirrorXmlTag::Bold,
@@ -93,6 +96,7 @@ impl<'a> DescriptionXmlParser<'a> {
         loop {
             match self.reader.read_event() {
                 Ok(Event::Start(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
+                    ProseMirrorXmlTag::Description => (),
                     ProseMirrorXmlTag::Heading => self.open_heading(e),
                     ProseMirrorXmlTag::Paragraph => self.open_paragraph(),
                     ProseMirrorXmlTag::Bold => self.open_bold(),
@@ -112,6 +116,7 @@ impl<'a> DescriptionXmlParser<'a> {
                 },
                 Ok(Event::Text(e)) => self.text(e)?,
                 Ok(Event::End(ref e)) => match ProseMirrorXmlTag::from(e.name()) {
+                    ProseMirrorXmlTag::Description => (),
                     ProseMirrorXmlTag::Heading => self.close_heading(),
                     ProseMirrorXmlTag::Paragraph => self.close_paragraph(),
                     ProseMirrorXmlTag::Bold => self.close_bold(),
@@ -145,13 +150,13 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok().filter(|a| a.key == QName(b"level")).map(|a| {
                     a.decode_and_unescape_value(self.reader.decoder())
-                        .expect("Error decoding heading level")
+                        .unwrap_or_else(|_| Cow::from("1".to_string()))
                         .to_string()
                 })
             })
             .unwrap_or_else(|| "1".to_string());
         self.html.push_str(&format!("<h{}>", self.heading_level));
-        let level = self.heading_level.parse::<u8>().expect("Error parsing heading level");
+        let level = self.heading_level.parse::<u8>().unwrap_or(1);
 
         for _ in 0..level {
             self.markdown.push('#');
@@ -224,7 +229,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"src"))
-                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap_or_default())
             })
             .unwrap_or_default();
         let alt = event
@@ -232,7 +237,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"alt"))
-                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap_or_default())
             })
             .unwrap_or_default();
         self.html.push_str(&format!(
@@ -248,7 +253,7 @@ impl<'a> DescriptionXmlParser<'a> {
             .find_map(|a| {
                 a.ok()
                     .filter(|a| a.key == QName(b"href"))
-                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap())
+                    .map(|a| a.decode_and_unescape_value(self.reader.decoder()).unwrap_or_default())
             })
             .unwrap_or_default();
 

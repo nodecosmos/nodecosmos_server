@@ -167,6 +167,8 @@ impl Description {
         // For some reason encodeStateAsUpdateV2 on front end converts &amp; to & and that will break xml parsing.
         let xml_str = &xml.get_string(&transaction).replace("&", "&amp;");
 
+        println!("xml_str: {:?}", xml_str);
+
         let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
         let html = prose_doc.html;
         let markdown = prose_doc.markdown;

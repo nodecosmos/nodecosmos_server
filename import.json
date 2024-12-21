@@ -1,0 +1,59 @@
+{
+  "root": {
+    "title": "Root",
+    "description": "",
+    "children": [
+      {
+        "title": "Child 1",
+        "description": "",
+        "children": [
+          {
+            "title": "Child 1.1",
+            "description": "",
+            "children": [],
+            "flows": []
+          },
+          {
+            "title": "Child 1.2",
+            "description": "",
+            "children": [],
+            "flows": []
+          }
+        ],
+        "flows": []
+      },
+      {
+        "title": "Child 2",
+        "description": "",
+        "children": [],
+        "flows": []
+      }
+    ],
+    "initialInputs": [
+      {
+        "title": "Input 1",
+        "description": ""
+      }
+    ],
+    "flows": [
+      {
+        "title": "Flow 1",
+        "description": "",
+        "flowSteps": [
+          {
+            "description": "",
+            "nodes": [],
+            "input_ids_by_node_id": {},
+            "output_ids_by_node_id": {}
+          }
+        ]
+      }
+    ],
+    "ios": [
+      {
+        "title": "iOS",
+        "description": ""
+      }
+    ]
+  }
+}

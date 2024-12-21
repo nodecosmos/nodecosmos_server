@@ -11,6 +11,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
+use crate::models::node::import::ImportNode;
 use crate::models::traits::{
     Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
 };
@@ -21,6 +22,7 @@ use crate::stream::MergedModelStream;
 mod auth;
 mod create;
 pub mod delete;
+pub mod import;
 pub mod reorder;
 pub mod search;
 pub mod sort;
