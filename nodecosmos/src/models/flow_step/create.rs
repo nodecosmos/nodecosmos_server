@@ -18,7 +18,6 @@ impl FlowStep {
         if self.is_default_context() {
             let now = chrono::Utc::now();
 
-            self.id = Uuid::new_v4();
             self.created_at = now;
             self.updated_at = now;
         }
