@@ -110,7 +110,7 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
         )
         .await?;
 
-    node.insert_cb(&data).execute(data.db_session()).await?;
+    let insert = node.insert_cb(&data).execute(data.db_session()).await;
 
     data.resource_locker()
         .unlock_resource_actions(
@@ -119,6 +119,10 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
             &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
+
+    if let Err(e) = insert {
+        return Err(e);
+    }
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -351,7 +355,7 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
         )
         .await?;
 
-    Import::new(current_root, json_file).await?.run(&data).await?;
+    let import_run = Import::new(current_root, json_file).await?.run(&data).await;
 
     data.resource_locker()
         .unlock_resource_actions(
@@ -360,6 +364,10 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
             &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
         )
         .await?;
+
+    if let Err(e) = import_run {
+        return Err(e);
+    }
 
     Ok(HttpResponse::Ok().finish())
 }
