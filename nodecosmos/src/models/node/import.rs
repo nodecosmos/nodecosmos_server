@@ -253,10 +253,10 @@ impl Import {
 
         for import_node in self.import_nodes.nodes.iter() {
             if self.node_id_by_temp_id.contains_key(&import_node.id) {
-                NodecosmosError::BadRequest(format!(
+                return Err(NodecosmosError::BadRequest(format!(
                     "Duplicate Node Id Error: Node with temp id {} already exists",
                     import_node.id
-                ));
+                )));
             }
 
             let parent_id = self
@@ -393,10 +393,10 @@ impl Import {
                                 .await?;
 
                             if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
-                                NodecosmosError::BadRequest(format!(
+                                return Err(NodecosmosError::BadRequest(format!(
                                     "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists",
                                     import_flow_step.id
-                                ));
+                                )));
                             }
                             fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
                         }
@@ -442,10 +442,10 @@ impl Import {
         flow_id: Option<Uuid>,
     ) -> Result<Io, NodecosmosError> {
         if self.io_id_by_tmp_id.contains_key(&import_io.id) {
-            NodecosmosError::BadRequest(format!(
+            return Err(NodecosmosError::BadRequest(format!(
                 "Duplicate IO Id Error: IO with temp id {} already exists. Make sure that IOs have unique temp ids",
                 import_io.id
-            ));
+            )));
         }
 
         let mut main_id = None;
@@ -514,11 +514,11 @@ impl Import {
         step_index: i32,
     ) -> Result<(), NodecosmosError> {
         if self.created_flow_steps_tmp_ids.contains(&import_flow_step.id) {
-            NodecosmosError::BadRequest(format!(
+            return Err(NodecosmosError::BadRequest(format!(
                 "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists. \
                  Make sure that Flow Steps have unique temp ids",
                 import_flow_step.id
-            ));
+            )));
         }
 
         let new_fs_id = Uuid::new_v4();
