@@ -1,3 +1,9 @@
+use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
+use crate::models::archived_description::ArchivedDescription;
+use crate::models::traits::Branchable;
+use crate::models::traits::SanitizeDescription;
+use crate::models::utils::DescriptionYDocParser;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use charybdis::callbacks::Callbacks;
@@ -5,19 +11,11 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert};
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
+use macros::{Branchable, ObjectId};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
-use yrs::{Doc, GetString, Transact, Update};
-
-use macros::{Branchable, ObjectId};
-
-use crate::api::data::RequestData;
-use crate::errors::NodecosmosError;
-use crate::models::archived_description::ArchivedDescription;
-use crate::models::traits::Branchable;
-use crate::models::traits::SanitizeDescription;
-use crate::models::utils::DescriptionXmlParser;
+use yrs::{Doc, Transact, Update};
 
 mod save;
 // TODO: fix flow step deletions
@@ -159,21 +157,16 @@ impl Description {
         let update = Update::decode_v2(&update_buf)?;
         let doc = Doc::new();
         let xml = doc.get_or_insert_xml_fragment(Self::DESCRIPTION_ROOT);
-        let mut transaction = doc.transact_mut();
 
+        let mut transaction = doc.transact_mut();
         transaction.apply_update(current)?;
         transaction.apply_update(update)?;
 
-        // For some reason encodeStateAsUpdateV2 on front end converts &amp; to & and that will break xml parsing.
-        let xml_str = &xml.get_string(&transaction).replace("&", "&amp;");
-
-        println!("xml_str: {:?}", xml_str);
-
-        let prose_doc = DescriptionXmlParser::new(xml_str).run()?;
+        let prose_doc = DescriptionYDocParser::new().run(&transaction, xml)?;
         let html = prose_doc.html;
         let markdown = prose_doc.markdown;
-        let base64 = STANDARD.encode(transaction.encode_update_v2());
         let short_description = prose_doc.short_description;
+        let base64 = STANDARD.encode(transaction.encode_update_v2());
 
         self.short_description = Some(short_description);
         self.html = Some(html);
