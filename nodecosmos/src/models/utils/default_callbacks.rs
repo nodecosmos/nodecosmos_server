@@ -79,11 +79,11 @@ macro_rules! sanitize_description_cb_fn {
             _session: &scylla::CachingSession,
             _ext: &Self::Extension,
         ) -> Result<(), NodecosmosError> {
-            use crate::models::traits::SanitizeDescription;
+            use crate::models::traits::Clean;
 
             self.updated_at = chrono::Utc::now();
 
-            self.description.sanitize()?;
+            self.description.clean()?;
 
             Ok(())
         }

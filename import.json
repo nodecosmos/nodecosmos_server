@@ -1,45 +1,38 @@
 {
   "nodes": [
     {
-      "id": "doc-uuid-overview",
-      "title": "Import Feature Overview",
-      "order_index": 1,
-      "description": "<description>      <heading level=\"1\">Import Feature Overview</heading>      <paragraph>The Import Feature in NodeCosmos allows users to seamlessly integrate complex hierarchical data structures into the platform. This facilitates the bulk creation and configuration of interconnected entities, enhancing productivity and ensuring consistency across the system.</paragraph>      </description>",
+      "id": "import_feature",
+      "title": "Import Feature",
+      "description": "<description><heading>Sample JSON for Import</heading><codeBlock>{\n  \"nodes\": [\n    {\n      \"id\": \"import_feature\",\n      \"title\": \"Import Feature\",\n      \"description\": \"<description><heading>Sample JSON for Import</heading><codeBlock>{\\n  \\\"nodes\\\": [\\n    {\\n      \\\"id\\\": \\\"node1\\\",\\n      \\\"title\\\": \\\"Node Example\\\",\\n      \\\"description\\\": \\\"<description><paragraph>Example of a node field.</paragraph></description>\\\"\\n    }\\n  ]\\n}</codeBlock>\"\n    }\n  ]\n}</codeBlock>",
+      "parent_id": "import_feature",
       "flows": []
     },
     {
-      "id": "doc-uuid-schema",
-      "title": "Import Schema Structure",
-      "order_index": 2,
-      "description": "<description>      <heading level=\"1\">Import Schema Structure</heading>      <paragraph>The import schema is composed of several key components:</paragraph>      <bulletList>      <listItem>ImportNodes: The root container holding all nodes.</listItem>      <listItem>ImportNode: Represents individual nodes within the hierarchy.</listItem>      <listItem>ImportFlow: Defines flows associated with nodes.</listItem>      <listItem>ImportFlowStep: Details each step within a flow.</listItem>      <listItem>ImportIo: Represents Input/Output entities linked to flows or flow steps.</listItem>      <listItem>ImportDescription: Provides rich descriptions in XML format.</listItem>      </bulletList>      </description>",
+      "id": "node",
+      "title": "Node",
+      "description": "<description><heading>Node Field</heading><paragraph>The \"node\" field defines an individual unit in the system. Each node must have a unique \"id\" and may contain nested nodes, a title, and an optional description.</paragraph></description>",
+      "parent_id": "import_feature",
       "flows": []
     },
     {
-      "id": "doc-uuid-constraints",
-      "title": "Constraints and Rules",
-      "order_index": 3,
-      "description": "<description>      <heading level=\"1\">Constraints and Rules</heading>      <paragraph>To maintain data integrity and ensure a smooth import process, adhere to the following constraints:</paragraph>      <bulletList>      <listItem><strong>Node Relationships:</strong> Every node in <code>flow_step.node_ids</code> must be either the node where the flow is created or one of its descendants.</listItem>      <listItem><strong>IO Uniqueness:</strong> Every IO created in <code>flow.initial_inputs</code> or <code>flow_step.outputs_by_node</code> must have a unique <code>id</code>.</listItem>      <listItem><strong>IO References:</strong> IOs referenced in <code>flow_step.input_ids_by_node</code> must be defined within the same node's flows, ensuring no cross-node references.</listItem>      <listItem><strong>Flow Step IDs:</strong> Each <code>flow_step</code> must have a unique <code>id</code> for accurate referencing and error reporting.</listItem>      </bulletList>      </description>",
+      "id": "flow",
+      "title": "Flow",
+      "description": "<description><heading>Flow Field</heading><paragraph>The \"flow\" field represents a sequence of processes. Each flow consists of \"initial_inputs\", \"steps\", and other metadata required to model the flow interactions.</paragraph></description>",
+      "parent_id": "import_feature",
       "flows": []
     },
     {
-      "id": "doc-uuid-json-example",
-      "title": "Example JSON Import File",
-      "order_index": 4,
-      "description": "<description>      <heading level=\"1\">Example JSON Import File</heading>      <paragraph>Below is a sample JSON file that adheres to the import schema. This example demonstrates how to structure nodes and their descriptions effectively.</paragraph>      <code>    {      \"nodes\": [    {      \"id\": \"root-uuid-1\",    \"title\": \"Root Node\",    \"order_index\": 1,    \"description\": \"<description><heading level=\\\"1\\\">Root Node</heading><paragraph>This is the root node of the AI system.</paragraph></description>\",    \"parent_id\": \"root\",    \"flows\": []  },    {      \"id\": \"doc-uuid-1\",    \"title\": \"Import Feature Overview\",    \"order_index\": 2,    \"description\": \"<description><heading level=\\\"1\\\">Import Feature Overview</heading><paragraph>The Import Feature in NodeCosmos allows users to seamlessly integrate complex hierarchical data structures into the platform.</paragraph></description>\",    \"parent_id\": \"root\",    \"flows\": []  }  ]}</code></description>",
+      "id": "flowStep",
+      "title": "Flow Step",
+      "description": "<description><heading>Flow Step Field</heading><paragraph>The \"flowStep\" field outlines a single step within a flow. It includes inputs and outputs and describes how nodes interact during this step.</paragraph></description>",
+      "parent_id": "import_feature",
       "flows": []
     },
     {
-      "id": "doc-uuid-best-practices",
-      "title": "Best Practices",
-      "order_index": 5,
-      "description": "<description><heading level=\"1\">Best Practices</heading><paragraph>To ensure successful imports, follow these best practices:</paragraph><bulletList><listItem><strong>Use Unique IDs:</strong> Ensure that all <code>id</code> fields are unique to prevent conflicts.</listItem><listItem><strong>Validate XML Descriptions:</strong> Confirm that all <code>description</code> fields contain well-formed XML conforming to the provided XSD.</listItem><listItem><strong>Maintain Hierarchical Integrity:</strong> Accurately define <code>parent_id</code> to reflect the desired node hierarchy.</listItem><listItem><strong>Leverage Templates:</strong> Utilize provided JSON templates to structure your import files correctly.</listItem></bulletList></description>",
-      "flows": []
-    },
-    {
-      "id": "doc-uuid-troubleshooting",
-      "title": "Troubleshooting",
-      "order_index": 6,
-      "description": "<description><heading level=\"1\">Troubleshooting</heading><paragraph>If you encounter issues during the import process, consider the following solutions:</paragraph><bulletList><listItem><strong>Duplicate IDs:</strong> Verify that all <code>id</code> fields are unique.</listItem><listItem><strong>Invalid Parent References:</strong> Ensure that <code>parent_id</code> values correspond to existing nodes or are set to 'root'.</listItem><listItem><strong>Malformed XML Descriptions:</strong> Use an XML validator to check the integrity of <code>description</code> fields.</listItem><listItem><strong>IO Reference Errors:</strong> Confirm that all IOs referenced in <code>input_ids_by_node</code> are defined within the same node's flows.</listItem></bulletList></description>",
+      "id": "description",
+      "title": "Description",
+      "description": "<description><heading>Description Field</heading><paragraph>The \"description\" field provides additional information or context for the node, flow, or flow step. It uses XML-like tags for formatting.</paragraph></description>",
+      "parent_id": "import_feature",
       "flows": []
     }
   ]

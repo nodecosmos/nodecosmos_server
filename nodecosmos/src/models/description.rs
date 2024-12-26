@@ -2,7 +2,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_description::ArchivedDescription;
 use crate::models::traits::Branchable;
-use crate::models::traits::SanitizeDescription;
+use crate::models::traits::Clean;
 use crate::models::utils::DescriptionYDocParser;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -73,7 +73,7 @@ impl Callbacks for Description {
 
         self.updated_at = Utc::now();
 
-        self.html.sanitize()?;
+        self.html.clean()?;
 
         Ok(())
     }

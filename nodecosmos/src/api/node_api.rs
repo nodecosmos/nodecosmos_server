@@ -356,7 +356,6 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
         .await?;
 
     let import_run = Import::new(current_root, json_file).await?.run(&data).await;
-
     data.resource_locker()
         .unlock_resource_actions(
             root_id,

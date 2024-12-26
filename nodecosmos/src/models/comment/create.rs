@@ -6,7 +6,7 @@ use crate::api::types::{ActionObject, ActionTypes};
 use crate::errors::NodecosmosError;
 use crate::models::comment::Comment;
 use crate::models::comment_thread::ThreadObjectType;
-use crate::models::traits::SanitizeDescription;
+use crate::models::traits::Clean;
 use crate::models::udts::Profile;
 use crate::resources::sse_broadcast::ModelEvent;
 
@@ -42,7 +42,7 @@ impl Comment {
         self.id = Uuid::new_v4();
         self.author_id = data.current_user.id;
         self.author = Some(Profile::init_from_current_user(&data.current_user));
-        self.content.sanitize()?;
+        self.content.clean()?;
         self.created_at = now;
         self.updated_at = now;
 

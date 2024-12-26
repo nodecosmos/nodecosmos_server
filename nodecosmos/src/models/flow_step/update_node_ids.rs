@@ -131,9 +131,6 @@ impl UpdateNodeIdsFlowStep {
             current.save_original_data_to_branch(data, self.branch_id).await?;
 
             self.node_ids.merge_unique(current.node_ids);
-
-            println!("self.node_ids: {:?}", self.node_ids);
-            println!("self.output_ids_by_node_id: {:?}", self.output_ids_by_node_id);
         }
 
         Ok(())

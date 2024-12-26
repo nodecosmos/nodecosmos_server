@@ -5,7 +5,7 @@ use crate::models::flow::Flow;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
 use crate::models::node::Node;
-use crate::models::traits::ObjectType;
+use crate::models::traits::{Clean, ObjectType};
 use crate::models::utils::DescriptionXmlParser;
 use actix_multipart::Multipart;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks};
@@ -70,11 +70,11 @@ pub struct ImportIo {
 pub struct ImportFlowStep {
     /// Temporary id used to reference flow steps in the import file or error messages
     pub id: String,
-    /// Temporary node ids that are part of the flow step. Every node in the list must be descendant of the node where
+    /// Node ids that are part of the flow step. Every node in the list must be descendant of the node where
     /// the flow step is being created, or it can be equal to the node itself.
     pub node_ids: Vec<String>,
-    /// Map inputs to nodes in the flow step. Key is the temp node id that is used in the current flow step,
-    /// and value is the temp IO id that is used as input to the node.
+    /// Take outputs to nodes defined in current flow steps. Key is the node id that is used in the current flow step
+    /// ('node_ids' list), and value is the list of Output Ids.
     pub input_ids_by_node: HashMap<String, Vec<String>>,
     /// Map outputs to nodes in the flow step. Key is the temp node id that is used in the current flow step,
     /// and value is the temp IO id that is used as output to the node.
@@ -211,19 +211,19 @@ impl Import {
                 created_nodes: Vec::new(),
             })
         } else {
-            Err(NodecosmosError::BadRequest("No JSON file provided".to_string()))
+            Err(NodecosmosError::ImportError("No JSON file provided".to_string()))
         }
     }
 
     pub async fn run(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
-        if let Err(e_execute) = self.execute(data).await {
-            let mut error = format!("Failed to execute import: {:?}", e_execute);
+        if let Err(e) = self.execute(data).await {
+            let mut error = format!("Failed to execute import: {:?}", e);
 
             if let Err(e_undo) = self.undo(data).await {
                 error.push_str(&format!(", Failed to undo import: {:?}", e_undo));
             }
 
-            return Err(NodecosmosError::InternalServerError(error));
+            return Err(e);
         }
 
         Ok(())
@@ -258,10 +258,17 @@ impl Import {
 
         for import_node in self.import_nodes.nodes.iter() {
             if self.node_id_by_temp_id.contains_key(&import_node.id) {
-                return Err(NodecosmosError::BadRequest(format!(
-                    "Duplicate Node Id Error: Node with temp id {} already exists",
-                    import_node.id
-                )));
+                return if import_node.id == TMP_ROOT_ID {
+                    Err(NodecosmosError::ImportError(
+                        "Can not import a node with id 'root' as 'root' refers to the node where import occurs"
+                            .to_string(),
+                    ))
+                } else {
+                    Err(NodecosmosError::ImportError(format!(
+                        "Duplicate Node Id Error: Node with temp id {} already exists",
+                        import_node.id.clean_clone()
+                    )))
+                };
             }
 
             let parent_id = self
@@ -272,6 +279,13 @@ impl Import {
                     log::error!("Failed to find parent_id: {}", import_node.parent_id);
                     self.current_root.id.clone()
                 });
+
+            if import_node.parent_id == import_node.id {
+                return Err(NodecosmosError::ImportError(format!(
+                    "Parent Id Error: Node with temp id {} can not be its own parent",
+                    import_node.id.clean_clone()
+                )));
+            }
 
             let mut new_node = Node {
                 branch_id: self.current_root.branch_id,
@@ -398,9 +412,9 @@ impl Import {
                                 .await?;
 
                             if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
-                                return Err(NodecosmosError::BadRequest(format!(
+                                return Err(NodecosmosError::ImportError(format!(
                                     "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists",
-                                    import_flow_step.id
+                                    import_flow_step.id.clean_clone()
                                 )));
                             }
                             fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
@@ -418,7 +432,7 @@ impl Import {
                         log::error!("Failed to find flow_id for temp id: {}", import_flow_step.id);
                         NodecosmosError::InternalServerError(format!(
                             "Unexpected Error: failed to find flow_id for flow_step with tmp id: {}",
-                            import_flow_step.id
+                            import_flow_step.id.clean_clone()
                         ))
                     })?;
 
@@ -447,9 +461,9 @@ impl Import {
         flow_id: Option<Uuid>,
     ) -> Result<Io, NodecosmosError> {
         if self.io_id_by_tmp_id.contains_key(&import_io.id) {
-            return Err(NodecosmosError::BadRequest(format!(
+            return Err(NodecosmosError::ImportError(format!(
                 "Duplicate IO Id Error: IO with temp id {} already exists. Make sure that IOs have unique temp ids",
-                import_io.id
+                import_io.id.clean_clone()
             )));
         }
 
@@ -519,10 +533,10 @@ impl Import {
         step_index: i32,
     ) -> Result<(), NodecosmosError> {
         if self.created_flow_steps_tmp_ids.contains(&import_flow_step.id) {
-            return Err(NodecosmosError::BadRequest(format!(
+            return Err(NodecosmosError::ImportError(format!(
                 "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists. \
                  Make sure that Flow Steps have unique temp ids",
-                import_flow_step.id
+                import_flow_step.id.clean_clone()
             )));
         }
 
@@ -576,14 +590,17 @@ impl Import {
     fn node_id_from_tmp(&self, temp_node_id: &String) -> Result<Uuid, NodecosmosError> {
         self.node_id_by_temp_id.get(temp_node_id).copied().ok_or_else(|| {
             log::error!("Failed to find node_id for temp id: {}", temp_node_id);
-            NodecosmosError::BadRequest(format!("Failed to find node_id for temp id: {}", temp_node_id))
+            NodecosmosError::ImportError(format!(
+                "Failed to find node_id for temp id: {}",
+                temp_node_id.clean_clone()
+            ))
         })
     }
 
     fn tmp_id_from_node_id(&self, node_id: Uuid) -> Result<&String, NodecosmosError> {
         self.tmp_ids_by_node_id.get(&node_id).ok_or_else(|| {
             log::error!("Failed to find temp id for node_id: {}", node_id);
-            NodecosmosError::BadRequest(format!("Failed to find temp id for node_id: {}", node_id))
+            NodecosmosError::ImportError(format!("Failed to find temp id for node_id: {}", node_id))
         })
     }
 
@@ -591,7 +608,10 @@ impl Import {
     fn io_id_from_tmp(&self, temp_io_id: &String) -> Result<Uuid, NodecosmosError> {
         self.io_id_by_tmp_id.get(temp_io_id).copied().ok_or_else(|| {
             log::error!("Failed to find io_id for temp id: {}", temp_io_id);
-            NodecosmosError::BadRequest(format!("Failed to find IO for temp id: {}", temp_io_id))
+            NodecosmosError::ImportError(format!(
+                "Failed to find Output for temp id: {}",
+                temp_io_id.clean_clone()
+            ))
         })
     }
 
@@ -605,7 +625,11 @@ impl Import {
             .iter()
             .map(|temp_node_id| {
                 let node_id = self.node_id_from_tmp(temp_node_id).map_err(|e| {
-                    NodecosmosError::BadRequest(format!("Flow Step {} Creation Error: {}", import_flow_step.id, e))
+                    NodecosmosError::ImportError(format!(
+                        "Flow Step {} Creation Error: {}",
+                        import_flow_step.id.clean_clone(),
+                        e
+                    ))
                 })?;
                 let tmp_node_id = self.tmp_id_from_node_id(node_id)?;
 
@@ -615,9 +639,12 @@ impl Import {
                         .get(&fs_node_id)
                         .map_or(true, |descendants| !descendants.contains(&node_id))
                 {
-                    return Err(NodecosmosError::BadRequest(format!(
-                        "Flow Step {} Creation Error: Node with tmp id {} is not a descendant of the node with tmp id {}",
-                        import_flow_step.id, temp_node_id, tmp_node_id
+                    return Err(NodecosmosError::ImportError(format!(
+                        "Flow Step <b>{}</b> Creation Error: \
+                         Node with tmp id <b>{}</b> is not a descendant of the node with tmp id <b>{}</b>",
+                        import_flow_step.id.clean_clone(),
+                        temp_node_id.clean_clone(),
+                        tmp_node_id.clean_clone()
                     )));
                 }
 
@@ -636,7 +663,11 @@ impl Import {
             .iter()
             .map(|(temp_node_id, temp_io_ids)| {
                 let input_node_id = self.node_id_from_tmp(temp_node_id).map_err(|e| {
-                    NodecosmosError::BadRequest(format!("Flow Step {} Creation Error: {}", import_flow_step.id, e))
+                    NodecosmosError::ImportError(format!(
+                        "Flow Step {} Creation Error: {}",
+                        import_flow_step.id.clean_clone(),
+                        e
+                    ))
                 })?;
 
                 let io_ids = temp_io_ids
@@ -653,11 +684,12 @@ impl Import {
                             })?;
 
                             if io_node_id != &node_id {
-                                return Err(NodecosmosError::BadRequest(format!(
+                                return Err(NodecosmosError::ImportError(format!(
                                     "Flow Step {} Creation Error: IO with temp id {} that is used as input is not in \
                                     the scope of the flow step. Please make sure that IOs associate inputs that are \
                                     created in the flows within the same node",
-                                    import_flow_step.id, temp_io_id
+                                    import_flow_step.id.clean_clone(),
+                                    temp_io_id.clean_clone()
                                 )));
                             }
                         }
@@ -682,14 +714,22 @@ impl Import {
 
             for import_io in import_ios.iter() {
                 let io_id = self.io_id_from_tmp(&import_io.id).map_err(|e| {
-                    NodecosmosError::BadRequest(format!("Flow Step {} Creation Error: {}", import_flow_step.id, e))
+                    NodecosmosError::ImportError(format!(
+                        "Flow Step {} Creation Error: {}",
+                        import_flow_step.id.clean_clone(),
+                        e
+                    ))
                 })?;
 
                 io_ids.push(io_id);
             }
 
             let output_node_id = self.node_id_from_tmp(temp_node_id).map_err(|e| {
-                NodecosmosError::BadRequest(format!("Flow Step {} Creation Error: {}", import_flow_step.id, e))
+                NodecosmosError::ImportError(format!(
+                    "Flow Step {} Creation Error: {}",
+                    import_flow_step.id.clean_clone(),
+                    e
+                ))
             })?;
 
             output_ids_by_node_id.insert(output_node_id, io_ids);
