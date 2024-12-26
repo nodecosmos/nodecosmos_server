@@ -105,8 +105,13 @@ pub struct ImportNode {
     pub order_index: Option<i32>,
     pub description: Option<ImportDescription>,
     /// if parent_id is 'root', then it is a top-level node where import occurs
+    #[serde(default = "default_parent_id")]
     pub parent_id: String,
     pub flows: Vec<ImportFlow>,
+}
+
+fn default_parent_id() -> String {
+    TMP_ROOT_ID.to_string()
 }
 
 #[derive(Deserialize)]
