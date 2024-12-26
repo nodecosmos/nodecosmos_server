@@ -70,6 +70,7 @@ pub enum NodecosmosError {
     ParseError(strum::ParseError),
     EmailError(String),
     EmailAlreadyExists,
+    ImportError(String),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -106,6 +107,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ParseError(e) => write!(f, "ParseError: {}", e),
             NodecosmosError::EmailError(e) => write!(f, "EmailError: {}", e),
             NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
+            NodecosmosError::ImportError(e) => write!(f, "ImportError: {}", e),
         }
     }
 }
@@ -158,6 +160,10 @@ impl ResponseError for NodecosmosError {
                 "status": 400,
                 "message": e
             })),
+            NodecosmosError::ImportError(e) => HttpResponse::BadRequest().json(json!({
+                "status": 400,
+                "message": e
+            })),
             NodecosmosError::UnsupportedMediaType => HttpResponse::UnsupportedMediaType().json({
                 json!({
                     "status": 415,
@@ -183,9 +189,7 @@ impl ResponseError for NodecosmosError {
                         "message": "Not Found"
                     }))
                 }
-                _ => {
-                    NodecosmosError::InternalServerError(format!("CharybdisError: {}", e)).error_response()
-                }
+                _ => NodecosmosError::InternalServerError(format!("CharybdisError: {}", e)).error_response(),
             },
             _ => {
                 error!("InternalServerError: {}", self.to_string());

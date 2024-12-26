@@ -10,7 +10,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::comment_thread::{CommentThread, ThreadLocation};
 use crate::models::notification::{Notification, NotificationType};
-use crate::models::traits::SanitizeDescription;
+use crate::models::traits::Clean;
 use crate::models::udts::Profile;
 
 mod create;
@@ -63,7 +63,7 @@ impl Callbacks for Comment {
         self.validate_author(data).await?;
         self.validate_url(data).await?;
 
-        self.content.sanitize()?;
+        self.content.clean()?;
 
         Ok(())
     }
@@ -200,7 +200,7 @@ impl Callbacks for UpdateContentComment {
     ) -> Result<(), NodecosmosError> {
         self.updated_at = chrono::Utc::now();
 
-        self.content.sanitize()?;
+        self.content.clean()?;
 
         Ok(())
     }

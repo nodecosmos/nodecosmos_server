@@ -1,7 +1,7 @@
 pub const MAX_PARALLEL_REQUESTS: usize = 25;
 pub const BATCH_CHUNK_SIZE: usize = 100;
 pub const PAGE_SIZE: i32 = 51;
-
+pub const MAX_DOC_SIZE: usize = 16 * 1024 * 1024;
 /// `max_partition_key_restrictions_per_query` is the maximum number of distinct partition key restrictions per query.
 /// `max_clustering_key_restrictions_per_query` is the maximum number of distinct clustering key restrictions per query.
 /// This limit places a bound on the size of IN tuples, especially when multiple clustering key columns have IN

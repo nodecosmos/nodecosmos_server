@@ -1,13 +1,26 @@
+use crate::constants::MAX_DOC_SIZE;
+use crate::errors::NodecosmosError;
 use ammonia::{clean, Builder};
 
-use crate::errors::NodecosmosError;
+pub trait Clean {
+    fn clean(&mut self) -> Result<&mut Self, NodecosmosError>;
 
-pub trait SanitizeDescription {
-    fn sanitize(&mut self) -> Result<(), NodecosmosError>;
+    fn clean_clone(&self) -> Self
+    where
+        Self: Sized + Clone,
+    {
+        let mut cloned = self.clone();
+        let _ = cloned.clean().map_err(|e| {
+            log::error!("{}", e);
+            NodecosmosError::InternalServerError
+        });
+
+        cloned
+    }
 }
 
-impl SanitizeDescription for Option<String> {
-    fn sanitize(&mut self) -> Result<(), NodecosmosError> {
+impl Clean for Option<String> {
+    fn clean(&mut self) -> Result<&mut Self, NodecosmosError> {
         if let Some(description) = &self {
             if description.len() > u16::MAX as usize {
                 return Err(NodecosmosError::Forbidden(
@@ -31,20 +44,20 @@ impl SanitizeDescription for Option<String> {
             *self = Some(sanitized.to_string());
         }
 
-        Ok(())
+        Ok(self)
     }
 }
 
-impl SanitizeDescription for String {
-    fn sanitize(&mut self) -> Result<(), NodecosmosError> {
-        if self.len() > u16::MAX as usize {
+impl Clean for String {
+    fn clean(&mut self) -> Result<&mut Self, NodecosmosError> {
+        if self.len() > MAX_DOC_SIZE {
             return Err(NodecosmosError::Forbidden(
-                "Description is too long. It can contain max 65535 characters".to_string(),
+                "Data is too long. It can contain max 16MB of data".to_string(),
             ));
         }
 
         *self = clean(self);
 
-        Ok(())
+        Ok(self)
     }
 }

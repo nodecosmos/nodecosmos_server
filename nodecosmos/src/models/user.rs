@@ -18,7 +18,7 @@ use crate::constants::BLACKLIST_USERNAMES;
 use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
-use crate::models::traits::{ElasticDocument, SanitizeDescription, WhereInChunksExec};
+use crate::models::traits::{Clean, ElasticDocument, WhereInChunksExec};
 use crate::models::udts::Address;
 use crate::models::user_counter::UserCounter;
 
@@ -380,7 +380,7 @@ impl Callbacks for UpdateBioUser {
     type Error = NodecosmosError;
 
     async fn before_update(&mut self, _: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
-        self.bio.sanitize()?;
+        self.bio.clean()?;
 
         Ok(())
     }

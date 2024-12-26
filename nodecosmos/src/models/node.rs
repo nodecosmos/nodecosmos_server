@@ -21,6 +21,7 @@ use crate::stream::MergedModelStream;
 mod auth;
 mod create;
 pub mod delete;
+pub mod import;
 pub mod reorder;
 pub mod search;
 pub mod sort;
@@ -110,6 +111,7 @@ impl Callbacks for Node {
         if self.is_default_context() {
             self.set_defaults(data).await?;
             self.validate_root()?;
+            self.validate_parent()?;
             self.validate_owner()?;
             self.validate_visibility()?;
             self.update_branch_with_creation(data)

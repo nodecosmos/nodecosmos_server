@@ -1,11 +1,13 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
+use crate::models::io::UpdateFlowStepIo;
 use crate::models::traits::{
     Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams, WhereInChunksExec,
 };
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
+use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
@@ -256,6 +258,30 @@ impl FlowStep {
         }
 
         [created_io_ids_by_node_id, removed_io_ids_by_node_id]
+    }
+
+    pub async fn associate_outputs_with_self(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        // create batch to update ios with flow_step_id as self.id
+        let mut batch = UpdateFlowStepIo::batch();
+        let output_ids_by_node = self.output_ids_by_node_id.clone().unwrap_or_default();
+        let output_ids = output_ids_by_node.into_values().flatten().collect::<Vec<Uuid>>();
+
+        let mut update_fs_ios = UpdateFlowStepIo::find_by_branch_id_and_root_id_and_ids(
+            db_session,
+            self.branch_id,
+            self.root_id,
+            output_ids,
+        )
+        .await?;
+
+        update_fs_ios.iter_mut().for_each(|io| {
+            io.flow_step_id = Some(self.id);
+            batch.append_update(io);
+        });
+
+        batch.execute(db_session).await?;
+
+        Ok(())
     }
 }
 
