@@ -74,6 +74,17 @@ impl Node {
         Ok(())
     }
 
+    pub fn validate_parent(&mut self) -> Result<(), NodecosmosError> {
+        if self.parent_id == Some(self.id) {
+            return Err(NodecosmosError::ValidationError((
+                "parent_id",
+                "must be different from id",
+            )));
+        }
+
+        Ok(())
+    }
+
     pub fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
         if self.owner_id == Uuid::default() {
             return Err(NodecosmosError::ValidationError(("owner_id", "must be present")));

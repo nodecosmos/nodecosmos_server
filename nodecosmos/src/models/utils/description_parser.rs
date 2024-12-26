@@ -538,8 +538,6 @@ impl DescriptionYDocParser {
         for child in xml_fragment.children(txn) {
             match child {
                 XmlOut::Element(element) => {
-                    println!("element: {:?}", element.tag());
-
                     match Tag::from(element.tag()) {
                         Tag::Description => {}
                         Tag::Heading => {
@@ -628,8 +626,6 @@ impl DescriptionYDocParser {
                 }
                 XmlOut::Text(text) => {
                     let text = text.get_string(txn);
-
-                    println!("text: {:?}", text);
 
                     let escaped = quick_xml::escape::escape(&text);
 
