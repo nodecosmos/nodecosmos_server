@@ -1,0 +1,128 @@
+{
+  "nodes": [
+    {
+      "id": "lightbulbCircuit",
+      "title": "Lightbulb Circuit",
+      "description": "<description><heading level=\"1\">Lightbulb Circuit</heading><paragraph>Top-level node representing the circuit.</paragraph></description>",
+      "parent_id": "root",
+      "flows": [
+        {
+          "title": "Turn On Flow",
+          "description": "<description><paragraph>This flow describes how the circuit is turned on.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
+          "flow_steps": [
+            {
+              "id": "flowStep1",
+              "node_ids": [
+                "userNode"
+              ],
+              "input_ids_by_node": {},
+              "outputs_by_node": {
+                "userNode": [
+                  {
+                    "id": "switchesOn",
+                    "title": "Switches On",
+                    "description": "<description><paragraph>Action from the user to flip the switch.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>User flips the switch on.</paragraph></description>"
+            },
+            {
+              "id": "flowStep2",
+              "node_ids": [
+                "switchNode"
+              ],
+              "input_ids_by_node": {
+                "switchNode": [
+                  "switchesOn"
+                ]
+              },
+              "outputs_by_node": {
+                "switchNode": [
+                  {
+                    "id": "circuitClosed",
+                    "title": "Closes Circuit",
+                    "description": "<description><paragraph>Switch is now in closed position.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The switch receives the 'Switches On' input and closes the circuit.</paragraph></description>"
+            },
+            {
+              "id": "flowStep3",
+              "node_ids": [
+                "batteryNode"
+              ],
+              "input_ids_by_node": {
+                "batteryNode": [
+                  "circuitClosed"
+                ]
+              },
+              "outputs_by_node": {
+                "batteryNode": [
+                  {
+                    "id": "current",
+                    "title": "Current",
+                    "description": "<description><paragraph>Battery outputs current once circuit is closed.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The battery detects the closed circuit and supplies current.</paragraph></description>"
+            },
+            {
+              "id": "flowStep4",
+              "node_ids": [
+                "lightbulbNode"
+              ],
+              "input_ids_by_node": {
+                "lightbulbNode": [
+                  "current"
+                ]
+              },
+              "outputs_by_node": {
+                "lightbulbNode": [
+                  {
+                    "id": "light",
+                    "title": "Light",
+                    "description": "<description><paragraph>The lightbulb produces light once current is received.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The lightbulb receives current and emits light.</paragraph></description>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "userNode",
+      "title": "User",
+      "description": "<description><paragraph>The actor who initiates the switch action.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
+      "flows": []
+    },
+    {
+      "id": "switchNode",
+      "title": "Switch",
+      "description": "<description><paragraph>The switch can open or close the circuit.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
+      "flows": []
+    },
+    {
+      "id": "batteryNode",
+      "title": "Battery",
+      "description": "<description><paragraph>The battery supplies power to the circuit when it is closed.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
+      "flows": []
+    },
+    {
+      "id": "lightbulbNode",
+      "title": "Lightbulb",
+      "description": "<description><paragraph>The lightbulb receives current and produces light.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
+      "flows": []
+    }
+  ]
+}

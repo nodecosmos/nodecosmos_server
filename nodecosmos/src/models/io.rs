@@ -422,3 +422,35 @@ partial_io!(DeleteIo, root_id, node_id, branch_id, id, flow_id, flow_step_id);
 partial_io!(BaseIo, branch_id, node_id, root_id, id);
 
 partial_io!(TitleIo, root_id, node_id, branch_id, id, title, created_at);
+
+partial_io!(
+    UpdateFlowStepIo,
+    root_id,
+    node_id,
+    branch_id,
+    id,
+    flow_step_id,
+    flow_step_node_id
+);
+
+impl UpdateFlowStepIo {
+    pub async fn find_by_branch_id_and_root_id_and_ids(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        root_id: Uuid,
+        ids: Vec<Uuid>,
+    ) -> Result<Vec<Self>, NodecosmosError> {
+        let ios = ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_flow_step_io!(
+                    "branch_id = ? AND root_id = ? AND id IN ?",
+                    (branch_id, root_id, ids_chunk)
+                )
+            })
+            .await
+            .try_collect()
+            .await?;
+
+        Ok(ios)
+    }
+}

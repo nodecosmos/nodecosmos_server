@@ -87,8 +87,6 @@ impl Image {
     pub fn compressed(self, target_size_in_bytes: Option<usize>) -> Result<Vec<u8>, NodecosmosError> {
         let img = self.inner;
 
-        println!("file size: {}", self.file_size);
-
         let target_size_in_bytes = target_size_in_bytes.unwrap_or(DEFAULT_TARGET_SIZE_IN_BYTES);
 
         if self.file_size <= target_size_in_bytes {

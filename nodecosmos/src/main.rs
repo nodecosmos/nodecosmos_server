@@ -76,7 +76,8 @@ fn main() {
                                 .service(delete_cover_image)
                                 .service(get_node_editors)
                                 .service(delete_node_editor)
-                                .service(listen_node_events),
+                                .service(listen_node_events)
+                                .service(import_nodes),
                         )
                         .service(web::scope("/no-compress-nodes").service(listen_node_events))
                         .service(

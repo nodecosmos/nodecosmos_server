@@ -1,6 +1,7 @@
 pub use authorization::*;
 pub use aws::*;
 pub use branchable::*;
+pub use clean::*;
 pub use collections::*;
 pub use context::*;
 pub use elastic::*;
@@ -12,11 +13,11 @@ pub use node::*;
 pub use pluck::*;
 pub use primitives::*;
 pub use query::*;
-pub use sanitize_description::*;
 
 mod authorization;
 mod aws;
 mod branchable;
+mod clean;
 mod collections;
 mod context;
 mod elastic;
@@ -28,4 +29,3 @@ mod node;
 mod pluck;
 mod primitives;
 mod query;
-mod sanitize_description;

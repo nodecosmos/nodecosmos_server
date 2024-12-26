@@ -234,9 +234,6 @@ impl Invitation {
                 username_or_email = token.email;
             }
 
-            println!("node_pk: {:?}", node_pk);
-            println!("username_or_email: {:?}", username_or_email);
-
             let invitation = Self::find_by_primary_key_value((node_pk.0, node_pk.1, username_or_email))
                 .execute(db_session)
                 .await?;
@@ -288,8 +285,7 @@ impl Invitation {
             self.node = Some(node);
         }
 
-        self
-            .node
+        self.node
             .as_mut()
             .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
     }
