@@ -1,38 +1,127 @@
 {
   "nodes": [
     {
-      "id": "import_feature",
-      "title": "Import Feature",
-      "description": "<description><heading>Sample JSON for Import</heading><codeBlock>{\n  \"nodes\": [\n    {\n      \"id\": \"import_feature\",\n      \"title\": \"Import Feature\",\n      \"description\": \"<description><heading>Sample JSON for Import</heading><codeBlock>{\\n  \\\"nodes\\\": [\\n    {\\n      \\\"id\\\": \\\"node1\\\",\\n      \\\"title\\\": \\\"Node Example\\\",\\n      \\\"description\\\": \\\"<description><paragraph>Example of a node field.</paragraph></description>\\\"\\n    }\\n  ]\\n}</codeBlock>\"\n    }\n  ]\n}</codeBlock>",
-      "parent_id": "import_feature",
+      "id": "lightbulbCircuit",
+      "title": "Lightbulb Circuit",
+      "description": "<description><heading level=\"1\">Lightbulb Circuit</heading><paragraph>Top-level node representing the circuit.</paragraph></description>",
+      "parent_id": "root",
+      "flows": [
+        {
+          "title": "Turn On Flow",
+          "description": "<description><paragraph>This flow describes how the circuit is turned on.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
+          "flow_steps": [
+            {
+              "id": "flowStep1",
+              "node_ids": [
+                "userNode"
+              ],
+              "input_ids_by_node": {},
+              "outputs_by_node": {
+                "userNode": [
+                  {
+                    "id": "switchesOn",
+                    "title": "Switches On",
+                    "description": "<description><paragraph>Action from the user to flip the switch.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>User flips the switch on.</paragraph></description>"
+            },
+            {
+              "id": "flowStep2",
+              "node_ids": [
+                "switchNode"
+              ],
+              "input_ids_by_node": {
+                "switchNode": [
+                  "switchesOn"
+                ]
+              },
+              "outputs_by_node": {
+                "switchNode": [
+                  {
+                    "id": "circuitClosed",
+                    "title": "Closes Circuit",
+                    "description": "<description><paragraph>Switch is now in closed position.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The switch receives the 'Switches On' input and closes the circuit.</paragraph></description>"
+            },
+            {
+              "id": "flowStep3",
+              "node_ids": [
+                "batteryNode"
+              ],
+              "input_ids_by_node": {
+                "batteryNode": [
+                  "circuitClosed"
+                ]
+              },
+              "outputs_by_node": {
+                "batteryNode": [
+                  {
+                    "id": "current",
+                    "title": "Current",
+                    "description": "<description><paragraph>Battery outputs current once circuit is closed.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The battery detects the closed circuit and supplies current.</paragraph></description>"
+            },
+            {
+              "id": "flowStep4",
+              "node_ids": [
+                "lightbulbNode"
+              ],
+              "input_ids_by_node": {
+                "lightbulbNode": [
+                  "current"
+                ]
+              },
+              "outputs_by_node": {
+                "lightbulbNode": [
+                  {
+                    "id": "light",
+                    "title": "Light",
+                    "description": "<description><paragraph>The lightbulb produces light once current is received.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The lightbulb receives current and emits light.</paragraph></description>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "userNode",
+      "title": "User",
+      "description": "<description><paragraph>The actor who initiates the switch action.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
       "flows": []
     },
     {
-      "id": "node",
-      "title": "Node",
-      "description": "<description><heading>Node Field</heading><paragraph>The \"node\" field defines an individual unit in the system. Each node must have a unique \"id\" and may contain nested nodes, a title, and an optional description.</paragraph></description>",
-      "parent_id": "import_feature",
+      "id": "switchNode",
+      "title": "Switch",
+      "description": "<description><paragraph>The switch can open or close the circuit.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
       "flows": []
     },
     {
-      "id": "flow",
-      "title": "Flow",
-      "description": "<description><heading>Flow Field</heading><paragraph>The \"flow\" field represents a sequence of processes. Each flow consists of \"initial_inputs\", \"steps\", and other metadata required to model the flow interactions.</paragraph></description>",
-      "parent_id": "import_feature",
+      "id": "batteryNode",
+      "title": "Battery",
+      "description": "<description><paragraph>The battery supplies power to the circuit when it is closed.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
       "flows": []
     },
     {
-      "id": "flowStep",
-      "title": "Flow Step",
-      "description": "<description><heading>Flow Step Field</heading><paragraph>The \"flowStep\" field outlines a single step within a flow. It includes inputs and outputs and describes how nodes interact during this step.</paragraph></description>",
-      "parent_id": "import_feature",
-      "flows": []
-    },
-    {
-      "id": "description",
-      "title": "Description",
-      "description": "<description><heading>Description Field</heading><paragraph>The \"description\" field provides additional information or context for the node, flow, or flow step. It uses XML-like tags for formatting.</paragraph></description>",
-      "parent_id": "import_feature",
+      "id": "lightbulbNode",
+      "title": "Lightbulb",
+      "description": "<description><paragraph>The lightbulb receives current and produces light.</paragraph></description>",
+      "parent_id": "lightbulbCircuit",
       "flows": []
     }
   ]

@@ -404,22 +404,22 @@ impl Import {
 
                 vertical_index += 1;
 
-                // first create all ios from the flow steps
+                // first create all ios from the flow steps and populate fs_flow_id_by_tmp_id
                 for import_flow_step in import_flow.flow_steps.iter() {
                     for (_node_id, import_output) in import_flow_step.outputs_by_node.iter() {
                         for import_io in import_output.iter() {
                             self.insert_io(data, import_io, new_flow.node_id, Some(new_flow.id))
                                 .await?;
-
-                            if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
-                                return Err(NodecosmosError::ImportError(format!(
-                                    "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists",
-                                    import_flow_step.id.clean_clone()
-                                )));
-                            }
-                            fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
                         }
                     }
+
+                    if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
+                        return Err(NodecosmosError::ImportError(format!(
+                            "Duplicate Flow Step Id Error: Flow Step with temp id {} already exists",
+                            import_flow_step.id.clean_clone()
+                        )));
+                    }
+                    fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
                 }
             }
         }
