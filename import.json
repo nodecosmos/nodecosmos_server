@@ -43,7 +43,7 @@
                 "switchNode": [
                   {
                     "id": "circuitClosed",
-                    "title": "Closes Circuit",
+                    "title": "Close ",
                     "description": "<description><paragraph>Switch is now in closed position.</paragraph></description>"
                   }
                 ]
