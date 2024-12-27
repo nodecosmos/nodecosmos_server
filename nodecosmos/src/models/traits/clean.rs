@@ -22,7 +22,7 @@ pub trait Clean {
 impl Clean for Option<String> {
     fn clean(&mut self) -> Result<&mut Self, NodecosmosError> {
         if let Some(description) = &self {
-            if description.len() > u16::MAX as usize {
+            if description.len() > MAX_DOC_SIZE {
                 return Err(NodecosmosError::Forbidden(
                     "Description is too long. It can contain max 65535 characters".to_string(),
                 ));
