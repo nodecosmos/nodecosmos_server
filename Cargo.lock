@@ -3264,6 +3264,7 @@ dependencies = [
  "openssl",
  "quick-xml",
  "rand",
+ "redis 0.27.6",
  "reqwest 0.12.9",
  "rustrict",
  "scylla",
@@ -3971,6 +3972,10 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "ryu",
+ "serde",
+ "serde_json",
+ "sha1_smol",
+ "socket2",
  "tokio",
  "tokio-util",
  "url",
@@ -4559,6 +4564,12 @@ dependencies = [
  "cpufeatures",
  "digest",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"

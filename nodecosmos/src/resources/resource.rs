@@ -181,3 +181,11 @@ impl<'a> Resource<'a> for SseBroadcast {
         SseBroadcast::new()
     }
 }
+
+impl<'a> Resource<'a> for redis::Client {
+    type Cfg = &'a Config;
+
+    async fn init_resource(config: Self::Cfg) -> Self {
+        redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
+    }
+}
