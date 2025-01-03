@@ -10,7 +10,7 @@ use serde_json::json;
 #[derive(Debug)]
 pub enum RedisError {
     PoolError(deadpool_redis::PoolError),
-    RedisError(deadpool_redis::redis::RedisError),
+    RedisError(redis::RedisError),
 }
 
 impl fmt::Display for RedisError {

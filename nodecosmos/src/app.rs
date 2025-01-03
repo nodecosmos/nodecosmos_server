@@ -7,7 +7,6 @@ use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{http, web};
-use deadpool_redis::Pool;
 use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 use serde::Deserialize;
@@ -86,6 +85,8 @@ pub struct App {
     pub resource_locker: Arc<ResourceLocker>,
     pub description_ws_pool: Arc<DescriptionWsPool>,
     pub sse_broadcast: Arc<SseBroadcast>,
+    pub redis_pool: deadpool_redis::Pool,
+    pub redis_client: redis::Client,
     pub mailer: Arc<Mailer>,
     pub secret_key: String,
 }
@@ -104,13 +105,14 @@ impl App {
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
         let db_session = CachingSession::init_resource(&config).await;
         let elastic_client = Elasticsearch::init_resource(&config).await;
-        let redis_pool = Pool::init_resource(&config).await;
-        let mailer = Mailer::init_resource(&config).await;
+        let redis_pool = deadpool_redis::Pool::init_resource(&config).await;
+        let redis_client = redis::Client::init_resource(&config).await;
 
-        // app data
+        // app
         let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.instances)).await;
-        let description_ws_pool = Arc::new(DescriptionWsPool::init_resource(()).await);
-        let sse_broadcast = Arc::new(SseBroadcast::init_resource(()).await);
+        let description_ws_pool = DescriptionWsPool::init_resource(()).await;
+        let sse_broadcast = SseBroadcast::init_resource(()).await;
+        let mailer = Mailer::init_resource(&config).await;
 
         Self {
             config,
@@ -118,11 +120,14 @@ impl App {
             recaptcha_secret,
             db_session: Arc::new(db_session),
             elastic_client: Arc::new(elastic_client),
-            mailer: Arc::new(mailer),
             s3_client: Arc::new(s3_client),
+            redis_pool,
+            redis_client,
+            // app
             resource_locker: Arc::new(resource_locker),
-            description_ws_pool,
-            sse_broadcast,
+            description_ws_pool: Arc::new(description_ws_pool),
+            sse_broadcast: Arc::new(sse_broadcast),
+            mailer: Arc::new(mailer),
             secret_key,
         }
     }
@@ -143,6 +148,7 @@ impl App {
 
         tasks::recovery_task(data).await;
         tasks::cleanup_rooms_task(self.sse_broadcast.clone()).await;
+        tasks::listen_redis_events(&self).await;
     }
 
     pub fn cors(&self) -> Cors {

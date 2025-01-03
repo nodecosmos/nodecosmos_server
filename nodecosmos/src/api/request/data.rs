@@ -58,6 +58,12 @@ impl RequestData {
     pub fn sse_broadcast(&self) -> Arc<SseBroadcast> {
         self.app.sse_broadcast.clone()
     }
+
+    pub async fn redis_connection(&self) -> Result<deadpool_redis::Connection, NodecosmosError> {
+        let conn = self.app.redis_pool.get().await?;
+
+        Ok(conn)
+    }
 }
 
 impl FromRequest for RequestData {
