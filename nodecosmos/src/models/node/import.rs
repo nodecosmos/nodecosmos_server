@@ -191,7 +191,7 @@ impl Import {
             }
 
             let import_nodes: ImportNodes = serde_json::from_str::<ImportNodes>(&json)
-                .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to parse JSON: {:?}", e)))?
+                .map_err(|e| NodecosmosError::BadRequest(format!("Failed to parse JSON: {:?}", e)))?
                 .sort();
 
             let mut node_id_by_tmp_id: HashMap<String, Uuid> = HashMap::new();
