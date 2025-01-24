@@ -70,7 +70,7 @@ impl Description {
 
     pub async fn update_elastic_index(&self, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.is_original() && self.object_type.parse::<ObjectType>()? == ObjectType::Node {
-            UpdateNodeDescriptionElasticIdx {
+            let _ = UpdateNodeDescriptionElasticIdx {
                 id: self.object_id,
                 short_description: self.short_description.clone().unwrap_or_default(),
                 description: self.html.clone().unwrap_or_default(),

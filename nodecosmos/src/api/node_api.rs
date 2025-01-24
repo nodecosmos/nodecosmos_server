@@ -1,6 +1,5 @@
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
@@ -26,8 +25,8 @@ use crate::models::user::ShowUser;
 use crate::resources::resource_locker::ResourceLocker;
 
 #[get("")]
-pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) -> Response {
-    let nodes = NodeSearch::new(&app.elastic_client, &query).index().await?;
+pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>, opt_cu: OptCurrentUser) -> Response {
+    let nodes = NodeSearch::new(&app.elastic_client, &query, &opt_cu).index().await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 
@@ -311,23 +310,7 @@ pub async fn delete_node_editor(
         ));
     }
 
-    let mut descendants = node.descendants(data.db_session()).await?;
-
-    let mut statement_vals = vec![(vec![editor_id], node.branch_id, node.id)];
-
-    while let Some(descendant) = descendants.next().await {
-        let descendant = descendant?;
-
-        statement_vals.push((vec![editor_id], descendant.branch_id, descendant.id));
-    }
-
-    Node::statement_batch()
-        .chunked_statements(&db_session, Node::PULL_EDITOR_IDS_QUERY, statement_vals.clone(), 100)
-        .await?;
-
-    Node::statement_batch()
-        .chunked_statements(&db_session, Node::PULL_VIEWER_IDS_QUERY, statement_vals, 100)
-        .await?;
+    UpdateEditorsNode::update_editor_ids(&data, node.root_id, branch_id, id, &[], &[editor_id]).await?;
 
     Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
 

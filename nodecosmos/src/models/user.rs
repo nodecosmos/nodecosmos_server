@@ -144,7 +144,7 @@ impl Callbacks for User {
     }
 
     async fn after_insert(&mut self, _db_session: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.add_elastic_document(&app.elastic_client).await;
+        let _ = self.add_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }
@@ -156,7 +156,7 @@ impl Callbacks for User {
     }
 
     async fn after_delete(&mut self, _: &CachingSession, app: &Arc<App>) -> Result<(), NodecosmosError> {
-        self.update_elastic_document(&app.elastic_client).await;
+        let _ = self.update_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }
@@ -235,7 +235,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
                 use crate::models::node::UpdateOwnerNode;
                 use crate::models::traits::ElasticDocument;
 
-                self.update_elastic_document(data.elastic_client()).await;
+                let _ = self.update_elastic_document(data.elastic_client()).await;
 
                 let user_id = self.id.clone();
                 let data = data.clone();
@@ -324,7 +324,7 @@ impl Callbacks for ConfirmUser {
     async fn after_update(&mut self, _: &CachingSession, app: &Self::Extension) -> Result<(), NodecosmosError> {
         use crate::models::traits::ElasticDocument;
 
-        self.update_elastic_document(&app.elastic_client).await;
+        let _ = self.update_elastic_document(&app.elastic_client).await;
 
         Ok(())
     }
@@ -386,7 +386,7 @@ impl Callbacks for UpdateBioUser {
     }
 
     async fn after_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
-        self.update_elastic_document(data.elastic_client()).await;
+        let _ = self.update_elastic_document(data.elastic_client()).await;
 
         Ok(())
     }
