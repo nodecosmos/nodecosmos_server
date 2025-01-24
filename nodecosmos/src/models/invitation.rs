@@ -1,9 +1,8 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
-use crate::models::node::Node;
+use crate::models::node::{Node, UpdateEditorsNode};
 use crate::models::notification::{Notification, NotificationType};
 use crate::models::token::Token;
-use crate::models::traits::Descendants;
 use crate::models::udts::Profile;
 use crate::models::user::User;
 use charybdis::batch::ModelBatch;
@@ -13,7 +12,6 @@ use charybdis::operations::{Find, Insert};
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use email_address::EmailAddress;
-use futures::StreamExt;
 use log::error;
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
@@ -178,26 +176,19 @@ impl Callbacks for Invitation {
         Ok(())
     }
 
-    async fn before_update(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+    async fn before_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         if self.ctx == InvitationContext::Confirm {
             let node = self.node(data.db_session()).await?;
-            let mut descendants = node.descendants(data.db_session()).await?;
 
-            let mut statement_vals = vec![(vec![data.current_user.id], self.branch_id, self.node_id)];
-
-            while let Some(descendant) = descendants.next().await {
-                let descendant = descendant?;
-
-                statement_vals.push((vec![data.current_user.id], descendant.branch_id, descendant.id));
-            }
-
-            Node::statement_batch()
-                .chunked_statements(db_session, Node::PUSH_EDITOR_IDS_QUERY, statement_vals.clone(), 100)
-                .await?;
-
-            Node::statement_batch()
-                .chunked_statements(db_session, Node::PUSH_VIEWER_IDS_QUERY, statement_vals, 100)
-                .await?;
+            UpdateEditorsNode::update_editor_ids(
+                data,
+                node.root_id,
+                node.branch_id,
+                node.id,
+                &[data.current_user.id],
+                &[],
+            )
+            .await?;
         }
 
         Ok(())

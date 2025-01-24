@@ -702,13 +702,13 @@ impl NodeDelete {
 
     async fn delete_elastic_data(&self, data: &RequestData) {
         if self.node.is_original() {
-            Node::bulk_delete_elastic_documents(data.elastic_client(), &self.deleted_node_ids).await;
+            let _ = Node::bulk_delete_elastic_documents(data.elastic_client(), &self.deleted_node_ids).await;
         }
     }
 
     async fn undo_delete_elastic_data(&self, data: &RequestData) {
         if self.node.is_original() {
-            Node::bulk_insert_elastic_documents(data.elastic_client(), &self.deleted_nodes).await;
+            let _ = Node::bulk_insert_elastic_documents(data.elastic_client(), &self.deleted_nodes).await;
         }
     }
 

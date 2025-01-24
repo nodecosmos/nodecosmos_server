@@ -1,13 +1,13 @@
-use charybdis::types::{BigInt, Int, Timestamp};
-use elasticsearch::{Elasticsearch, SearchParts};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use yrs::Uuid;
-
+use crate::api::current_user::OptCurrentUser;
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::udts::Profile;
+use charybdis::types::{BigInt, Int, Timestamp, Uuid};
+use elasticsearch::{Elasticsearch, SearchParts};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::HashSet;
 
 const PAGE_SIZE: i16 = 20;
 
@@ -29,6 +29,7 @@ pub struct IndexNode {
     pub cover_image_url: Option<String>,
     pub is_root: bool,
     pub is_public: bool,
+    pub editor_ids: Option<HashSet<Uuid>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -52,13 +53,19 @@ pub fn default_to_opt_0() -> i16 {
 pub struct NodeSearch<'a> {
     pub elastic_client: &'a Elasticsearch,
     pub node_search_query: &'a NodeSearchQuery,
+    pub opt_cu: &'a OptCurrentUser,
 }
 
 impl<'a> NodeSearch<'a> {
-    pub fn new(elastic_client: &'a Elasticsearch, node_search_query: &'a NodeSearchQuery) -> Self {
+    pub fn new(
+        elastic_client: &'a Elasticsearch,
+        node_search_query: &'a NodeSearchQuery,
+        opt_cu: &'a OptCurrentUser,
+    ) -> Self {
         Self {
             elastic_client,
             node_search_query,
+            opt_cu,
         }
     }
 
@@ -77,9 +84,16 @@ impl<'a> NodeSearch<'a> {
 
         let mut nodes: Vec<IndexNode> = Vec::new();
         for hit in hits {
-            let document = serde_json::from_value(hit["_source"].take())?;
+            let node: IndexNode = serde_json::from_value(hit["_source"].take())?;
 
-            nodes.push(document);
+            if node.is_public
+                || node.owner_id == self.opt_cu.0.as_ref().map_or(Uuid::nil(), |cu| cu.id)
+                || node.editor_ids.as_ref().map_or(false, |ids| {
+                    self.opt_cu.0.as_ref().map_or(false, |cu| ids.contains(&cu.id))
+                })
+            {
+                nodes.push(node);
+            }
         }
 
         Ok(nodes)
@@ -87,13 +101,6 @@ impl<'a> NodeSearch<'a> {
 
     fn search_json(&self) -> Value {
         let mut data = json!({
-            "query": {
-                "bool": {
-                    "must": [
-                        { "term": { "isPublic": true } } // Only public nodes
-                    ]
-                }
-            },
             "sort": [
                 { "likeCount": { "order": "desc" } },
                 { "isRoot": { "order": "desc" } },

@@ -58,7 +58,7 @@ impl UpdateCreatorNode {
             ))
         }
 
-        UpdateCreatorNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await;
+        UpdateCreatorNode::bulk_update_elastic_documents(data.elastic_client(), &nodes_to_update).await?;
 
         Self::unlogged_batch()
             .chunked_insert(data.db_session(), &nodes_to_update, crate::constants::BATCH_CHUNK_SIZE)

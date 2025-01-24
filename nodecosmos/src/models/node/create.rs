@@ -94,11 +94,11 @@ impl Node {
     }
 
     pub fn validate_visibility(&mut self) -> Result<(), NodecosmosError> {
-        if !self.is_public {
-            return Err(NodecosmosError::Forbidden(
-                "Currently only public nodes are allowed".to_string(),
-            ));
-        }
+        // if !self.is_public {
+        //     return Err(NodecosmosError::Forbidden(
+        //         "Currently only public nodes are allowed".to_string(),
+        //     ));
+        // }
 
         Ok(())
     }
@@ -297,7 +297,7 @@ impl Node {
 
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
-            self.add_elastic_document(elastic_client).await;
+            let _ = self.add_elastic_document(elastic_client).await;
         }
     }
 
