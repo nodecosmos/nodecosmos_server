@@ -23,6 +23,7 @@ pub mod node_counter;
 pub mod node_descendant;
 pub mod notification;
 pub mod recovery;
+pub mod subscription;
 pub mod token;
 pub mod traits;
 pub mod udts;

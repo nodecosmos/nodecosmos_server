@@ -34,7 +34,8 @@ pub struct ScyllaConfig {
 
 #[derive(Clone, Deserialize)]
 pub struct ElasticConfig {
-    pub host: String,
+    pub hosts: Vec<String>,
+    pub pem: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -45,7 +46,13 @@ pub struct AwsConfig {
 #[derive(Clone, Deserialize)]
 pub struct RedisConfig {
     pub url: String,
-    pub instances: u8,
+
+    #[serde(default)]
+    pub replicas: u8,
+
+    pub ca: Option<String>,
+    pub cert: Option<String>,
+    pub key: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -109,7 +116,7 @@ impl App {
         let redis_client = redis::Client::init_resource(&config).await;
 
         // app
-        let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.instances)).await;
+        let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.replicas)).await;
         let description_ws_pool = DescriptionWsPool::init_resource(()).await;
         let sse_broadcast = SseBroadcast::init_resource(()).await;
         let mailer = Mailer::init_resource(&config).await;

@@ -1,18 +1,21 @@
-use std::time::Duration;
-
 use crate::app::Config;
-use aws_config::BehaviorVersion;
-use deadpool_redis::Pool;
-use elasticsearch::http::transport::Transport;
-use elasticsearch::Elasticsearch;
-use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
-use scylla::{CachingSession, SessionBuilder};
-
 use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::email_client::{EmailClient, SesMailer, Smtp};
 use crate::resources::mailer::Mailer;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use ammonia::Url;
+use aws_config::BehaviorVersion;
+use deadpool_redis::Pool;
+use elasticsearch::auth::{ClientCertificate, Credentials};
+use elasticsearch::http::transport::{MultiNodeConnectionPool, TransportBuilder};
+use elasticsearch::Elasticsearch;
+use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
+use redis::{ClientTlsConfig, TlsCertificates};
+use scylla::{CachingSession, SessionBuilder};
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::time::Duration;
 
 /// Resource's should be alive during application runtime.
 /// It's usually related to external services like db clients,
@@ -92,12 +95,40 @@ impl<'a> Resource<'a> for Elasticsearch {
     type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let transport = Transport::single_node(&config.elasticsearch.host).unwrap_or_else(|e| {
-            panic!(
-                "Unable to connect to elastic host: {}. \nError: {}",
-                &config.elasticsearch.host, e
-            )
-        });
+        let urls: Vec<Url> = config
+            .elasticsearch
+            .hosts
+            .iter()
+            .map(|url| Url::parse(url))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                panic!(
+                    "Invalid Elasticsearch URL: {}. \nError: {}",
+                    config.elasticsearch.hosts.join(", "),
+                    e
+                )
+            })
+            .expect("Failed to parse Elasticsearch URL");
+
+        let conn_pool = MultiNodeConnectionPool::round_robin(urls, None);
+        let mut builder = TransportBuilder::new(conn_pool);
+
+        if let Some(cert) = &config.elasticsearch.pem {
+            builder = builder.auth(Credentials::Certificate(ClientCertificate::Pem(
+                std::fs::read(cert).expect("Failed to read certificate"),
+            )))
+        }
+
+        let transport = builder
+            .build()
+            .map_err(|e| {
+                panic!(
+                    "Unable to connect to elastic hosts: {}. \nError: {}",
+                    config.elasticsearch.hosts.join(", "),
+                    e
+                )
+            })
+            .unwrap();
 
         Elasticsearch::new(transport)
     }
@@ -107,7 +138,9 @@ impl<'a> Resource<'a> for Pool {
     type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let cfg = deadpool_redis::Config::from_url(&config.redis.url);
+        let redis_client = redis::Client::init_resource(config).await;
+        let connection_info = redis_client.get_connection_info();
+        let cfg = deadpool_redis::Config::from_connection_info(connection_info.clone());
 
         cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))
             .expect("Failed to create pool.")
@@ -186,6 +219,40 @@ impl<'a> Resource<'a> for redis::Client {
     type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
+        if let Some(ca) = &config.redis.ca {
+            let root_cert_file = File::open(ca).expect("cannot open private cert file");
+            let mut root_cert_vec = Vec::new();
+            BufReader::new(root_cert_file)
+                .read_to_end(&mut root_cert_vec)
+                .expect("Unable to read ROOT cert file");
+
+            let cert_file = File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+                .expect("cannot open private cert file");
+            let mut client_cert_vec = Vec::new();
+            BufReader::new(cert_file)
+                .read_to_end(&mut client_cert_vec)
+                .expect("Unable to read client cert file");
+
+            let key_file = File::open(&config.redis.key.clone().expect("redis must have key defined"))
+                .expect("cannot open private key file");
+            let mut client_key_vec = Vec::new();
+            BufReader::new(key_file)
+                .read_to_end(&mut client_key_vec)
+                .expect("Unable to read client key file");
+
+            redis::Client::build_with_tls(
+                config.redis.url.clone(),
+                TlsCertificates {
+                    client_tls: Some(ClientTlsConfig {
+                        client_cert: client_cert_vec,
+                        client_key: client_key_vec,
+                    }),
+                    root_cert: Some(root_cert_vec),
+                },
+            )
+            .expect("Unable to build client")
+        } else {
+            redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
+        }
     }
 }

@@ -71,6 +71,7 @@ pub enum NodecosmosError {
     EmailError(String),
     EmailAlreadyExists,
     ImportError(String),
+    ReqwestError(reqwest::Error),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -108,6 +109,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::EmailError(e) => write!(f, "EmailError: {}", e),
             NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
             NodecosmosError::ImportError(e) => write!(f, "ImportError: {}", e),
+            NodecosmosError::ReqwestError(e) => write!(f, "ReqwestError: {}", e),
         }
     }
 }
@@ -124,6 +126,7 @@ impl Error for NodecosmosError {
             NodecosmosError::YjsError(e) => Some(e),
             NodecosmosError::QuickXmlError(e) => Some(e),
             NodecosmosError::ParseError(e) => Some(e),
+            NodecosmosError::ReqwestError(e) => Some(e),
             _ => None,
         }
     }

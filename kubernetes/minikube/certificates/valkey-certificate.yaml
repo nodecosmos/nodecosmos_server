@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: valkey-tls
+  namespace: valkey
+spec:
+  secretName: valkey-tls-secret
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  commonName: valkey.svc.cluster.local
+  dnsNames:
+    - valkey.svc.cluster.local

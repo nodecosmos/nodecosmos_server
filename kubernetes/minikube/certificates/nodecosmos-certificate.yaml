@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodecosmos-tls
+  namespace: nodecosmos
+spec:
+  secretName: nodecosmos-tls-secret
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  commonName: nodecosmos.svc.cluster.local
+  dnsNames:
+    - nodecosmos.svc.cluster.local
