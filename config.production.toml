@@ -1,8 +1,12 @@
 port = 443
-allowed_origin = "https://nodecosmos.com"
+allowed_origin_1 = "https://nodecosmos.com"
+allowed_origin_2 = ""
 client_url = "https://nodecosmos.com"
 session_expiration_in_days = 30
 ssl = true
+ca = "/etc/certs/ca.crt"
+cert = "/etc/certs/tls.crt"
+key = "/etc/certs/tls.key"
 
 [scylla]
 hosts = [
@@ -15,16 +19,18 @@ cert = "/etc/certs/tls.crt"
 key = "/etc/certs/tls.key"
 
 [redis]
-url = "redis://valkey-primary-0:6379"
+url = "redis://valkey-primary-0.valkey.svc.cluster.local:6379"
 ca = "/etc/certs/ca.crt"
 cert = "/etc/certs/tls.crt"
 key = "/etc/certs/tls.key"
 
 [elasticsearch]
 hosts = [
-    "https://elasticsearch-service:9200"
+    "https://elasticsearch-eck-elasticsearch-es-default-0.elastic.svc.cluster.local:9200"
 ]
-pem = "/etc/certs/ca.crt"
+ca = "/etc/certs/ca.crt"
+cert = "/etc/certs/tls.crt"
+key = "/etc/certs/tls.key"
 
 [aws]
 bucket = "nodecosmos-production"

@@ -74,6 +74,7 @@ impl Recovery {
     }
 
     pub async fn run_recovery_task(data: &RequestData) -> Result<(), NodecosmosError> {
+        log::info!("Running recovery task");
         let from_min_ago = chrono::Utc::now() - chrono::Duration::minutes(RECOVERY_INTERVAL_MIN);
         // 3 minutes should be enough for main processes to recover from a crash.
         // If the process is still down after 3 minutes, we can assume that the process is dead,

@@ -20,26 +20,43 @@ pub trait ElasticIndex {
     fn index_id(&self) -> String;
 
     async fn idx_exists(client: &Elasticsearch) -> bool {
+        info!(
+            "{} {}",
+            "Checking if elastic index exists for".bright_green(),
+            Self::ELASTIC_IDX_NAME.bright_yellow()
+        );
+
         let response = client
             .indices()
             .exists(IndicesExistsParts::Index(&[Self::ELASTIC_IDX_NAME]))
             .send()
             .await
-            .unwrap();
+            .map_err(|e| {
+                panic!("Failed to send index request: {:#?}", e);
+            })
+            .expect("Failed to send index request");
 
         let status = response.status_code();
 
+        if status.is_success() {
+            info!(
+                "{} {}",
+                "Elastic index exists for".bright_green(),
+                Self::ELASTIC_IDX_NAME.bright_yellow()
+            );
+        } else {
+            info!(
+                "{} {}",
+                "Elastic index does not exist for".bright_green(),
+                Self::ELASTIC_IDX_NAME.bright_yellow()
+            );
+        }
+
         status.is_success()
     }
-}
 
-pub trait BuildIndex: ElasticIndex {
-    async fn build_index(client: &Elasticsearch);
-}
-
-impl<T: ElasticIndex> BuildIndex for T {
     async fn build_index(client: &Elasticsearch) {
-        let response = if T::idx_exists(client).await {
+        let response = if Self::idx_exists(client).await {
             info!(
                 "{} {}",
                 "Sync elastic index for".bright_green(),

@@ -8,14 +8,37 @@ use ammonia::Url;
 use aws_config::BehaviorVersion;
 use deadpool_redis::Pool;
 use elasticsearch::auth::{ClientCertificate, Credentials};
+use elasticsearch::cert::{Certificate, CertificateValidation};
 use elasticsearch::http::transport::{MultiNodeConnectionPool, TransportBuilder};
 use elasticsearch::Elasticsearch;
+use log::info;
+use openssl::pkcs12::Pkcs12;
+use openssl::pkey::PKey;
 use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
+use openssl::x509::X509;
 use redis::{ClientTlsConfig, TlsCertificates};
 use scylla::{CachingSession, SessionBuilder};
-use std::fs::File;
+use std::error::Error;
+use std::fs;
 use std::io::{BufReader, Read};
 use std::time::Duration;
+
+const PASSPHRASE: &str = "KEEP_CALM_AND_LET_IT_BE";
+
+fn create_pkcs12_bundle(tls_crt: &str, tls_key: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    // Read the PEM files
+    let cert_pem = fs::read(tls_crt)?; // Read the certificate from tls_crt
+    let key_pem = fs::read(tls_key)?; // Read the private key from tls_key
+
+    // Parse the certificate and private key
+    let cert = X509::from_pem(&cert_pem)?;
+    let pkey = PKey::private_key_from_pem(&key_pem)?;
+
+    // Build the PKCS#12 bundle; an empty password ("") is used here, but you can change that if needed.
+    let pkcs12 = Pkcs12::builder().cert(&cert).pkey(&pkey).build2(PASSPHRASE)?;
+
+    Ok(pkcs12.to_der().expect("Failed to convert pkcs12 to der"))
+}
 
 /// Resource's should be alive during application runtime.
 /// It's usually related to external services like db clients,
@@ -113,22 +136,50 @@ impl<'a> Resource<'a> for Elasticsearch {
         let conn_pool = MultiNodeConnectionPool::round_robin(urls, None);
         let mut builder = TransportBuilder::new(conn_pool);
 
-        if let Some(cert) = &config.elasticsearch.pem {
-            builder = builder.auth(Credentials::Certificate(ClientCertificate::Pem(
-                std::fs::read(cert).expect("Failed to read certificate"),
-            )))
+        info!("Connecting to Elasticsearch: {:?}", config.elasticsearch.hosts);
+
+        if let (Some(ca), Some(cert), Some(key)) = (
+            &config.elasticsearch.ca,
+            &config.elasticsearch.cert,
+            &config.elasticsearch.key,
+        ) {
+            info!("Using client certificate for Elasticsearch");
+
+            let pkcs12 = create_pkcs12_bundle(cert, key)
+                .map_err(|e| {
+                    panic!(
+                        "Failed to create pkcs12 bundle from ca, cert and key files. \nError: {:?}",
+                        e
+                    )
+                })
+                .unwrap();
+
+            let cert_validation = CertificateValidation::Full(
+                Certificate::from_pem(&fs::read(ca).expect("Failed to read ca file"))
+                    .expect("Failed to create certificate from ca file"),
+            );
+
+            builder =
+                builder
+                    .cert_validation(cert_validation)
+                    .auth(Credentials::Certificate(ClientCertificate::Pkcs12(
+                        pkcs12,
+                        Some(PASSPHRASE.to_string()),
+                    )));
         }
 
         let transport = builder
             .build()
             .map_err(|e| {
                 panic!(
-                    "Unable to connect to elastic hosts: {}. \nError: {}",
+                    "Unable to connect to elastic hosts: {}. \nError: {:?}",
                     config.elasticsearch.hosts.join(", "),
                     e
                 )
             })
             .unwrap();
+
+        info!("Connected to Elasticsearch");
 
         Elasticsearch::new(transport)
     }
@@ -219,28 +270,30 @@ impl<'a> Resource<'a> for redis::Client {
     type Cfg = &'a Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
+        let client;
         if let Some(ca) = &config.redis.ca {
-            let root_cert_file = File::open(ca).expect("cannot open private cert file");
+            let root_cert_file = fs::File::open(ca).expect("cannot open private cert file");
             let mut root_cert_vec = Vec::new();
             BufReader::new(root_cert_file)
                 .read_to_end(&mut root_cert_vec)
                 .expect("Unable to read ROOT cert file");
 
-            let cert_file = File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+            let cert_file = fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
                 .expect("cannot open private cert file");
             let mut client_cert_vec = Vec::new();
             BufReader::new(cert_file)
                 .read_to_end(&mut client_cert_vec)
                 .expect("Unable to read client cert file");
 
-            let key_file = File::open(&config.redis.key.clone().expect("redis must have key defined"))
+            let key_file = fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
                 .expect("cannot open private key file");
             let mut client_key_vec = Vec::new();
             BufReader::new(key_file)
                 .read_to_end(&mut client_key_vec)
                 .expect("Unable to read client key file");
 
-            redis::Client::build_with_tls(
+            info!("Connecting to Redis with TLS");
+            client = redis::Client::build_with_tls(
                 config.redis.url.clone(),
                 TlsCertificates {
                     client_tls: Some(ClientTlsConfig {
@@ -250,9 +303,13 @@ impl<'a> Resource<'a> for redis::Client {
                     root_cert: Some(root_cert_vec),
                 },
             )
-            .expect("Unable to build client")
+            .expect("Unable to build client");
         } else {
-            redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
+            client = redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
         }
+
+        info!("Connected to Redis");
+
+        client
     }
 }

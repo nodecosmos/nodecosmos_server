@@ -14,7 +14,7 @@ use toml::Value;
 
 use crate::api::data::RequestData;
 use crate::models::node::Node;
-use crate::models::traits::BuildIndex;
+use crate::models::traits::ElasticIndex;
 use crate::models::user::User;
 use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::mailer::Mailer;
@@ -35,7 +35,9 @@ pub struct ScyllaConfig {
 #[derive(Clone, Deserialize)]
 pub struct ElasticConfig {
     pub hosts: Vec<String>,
-    pub pem: Option<String>,
+    pub ca: Option<String>,
+    pub cert: Option<String>,
+    pub key: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -79,6 +81,9 @@ pub struct Config {
     pub elasticsearch: ElasticConfig,
     pub aws: AwsConfig,
     pub smtp: Option<SmtpConfig>,
+    pub ca: Option<String>,
+    pub cert: Option<String>,
+    pub key: Option<String>,
 }
 
 #[derive(Clone)]
@@ -101,6 +106,7 @@ pub struct App {
 impl App {
     pub async fn new() -> Self {
         dotenv::dotenv().ok();
+        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
         let secret_key = env::var("SECRET_KEY").expect("SECRET_KEY must be set");
         let config_file = env::var("CONFIG_FILE").expect("CONFIG_FILE must be set");
@@ -141,9 +147,6 @@ impl App {
 
     /// Init processes that need to be run on startup
     pub async fn init(&self) {
-        // init logger
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
-
         // init elastic
         Node::build_index(&self.elastic_client).await;
         User::build_index(&self.elastic_client).await;
