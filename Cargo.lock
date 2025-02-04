@@ -68,6 +68,7 @@ dependencies = [
  "actix-codec",
  "actix-rt",
  "actix-service",
+ "actix-tls",
  "actix-utils",
  "ahash",
  "base64 0.22.1",
@@ -209,11 +210,31 @@ dependencies = [
  "actix-utils",
  "actix-web",
  "anyhow",
+ "deadpool-redis",
  "derive_more 1.0.0",
  "rand",
- "redis 0.26.1",
+ "redis",
  "serde",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "actix-tls"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac453898d866cdbecdbc2334fe1738c747b4eba14a677261f2b768ba05329389"
+dependencies = [
+ "actix-rt",
+ "actix-service",
+ "actix-utils",
+ "futures-core",
+ "impl-more",
+ "openssl",
+ "pin-project-lite",
+ "tokio",
+ "tokio-openssl",
+ "tokio-util",
  "tracing",
 ]
 
@@ -240,6 +261,7 @@ dependencies = [
  "actix-rt",
  "actix-server",
  "actix-service",
+ "actix-tls",
  "actix-utils",
  "actix-web-codegen",
  "ahash",
@@ -1482,16 +1504,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-foundation"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b55271e5c8c478ad3f38ad24ef34923091e0548492a266d19b3c0b4d82574c63"
-dependencies = [
- "core-foundation-sys",
- "libc",
-]
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1717,12 +1729,12 @@ dependencies = [
 
 [[package]]
 name = "deadpool-redis"
-version = "0.18.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfae6799b68a735270e4344ee3e834365f707c72da09c9a8bb89b45cc3351395"
+checksum = "1ed4f481f6a4770b95e09b91e183ee5ed6e1d4a34c0b09814012b3ee5e585f70"
 dependencies = [
  "deadpool",
- "redis 0.27.6",
+ "redis",
 ]
 
 [[package]]
@@ -2510,7 +2522,6 @@ dependencies = [
  "http 1.2.0",
  "http-body 1.0.1",
  "httparse",
- "httpdate",
  "itoa",
  "pin-project-lite",
  "smallvec",
@@ -2545,7 +2556,6 @@ dependencies = [
  "hyper 1.5.2",
  "hyper-util",
  "rustls 0.23.20",
- "rustls-native-certs 0.8.1",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.1",
@@ -3213,7 +3223,7 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework 2.11.1",
+ "security-framework",
  "security-framework-sys",
  "tempfile",
 ]
@@ -3260,7 +3270,7 @@ dependencies = [
  "openssl",
  "quick-xml",
  "rand",
- "redis 0.27.6",
+ "redis",
  "reqwest",
  "rustrict",
  "scylla",
@@ -3274,7 +3284,6 @@ dependencies = [
  "toml",
  "uuid",
  "yrs",
- "yup-oauth2",
 ]
 
 [[package]]
@@ -3382,15 +3391,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
  "hermit-abi 0.3.9",
- "libc",
-]
-
-[[package]]
-name = "num_threads"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
-dependencies = [
  "libc",
 ]
 
@@ -3633,18 +3633,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.1.7"
+version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be57f64e946e500c8ee36ef6331845d40a93055567ec57e8fae13efd33759b95"
+checksum = "1e2ec53ad785f4d35dac0adea7f7dc6f1bb277ad84a680c7afefeae05d1f5916"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.7"
+version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c0f5fad0874fc7abcd4d750e76917eaebbecaa2c20bde22e1dbeeba8beb758c"
+checksum = "d56a66c0c55993aa927429d0f8a0abfd74f084e4d9c192cffed01e418d83eefb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4006,29 +4006,6 @@ dependencies = [
  "num-bigint 0.4.6",
  "percent-encoding",
  "pin-project-lite",
- "ryu",
- "tokio",
- "tokio-retry",
- "tokio-util",
- "url",
-]
-
-[[package]]
-name = "redis"
-version = "0.27.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09d8f99a4090c89cc489a94833c901ead69bfbf3877b4867d5482e321ee875bc"
-dependencies = [
- "arc-swap",
- "async-trait",
- "bytes",
- "combine",
- "futures-util",
- "itertools 0.13.0",
- "itoa",
- "num-bigint 0.4.6",
- "percent-encoding",
- "pin-project-lite",
  "rustls 0.23.20",
  "rustls-native-certs 0.7.3",
  "rustls-pemfile 2.2.0",
@@ -4039,6 +4016,7 @@ dependencies = [
  "sha1_smol",
  "socket2",
  "tokio",
+ "tokio-retry",
  "tokio-rustls 0.26.1",
  "tokio-util",
  "url",
@@ -4250,7 +4228,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pemfile 1.0.4",
  "schannel",
- "security-framework 2.11.1",
+ "security-framework",
 ]
 
 [[package]]
@@ -4263,19 +4241,7 @@ dependencies = [
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
  "schannel",
- "security-framework 2.11.1",
-]
-
-[[package]]
-name = "rustls-native-certs"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcff2dd52b58a8d98a70243663a0d234c4e2b79235637849d15913394a247d3"
-dependencies = [
- "openssl-probe",
- "rustls-pki-types",
- "schannel",
- "security-framework 3.2.0",
+ "security-framework",
 ]
 
 [[package]]
@@ -4460,12 +4426,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "seahash"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
-
-[[package]]
 name = "sec1"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4495,20 +4455,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "897b2245f0b511c87893af39b033e5ca9cce68824c4d7e7630b5a1d339658d02"
 dependencies = [
  "bitflags 2.6.0",
- "core-foundation 0.9.4",
- "core-foundation-sys",
- "libc",
- "security-framework-sys",
-]
-
-[[package]]
-name = "security-framework"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271720403f46ca04f7ba6f55d438f8bd878d6b8ca0a1046e8228c4145bcbb316"
-dependencies = [
- "bitflags 2.6.0",
- "core-foundation 0.10.0",
+ "core-foundation",
  "core-foundation-sys",
  "libc",
  "security-framework-sys",
@@ -4878,7 +4825,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
 dependencies = [
  "bitflags 2.6.0",
- "core-foundation 0.9.4",
+ "core-foundation",
  "system-configuration-sys",
 ]
 
@@ -4994,9 +4941,7 @@ checksum = "35e7868883861bd0e56d9ac6efcaaca0d6d5d82a2a7ec8209ff492c07cf37b21"
 dependencies = [
  "deranged",
  "itoa",
- "libc",
  "num-conv",
- "num_threads",
  "powerfmt",
  "serde",
  "time-core",
@@ -5743,33 +5688,6 @@ dependencies = [
  "smallstr",
  "smallvec",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "yup-oauth2"
-version = "11.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ed5f19242090128c5809f6535cc7b8d4e2c32433f6c6005800bbc20a644a7f0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "futures",
- "http 1.2.0",
- "http-body-util",
- "hyper 1.5.2",
- "hyper-rustls 0.27.3",
- "hyper-util",
- "log",
- "percent-encoding",
- "rustls 0.23.20",
- "rustls-pemfile 2.2.0",
- "seahash",
- "serde",
- "serde_json",
- "time",
- "tokio",
- "url",
 ]
 
 [[package]]

@@ -4,6 +4,7 @@
 // TODO: refactor all find_by_ids to chunked queries of max 100 ids
 //  fn .+by*.+ids\( - regex to search methods
 
+use actix_session::storage::RedisSessionStore;
 use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
@@ -29,8 +30,17 @@ fn main() {
                 let port = app.port();
 
                 app.init().await;
+
+                let session_store = RedisSessionStore::builder_pooled(app.redis_pool.clone())
+                    .build()
+                    .await
+                    .map_err(|e| {
+                        log::error!("Failed to create Redis session store: {}", e);
+
+                        e
+                    })
+                    .unwrap();
                 let app_web_data = web::Data::new(app);
-                let session_store = app_web_data.redis_session_store().await;
 
                 HttpServer::new(move || {
                     // web data
