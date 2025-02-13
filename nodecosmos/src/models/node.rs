@@ -123,7 +123,7 @@ impl Callbacks for Node {
                 .context("Failed to update branch")?;
         }
 
-        self.create_workflow(data).await?;
+        self.create_workflow(data.db_session()).await?;
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 

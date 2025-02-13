@@ -87,7 +87,9 @@ fn main() {
                                 .service(get_node_editors)
                                 .service(delete_node_editor)
                                 .service(listen_node_events)
-                                .service(import_nodes),
+                                .service(import_nodes)
+                                // TODO: remove
+                                .service(restore_nodes_and_users_from_elastic),
                         )
                         .service(web::scope("/no-compress-nodes").service(listen_node_events))
                         .service(

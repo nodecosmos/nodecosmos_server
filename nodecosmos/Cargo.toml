@@ -52,3 +52,4 @@ openssl = "0.10.64"
 time = "0.3.37"
 yrs = "0.21.3"
 redis = { version = "0.26", features = ["json", "tokio-comp", "tokio-rustls-comp"] }
+html2md = "0.2.15"
