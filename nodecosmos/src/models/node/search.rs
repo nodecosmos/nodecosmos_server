@@ -3,7 +3,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::udts::Profile;
-use charybdis::types::{BigInt, Double, Int, Timestamp, Uuid};
+use charybdis::types::{BigInt, Int, Timestamp, Uuid};
 use elasticsearch::{Elasticsearch, SearchParts};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -30,11 +30,6 @@ pub struct IndexNode {
     pub is_root: bool,
     pub is_public: bool,
     pub editor_ids: Option<HashSet<Uuid>>,
-    pub parent_id: Option<Uuid>,
-    pub updated_at: Timestamp,
-    pub viewer_ids: Option<HashSet<Uuid>>,
-    pub order_index: Double,
-    pub cover_image_filename: Option<String>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
