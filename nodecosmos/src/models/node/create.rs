@@ -94,11 +94,11 @@ impl Node {
     }
 
     pub fn validate_visibility(&mut self) -> Result<(), NodecosmosError> {
-        // if !self.is_public {
-        //     return Err(NodecosmosError::Forbidden(
-        //         "Currently only public nodes are allowed".to_string(),
-        //     ));
-        // }
+        if !self.is_public {
+            return Err(NodecosmosError::Forbidden(
+                "Currently only public nodes are allowed".to_string(),
+            ));
+        }
 
         Ok(())
     }
