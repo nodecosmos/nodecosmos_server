@@ -16,14 +16,13 @@ use crate::api::request::data::RequestData;
 use crate::api::types::{ActionObject, ActionTypes, Response};
 use crate::app::App;
 use crate::errors::NodecosmosError;
-use crate::models::description::Description;
 use crate::models::invitation::Invitation;
 use crate::models::node::import::Import;
 use crate::models::node::reorder::ReorderParams;
-use crate::models::node::search::{IndexNode, NodeSearch, NodeSearchQuery};
+use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
-use crate::models::traits::{Authorization, ElasticIndex};
-use crate::models::traits::{Descendants, ObjectType};
+use crate::models::traits::Authorization;
+use crate::models::traits::{Descendants, ElasticIndex};
 use crate::models::user::{ShowUser, User};
 use crate::resources::resource_locker::ResourceLocker;
 
@@ -378,86 +377,12 @@ struct IndexUser {
 pub async fn restore_nodes_and_users_from_elastic(app: web::Data<App>) -> Response {
     let response = app
         .elastic_client
-        .search(SearchParts::Index(&[Node::ELASTIC_IDX_NAME]))
-        .body(json!({
-            "query": {
-                "match_all": {}
-            },
-        }))
-        .send()
-        .await?;
-
-    let mut response_body = response.json::<Value>().await?;
-
-    let mut res = vec![];
-    let hits = response_body["hits"]["hits"].as_array_mut().unwrap_or(&mut res);
-
-    let mut index_nodes: Vec<IndexNode> = Vec::new();
-    for hit in hits {
-        let node: IndexNode = serde_json::from_value(hit["_source"].take())?;
-        index_nodes.push(node);
-    }
-
-    for index_node in index_nodes.into_iter() {
-        let node = Node {
-            id: index_node.id,
-            root_id: index_node.root_id,
-            branch_id: index_node.branch_id,
-            parent_id: index_node.parent_id,
-            ancestor_ids: index_node
-                .ancestor_ids
-                .map(|ids| ids.into_iter().map(Uuid::from).collect()),
-            owner: Some(index_node.owner),
-            owner_id: index_node.owner_id,
-            editor_ids: index_node.editor_ids,
-            viewer_ids: index_node.viewer_ids,
-            title: index_node.title,
-            cover_image_url: index_node.cover_image_url,
-            is_public: index_node.is_public,
-            is_root: index_node.is_root,
-            created_at: index_node.created_at,
-            updated_at: index_node.updated_at,
-            order_index: index_node.order_index,
-            creator_id: index_node.creator_id,
-            creator: index_node.creator,
-            cover_image_filename: index_node.cover_image_filename,
-            parent: None,
-            auth_branch: None,
-            delete_data: None,
-            ctx: Default::default(),
-        };
-
-        node.append_to_ancestors(&app.db_session).await?;
-
-        node.insert().execute(&app.db_session).await?;
-        node.create_workflow(&app.db_session).await?;
-
-        if index_node.description.is_some() {
-            Description {
-                node_id: index_node.id,
-                branch_id: index_node.branch_id,
-                object_id: index_node.id,
-                root_id: index_node.root_id,
-                object_type: ObjectType::Node.to_string(),
-                short_description: index_node.short_description,
-                html: Some(index_node.description.clone().unwrap()),
-                markdown: Some(html2md::parse_html(&index_node.description.unwrap())),
-                base64: None,
-                updated_at: index_node.updated_at,
-            }
-            .insert()
-            .execute(&app.db_session)
-            .await?;
-        }
-    }
-
-    let response = app
-        .elastic_client
         .search(SearchParts::Index(&[User::ELASTIC_IDX_NAME]))
         .body(json!({
             "query": {
                 "match_all": {}
             },
+            "size": 10000
         }))
         .send()
         .await?;
