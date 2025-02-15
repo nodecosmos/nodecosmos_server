@@ -27,6 +27,7 @@ jobs:
         with:
           project_id: nodecosmos-cloud
           workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-identity/providers/github-oidc-provider'
+          service_account: 534114130521-compute
 
       - name: Get Credentials
         uses: google-github-actions/get-gke-credentials@v2
