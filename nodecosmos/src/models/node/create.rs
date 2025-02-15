@@ -297,11 +297,11 @@ impl Node {
 
     pub async fn add_to_elastic(&self, elastic_client: &Elasticsearch) {
         if self.is_original() {
-            self.add_elastic_document(elastic_client).await;
+            let _ = self.add_elastic_document(elastic_client).await;
         }
     }
 
-    pub async fn create_workflow(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+    pub async fn create_workflow(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
         Workflow {
             root_id: self.root_id,
             node_id: self.id,
@@ -313,7 +313,7 @@ impl Node {
             ctx: self.ctx,
         }
         .insert()
-        .execute(data.db_session())
+        .execute(db_session)
         .map_err(|e| {
             error!("Error creating new workflow for node {}: {:?}", self.id, e);
 

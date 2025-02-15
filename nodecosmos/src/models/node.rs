@@ -1,22 +1,26 @@
-use anyhow::Context;
-use charybdis::callbacks::Callbacks;
-use charybdis::macros::charybdis_model;
-use charybdis::model::AsNative;
-use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
-use macros::{Branchable, Id, NodeAuthorization, NodeParent};
-use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
-
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
+use crate::models::node_descendant::NodeDescendant;
 use crate::models::traits::{
     Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
 };
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
 use crate::stream::MergedModelStream;
+use anyhow::Context;
+use charybdis::batch::CharybdisModelBatch;
+use charybdis::callbacks::Callbacks;
+use charybdis::macros::charybdis_model;
+use charybdis::model::AsNative;
+use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
+use chrono::Utc;
+use futures::StreamExt;
+use macros::{Branchable, Id, NodeAuthorization, NodeParent};
+use scylla::CachingSession;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 mod auth;
 mod create;
@@ -119,7 +123,7 @@ impl Callbacks for Node {
                 .context("Failed to update branch")?;
         }
 
-        self.create_workflow(data).await?;
+        self.create_workflow(data.db_session()).await?;
         self.preserve_branch_ancestors(data).await?;
         self.append_to_ancestors(db_session).await?;
 
@@ -310,7 +314,7 @@ impl Callbacks for UpdateTitleNode {
 
         tokio::spawn(async move {
             if self_clone.is_original() {
-                self_clone.update_elastic_document(data.elastic_client()).await;
+                let _ = self_clone.update_elastic_document(data.elastic_client()).await;
             }
         });
 
@@ -363,13 +367,112 @@ impl Callbacks for UpdateCoverImageNode {
         use crate::models::traits::ElasticDocument;
 
         if self.is_original() {
-            self.update_elastic_document(data.elastic_client()).await;
+            let _ = self.update_elastic_document(data.elastic_client()).await;
         }
 
         Ok(())
     }
 }
 
-partial_node!(UpdateEditorNode, branch_id, id, root_id, editor_ids, updated_at);
+partial_node!(UpdateEditorsNode, branch_id, id, root_id, editor_ids, updated_at);
+
+impl UpdateEditorsNode {
+    pub async fn find_by_ids(
+        db_session: &CachingSession,
+        branch_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<MergedModelStream<UpdateEditorsNode>, NodecosmosError> {
+        Ok(ids
+            .where_in_chunked_query(db_session, |ids_chunk| {
+                find_update_editors_node!("branch_id = ? AND id IN ?", (branch_id, ids_chunk))
+            })
+            .await)
+    }
+
+    pub async fn update_editor_ids(
+        data: &RequestData,
+        root_id: Uuid,
+        branch_id: Uuid,
+        node_id: Uuid,
+        added_editor_ids: &[Uuid],
+        removed_editor_ids: &[Uuid],
+    ) -> Result<(), NodecosmosError> {
+        let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid, Uuid), Node> = CharybdisModelBatch::new();
+        let mut descendants = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(root_id, branch_id, node_id)
+            .execute(data.db_session())
+            .await?;
+        let mut all_node_ids = vec![node_id];
+
+        let mut append = |stmt: &str, node_id: Uuid, editor_ids: &[Uuid]| {
+            for editor_id in editor_ids {
+                batch.append_statement(stmt, (vec![*editor_id], branch_id, node_id));
+            }
+        };
+
+        append(Node::PUSH_EDITOR_IDS_QUERY, node_id, added_editor_ids);
+        append(Node::PULL_EDITOR_IDS_QUERY, node_id, removed_editor_ids);
+
+        while let Some(descendant) = descendants.next().await {
+            let descendant = descendant?;
+
+            append(Node::PUSH_EDITOR_IDS_QUERY, descendant.id, added_editor_ids);
+            append(Node::PULL_EDITOR_IDS_QUERY, descendant.id, removed_editor_ids);
+
+            all_node_ids.push(descendant.id);
+        }
+
+        let mut nodes = UpdateEditorsNode::find_by_ids(data.db_session(), branch_id, &all_node_ids).await?;
+        let mut update_editor_nodes: Vec<UpdateEditorsNode> = vec![];
+
+        while let Some(node) = nodes.next().await {
+            let node = node?;
+            let mut editor_ids = node.editor_ids.unwrap_or(HashSet::new());
+
+            for editor_id in added_editor_ids {
+                editor_ids.insert(*editor_id);
+            }
+
+            for editor_id in removed_editor_ids {
+                editor_ids.remove(editor_id);
+            }
+
+            update_editor_nodes.push(UpdateEditorsNode {
+                id: node.id,
+                branch_id: node.branch_id,
+                editor_ids: Some(editor_ids),
+                root_id: node.root_id,
+                updated_at: Utc::now(),
+            });
+        }
+
+        batch.execute(data.db_session()).await.map_err(|e| {
+            log::error!(
+                "Failed to update editor ids for node! RootId: {}, BranchId: {}, NodeId: {}, \nError: {:?}",
+                root_id,
+                branch_id,
+                node_id,
+                e
+            );
+
+            e
+        })?;
+
+        UpdateEditorsNode::bulk_update_elastic_documents(data.elastic_client(), &update_editor_nodes)
+            .await
+            .map_err(|e| {
+                log::error!(
+                "Failed to update editor ids for node in elastic! RootId: {}, BranchId: {}, NodeId: {}, \nError: {:?}",
+                root_id,
+                branch_id,
+                node_id,
+                e
+            );
+
+                e
+            })?;
+
+        Ok(())
+    }
+}
 
 partial_node!(FindCoverImageNode, branch_id, id, root_id, cover_image_url);

@@ -1,13 +1,14 @@
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
-use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::Uuid;
+use charybdis::operations::{DeleteWithCallbacks, Find, Insert, InsertWithCallbacks, UpdateWithCallbacks};
+use charybdis::types::{Timestamp, Uuid};
+use elasticsearch::SearchParts;
 use futures::StreamExt;
+use rand::Rng;
 use scylla::CachingSession;
-use serde::Deserialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use tokio_stream::wrappers::BroadcastStream; // This is crucial for handling streams
 
 use crate::api::request::current_user::OptCurrentUser;
@@ -21,13 +22,13 @@ use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
 use crate::models::traits::Authorization;
-use crate::models::traits::Descendants;
-use crate::models::user::ShowUser;
+use crate::models::traits::{Descendants, ElasticIndex};
+use crate::models::user::{ShowUser, User};
 use crate::resources::resource_locker::ResourceLocker;
 
 #[get("")]
-pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>) -> Response {
-    let nodes = NodeSearch::new(&app.elastic_client, &query).index().await?;
+pub async fn get_nodes(app: web::Data<App>, query: web::Query<NodeSearchQuery>, opt_cu: OptCurrentUser) -> Response {
+    let nodes = NodeSearch::new(&app.elastic_client, &query, &opt_cu).index().await?;
     Ok(HttpResponse::Ok().json(nodes))
 }
 
@@ -311,23 +312,7 @@ pub async fn delete_node_editor(
         ));
     }
 
-    let mut descendants = node.descendants(data.db_session()).await?;
-
-    let mut statement_vals = vec![(vec![editor_id], node.branch_id, node.id)];
-
-    while let Some(descendant) = descendants.next().await {
-        let descendant = descendant?;
-
-        statement_vals.push((vec![editor_id], descendant.branch_id, descendant.id));
-    }
-
-    Node::statement_batch()
-        .chunked_statements(&db_session, Node::PULL_EDITOR_IDS_QUERY, statement_vals.clone(), 100)
-        .await?;
-
-    Node::statement_batch()
-        .chunked_statements(&db_session, Node::PULL_VIEWER_IDS_QUERY, statement_vals, 100)
-        .await?;
+    UpdateEditorsNode::update_editor_ids(&data, node.root_id, branch_id, id, &[], &[editor_id]).await?;
 
     Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
 
@@ -367,6 +352,81 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
     if let Err(e) = import_run {
         return Err(e);
     }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexUser {
+    id: Uuid,
+    username: String,
+    email: String,
+    first_name: String,
+    last_name: String,
+    bio: Option<String>,
+    profile_image_filename: Option<String>,
+    profile_image_url: Option<String>,
+    is_confirmed: bool,
+    is_blocked: bool,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+}
+
+#[get("/import_nodes_from_elastic_123")]
+pub async fn restore_nodes_and_users_from_elastic(app: web::Data<App>) -> Response {
+    let response = app
+        .elastic_client
+        .search(SearchParts::Index(&[User::ELASTIC_IDX_NAME]))
+        .body(json!({
+            "query": {
+                "match_all": {}
+            },
+            "size": 10000
+        }))
+        .send()
+        .await?;
+
+    let mut response_body = response.json::<Value>().await?;
+
+    let mut res = vec![];
+    let hits = response_body["hits"]["hits"].as_array_mut().unwrap_or(&mut res);
+
+    let mut users: Vec<IndexUser> = Vec::new();
+    for hit in hits {
+        let user: IndexUser = serde_json::from_value(hit["_source"].take())?;
+        users.push(user);
+    }
+
+    for index_user in users.into_iter() {
+        let user = User {
+            id: index_user.id,
+            username: index_user.username,
+            email: index_user.email,
+            password: (0..100)
+                .map(|_| char::from(rand::thread_rng().gen_range(32..127)))
+                .collect(),
+            first_name: index_user.first_name,
+            last_name: index_user.last_name,
+            bio: index_user.bio,
+            address: None,
+            profile_image_filename: index_user.profile_image_filename,
+            profile_image_url: index_user.profile_image_url,
+            is_confirmed: index_user.is_confirmed,
+            is_blocked: index_user.is_blocked,
+            created_at: index_user.created_at,
+            updated_at: index_user.updated_at,
+            ctx: None,
+        };
+
+        user.insert().execute(&app.db_session).await?;
+    }
+
+    let nodes = Node::find_all().execute(&app.db_session).await?.try_collect().await?;
+    let users = User::find_all().execute(&app.db_session).await?.try_collect().await?;
+
+    assert_eq!(nodes.len(), 851);
+    assert_eq!(users.len(), 44);
 
     Ok(HttpResponse::Ok().finish())
 }

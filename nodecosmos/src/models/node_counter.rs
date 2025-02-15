@@ -55,7 +55,7 @@ impl NodeCounter {
 
         match counter {
             Ok(c) => {
-                UpdateCounterNodeElasticIdx {
+                let _ = UpdateCounterNodeElasticIdx {
                     id,
                     likes_count: c.like_count.unwrap_or(Counter(0)).0 as i32,
                     descendants_count: c.descendants_count.unwrap_or(Counter(0)).0 as i32,

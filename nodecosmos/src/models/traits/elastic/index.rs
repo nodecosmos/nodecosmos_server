@@ -6,7 +6,9 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::models::node::{Node, UpdateCoverImageNode, UpdateCreatorNode, UpdateOwnerNode, UpdateTitleNode};
+use crate::models::node::{
+    Node, UpdateCoverImageNode, UpdateCreatorNode, UpdateEditorsNode, UpdateOwnerNode, UpdateTitleNode,
+};
 use crate::models::user::{ConfirmUser, UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
 
 pub trait ElasticIndex {
@@ -18,26 +20,43 @@ pub trait ElasticIndex {
     fn index_id(&self) -> String;
 
     async fn idx_exists(client: &Elasticsearch) -> bool {
+        info!(
+            "{} {}",
+            "Checking if elastic index exists for".bright_green(),
+            Self::ELASTIC_IDX_NAME.bright_yellow()
+        );
+
         let response = client
             .indices()
             .exists(IndicesExistsParts::Index(&[Self::ELASTIC_IDX_NAME]))
             .send()
             .await
-            .unwrap();
+            .map_err(|e| {
+                panic!("Failed to send index request: {:#?}", e);
+            })
+            .expect("Failed to send index request");
 
         let status = response.status_code();
 
+        if status.is_success() {
+            info!(
+                "{} {}",
+                "Elastic index exists for".bright_green(),
+                Self::ELASTIC_IDX_NAME.bright_yellow()
+            );
+        } else {
+            info!(
+                "{} {}",
+                "Elastic index does not exist for".bright_green(),
+                Self::ELASTIC_IDX_NAME.bright_yellow()
+            );
+        }
+
         status.is_success()
     }
-}
 
-pub trait BuildIndex: ElasticIndex {
-    async fn build_index(client: &Elasticsearch);
-}
-
-impl<T: ElasticIndex> BuildIndex for T {
     async fn build_index(client: &Elasticsearch) {
-        let response = if T::idx_exists(client).await {
+        let response = if Self::idx_exists(client).await {
             info!(
                 "{} {}",
                 "Sync elastic index for".bright_green(),
@@ -128,11 +147,9 @@ impl ElasticIndex for Node {
             "properties": {
                 "id": { "type": "keyword", "index": false },
                 "rootId": { "type": "keyword", "index": false },
-                 "ancestorIds": {
-                    "type": "keyword",
-                    "index": false
-                },
+                "ancestorIds": {"type": "keyword", "index": false },
                 "ownerId": { "type": "keyword", "index": false },
+                "editorIds": {"type": "keyword", "index": false },
                 "creatorId": { "type": "keyword", "index": false },
                 "title": { "type": "text", "analyzer": "english" },
                 "shortDescription": { "type": "text", "index": false  },
@@ -260,6 +277,8 @@ impl_elastic_index!(UpdateCoverImageNode, Node);
 impl_elastic_index!(UpdateCounterNodeElasticIdx, Node);
 impl_elastic_index!(UpdateOwnerNode, Node);
 impl_elastic_index!(UpdateCreatorNode, Node);
+impl_elastic_index!(UpdateEditorsNode, Node);
+
 // user
 impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);

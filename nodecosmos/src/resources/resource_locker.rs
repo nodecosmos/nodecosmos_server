@@ -23,10 +23,10 @@ impl ResourceLocker {
     const RESOURCE_LOCK_ERROR: NodecosmosError =
         NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
 
-    pub fn new(pool: &Pool, instances: u8) -> Self {
+    pub fn new(pool: &Pool, replicas: u8) -> Self {
         Self {
             pool: pool.clone(),
-            replicas: instances - 1,
+            replicas,
         }
     }
 
