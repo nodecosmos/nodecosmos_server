@@ -65,15 +65,9 @@ WORKDIR /usr/local/bin
 # Copy the compiled binary from the builder stage
 COPY --from=builder /usr/src/app/target/release/nodecosmos .
 
-# Set environment variables
-ENV CONFIG_FILE=/etc/nodecosmos/config.toml
-
-# Expose the application port
-EXPOSE 443
-
 # Write .aws/credentials file
 RUN mkdir -p /root/.aws
-RUN echo "[default]\naws_access_key_id=AKIA2MSURSTR455UNKXF\naws_secret_access_key=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\nregion=us-east-1" > /root/.aws/credentials
+RUN echo "[default]\naws_access_key_id=$AWS_KEY\naws_secret_access_key=$AWS_SECRET_KEY\nregion=$AWS_REGION" > /root/.aws/credentials
 
 # Define the entrypoint
 ENTRYPOINT ["./nodecosmos"]
