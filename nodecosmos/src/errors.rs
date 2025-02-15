@@ -51,6 +51,9 @@ pub enum NodecosmosError {
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
     RedisError(RedisError),
+    // NOTE: ATM we use different version for main redis and deadpool_redis because actix_session
+    // uses deadpool_redis 0.16.0
+    DeadpoolRedisError(deadpool_redis::redis::RedisError),
     LockerError(String),
     AwsSdkError(String),
     TemplateError(String),
@@ -71,6 +74,7 @@ pub enum NodecosmosError {
     EmailError(String),
     EmailAlreadyExists,
     ImportError(String),
+    ReqwestError(reqwest::Error),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -93,6 +97,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
             NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
             NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: {}", e),
+            NodecosmosError::DeadpoolRedisError(e) => write!(f, "Deadpool Redis Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
             NodecosmosError::AwsSdkError(e) => write!(f, "Aws SDK Error: {}", e),
             NodecosmosError::TemplateError(e) => write!(f, "TemplateError: {}", e),
@@ -108,6 +113,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::EmailError(e) => write!(f, "EmailError: {}", e),
             NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
             NodecosmosError::ImportError(e) => write!(f, "ImportError: {}", e),
+            NodecosmosError::ReqwestError(e) => write!(f, "ReqwestError: {}", e),
         }
     }
 }
@@ -120,10 +126,12 @@ impl Error for NodecosmosError {
             NodecosmosError::ElasticError(e) => Some(e),
             NodecosmosError::ResourceLocked(_) => None,
             NodecosmosError::RedisError(e) => Some(e),
+            NodecosmosError::DeadpoolRedisError(e) => Some(e),
             NodecosmosError::DecodeError(e) => Some(e),
             NodecosmosError::YjsError(e) => Some(e),
             NodecosmosError::QuickXmlError(e) => Some(e),
             NodecosmosError::ParseError(e) => Some(e),
+            NodecosmosError::ReqwestError(e) => Some(e),
             _ => None,
         }
     }
@@ -229,7 +237,7 @@ impl From<deadpool_redis::PoolError> for NodecosmosError {
 
 impl From<deadpool_redis::redis::RedisError> for NodecosmosError {
     fn from(e: deadpool_redis::redis::RedisError) -> Self {
-        NodecosmosError::RedisError(RedisError::RedisError(e))
+        NodecosmosError::DeadpoolRedisError(e)
     }
 }
 

@@ -1,0 +1,85 @@
+name: Build, Migrate, and Deploy to GKE via Helm
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GCP_PROJECT: nodecosmos-cloud
+  GKE_CLUSTER: nodecosmos-us-central1
+  GKE_ZONE: us-central1
+  ARTIFACT_REGISTRY_LOCATION: us-central1
+  ARTIFACT_REGISTRY_REPOSITORY: /nodecosmos-registry/nodecosmos_server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: nodecosmos-cloud
+          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-identity/providers/github-oidc-provider'
+
+      - name: Get Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: nodecosmos-us-central1
+          location: us-central1
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev
+
+      - name: Install Helm
+        run: |
+          curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v3.17.1-linux-amd64.tar.gz
+          tar -zxvf helm.tar.gz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          helm version #Verify the installation
+
+      - name: Build Docker image
+        run: |
+          IMAGE=${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_REPOSITORY}/nodecosmos:${{ github.sha }}
+          echo "Building image $IMAGE"
+          docker build -t $IMAGE -f docker/kubernetes/Dockerfile .
+
+      - name: Push Docker image
+        run: |
+          docker push $IMAGE
+
+      - name: Decode SSL Certificate
+        run: echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
+
+      - name: Decode SSL Key
+        run: echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
+
+      - name: Decode CA Certificate
+        run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
+
+      - name: Run migrations
+        run: |
+          migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} --drop-and-replace --ca ca.crt --cert client.crt --key client.key
+
+      - name: Checkout Helm Charts Repo
+        uses: actions/checkout@v4
+        with:
+          repository: nodecosmos/kubernetes
+          path: kubernetes
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade nodecosmos kubernetes/nodecosmos \
+            --install \
+            --values kubernetes/google-cloud/nodecosmos/nodecosmos-values.yaml \
+            --set image.repository=${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_REPOSITORY}/nodecosmos \
+            --set image.tag=${{ github.sha }} \
+            --wait
+            -n nodecosmos

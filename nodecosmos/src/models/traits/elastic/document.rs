@@ -1,3 +1,5 @@
+use crate::errors::NodecosmosError;
+use crate::models::traits::ElasticIndex;
 use charybdis::types::Uuid;
 use colored::Colorize;
 use elasticsearch::http::response::Response;
@@ -5,8 +7,6 @@ use elasticsearch::{BulkOperation, BulkOperations, BulkParts, DeleteParts, Elast
 use log::error;
 use serde::Serialize;
 use serde_json::json;
-
-use crate::models::traits::ElasticIndex;
 
 #[derive(strum_macros::Display, strum_macros::EnumString)]
 pub enum ElasticDocumentOp {
@@ -19,11 +19,11 @@ pub enum ElasticDocumentOp {
 }
 
 pub trait ElasticDocument<T: ElasticIndex + Serialize> {
-    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]);
-    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]);
-    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]);
+    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]) -> Result<(), NodecosmosError>;
+    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]) -> Result<(), NodecosmosError>;
+    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]) -> Result<(), NodecosmosError>;
 
-    async fn handle_response_error(response: Response, op: ElasticDocumentOp) {
+    async fn handle_response_error(response: Response, op: ElasticDocumentOp) -> Result<(), NodecosmosError> {
         let status_code = response.status_code();
         let res_txt = response.text().await.unwrap_or("No Body!".to_string());
 
@@ -38,18 +38,22 @@ pub trait ElasticDocument<T: ElasticIndex + Serialize> {
                 "Response body:".bright_red(),
                 res_txt.red(),
             );
+
+            return Err(NodecosmosError::InternalServerError(res_txt));
         }
+
+        Ok(())
     }
 
-    async fn add_elastic_document(&self, client: &Elasticsearch);
-    async fn update_elastic_document(&self, client: &Elasticsearch);
+    async fn add_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError>;
+    async fn update_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError>;
 
     #[allow(unused)]
-    async fn delete_elastic_document(&self, client: &Elasticsearch);
+    async fn delete_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError>;
 }
 
 impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
-    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]) {
+    async fn bulk_insert_elastic_documents(client: &Elasticsearch, models: &[T]) -> Result<(), NodecosmosError> {
         let mut ops = BulkOperations::new();
 
         for model in models {
@@ -77,11 +81,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
 
-    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]) {
+    async fn bulk_update_elastic_documents(client: &Elasticsearch, models: &[T]) -> Result<(), NodecosmosError> {
         let mut ops = BulkOperations::new();
 
         for model in models {
@@ -92,13 +98,16 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     "doc": model
                 }),
             );
-            let _ = ops.push(op).map_err(|_| {
+
+            ops.push(op).map_err(|e| {
                 error!(
                     "Failed to add update operation to bulk request! Index: {}, Id: {}",
                     T::ELASTIC_IDX_NAME,
                     index_id
-                )
-            });
+                );
+
+                e
+            })?;
         }
 
         let bulk_response = client
@@ -115,11 +124,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
 
-    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]) {
+    async fn bulk_delete_elastic_documents(client: &Elasticsearch, ids: &[Uuid]) -> Result<(), NodecosmosError> {
         let mut ops = BulkOperations::new();
 
         for id in ids {
@@ -147,11 +158,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
 
-    async fn add_elastic_document(&self, client: &Elasticsearch) {
+    async fn add_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError> {
         let response = client
             .index(IndexParts::IndexId(T::ELASTIC_IDX_NAME, &self.index_id()))
             .body(&self)
@@ -166,11 +179,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
 
-    async fn update_elastic_document(&self, client: &Elasticsearch) {
+    async fn update_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError> {
         let response = client
             .update(UpdateParts::IndexId(T::ELASTIC_IDX_NAME, &self.index_id()))
             .body(json!({
@@ -187,11 +202,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
 
-    async fn delete_elastic_document(&self, client: &Elasticsearch) {
+    async fn delete_elastic_document(&self, client: &Elasticsearch) -> Result<(), NodecosmosError> {
         let response = client
             .delete(DeleteParts::IndexId(T::ELASTIC_IDX_NAME, &self.index_id()))
             .send()
@@ -205,6 +222,8 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                     T::ELASTIC_IDX_NAME,
                     e
                 );
+
+                Err(NodecosmosError::from(e))
             }
         }
     }
