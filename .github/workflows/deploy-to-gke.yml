@@ -10,7 +10,7 @@ env:
   GKE_CLUSTER: nodecosmos-us-central1
   GKE_ZONE: us-central1
   ARTIFACT_REGISTRY_LOCATION: us-central1
-  ARTIFACT_REGISTRY_REPOSITORY: /nodecosmos-registry/nodecosmos_server
+  ARTIFACT_REGISTRY_REPOSITORY: nodecosmos-registry/nodecosmos_server
 
 jobs:
   deploy:
@@ -26,18 +26,13 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           project_id: nodecosmos-cloud
-          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-identity/providers/github-oidc-provider'
-          service_account: 534114130521-compute
+          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-oidc-provider/providers/github-issuer-provider'
 
       - name: Get Credentials
         uses: google-github-actions/get-gke-credentials@v2
         with:
           cluster_name: nodecosmos-us-central1
           location: us-central1
-
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev
 
       - name: Install Helm
         run: |
@@ -46,24 +41,35 @@ jobs:
           sudo mv linux-amd64/helm /usr/local/bin/helm
           helm version #Verify the installation
 
-      - name: Build Docker image
+      - name: Configure Docker for Artifact Registry
         run: |
-          IMAGE=${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_REPOSITORY}/nodecosmos:${{ github.sha }}
-          echo "Building image $IMAGE"
-          docker build -t $IMAGE -f docker/kubernetes/Dockerfile .
+          gcloud auth configure-docker ${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev --verbosity=debug
 
-      - name: Push Docker image
-        run: |
-          docker push $IMAGE
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/kubernetes/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
+          cache-from: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
+          cache-to: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
       - name: Decode SSL Certificate
-        run: echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
+        run: echo "${{ secrets.DB_CLIENT_CERT }}" | > client.crt
 
       - name: Decode SSL Key
-        run: echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
+        run: echo "${{ secrets.DB_CLIENT_KEY }}" | > client.key
 
       - name: Decode CA Certificate
-        run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
+        run: echo "${{ secrets.DB_CA_CERT }}" | > ca.crt
 
       - name: Run migrations
         run: |
@@ -80,7 +86,7 @@ jobs:
           helm upgrade nodecosmos kubernetes/nodecosmos \
             --install \
             --values kubernetes/google-cloud/nodecosmos/nodecosmos-values.yaml \
-            --set image.repository=${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_REPOSITORY}/nodecosmos \
+            --set image.repository=${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${ARTIFACT_REGISTRY_REPOSITORY} \
             --set image.tag=${{ github.sha }} \
             --wait
             -n nodecosmos
