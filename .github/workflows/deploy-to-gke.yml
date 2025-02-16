@@ -50,6 +50,34 @@ jobs:
         with:
           buildkitd-flags: --debug
 
+      - name: Create dummy Dockerfile
+        run: |
+          cat <<'EOF' > Dockerfile.dumb
+          # syntax=docker/dockerfile:1.4
+          FROM alpine:3.18
+          CMD ["echo", "Dummy image for testing push"]
+          EOF
+
+      - name: Build and push dummy image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dumb
+          push: true
+          tags: |
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:dummy
+          cache-from: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:dummy
+          cache-to: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:dummy,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Delete dummy image
+        run: |
+          echo "Deleting dummy image from Artifact Registry"
+          gcloud artifacts docker images delete \
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:dummy \
+            --quiet --delete-tags
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
