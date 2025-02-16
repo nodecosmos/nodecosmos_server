@@ -48,6 +48,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Write credentials file
+        run: |
+          echo '{"type": "authorized_user", "client_id": "", "client_secret": "", "refresh_token": "'$(gcloud auth print-access-token)'"}' > $HOME/gcloud-creds.json
+          echo "::set-env name=GOOGLE_APPLICATION_CREDENTIALS::$HOME/gcloud-creds.json"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
