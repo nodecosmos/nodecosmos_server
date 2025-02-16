@@ -23,6 +23,7 @@ RUN cargo build --release
 
 # Stage 2: Build the full application
 FROM deps AS builder
+
 # Now copy the rest of the source code (this invalidates the cache for later layers but keeps the deps layer cached)
 COPY . .
 RUN cargo build --release
