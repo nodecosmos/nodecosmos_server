@@ -1,73 +1,35 @@
-# Stage 1: Builder
-FROM ubuntu:24.10 AS builder
+# Stage 1: Build dependencies
+FROM ubuntu:24.10 AS deps
 
-# Install system dependencies
+# Install system dependencies and Rust
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    wget \
-    ca-certificates \
-    perl \
-    zip \
-    unzip \
-    curl \
-    openssl \
-    libssl-dev \
-    pkg-config \
-    git \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set up Rust environment
+    build-essential ca-certificates curl openssl libssl-dev pkg-config --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-# Update PATH for subsequent RUN commands
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Set the working directory
 WORKDIR /usr/src/app
 
-# Copy Cargo.toml and Cargo.lock to leverage Docker cache
 COPY Cargo.toml Cargo.lock ./
-
-# Create a dummy main.rs to build dependencies
-RUN mkdir -p nodecosmos/src
-RUN mkdir -p macros/src
-
 COPY nodecosmos/Cargo.toml nodecosmos/Cargo.toml
-COPY macros/ macros/
-COPY benchmarks/ benchmarks/
+COPY macros/Cargo.toml macros/Cargo.toml
 
-RUN echo "fn main() {}" > nodecosmos/src/main.rs
+# Create dummy main files to satisfy Cargo in each crate as needed:
+RUN mkdir -p nodecosmos/src && echo "fn main() {}" > nodecosmos/src/main.rs
+RUN mkdir -p macros/src && echo "" > macros/src/lib.rs
 
-# Build dependencies
+# Build dependencies (this layer will be cached if the manifests don't change)
 RUN cargo build --release
-RUN rm -f target/release/deps/nodecosmos*
 
-# Copy everything except the target directory
+# Stage 2: Build the full application
+FROM deps AS builder
+# Now copy the rest of the source code (this invalidates the cache for later layers but keeps the deps layer cached)
 COPY . .
-
-# Build the application
 RUN cargo build --release
 
-# Stage 2: Runtime
+# Stage 3: Final runtime image
 FROM ubuntu:24.10
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    openssl \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set the working directory
+RUN apt-get update && apt-get install -y ca-certificates openssl libssl-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/bin
-
-# Copy the compiled binary from the builder stage
 COPY --from=builder /usr/src/app/target/release/nodecosmos .
-
-# Write .aws/credentials file
-RUN mkdir -p /root/.aws
-RUN echo "[default]\naws_access_key_id=$AWS_KEY\naws_secret_access_key=$AWS_SECRET_KEY\nregion=$AWS_REGION" > /root/.aws/credentials
-
-# Define the entrypoint
-ENTRYPOINT ["./nodecosmos"]
+CMD ["./nodecosmos"]
