@@ -3,7 +3,6 @@ os: linux
 files:
   - source: ./nodecosmos
     destination: /usr/local/bin/
-
 hooks:
   ApplicationStop:
     - location: scripts/stop_server.sh
