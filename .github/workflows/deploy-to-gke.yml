@@ -19,51 +19,51 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Restore local Buildx cache (if it exists)
-      - name: Restore Buildx Cache
-        id: cache-buildx
-        uses: actions/cache@v4
-        with:
-          path: .buildx-cache
-          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT }}
-          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-oidc-provider/providers/github-issuer-provider'
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/kubernetes/Dockerfile
-          tags: |
-            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
-            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
-          cache-from: type=local,src=.buildx-cache
-          cache-to: type=local,dest=.buildx-cache,mode=max
-          load: true
-
-      - name: Authenticate Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev --verbosity=debug
-
-      - name: Push to Artifact Registry
-        run: docker push ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
-
-      - name: Save Buildx Cache
-        uses: actions/cache@v4
-        with:
-          path: .buildx-cache
-          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
+  #    steps:
+  #      - name: Checkout code
+  #        uses: actions/checkout@v4
+  #
+  #      # Restore local Buildx cache (if it exists)
+  #      - name: Restore Buildx Cache
+  #        id: cache-buildx
+  #        uses: actions/cache@v4
+  #        with:
+  #          path: .buildx-cache
+  #          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
+  #
+  #      - name: Authenticate to Google Cloud
+  #        uses: google-github-actions/auth@v2
+  #        with:
+  #          project_id: ${{ env.GCP_PROJECT }}
+  #          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-oidc-provider/providers/github-issuer-provider'
+  #
+  #      - name: Set up Docker Buildx
+  #        uses: docker/setup-buildx-action@v3
+  #
+  #      - name: Build
+  #        uses: docker/build-push-action@v6
+  #        with:
+  #          context: .
+  #          file: docker/kubernetes/Dockerfile
+  #          tags: |
+  #            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
+  #            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
+  #          cache-from: type=local,src=.buildx-cache
+  #          cache-to: type=local,dest=.buildx-cache,mode=max
+  #          load: true
+  #
+  #      - name: Authenticate Docker for Artifact Registry
+  #        run: |
+  #          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev --verbosity=debug
+  #
+  #      - name: Push to Artifact Registry
+  #        run: docker push ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
+  #
+  #      - name: Save Buildx Cache
+  #        uses: actions/cache@v4
+  #        with:
+  #          path: .buildx-cache
+  #          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
 
   migrate:
     runs-on: ubuntu-latest
@@ -76,9 +76,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
@@ -92,7 +90,7 @@ jobs:
         run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
 
       - name: Install Migrate
-        run: cargo install charybdis-migrate
+        run: cargo install charybdis-migrate --locked
 
       - name: Run migrations
         run: |
