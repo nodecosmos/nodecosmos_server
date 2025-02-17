@@ -16,7 +16,7 @@ use openssl::pkcs12::Pkcs12;
 use openssl::pkey::PKey;
 use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
 use openssl::x509::X509;
-use redis::{ClientTlsConfig, TlsCertificates};
+use redis::{AsyncCommands, ClientTlsConfig, TlsCertificates};
 use scylla::{CachingSession, SessionBuilder};
 use std::error::Error;
 use std::fs;
@@ -193,8 +193,14 @@ impl<'a> Resource<'a> for Pool {
         let connection_info = redis_client.get_connection_info();
         let cfg = deadpool_redis::Config::from_connection_info(connection_info.clone());
 
-        cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))
-            .expect("Failed to create pool.")
+        let pool = cfg
+            .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+            .expect("Failed to create pool.");
+        // test write
+        let mut conn = pool.get().await.expect("Failed to get connection");
+        let _: () = conn.set("test", "test").await.expect("Failed to set key form pool");
+
+        pool
     }
 }
 
@@ -307,6 +313,13 @@ impl<'a> Resource<'a> for redis::Client {
         } else {
             client = redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
         }
+
+        let mut conn = client
+            .get_multiplexed_async_connection()
+            .await
+            .expect("Failed to connect to Redis");
+        // test write
+        let _: () = conn.set("test", "test").await.expect("Failed to set key form client");
 
         info!("Connected to Redis");
 
