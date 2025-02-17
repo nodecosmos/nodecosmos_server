@@ -12,18 +12,16 @@ WORKDIR /usr/src/app
 
 COPY Cargo.toml Cargo.lock ./
 COPY nodecosmos/Cargo.toml nodecosmos/Cargo.toml
-COPY macros/Cargo.toml macros/Cargo.toml
+COPY macros/ macros/
 
 # Create dummy main files to satisfy Cargo in each crate as needed:
 RUN mkdir -p nodecosmos/src && echo "fn main() {}" > nodecosmos/src/main.rs
-RUN mkdir -p macros/src && echo "" > macros/src/lib.rs
 
 # Build dependencies (this layer will be cached if the manifests don't change)
 RUN cargo build --release
 
 # Stage 2: Build the full application
 FROM deps AS builder
-
 # Now copy the rest of the source code (this invalidates the cache for later layers but keeps the deps layer cached)
 COPY . .
 RUN cargo build --release

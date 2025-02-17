@@ -177,6 +177,9 @@ impl App {
                 http::header::USER_AGENT,
                 http::header::DNT,
                 http::header::CONTENT_TYPE,
+                http::header::X_FORWARDED_FOR,
+                http::header::X_FORWARDED_PROTO,
+                http::header::X_FORWARDED_HOST,
             ])
             .expose_headers(vec![http::header::LOCATION, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
             .max_age(86400)

@@ -60,9 +60,7 @@ jobs:
             ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
             ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
           cache-from: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
-          cache-to: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+          cache-to: type=registry,ref=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
 
       - name: Decode SSL Certificate
         run: echo "${{ secrets.DB_CLIENT_CERT }}" | > client.crt
