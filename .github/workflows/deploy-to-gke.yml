@@ -49,7 +49,7 @@ jobs:
 
       - name: Docker Login with Access Token (CRUCIAL STEP)
         run: |
-          echo "${{ steps.auth.outputs.access_token }}" | docker login --username _json_key --password-stdin https://${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
+          docker login -u _json_key -p "${{ steps.auth.outputs.access_token }}" https://${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
 
       - name: Build and push
         uses: docker/build-push-action@v6
