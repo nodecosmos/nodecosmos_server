@@ -187,7 +187,7 @@ impl App {
     }
 
     pub async fn redis_session_store(&self) -> RedisSessionStore {
-        RedisSessionStore::new(&self.config.redis.url)
+        RedisSessionStore::new_pooled(self.redis_pool.clone())
             .await
             .map_err(|e| {
                 log::error!("Failed to create Redis session store: {}", e);
