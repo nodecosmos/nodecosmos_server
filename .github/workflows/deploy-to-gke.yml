@@ -46,10 +46,6 @@ jobs:
         with:
           buildkitd-flags: --debug
 
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev --verbosity=debug
-
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
