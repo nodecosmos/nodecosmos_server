@@ -19,7 +19,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    if: ${{ github.event_name == 'push' && (contains(github.event.head_commit.modified, 'Cargo.toml') || contains(github.event.head_commit.modified, 'nodecosmos/') || contains(github.event.head_commit.modified, 'macros/')) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -69,7 +68,6 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     needs: build
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.modified, 'nodecosmos/') }}
     steps:
       - name: Checkout code for migrations
         uses: actions/checkout@v4
