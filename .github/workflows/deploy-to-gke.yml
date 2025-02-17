@@ -14,14 +14,11 @@ env:
   DOCKER_BUILDKIT: 1
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #  build:
+  #    runs-on: ubuntu-latest
+  #    permissions:
+  #      id-token: write
+  #      contents: read
   #    steps:
   #      - name: Checkout code
   #        uses: actions/checkout@v4
@@ -67,42 +64,42 @@ jobs:
   #        with:
   #          path: .buildx-cache
   #          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
-
-  migrate:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code for migrations
-        uses: actions/checkout@v4
-
-      - name: Cache Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Decode SSL Certificate
-        run: echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
-
-      - name: Decode SSL Key
-        run: echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
-
-      - name: Decode CA Certificate
-        run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
-
-      - name: Install Migrate
-        run: cargo install charybdis-migrate --locked
-
-      - name: Run migrations
-        run: |
-          migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} \
-            --drop-and-replace --ca ca.crt --cert client.crt --key client.key
+  #
+  #  migrate:
+  #    runs-on: ubuntu-latest
+  #    needs: build
+  #    steps:
+  #      - name: Checkout code for migrations
+  #        uses: actions/checkout@v4
+  #
+  #      - name: Cache Dependencies
+  #        uses: actions/cache@v4
+  #        with:
+  #          path: |
+  #            ~/.cargo
+  #            target
+  #          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+  #
+  #      - name: Decode SSL Certificate
+  #        run: echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
+  #
+  #      - name: Decode SSL Key
+  #        run: echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
+  #
+  #      - name: Decode CA Certificate
+  #        run: echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
+  #
+  #      - name: Install Migrate
+  #        run: cargo install charybdis-migrate --locked
+  #
+  #      - name: Run migrations
+  #        run: |
+  #          migrate --keyspace nodecosmos --host ${{ secrets.SCYLLA_URL }} \
+  #            --drop-and-replace --ca ca.crt --cert client.crt --key client.key
 
   deploy:
     runs-on: ubuntu-latest
-    needs: migrate
+    #    needs: migrate
     steps:
       - name: Checkout Helm Charts Repo
         uses: actions/checkout@v4
@@ -111,6 +108,12 @@ jobs:
           ref: main
           path: kubernetes
           token: ${{ secrets.K8_PAT }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-oidc-provider/providers/github-issuer-provider'
 
       - name: Install GKE auth plugin
         run: gcloud components install gke-gcloud-auth-plugin --quiet
