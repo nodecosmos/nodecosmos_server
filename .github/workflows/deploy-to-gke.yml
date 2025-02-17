@@ -105,6 +105,10 @@ jobs:
           path: kubernetes
           token: ${{ secrets.K8_PAT }}
 
+      - name: Configure GKE credentials
+        run: |
+          gcloud container clusters get-credentials nodecosmos-us-central1 --location=us-central1
+
       - name: Deploy with Helm
         run: |
           helm upgrade nodecosmos kubernetes/nodecosmos \
