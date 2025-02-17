@@ -24,6 +24,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
+        id: auth
         with:
           project_id: nodecosmos-cloud
           workload_identity_provider: 'projects/534114130521/locations/global/workloadIdentityPools/github-oidc-provider/providers/github-issuer-provider'
@@ -45,6 +46,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           buildkitd-flags: --debug
+
+      - name: Docker Login with Access Token (CRUCIAL STEP)
+        run: |
+          echo "${{ steps.auth.outputs.access_token }}" | docker login --username _json_key --password-stdin https://${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
 
       - name: Build and push
         uses: docker/build-push-action@v6
