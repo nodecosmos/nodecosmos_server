@@ -32,9 +32,5 @@ RUN apt-get update && apt-get install -y ca-certificates openssl libssl-dev && r
 WORKDIR /usr/local/bin
 COPY --from=builder /usr/src/app/target/release/nodecosmos .
 
-# Write .aws/credentials file
-RUN mkdir -p /root/.aws
-RUN echo "[default]\naws_access_key_id=$AWS_KEY\naws_secret_access_key=$AWS_SECRET_KEY\nregion=$AWS_REGION" > /root/.aws/credentials
-
 # Define the entrypoint
 ENTRYPOINT ["./nodecosmos"]
