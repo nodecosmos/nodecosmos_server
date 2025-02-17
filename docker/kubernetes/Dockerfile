@@ -28,7 +28,19 @@ RUN cargo build --release
 
 # Stage 3: Final runtime image
 FROM ubuntu:24.10
-RUN apt-get update && apt-get install -y ca-certificates openssl libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    ca-certificates \
+    perl \
+    zip \
+    unzip \
+    curl \
+    openssl \
+    libssl-dev \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+
 WORKDIR /usr/local/bin
 COPY --from=builder /usr/src/app/target/release/nodecosmos .
 
