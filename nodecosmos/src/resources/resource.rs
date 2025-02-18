@@ -229,6 +229,59 @@ impl<'a> Resource<'a> for crate::resources::sse_broadcast::SseBroadcast {
     }
 }
 
+impl<'a> Resource<'a> for Vec<redis::Client> {
+    type Cfg = &'a crate::app::Config;
+
+    async fn init_resource(config: Self::Cfg) -> Self {
+        let mut clients = Vec::new();
+        use std::io::Read;
+
+        for url in &config.redis.urls {
+            let client;
+
+            if let Some(ca) = &config.redis.ca {
+                let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
+                let mut root_cert_vec = Vec::new();
+                std::io::BufReader::new(root_cert_file)
+                    .read_to_end(&mut root_cert_vec)
+                    .expect("Unable to read ROOT cert file");
+
+                let cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+                    .expect("cannot open private cert file");
+                let mut client_cert_vec = Vec::new();
+                std::io::BufReader::new(cert_file)
+                    .read_to_end(&mut client_cert_vec)
+                    .expect("Unable to read client cert file");
+
+                let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+                    .expect("cannot open private key file");
+                let mut client_key_vec = Vec::new();
+                std::io::BufReader::new(key_file)
+                    .read_to_end(&mut client_key_vec)
+                    .expect("Unable to read client key file");
+
+                log::info!("Connecting to Redis with TLS");
+
+                let tls = redis::TlsCertificates {
+                    client_tls: Some(redis::ClientTlsConfig {
+                        client_cert: client_cert_vec,
+                        client_key: client_key_vec,
+                    }),
+                    root_cert: Some(root_cert_vec),
+                };
+
+                client = redis::Client::build_with_tls(url.clone(), tls).expect("Unable to build client");
+            } else {
+                client = redis::Client::open(url.clone()).expect("Failed to create Redis client");
+            }
+
+            clients.push(client);
+        }
+
+        clients
+    }
+}
+
 impl<'a> Resource<'a> for redis::cluster::ClusterClient {
     type Cfg = &'a crate::app::Config;
 
@@ -288,59 +341,6 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
     }
 }
 
-impl<'a> Resource<'a> for Vec<redis::Client> {
-    type Cfg = &'a crate::app::Config;
-
-    async fn init_resource(config: Self::Cfg) -> Self {
-        let mut clients = Vec::new();
-        use std::io::Read;
-
-        for url in &config.redis.urls {
-            let client;
-
-            if let Some(ca) = &config.redis.ca {
-                let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
-                let mut root_cert_vec = Vec::new();
-                std::io::BufReader::new(root_cert_file)
-                    .read_to_end(&mut root_cert_vec)
-                    .expect("Unable to read ROOT cert file");
-
-                let cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
-                    .expect("cannot open private cert file");
-                let mut client_cert_vec = Vec::new();
-                std::io::BufReader::new(cert_file)
-                    .read_to_end(&mut client_cert_vec)
-                    .expect("Unable to read client cert file");
-
-                let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
-                    .expect("cannot open private key file");
-                let mut client_key_vec = Vec::new();
-                std::io::BufReader::new(key_file)
-                    .read_to_end(&mut client_key_vec)
-                    .expect("Unable to read client key file");
-
-                log::info!("Connecting to Redis with TLS");
-
-                let tls = redis::TlsCertificates {
-                    client_tls: Some(redis::ClientTlsConfig {
-                        client_cert: client_cert_vec,
-                        client_key: client_key_vec,
-                    }),
-                    root_cert: Some(root_cert_vec),
-                };
-
-                client = redis::Client::build_with_tls(url.clone(), tls).expect("Unable to build client");
-            } else {
-                client = redis::Client::open(url.clone()).expect("Failed to create Redis client");
-            }
-
-            clients.push(client);
-        }
-
-        clients
-    }
-}
-
 // Custom manager that holds your preconfigured ClusterClient.
 pub struct RedisClusterManager {
     client: redis::cluster::ClusterClient,
@@ -378,8 +378,7 @@ impl<'a> Resource<'a> for deadpool::managed::Pool<RedisClusterManager> {
     type Cfg = &'a crate::app::Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let cluster_client =
-            redis::cluster::ClusterClient::new(config.redis.urls.clone()).expect("Failed to create Redis client");
+        let cluster_client = redis::cluster::ClusterClient::init_resource(config).await;
 
         let manager = RedisClusterManager::new(cluster_client);
 
