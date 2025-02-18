@@ -22,7 +22,6 @@ mod collections;
 mod context;
 mod elastic;
 mod find_branched;
-mod gcp;
 mod group;
 mod id;
 mod model;

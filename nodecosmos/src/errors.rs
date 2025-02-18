@@ -8,30 +8,6 @@ use log::{error, warn};
 use serde_json::json;
 
 #[derive(Debug)]
-pub enum RedisError {
-    PoolError(deadpool_redis::PoolError),
-    RedisError(redis::RedisError),
-}
-
-impl fmt::Display for RedisError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RedisError::PoolError(e) => write!(f, "Pool Error: {}", e),
-            RedisError::RedisError(e) => write!(f, "Redis Error: {}", e),
-        }
-    }
-}
-
-impl Error for RedisError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            RedisError::PoolError(e) => Some(e),
-            RedisError::RedisError(e) => Some(e),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub enum NodecosmosError {
     // 400s
     Unauthorized(&'static str),
@@ -50,10 +26,8 @@ pub enum NodecosmosError {
     ClientSessionError(String),
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
-    RedisError(RedisError),
-    // NOTE: ATM we use different version for main redis and deadpool_redis because actix_session
-    // uses deadpool_redis 0.16.0
-    DeadpoolRedisError(deadpool_redis::redis::RedisError),
+    RedisError(redis::RedisError),
+    PoolError(deadpool::managed::PoolError<redis::RedisError>),
     LockerError(String),
     AwsSdkError(String),
     TemplateError(String),
@@ -74,7 +48,6 @@ pub enum NodecosmosError {
     EmailError(String),
     EmailAlreadyExists,
     ImportError(String),
-    ReqwestError(reqwest::Error),
 }
 
 impl fmt::Display for NodecosmosError {
@@ -96,8 +69,8 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
             NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
-            NodecosmosError::RedisError(e) => write!(f, "Redis Pool Error: {}", e),
-            NodecosmosError::DeadpoolRedisError(e) => write!(f, "Deadpool Redis Error: {}", e),
+            NodecosmosError::RedisError(e) => write!(f, "Redis Error: {}", e),
+            NodecosmosError::PoolError(e) => write!(f, "Pool Error: {}", e),
             NodecosmosError::LockerError(e) => write!(f, "Locker Error: {}", e),
             NodecosmosError::AwsSdkError(e) => write!(f, "Aws SDK Error: {}", e),
             NodecosmosError::TemplateError(e) => write!(f, "TemplateError: {}", e),
@@ -113,7 +86,6 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::EmailError(e) => write!(f, "EmailError: {}", e),
             NodecosmosError::EmailAlreadyExists => write!(f, "EmailAlreadyExists"),
             NodecosmosError::ImportError(e) => write!(f, "ImportError: {}", e),
-            NodecosmosError::ReqwestError(e) => write!(f, "ReqwestError: {}", e),
         }
     }
 }
@@ -126,12 +98,11 @@ impl Error for NodecosmosError {
             NodecosmosError::ElasticError(e) => Some(e),
             NodecosmosError::ResourceLocked(_) => None,
             NodecosmosError::RedisError(e) => Some(e),
-            NodecosmosError::DeadpoolRedisError(e) => Some(e),
+            NodecosmosError::PoolError(e) => Some(e),
             NodecosmosError::DecodeError(e) => Some(e),
             NodecosmosError::YjsError(e) => Some(e),
             NodecosmosError::QuickXmlError(e) => Some(e),
             NodecosmosError::ParseError(e) => Some(e),
-            NodecosmosError::ReqwestError(e) => Some(e),
             _ => None,
         }
     }
@@ -229,15 +200,15 @@ impl From<elasticsearch::Error> for NodecosmosError {
     }
 }
 
-impl From<deadpool_redis::PoolError> for NodecosmosError {
-    fn from(e: deadpool_redis::PoolError) -> Self {
-        NodecosmosError::RedisError(RedisError::PoolError(e))
+impl From<redis::RedisError> for NodecosmosError {
+    fn from(e: redis::RedisError) -> Self {
+        NodecosmosError::RedisError(e)
     }
 }
 
-impl From<deadpool_redis::redis::RedisError> for NodecosmosError {
-    fn from(e: deadpool_redis::redis::RedisError) -> Self {
-        NodecosmosError::DeadpoolRedisError(e)
+impl From<deadpool::managed::PoolError<redis::RedisError>> for NodecosmosError {
+    fn from(e: deadpool::managed::PoolError<redis::RedisError>) -> Self {
+        NodecosmosError::PoolError(e)
     }
 }
 

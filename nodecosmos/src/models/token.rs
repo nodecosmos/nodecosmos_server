@@ -4,7 +4,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Text, Timestamp, Tuple, Uuid};
 use chrono::Utc;
 use rand::rngs::OsRng;
-use rand::Rng;
+use rand::TryRngCore;
 
 #[derive(strum_macros::Display, strum_macros::EnumString, PartialEq)]
 pub enum TokenType {
@@ -33,7 +33,9 @@ pub struct Token {
 impl Token {
     fn generate_token() -> String {
         let mut rng = OsRng;
-        let random_bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+        let mut random_bytes = [0u8; 32];
+        rng.try_fill_bytes(&mut random_bytes)
+            .expect("Failed to generate random bytes with OS RNG");
         URL_SAFE.encode(&random_bytes)
     }
 

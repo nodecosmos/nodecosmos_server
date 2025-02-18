@@ -4,7 +4,7 @@
 // TODO: refactor all find_by_ids to chunked queries of max 100 ids
 //  fn .+by*.+ids\( - regex to search methods
 
-use actix_session::storage::RedisSessionStore;
+use crate::session_store::RedisClusterSessionStore;
 use actix_web::middleware::{Compress, Logger};
 use actix_web::{web, App as ActixWebApp, HttpServer};
 use api::*;
@@ -16,6 +16,7 @@ mod constants;
 mod errors;
 mod models;
 mod resources;
+mod session_store;
 mod stream;
 mod tasks;
 
@@ -34,15 +35,7 @@ fn main() {
 
                 app.init().await;
 
-                let session_store = RedisSessionStore::builder_pooled(app.redis_pool.clone())
-                    .build()
-                    .await
-                    .map_err(|e| {
-                        log::error!("Failed to create Redis session store: {}", e);
-
-                        e
-                    })
-                    .unwrap();
+                let session_store = RedisClusterSessionStore::new(app.redis_pool.clone());
                 let app_web_data = web::Data::new(app);
 
                 HttpServer::new(move || {
@@ -90,9 +83,7 @@ fn main() {
                                 .service(get_node_editors)
                                 .service(delete_node_editor)
                                 .service(listen_node_events)
-                                .service(import_nodes)
-                                // TODO: remove
-                                .service(restore_nodes_and_users_from_elastic),
+                                .service(import_nodes),
                         )
                         .service(web::scope("/no-compress-nodes").service(listen_node_events))
                         .service(

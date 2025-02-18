@@ -3,7 +3,6 @@ use std::{env, fs};
 
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
-use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{http, web};
@@ -18,9 +17,10 @@ use crate::models::traits::ElasticIndex;
 use crate::models::user::User;
 use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::mailer::Mailer;
-use crate::resources::resource::Resource;
+use crate::resources::resource::{RedisClusterManager, Resource};
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use crate::session_store::RedisClusterSessionStore;
 use crate::tasks;
 
 #[derive(Clone, Deserialize)]
@@ -47,7 +47,7 @@ pub struct AwsConfig {
 
 #[derive(Clone, Deserialize)]
 pub struct RedisConfig {
-    pub url: String,
+    pub urls: Vec<String>,
 
     #[serde(default)]
     pub replicas: u8,
@@ -68,6 +68,7 @@ pub struct SmtpConfig {
     pub from_email: String,
 }
 
+#[allow(unused)]
 #[derive(Clone, Deserialize)]
 pub struct Config {
     pub port: u16,
@@ -86,6 +87,9 @@ pub struct Config {
     pub key: Option<String>,
 }
 
+type RedisClients = Vec<redis::Client>;
+pub type RedisClusterManagerPool = deadpool::managed::Pool<RedisClusterManager>;
+
 #[derive(Clone)]
 pub struct App {
     pub config: Config,
@@ -97,8 +101,8 @@ pub struct App {
     pub resource_locker: Arc<ResourceLocker>,
     pub description_ws_pool: Arc<DescriptionWsPool>,
     pub sse_broadcast: Arc<SseBroadcast>,
-    pub redis_pool: deadpool_redis::Pool,
-    pub redis_client: redis::Client,
+    pub redis_pool: RedisClusterManagerPool,
+    pub redis_clients: RedisClients,
     pub mailer: Arc<Mailer>,
     pub secret_key: String,
 }
@@ -115,8 +119,8 @@ impl App {
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
         let db_session = CachingSession::init_resource(&config).await;
         let elastic_client = Elasticsearch::init_resource(&config).await;
-        let redis_pool = deadpool_redis::Pool::init_resource(&config).await;
-        let redis_client = redis::Client::init_resource(&config).await;
+        let redis_pool = RedisClusterManagerPool::init_resource(&config).await;
+        let redis_clients: RedisClients = RedisClients::init_resource(&config).await;
 
         // app
         let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.replicas)).await;
@@ -132,7 +136,7 @@ impl App {
             elastic_client: Arc::new(elastic_client),
             s3_client: Arc::new(s3_client),
             redis_pool,
-            redis_client,
+            redis_clients,
             // app
             resource_locker: Arc::new(resource_locker),
             description_ws_pool: Arc::new(description_ws_pool),
@@ -186,18 +190,7 @@ impl App {
         self.config.port
     }
 
-    pub async fn redis_session_store(&self) -> RedisSessionStore {
-        RedisSessionStore::new_pooled(self.redis_pool.clone())
-            .await
-            .map_err(|e| {
-                log::error!("Failed to create Redis session store: {}", e);
-
-                e
-            })
-            .unwrap()
-    }
-
-    pub fn session_middleware(&self, rss: RedisSessionStore) -> SessionMiddleware<RedisSessionStore> {
+    pub fn session_middleware(&self, rss: RedisClusterSessionStore) -> SessionMiddleware<RedisClusterSessionStore> {
         let secret_key = Key::from(self.secret_key.as_ref());
 
         let expiration = self.config.session_expiration_in_days;

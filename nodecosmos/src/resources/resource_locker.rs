@@ -1,16 +1,15 @@
-use charybdis::types::Uuid;
-use deadpool_redis::redis::AsyncCommands;
-use deadpool_redis::{redis, Pool};
-
 use crate::api::types::ActionTypes;
 use crate::errors::NodecosmosError;
+use crate::resources::resource::RedisClusterManager;
+use charybdis::types::Uuid;
+use redis::AsyncCommands;
 
 const LOCK_NAMESPACE: &str = "LOCK";
 
 /// Resource Locker users redis to lock resources
 #[derive(Clone)]
 pub struct ResourceLocker {
-    pool: Pool,
+    pool: deadpool::managed::Pool<RedisClusterManager>,
     replicas: u8,
 }
 
@@ -23,7 +22,7 @@ impl ResourceLocker {
     const RESOURCE_LOCK_ERROR: NodecosmosError =
         NodecosmosError::ResourceLocked("Resource Locked. If issue persist contact support");
 
-    pub fn new(pool: &Pool, replicas: u8) -> Self {
+    pub fn new(pool: &deadpool::managed::Pool<RedisClusterManager>, replicas: u8) -> Self {
         Self {
             pool: pool.clone(),
             replicas,

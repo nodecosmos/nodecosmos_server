@@ -1,41 +1,19 @@
-use crate::app::Config;
-use crate::resources::description_ws_pool::DescriptionWsPool;
-use crate::resources::email_client::{EmailClient, SesMailer, Smtp};
-use crate::resources::mailer::Mailer;
-use crate::resources::resource_locker::ResourceLocker;
-use crate::resources::sse_broadcast::SseBroadcast;
-use ammonia::Url;
-use aws_config::BehaviorVersion;
-use deadpool_redis::Pool;
-use elasticsearch::auth::{ClientCertificate, Credentials};
-use elasticsearch::cert::{Certificate, CertificateValidation};
-use elasticsearch::http::transport::{MultiNodeConnectionPool, TransportBuilder};
-use elasticsearch::Elasticsearch;
-use log::info;
-use openssl::pkcs12::Pkcs12;
-use openssl::pkey::PKey;
-use openssl::ssl::{SslContextBuilder, SslMethod, SslVerifyMode};
-use openssl::x509::X509;
-use redis::{AsyncCommands, ClientTlsConfig, TlsCertificates};
-use scylla::{CachingSession, SessionBuilder};
-use std::error::Error;
-use std::fs;
-use std::io::{BufReader, Read};
-use std::time::Duration;
-
 const PASSPHRASE: &str = "KEEP_CALM_AND_LET_IT_BE";
 
-fn create_pkcs12_bundle(tls_crt: &str, tls_key: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+fn create_pkcs12_bundle(tls_crt: &str, tls_key: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Read the PEM files
-    let cert_pem = fs::read(tls_crt)?; // Read the certificate from tls_crt
-    let key_pem = fs::read(tls_key)?; // Read the private key from tls_key
+    let cert_pem = std::fs::read(tls_crt)?; // Read the certificate from tls_crt
+    let key_pem = std::fs::read(tls_key)?; // Read the private key from tls_key
 
     // Parse the certificate and private key
-    let cert = X509::from_pem(&cert_pem)?;
-    let pkey = PKey::private_key_from_pem(&key_pem)?;
+    let cert = openssl::x509::X509::from_pem(&cert_pem)?;
+    let pkey = openssl::pkey::PKey::private_key_from_pem(&key_pem)?;
 
     // Build the PKCS#12 bundle; an empty password ("") is used here, but you can change that if needed.
-    let pkcs12 = Pkcs12::builder().cert(&cert).pkey(&pkey).build2(PASSPHRASE)?;
+    let pkcs12 = openssl::pkcs12::Pkcs12::builder()
+        .cert(&cert)
+        .pkey(&pkey)
+        .build2(PASSPHRASE)?;
 
     Ok(pkcs12.to_der().expect("Failed to convert pkcs12 to der"))
 }
@@ -50,19 +28,19 @@ pub trait Resource<'a> {
     async fn init_resource(config: Self::Cfg) -> Self;
 }
 
-impl<'a> Resource<'a> for CachingSession {
-    type Cfg = &'a Config;
+impl<'a> Resource<'a> for scylla::CachingSession {
+    type Cfg = &'a crate::app::Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
         let known_nodes: Vec<&str> = config.scylla.hosts.iter().map(|x| x.as_str()).collect();
 
-        let mut builder = SessionBuilder::new()
+        let mut builder = scylla::SessionBuilder::new()
             .known_nodes(&known_nodes)
-            .connection_timeout(Duration::from_secs(3))
+            .connection_timeout(std::time::Duration::from_secs(3))
             .use_keyspace(&config.scylla.keyspace, false);
 
         if let Some(ca) = &config.scylla.ca {
-            let mut context_builder = SslContextBuilder::new(SslMethod::tls())
+            let mut context_builder = openssl::ssl::SslContextBuilder::new(openssl::ssl::SslMethod::tls())
                 .map_err(|e| {
                     eprintln!("Failed to create SSL context: {}", e);
                     std::process::exit(1);
@@ -77,7 +55,7 @@ impl<'a> Resource<'a> for CachingSession {
                 })
                 .unwrap();
 
-            context_builder.set_verify(SslVerifyMode::PEER);
+            context_builder.set_verify(openssl::ssl::SslVerifyMode::PEER);
 
             if let Some(key) = &config.scylla.cert {
                 context_builder
@@ -110,19 +88,19 @@ impl<'a> Resource<'a> for CachingSession {
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
 
-        CachingSession::from(db_session, 1000)
+        scylla::CachingSession::from(db_session, 1000)
     }
 }
 
-impl<'a> Resource<'a> for Elasticsearch {
-    type Cfg = &'a Config;
+impl<'a> Resource<'a> for elasticsearch::Elasticsearch {
+    type Cfg = &'a crate::app::Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
-        let urls: Vec<Url> = config
+        let urls: Vec<elasticsearch::http::Url> = config
             .elasticsearch
             .hosts
             .iter()
-            .map(|url| Url::parse(url))
+            .map(|url| elasticsearch::http::Url::parse(url))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 panic!(
@@ -133,17 +111,17 @@ impl<'a> Resource<'a> for Elasticsearch {
             })
             .expect("Failed to parse Elasticsearch URL");
 
-        let conn_pool = MultiNodeConnectionPool::round_robin(urls, None);
-        let mut builder = TransportBuilder::new(conn_pool);
+        let conn_pool = elasticsearch::http::transport::MultiNodeConnectionPool::round_robin(urls, None);
+        let mut builder = elasticsearch::http::transport::TransportBuilder::new(conn_pool);
 
-        info!("Connecting to Elasticsearch: {:?}", config.elasticsearch.hosts);
+        log::info!("Connecting to Elasticsearch: {:?}", config.elasticsearch.hosts);
 
         if let (Some(ca), Some(cert), Some(key)) = (
             &config.elasticsearch.ca,
             &config.elasticsearch.cert,
             &config.elasticsearch.key,
         ) {
-            info!("Using client certificate for Elasticsearch");
+            log::info!("Using client certificate for Elasticsearch");
 
             let pkcs12 = create_pkcs12_bundle(cert, key)
                 .map_err(|e| {
@@ -154,18 +132,16 @@ impl<'a> Resource<'a> for Elasticsearch {
                 })
                 .unwrap();
 
-            let cert_validation = CertificateValidation::Full(
-                Certificate::from_pem(&fs::read(ca).expect("Failed to read ca file"))
+            let cert_validation = elasticsearch::cert::CertificateValidation::Full(
+                elasticsearch::cert::Certificate::from_pem(&std::fs::read(ca).expect("Failed to read ca file"))
                     .expect("Failed to create certificate from ca file"),
             );
 
-            builder =
-                builder
-                    .cert_validation(cert_validation)
-                    .auth(Credentials::Certificate(ClientCertificate::Pkcs12(
-                        pkcs12,
-                        Some(PASSPHRASE.to_string()),
-                    )));
+            builder = builder
+                .cert_validation(cert_validation)
+                .auth(elasticsearch::auth::Credentials::Certificate(
+                    elasticsearch::auth::ClientCertificate::Pkcs12(pkcs12, Some(PASSPHRASE.to_string())),
+                ));
         }
 
         let transport = builder
@@ -179,28 +155,9 @@ impl<'a> Resource<'a> for Elasticsearch {
             })
             .unwrap();
 
-        info!("Connected to Elasticsearch");
+        log::info!("Connected to Elasticsearch");
 
-        Elasticsearch::new(transport)
-    }
-}
-
-impl<'a> Resource<'a> for Pool {
-    type Cfg = &'a Config;
-
-    async fn init_resource(config: Self::Cfg) -> Self {
-        let redis_client = redis::Client::init_resource(config).await;
-        let connection_info = redis_client.get_connection_info();
-        let cfg = deadpool_redis::Config::from_connection_info(connection_info.clone());
-
-        let pool = cfg
-            .create_pool(Some(deadpool_redis::Runtime::Tokio1))
-            .expect("Failed to create pool.");
-        // test write
-        let mut conn = pool.get().await.expect("Failed to get connection");
-        let _: () = conn.set("test", "test").await.expect("Failed to set key form pool");
-
-        pool
+        elasticsearch::Elasticsearch::new(transport)
     }
 }
 
@@ -208,29 +165,29 @@ impl<'a> Resource<'a> for aws_sdk_s3::Client {
     type Cfg = ();
 
     async fn init_resource(_config: ()) -> Self {
-        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
+        let config = aws_config::defaults(aws_config::BehaviorVersion::latest()).load().await;
 
         aws_sdk_s3::Client::new(&config)
     }
 }
 
-impl<'a> Resource<'a> for Mailer {
-    type Cfg = &'a Config;
+impl<'a> Resource<'a> for crate::resources::mailer::Mailer {
+    type Cfg = &'a crate::app::Config;
 
     async fn init_resource(cfg: Self::Cfg) -> Self {
         // check if we use smtp or ses
 
         let client = if let Some(smtp_config) = cfg.smtp.clone() {
-            EmailClient::Smtp(Smtp::new(smtp_config))
+            crate::resources::email_client::EmailClient::Smtp(crate::resources::email_client::Smtp::new(smtp_config))
         } else {
-            let ses_cfg = aws_config::defaults(BehaviorVersion::latest()).load().await;
+            let ses_cfg = aws_config::defaults(aws_config::BehaviorVersion::latest()).load().await;
 
             let client = aws_sdk_ses::Client::new(&ses_cfg);
 
-            EmailClient::Ses(SesMailer::new(client))
+            crate::resources::email_client::EmailClient::Ses(crate::resources::email_client::SesMailer::new(client))
         };
 
-        Mailer::new(client, cfg)
+        crate::resources::mailer::Mailer::new(client, cfg)
     }
 }
 
@@ -248,81 +205,186 @@ impl<'a> Resource<'a> for ammonia::Builder<'a> {
     }
 }
 
-impl<'a> Resource<'a> for ResourceLocker {
-    type Cfg = (&'a Pool, u8);
+impl<'a> Resource<'a> for crate::resources::resource_locker::ResourceLocker {
+    type Cfg = (&'a deadpool::managed::Pool<RedisClusterManager>, u8);
 
     async fn init_resource(cfg: Self::Cfg) -> Self {
-        ResourceLocker::new(cfg.0, cfg.1)
+        crate::resources::resource_locker::ResourceLocker::new(cfg.0, cfg.1)
     }
 }
 
-impl<'a> Resource<'a> for DescriptionWsPool {
+impl<'a> Resource<'a> for crate::resources::description_ws_pool::DescriptionWsPool {
     type Cfg = ();
 
     async fn init_resource(_config: ()) -> Self {
-        DescriptionWsPool::default()
+        crate::resources::description_ws_pool::DescriptionWsPool::default()
     }
 }
 
-impl<'a> Resource<'a> for SseBroadcast {
+impl<'a> Resource<'a> for crate::resources::sse_broadcast::SseBroadcast {
     type Cfg = ();
 
     async fn init_resource(_config: ()) -> Self {
-        SseBroadcast::new()
+        crate::resources::sse_broadcast::SseBroadcast::new()
     }
 }
 
-impl<'a> Resource<'a> for redis::Client {
-    type Cfg = &'a Config;
+impl<'a> Resource<'a> for redis::cluster::ClusterClient {
+    type Cfg = &'a crate::app::Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
+        use redis::AsyncCommands;
+        use std::io::Read;
+
         let client;
         if let Some(ca) = &config.redis.ca {
-            let root_cert_file = fs::File::open(ca).expect("cannot open private cert file");
+            let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
             let mut root_cert_vec = Vec::new();
-            BufReader::new(root_cert_file)
+            std::io::BufReader::new(root_cert_file)
                 .read_to_end(&mut root_cert_vec)
                 .expect("Unable to read ROOT cert file");
 
-            let cert_file = fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+            let cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
                 .expect("cannot open private cert file");
             let mut client_cert_vec = Vec::new();
-            BufReader::new(cert_file)
+            std::io::BufReader::new(cert_file)
                 .read_to_end(&mut client_cert_vec)
                 .expect("Unable to read client cert file");
 
-            let key_file = fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+            let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
                 .expect("cannot open private key file");
             let mut client_key_vec = Vec::new();
-            BufReader::new(key_file)
+            std::io::BufReader::new(key_file)
                 .read_to_end(&mut client_key_vec)
                 .expect("Unable to read client key file");
 
-            info!("Connecting to Redis with TLS");
-            client = redis::Client::build_with_tls(
-                config.redis.url.clone(),
-                TlsCertificates {
-                    client_tls: Some(ClientTlsConfig {
+            log::info!("Connecting to Redis with TLS");
+
+            let tls = redis::TlsCertificates {
+                client_tls: Some(redis::ClientTlsConfig {
+                    client_cert: client_cert_vec,
+                    client_key: client_key_vec,
+                }),
+                root_cert: Some(root_cert_vec),
+            };
+
+            client = redis::cluster::ClusterClient::builder(config.redis.urls.clone())
+                .tls(redis::cluster::TlsMode::Secure)
+                .certs(tls)
+                .build()
+                .expect("Unable to build client");
+        } else {
+            client =
+                redis::cluster::ClusterClient::new(config.redis.urls.clone()).expect("Failed to create Redis client")
+        }
+
+        let mut conn = client.get_async_connection().await.expect("Failed to connect to Redis");
+        // test write
+        let _: () = conn.set("test", "test").await.expect("Failed to set key form client");
+
+        log::info!("Connected to Redis");
+
+        client
+    }
+}
+
+impl<'a> Resource<'a> for Vec<redis::Client> {
+    type Cfg = &'a crate::app::Config;
+
+    async fn init_resource(config: Self::Cfg) -> Self {
+        let mut clients = Vec::new();
+        use std::io::Read;
+
+        for url in &config.redis.urls {
+            let client;
+
+            if let Some(ca) = &config.redis.ca {
+                let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
+                let mut root_cert_vec = Vec::new();
+                std::io::BufReader::new(root_cert_file)
+                    .read_to_end(&mut root_cert_vec)
+                    .expect("Unable to read ROOT cert file");
+
+                let cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+                    .expect("cannot open private cert file");
+                let mut client_cert_vec = Vec::new();
+                std::io::BufReader::new(cert_file)
+                    .read_to_end(&mut client_cert_vec)
+                    .expect("Unable to read client cert file");
+
+                let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+                    .expect("cannot open private key file");
+                let mut client_key_vec = Vec::new();
+                std::io::BufReader::new(key_file)
+                    .read_to_end(&mut client_key_vec)
+                    .expect("Unable to read client key file");
+
+                log::info!("Connecting to Redis with TLS");
+
+                let tls = redis::TlsCertificates {
+                    client_tls: Some(redis::ClientTlsConfig {
                         client_cert: client_cert_vec,
                         client_key: client_key_vec,
                     }),
                     root_cert: Some(root_cert_vec),
-                },
-            )
-            .expect("Unable to build client");
-        } else {
-            client = redis::Client::open(config.redis.url.clone()).expect("Failed to create Redis client")
+                };
+
+                client = redis::Client::build_with_tls(url.clone(), tls).expect("Unable to build client");
+            } else {
+                client = redis::Client::open(url.clone()).expect("Failed to create Redis client");
+            }
+
+            clients.push(client);
         }
 
-        let mut conn = client
-            .get_multiplexed_async_connection()
+        clients
+    }
+}
+
+// Custom manager that holds your preconfigured ClusterClient.
+pub struct RedisClusterManager {
+    client: redis::cluster::ClusterClient,
+}
+
+impl RedisClusterManager {
+    pub fn new(client: redis::cluster::ClusterClient) -> Self {
+        Self { client }
+    }
+}
+
+impl deadpool::managed::Manager for RedisClusterManager {
+    type Type = redis::cluster_async::ClusterConnection;
+    type Error = redis::RedisError;
+
+    // Create a new connection from the preconfigured redis::cluster::ClusterClient.
+    async fn create(&self) -> Result<Self::Type, redis::RedisError> {
+        self.client.get_async_connection().await
+    }
+
+    // Optionally recycle the connection (e.g. by sending a PING).
+    async fn recycle(
+        &self,
+        obj: &mut Self::Type,
+        _metrics: &deadpool::managed::Metrics,
+    ) -> Result<(), deadpool::managed::RecycleError<redis::RedisError>> {
+        redis::cmd("PING")
+            .query_async(obj)
             .await
-            .expect("Failed to connect to Redis");
-        // test write
-        let _: () = conn.set("test", "test").await.expect("Failed to set key form client");
+            .map_err(|e| deadpool::managed::RecycleError::Backend(e))
+    }
+}
 
-        info!("Connected to Redis");
+impl<'a> Resource<'a> for deadpool::managed::Pool<RedisClusterManager> {
+    type Cfg = &'a crate::app::Config;
 
-        client
+    async fn init_resource(config: Self::Cfg) -> Self {
+        let cluster_client =
+            redis::cluster::ClusterClient::new(config.redis.urls.clone()).expect("Failed to create Redis client");
+
+        let manager = RedisClusterManager::new(cluster_client);
+
+        deadpool::managed::Pool::builder(manager)
+            .build()
+            .expect("Failed to build Redis pool")
     }
 }
