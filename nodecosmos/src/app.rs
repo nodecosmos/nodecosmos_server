@@ -12,6 +12,7 @@ use serde::Deserialize;
 use toml::Value;
 
 use crate::api::data::RequestData;
+use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::user::User;
@@ -108,12 +109,16 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new() -> Self {
-        let secret_key = env::var("SECRET_KEY").expect("SECRET_KEY must be set");
-        let config_file = env::var("CONFIG_FILE").expect("CONFIG_FILE must be set");
-        let contents = fs::read_to_string(config_file).expect("Unable to read file");
-        let config_val = contents.parse::<Value>().expect("Unable to parse TOML");
-        let config = config_val.try_into::<Config>().expect("Unable to parse config");
+    pub async fn new() -> Result<Self, NodecosmosError> {
+        let secret_key = env::var("SECRET_KEY").map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
+        let config_file = env::var("CONFIG_FILE").map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
+        let contents = fs::read_to_string(config_file).map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
+        let config_val = contents
+            .parse::<Value>()
+            .map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
+        let config = config_val
+            .try_into::<Config>()
+            .map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
         let recaptcha_enabled = env::var("RECAPTCHA_ENABLED").unwrap_or_default() == "true";
         let recaptcha_secret = env::var("RECAPTCHA_SECRET").unwrap_or_default();
         let s3_client = aws_sdk_s3::Client::init_resource(()).await;
@@ -128,7 +133,7 @@ impl App {
         let sse_broadcast = SseBroadcast::init_resource(()).await;
         let mailer = Mailer::init_resource(&config).await;
 
-        Self {
+        Ok(Self {
             config,
             recaptcha_enabled,
             recaptcha_secret,
@@ -143,7 +148,7 @@ impl App {
             sse_broadcast: Arc::new(sse_broadcast),
             mailer: Arc::new(mailer),
             secret_key,
-        }
+        })
     }
 
     /// Init processes that need to be run on startup

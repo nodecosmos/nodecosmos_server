@@ -128,6 +128,7 @@ jobs:
       - name: Deploy with Helm
         run: |
           helm upgrade nodecosmos kubernetes/nodecosmos \
+            --debug \
             --install \
             --values kubernetes/google-cloud/nodecosmos/nodecosmos-values.yaml \
             --set image.repository=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }} \

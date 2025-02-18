@@ -23,6 +23,7 @@ pub enum NodecosmosError {
     // 400 | 500
     CharybdisError(CharybdisError),
     // 500
+    ConfigError(String),
     ClientSessionError(String),
     SerdeError(serde_json::Error),
     ElasticError(elasticsearch::Error),
@@ -66,6 +67,7 @@ impl fmt::Display for NodecosmosError {
             NodecosmosError::PreconditionFailed(e) => write!(f, "Precondition Failed: {}", e),
             NodecosmosError::BadRequest(e) => write!(f, "Bad Request: {}", e),
             NodecosmosError::CharybdisError(e) => write!(f, "Charybdis Error: {}", e),
+            NodecosmosError::ConfigError(e) => write!(f, "Config Error: {}", e),
             NodecosmosError::ClientSessionError(e) => write!(f, "Client Session Error: {}", e),
             NodecosmosError::SerdeError(e) => write!(f, "Serde Error: {}", e),
             NodecosmosError::ElasticError(e) => write!(f, "Elastic Error: {}", e),
