@@ -293,33 +293,27 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
         if let Some(ca) = &config.redis.ca {
             log::info!("Connecting to Redis with TLS"); // Log before attempting to open files
 
-            let mut root_cert_file = std::fs::File::open(ca).expect(&format!("cannot open CA cert file: {}", ca)); // More specific error message
+            let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
             let mut root_cert_vec = Vec::new();
-            root_cert_file
+            std::io::BufReader::new(root_cert_file)
                 .read_to_end(&mut root_cert_vec)
-                .expect(&format!("Unable to read CA cert file: {}", ca));
+                .expect("Unable to read ROOT cert file");
 
-            let mut cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
-                .expect(&format!(
-                    "cannot open client cert file: {}",
-                    config.redis.cert.clone().unwrap()
-                ));
+            let cert_file = std::fs::File::open(config.redis.cert.clone().expect("redis must have cert defined"))
+                .expect("cannot open private cert file");
             let mut client_cert_vec = Vec::new();
-            cert_file.read_to_end(&mut client_cert_vec).expect(&format!(
-                "Unable to read client cert file: {}",
-                config.redis.cert.clone().unwrap()
-            ));
+            std::io::BufReader::new(cert_file)
+                .read_to_end(&mut client_cert_vec)
+                .expect("Unable to read client cert file");
 
-            let mut key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
-                .expect(&format!(
-                    "cannot open client key file: {}",
-                    config.redis.key.clone().unwrap()
-                ));
+            let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+                .expect("cannot open private key file");
             let mut client_key_vec = Vec::new();
-            key_file.read_to_end(&mut client_key_vec).expect(&format!(
-                "Unable to read client key file: {}",
-                config.redis.key.clone().unwrap()
-            ));
+            std::io::BufReader::new(key_file)
+                .read_to_end(&mut client_key_vec)
+                .expect("Unable to read client key file");
+
+            log::info!("Connecting to Redis with TLS");
 
             let tls = redis::TlsCertificates {
                 client_tls: Some(redis::ClientTlsConfig {
