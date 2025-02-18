@@ -30,7 +30,14 @@ fn main() {
         .unwrap()
         .block_on(async {
             {
-                let app = App::new().await;
+                let app_res = App::new().await;
+
+                if let Err(e) = app_res {
+                    log::error!("Could not initialize app: {}", e);
+                    return;
+                }
+
+                let app = app_res.unwrap();
                 let port = app.port();
 
                 app.init().await;
