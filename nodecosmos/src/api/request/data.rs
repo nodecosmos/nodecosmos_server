@@ -59,7 +59,9 @@ impl RequestData {
         self.app.sse_broadcast.clone()
     }
 
-    pub async fn redis_connection(&self) -> Result<deadpool_redis::Connection, NodecosmosError> {
+    pub async fn redis_connection(
+        &self,
+    ) -> Result<deadpool::managed::Object<crate::resources::resource::RedisClusterManager>, NodecosmosError> {
         let conn = self.app.redis_pool.get().await?;
 
         Ok(conn)

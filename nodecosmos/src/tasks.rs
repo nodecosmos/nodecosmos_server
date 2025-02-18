@@ -53,46 +53,44 @@ pub async fn cleanup_rooms_task(sse_broadcast: Arc<SseBroadcast>) {
 }
 
 pub async fn listen_redis_events(app: &App) {
-    let mut pubsub = app
-        .redis_client
-        .get_async_pubsub()
-        .await
-        .expect("Failed to get redis connection");
-    let sse_broadcast = app.sse_broadcast.clone();
+    for client in &app.redis_clients {
+        let mut pubsub = client.get_async_pubsub().await.expect("Failed to get redis connection");
+        let sse_broadcast = app.sse_broadcast.clone();
 
-    tokio::spawn(async move {
-        pubsub
-            .subscribe("BROADCAST_MESSAGE")
-            .await
-            .expect("Failed to subscribe to channel");
+        tokio::spawn(async move {
+            pubsub
+                .subscribe("BROADCAST_MESSAGE")
+                .await
+                .expect("Failed to subscribe to channel");
 
-        let mut on_message = pubsub.on_message();
+            let mut on_message = pubsub.on_message();
 
-        loop {
-            tokio::select! {
-                msg = on_message.next() => {
-                    if let Some(msg) = msg {
-                        let payload = msg.get_payload::<SseMessage>();
-                        match payload {
-                            Ok(payload) => {
-                                let _ = sse_broadcast
-                                    .send_message(payload.root_id, actix_web::web::Bytes::from(payload.data))
-                                    .await
-                                    .map_err(|e| {
-                                        log::error!("Failed to send message: {:?}", e);
-                                    });
-                            }
-                            Err(e) => {
-                                log::error!("Failed to get payload: {}", e);
+            loop {
+                tokio::select! {
+                    msg = on_message.next() => {
+                        if let Some(msg) = msg {
+                            let payload = msg.get_payload::<SseMessage>();
+                            match payload {
+                                Ok(payload) => {
+                                    let _ = sse_broadcast
+                                        .send_message(payload.root_id, actix_web::web::Bytes::from(payload.data))
+                                        .await
+                                        .map_err(|e| {
+                                            log::error!("Failed to send message: {:?}", e);
+                                        });
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to get payload: {}", e);
+                                }
                             }
                         }
                     }
-                }
-                _ = tokio::signal::ctrl_c() => {
-                    info!("SSE task is shutting down due to Ctrl-C.");
-                    break;
+                    _ = tokio::signal::ctrl_c() => {
+                        info!("SSE task is shutting down due to Ctrl-C.");
+                        break;
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 }
