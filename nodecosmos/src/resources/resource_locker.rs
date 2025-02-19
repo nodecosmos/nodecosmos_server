@@ -190,17 +190,13 @@ impl ResourceLocker {
     }
 
     fn key(&self, id: Uuid, branch_id: Uuid) -> String {
-        format!("{}:{}:{}", LOCK_NAMESPACE, id, branch_id)
+        format!("{}:{{{}}}:{}", LOCK_NAMESPACE, id, branch_id)
     }
 
     fn action_key(&self, action: &ActionTypes, id: Uuid, branch_id: Uuid) -> String {
-        // merge is a special case where we use original id as branch_id
-        let branch_id = match action {
-            ActionTypes::Merge => id,
-            _ => branch_id,
-        };
-
-        format!("{}:{}:{}:{}", LOCK_NAMESPACE, action, id, branch_id)
+        // Use a hash tag based on the resource id to force all keys into the same slot.
+        // This ensures that all keys like "{resource-id}:<action>" hash to the same slot.
+        format!("{}:{{{}}}:{}:{}", LOCK_NAMESPACE, id, action, branch_id)
     }
 
     /// To be used once we have multiple redis instances
