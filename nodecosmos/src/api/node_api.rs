@@ -2,10 +2,10 @@ use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
-use charybdis::types::{Timestamp, Uuid};
+use charybdis::types::Uuid;
 use futures::StreamExt;
 use scylla::CachingSession;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream; // This is crucial for handling streams
 
@@ -352,21 +352,4 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
     }
 
     Ok(HttpResponse::Ok().finish())
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct IndexUser {
-    id: Uuid,
-    username: String,
-    email: String,
-    first_name: String,
-    last_name: String,
-    bio: Option<String>,
-    profile_image_filename: Option<String>,
-    profile_image_url: Option<String>,
-    is_confirmed: bool,
-    is_blocked: bool,
-    created_at: Timestamp,
-    updated_at: Timestamp,
 }
