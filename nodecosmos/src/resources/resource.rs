@@ -1,4 +1,4 @@
-use redis::AsyncCommands;
+use redis::{AsyncCommands, ProtocolVersion};
 use std::io::Read;
 
 const PASSPHRASE: &str = "KEEP_CALM_AND_LET_IT_BE";
@@ -263,7 +263,7 @@ impl<'a> Resource<'a> for Vec<redis::Client> {
                     .read_to_end(&mut client_key_vec)
                     .expect("Unable to read client key file");
 
-                log::info!("Connecting to Redis with TLS");
+                log::info!("Connecting to Redis with TLS Vec<redis::Client>");
 
                 let tls = redis::TlsCertificates {
                     client_tls: Some(redis::ClientTlsConfig {
@@ -274,6 +274,18 @@ impl<'a> Resource<'a> for Vec<redis::Client> {
                 };
 
                 client = redis::Client::build_with_tls(url.clone(), tls).expect("Unable to build client");
+
+                let mut conn = client
+                    .get_multiplexed_async_connection()
+                    .await
+                    .expect("Failed to connect to Redis");
+
+                redis::cmd("SET")
+                    .arg("test")
+                    .arg("test")
+                    .exec_async(&mut conn)
+                    .await
+                    .expect("Failed to set key from client");
             } else {
                 client = redis::Client::open(url.clone()).expect("Failed to create Redis client");
             }
@@ -291,8 +303,6 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
     async fn init_resource(config: Self::Cfg) -> Self {
         let client;
         if let Some(ca) = &config.redis.ca {
-            log::info!("Connecting to Redis with TLS"); // Log before attempting to open files
-
             let root_cert_file = std::fs::File::open(ca).expect("cannot open private cert file");
             let mut root_cert_vec = Vec::new();
             std::io::BufReader::new(root_cert_file)
@@ -313,7 +323,7 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
                 .read_to_end(&mut client_key_vec)
                 .expect("Unable to read client key file");
 
-            log::info!("Connecting to Redis with TLS");
+            log::info!("Connecting to Redis with TLS Cluster Client");
 
             let tls = redis::TlsCertificates {
                 client_tls: Some(redis::ClientTlsConfig {
@@ -325,6 +335,7 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
 
             client = redis::cluster::ClusterClient::builder(config.redis.urls.clone())
                 .certs(tls)
+                .use_protocol(ProtocolVersion::RESP3)
                 .build()
                 .expect("Unable to build client");
         } else {

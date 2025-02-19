@@ -1,7 +1,4 @@
-# Stage 1: Build dependencies
-FROM ubuntu:24.10 AS builder
-
-# Install system dependencies and Rust
+FROM ubuntu:24.10 AS base
 RUN apt-get update && apt-get install -y \
     build-essential \
     wget \
@@ -13,32 +10,41 @@ RUN apt-get update && apt-get install -y \
     openssl \
     libssl-dev \
     pkg-config \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+# Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+WORKDIR /app
 
-WORKDIR /usr/src/app
+# Stage 1: Dependencies - build only the dependencies
+FROM base AS dependencies
+# Copy dependency files
+COPY Cargo.toml Cargo.lock ./
+COPY nodecosmos/Cargo.toml nodecosmos/Cargo.toml
+COPY macros/ macros/
+# Create a dummy main file so that Cargo can build a minimal binary
+RUN mkdir -p nodecosmos/src && \
+    echo "fn main() {println!(\"if you see this, the build broke\")}" > nodecosmos/src/main.rs
+# Build dependencies; this layer is cached unless Cargo.toml or related files change.
+RUN cargo build --release --locked
 
+# Copy the full source code.
 COPY . .
-RUN cargo build --release
+RUN touch nodecosmos/src/main.rs
 
-# Stage 2: Runtime
+# Optionally, force file timestamps to update so Cargo detects changes:
+# Build the final binary.
+RUN cargo build --release --locked
+
+# Stage 3: Runtime - final minimal image
 FROM ubuntu:24.10
-
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     openssl \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set the working directory
+    libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/bin
-
-# Copy the compiled binary from the builder stage
-COPY --from=builder /usr/src/app/target/release/nodecosmos .
-
-# Define the entrypoint
+# Copy the built binary from the builder stage.
+COPY --from=dependencies /app/target/release/nodecosmos .
 ENTRYPOINT ["./nodecosmos"]
