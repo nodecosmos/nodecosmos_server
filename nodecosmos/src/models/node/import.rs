@@ -75,10 +75,10 @@ pub struct ImportFlowStep {
     pub node_ids: Vec<String>,
     /// Take outputs to nodes defined in current flow steps. Key is the node id that is used in the current flow step
     /// ('node_ids' list), and value is the list of Output Ids.
-    pub input_ids_by_node: HashMap<String, Vec<String>>,
+    pub input_ids_by_node: Option<HashMap<String, Vec<String>>>,
     /// Map outputs to nodes in the flow step. Key is the tmp node id that is used in the current flow step,
     /// and value is the tmp IO id that is used as output to the node.
-    pub outputs_by_node: HashMap<String, Vec<ImportIo>>,
+    pub outputs_by_node: Option<HashMap<String, Vec<ImportIo>>>,
     /// Description of the flow step
     pub description: Option<ImportDescription>,
 }
@@ -90,7 +90,7 @@ pub struct ImportFlow {
     /// Flow steps that are part of the flow
     pub flow_steps: Vec<ImportFlowStep>,
     /// Initial inputs to the flow
-    pub initial_inputs: Vec<ImportIo>,
+    pub initial_inputs: Option<Vec<ImportIo>>,
     /// Step where the flow starts in the complete workflow structure. For example, if we have flow step that has a node
     /// that act as a decision point, those decision can branch out to different flows. Following flows can have
     /// start_index set to the index of `current_flow.start_index + step_index + 1`.
@@ -394,18 +394,22 @@ impl Import {
                     description.insert_cb(data).execute(data.db_session()).await?;
                 }
 
-                for import_io in import_flow.initial_inputs.iter() {
-                    self.insert_io(data, import_io, new_flow.node_id, None).await?;
+                if let Some(initial_inputs) = &import_flow.initial_inputs {
+                    for import_io in initial_inputs.iter() {
+                        self.insert_io(data, import_io, new_flow.node_id, None).await?;
+                    }
                 }
 
                 vertical_index += 1;
 
                 // first create all ios from the flow steps and populate fs_flow_id_by_tmp_id
                 for import_flow_step in import_flow.flow_steps.iter() {
-                    for (_node_id, import_output) in import_flow_step.outputs_by_node.iter() {
-                        for import_io in import_output.iter() {
-                            self.insert_io(data, import_io, new_flow.node_id, Some(new_flow.id))
-                                .await?;
+                    if let Some(import_outputs) = &import_flow_step.outputs_by_node {
+                        for (_node_id, import_output) in import_outputs.iter() {
+                            for import_io in import_output.iter() {
+                                self.insert_io(data, import_io, new_flow.node_id, Some(new_flow.id))
+                                    .await?;
+                            }
                         }
                     }
 
@@ -662,49 +666,52 @@ impl Import {
         import_flow_step: &ImportFlowStep,
         node_id: Uuid,
     ) -> Result<HashMap<Uuid, Vec<Uuid>>, NodecosmosError> {
-        import_flow_step
-            .input_ids_by_node
-            .iter()
-            .map(|(tmp_node_id, tmp_io_ids)| {
-                let input_node_id = self.node_id_from_tmp(tmp_node_id).map_err(|e| {
-                    NodecosmosError::ImportError(format!(
-                        "Flow Step {} Creation Error: {}",
-                        import_flow_step.id.clean_clone(),
-                        e
-                    ))
-                })?;
+        if let Some(import_input_ids_by_node) = &import_flow_step.input_ids_by_node {
+            import_input_ids_by_node
+                .iter()
+                .map(|(tmp_node_id, tmp_io_ids)| {
+                    let input_node_id = self.node_id_from_tmp(tmp_node_id).map_err(|e| {
+                        NodecosmosError::ImportError(format!(
+                            "Flow Step {} Creation Error: {}",
+                            import_flow_step.id.clean_clone(),
+                            e
+                        ))
+                    })?;
 
-                let io_ids = tmp_io_ids
-                    .iter()
-                    .map(|tmp_io_id| {
-                        let io_id = self.io_id_from_tmp(tmp_io_id);
-                        // ensure that IO is in the scope
-                        if let Ok(io_id) = io_id {
-                            let io_node_id = self.io_node_id_by_id.get(&io_id).ok_or_else(|| {
-                                NodecosmosError::InternalServerError(format!(
-                                    "Unexpected Error: IO with tmp id {} and id {} is not associated with any node",
-                                    tmp_io_id, io_id
-                                ))
-                            })?;
+                    let io_ids = tmp_io_ids
+                        .iter()
+                        .map(|tmp_io_id| {
+                            let io_id = self.io_id_from_tmp(tmp_io_id);
+                            // ensure that IO is in the scope
+                            if let Ok(io_id) = io_id {
+                                let io_node_id = self.io_node_id_by_id.get(&io_id).ok_or_else(|| {
+                                    NodecosmosError::InternalServerError(format!(
+                                        "Unexpected Error: IO with tmp id {} and id {} is not associated with any node",
+                                        tmp_io_id, io_id
+                                    ))
+                                })?;
 
-                            if io_node_id != &node_id {
-                                return Err(NodecosmosError::ImportError(format!(
-                                    "Flow Step {} Creation Error: IO with tmp id {} that is used as input is not in \
+                                if io_node_id != &node_id {
+                                    return Err(NodecosmosError::ImportError(format!(
+                                        "Flow Step {} Creation Error: IO with tmp id {} that is used as input is not in \
                                     the scope of the flow step. Please make sure that IOs associate inputs that are \
                                     created in the flows within the same node",
-                                    import_flow_step.id.clean_clone(),
-                                    tmp_io_id.clean_clone()
-                                )));
+                                        import_flow_step.id.clean_clone(),
+                                        tmp_io_id.clean_clone()
+                                    )));
+                                }
                             }
-                        }
 
-                        io_id
-                    })
-                    .collect::<Result<Vec<Uuid>, NodecosmosError>>()?;
+                            io_id
+                        })
+                        .collect::<Result<Vec<Uuid>, NodecosmosError>>()?;
 
-                Ok((input_node_id, io_ids))
-            })
-            .collect::<Result<HashMap<Uuid, Vec<Uuid>>, NodecosmosError>>()
+                    Ok((input_node_id, io_ids))
+                })
+                .collect::<Result<HashMap<Uuid, Vec<Uuid>>, NodecosmosError>>()
+        } else {
+            Ok(HashMap::new())
+        }
     }
 
     async fn build_fs_output_ids_by_node_id(
@@ -713,11 +720,23 @@ impl Import {
     ) -> Result<HashMap<Uuid, Vec<Uuid>>, NodecosmosError> {
         let mut output_ids_by_node_id = HashMap::new();
 
-        for (tmp_node_id, import_ios) in import_flow_step.outputs_by_node.iter() {
-            let mut io_ids = Vec::new();
+        if let Some(import_outputs) = &import_flow_step.outputs_by_node {
+            for (tmp_node_id, import_ios) in import_outputs.iter() {
+                let mut io_ids = Vec::new();
 
-            for import_io in import_ios.iter() {
-                let io_id = self.io_id_from_tmp(&import_io.id).map_err(|e| {
+                for import_io in import_ios.iter() {
+                    let io_id = self.io_id_from_tmp(&import_io.id).map_err(|e| {
+                        NodecosmosError::ImportError(format!(
+                            "Flow Step {} Creation Error: {}",
+                            import_flow_step.id.clean_clone(),
+                            e
+                        ))
+                    })?;
+
+                    io_ids.push(io_id);
+                }
+
+                let output_node_id = self.node_id_from_tmp(tmp_node_id).map_err(|e| {
                     NodecosmosError::ImportError(format!(
                         "Flow Step {} Creation Error: {}",
                         import_flow_step.id.clean_clone(),
@@ -725,18 +744,8 @@ impl Import {
                     ))
                 })?;
 
-                io_ids.push(io_id);
+                output_ids_by_node_id.insert(output_node_id, io_ids);
             }
-
-            let output_node_id = self.node_id_from_tmp(tmp_node_id).map_err(|e| {
-                NodecosmosError::ImportError(format!(
-                    "Flow Step {} Creation Error: {}",
-                    import_flow_step.id.clean_clone(),
-                    e
-                ))
-            })?;
-
-            output_ids_by_node_id.insert(output_node_id, io_ids);
         }
 
         Ok(output_ids_by_node_id)
