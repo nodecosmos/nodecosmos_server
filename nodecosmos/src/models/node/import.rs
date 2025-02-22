@@ -107,7 +107,7 @@ pub struct ImportNode {
     /// if parent_id is 'root', then it is a top-level node where import occurs
     #[serde(default = "default_parent_id")]
     pub parent_id: String,
-    pub flows: Vec<ImportFlow>,
+    pub flows: Option<Vec<ImportFlow>>,
 }
 
 fn default_parent_id() -> String {
@@ -357,93 +357,97 @@ impl Import {
         let mut fs_flow_id_by_tmp_id: HashMap<String, Uuid> = HashMap::new();
 
         for import_node in import_nodes.iter() {
-            let mut vertical_index = 0;
+            if let Some(flows) = &import_node.flows {
+                let mut vertical_index = 0;
 
-            for import_flow in import_node.flows.iter() {
-                let start_index = import_flow.start_index.unwrap_or(0);
+                for import_flow in flows.iter() {
+                    let start_index = import_flow.start_index.unwrap_or(0);
 
-                let mut new_flow = Flow {
-                    branch_id: self.current_root.branch_id,
-                    root_id: self.current_root.root_id,
-                    node_id: self.node_id_by_tmp_id.get(&import_node.id).copied().unwrap_or_else(|| {
-                        log::error!("Failed to find node_id: {}", import_node.id);
-                        self.current_root.id.clone()
-                    }),
-                    title: import_flow.title.clone(),
-                    start_index,
-                    vertical_index: Double::from(vertical_index),
-                    ..Default::default()
-                };
-
-                new_flow.insert_cb(data).execute(data.db_session()).await?;
-
-                if let Some(i_desc) = &import_flow.description {
-                    let mut description = Description {
-                        node_id: new_flow.node_id,
-                        branch_id: new_flow.branch_id,
-                        root_id: new_flow.root_id,
-                        object_id: new_flow.id,
-                        object_type: ObjectType::Flow.to_string(),
-                        short_description: Some(i_desc.short_description.clone()),
-                        html: Some(i_desc.html.clone()),
-                        markdown: Some(i_desc.markdown.clone()),
-                        base64: None,
-                        updated_at: chrono::Utc::now(),
+                    let mut new_flow = Flow {
+                        branch_id: self.current_root.branch_id,
+                        root_id: self.current_root.root_id,
+                        node_id: self.node_id_by_tmp_id.get(&import_node.id).copied().unwrap_or_else(|| {
+                            log::error!("Failed to find node_id: {}", import_node.id);
+                            self.current_root.id.clone()
+                        }),
+                        title: import_flow.title.clone(),
+                        start_index,
+                        vertical_index: Double::from(vertical_index),
+                        ..Default::default()
                     };
 
-                    description.insert_cb(data).execute(data.db_session()).await?;
-                }
+                    new_flow.insert_cb(data).execute(data.db_session()).await?;
 
-                if let Some(initial_inputs) = &import_flow.initial_inputs {
-                    for import_io in initial_inputs.iter() {
-                        self.insert_io(data, import_io, new_flow.node_id, None).await?;
+                    if let Some(i_desc) = &import_flow.description {
+                        let mut description = Description {
+                            node_id: new_flow.node_id,
+                            branch_id: new_flow.branch_id,
+                            root_id: new_flow.root_id,
+                            object_id: new_flow.id,
+                            object_type: ObjectType::Flow.to_string(),
+                            short_description: Some(i_desc.short_description.clone()),
+                            html: Some(i_desc.html.clone()),
+                            markdown: Some(i_desc.markdown.clone()),
+                            base64: None,
+                            updated_at: chrono::Utc::now(),
+                        };
+
+                        description.insert_cb(data).execute(data.db_session()).await?;
                     }
-                }
 
-                vertical_index += 1;
-
-                // first create all ios from the flow steps and populate fs_flow_id_by_tmp_id
-                for import_flow_step in import_flow.flow_steps.iter() {
-                    if let Some(import_outputs) = &import_flow_step.outputs_by_node {
-                        for (_node_id, import_output) in import_outputs.iter() {
-                            for import_io in import_output.iter() {
-                                self.insert_io(data, import_io, new_flow.node_id, Some(new_flow.id))
-                                    .await?;
-                            }
+                    if let Some(initial_inputs) = &import_flow.initial_inputs {
+                        for import_io in initial_inputs.iter() {
+                            self.insert_io(data, import_io, new_flow.node_id, None).await?;
                         }
                     }
 
-                    if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
-                        return Err(NodecosmosError::ImportError(format!(
-                            "Duplicate Flow Step Id Error: Flow Step with tmp id {} already exists",
-                            import_flow_step.id.clean_clone()
-                        )));
+                    vertical_index += 1;
+
+                    // first create all ios from the flow steps and populate fs_flow_id_by_tmp_id
+                    for import_flow_step in import_flow.flow_steps.iter() {
+                        if let Some(import_outputs) = &import_flow_step.outputs_by_node {
+                            for (_node_id, import_output) in import_outputs.iter() {
+                                for import_io in import_output.iter() {
+                                    self.insert_io(data, import_io, new_flow.node_id, Some(new_flow.id))
+                                        .await?;
+                                }
+                            }
+                        }
+
+                        if fs_flow_id_by_tmp_id.contains_key(&import_flow_step.id) {
+                            return Err(NodecosmosError::ImportError(format!(
+                                "Duplicate Flow Step Id Error: Flow Step with tmp id {} already exists",
+                                import_flow_step.id.clean_clone()
+                            )));
+                        }
+                        fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
                     }
-                    fs_flow_id_by_tmp_id.insert(import_flow_step.id.clone(), new_flow.id);
                 }
             }
         }
 
         // create flow steps after all ios are created, so they can be referenced properly
         for import_node in import_nodes.iter() {
-            for import_flow in import_node.flows.iter() {
-                for (step_index, import_flow_step) in import_flow.flow_steps.iter().enumerate() {
-                    let flow_id = fs_flow_id_by_tmp_id.get(&import_flow_step.id).copied().ok_or_else(|| {
-                        log::error!("Failed to find flow_id for tmp id: {}", import_flow_step.id);
-                        NodecosmosError::InternalServerError(format!(
-                            "Unexpected Error: failed to find flow_id for flow_step with tmp id: {}",
-                            import_flow_step.id.clean_clone()
-                        ))
-                    })?;
+            if let Some(flows) = &import_node.flows {
+                for import_flow in flows.iter() {
+                    for (step_index, import_flow_step) in import_flow.flow_steps.iter().enumerate() {
+                        let flow_id = fs_flow_id_by_tmp_id.get(&import_flow_step.id).copied().ok_or_else(|| {
+                            log::error!("Failed to find flow_id for tmp id: {}", import_flow_step.id);
+                            NodecosmosError::InternalServerError(format!(
+                                "Unexpected Error: failed to find flow_id for flow_step with tmp id: {}",
+                                import_flow_step.id.clean_clone()
+                            ))
+                        })?;
 
-                    self.insert_flow_step(
-                        data,
-                        import_flow_step,
-                        self.node_id_from_tmp(&import_node.id)?,
-                        flow_id,
-                        step_index as i32,
-                    )
-                    .await?;
+                        self.insert_flow_step(
+                            data,
+                            import_flow_step,
+                            self.node_id_from_tmp(&import_node.id)?,
+                            flow_id,
+                            step_index as i32,
+                        )
+                        .await?;
+                    }
                 }
             }
         }

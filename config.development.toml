@@ -10,8 +10,8 @@ hosts = ["127.0.0.1:9042", "127.0.0.1:9043", "127.0.0.1:9044"]
 keyspace = "nodecosmos"
 
 [redis]
-urls = ["redis://127.0.0.1:6379/"]
-instances = 1
+urls = ["redis://127.0.0.1:6379/", "redis://127.0.0.1:6380/", "redis://127.0.0.1:6381/"]
+replicas = 0
 
 [elasticsearch]
 hosts = ["http://127.0.0.1:9200"]
