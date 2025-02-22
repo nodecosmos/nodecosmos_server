@@ -52,10 +52,40 @@ services:
       - ./volumes/scylla3:/var/lib/scylla
 
   #-------------------------------------------------------------------------------------------------
-  redis:
-    image: valkey/valkey:latest
+  redis-1:
+    environment:
+      - 'REDIS_REPLICATION_MODE=master'
+      - 'REDIS_NODES=redis-1 redis-2 redis-3'
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+    image: docker.io/bitnami/redis-cluster:latest
     ports:
       - "6379:6379"
+    networks:
+      - redisnet
+
+  redis-2:
+    environment:
+      - 'REDIS_REPLICATION_MODE=master'
+      - 'REDIS_NODES=redis-1 redis-2 redis-3'
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+    image: docker.io/bitnami/redis-cluster:latest
+    ports:
+      - "6380:6379"
+    networks:
+      - redisnet
+
+  redis-3:
+    environment:
+      - 'REDIS_REPLICATION_MODE=master'
+      - 'REDIS_NODES=redis-1 redis-2 redis-3'
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - 'REDIS_CLUSTER_REPLICAS=0'
+      - 'REDIS_CLUSTER_CREATOR=yes'
+    image: docker.io/bitnami/redis-cluster:latest
+    ports:
+      - "6381:6379"
+    networks:
+      - redisnet
 
   #-------------------------------------------------------------------------------------------------
   elasticsearch:
@@ -95,3 +125,4 @@ networks:
       config:
         - subnet: 172.28.0.0/16
   esnet:
+  redisnet:
