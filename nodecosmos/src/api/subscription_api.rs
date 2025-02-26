@@ -140,6 +140,16 @@ pub async fn build_subscription_url(node: web::Json<Node>, data: RequestData) ->
         ))?
     }
 
+    if !data.current_user.is_confirmed {
+        Err(NodecosmosError::Forbidden(
+            "User must confirm email before creating subscription!".to_string(),
+        ))?
+    }
+
+    if data.current_user.is_blocked {
+        Err(NodecosmosError::Forbidden("User is blocked!".to_string()))?
+    }
+
     let insert = node.insert_cb(&data).execute(data.db_session()).await;
 
     if let Err(e) = insert {

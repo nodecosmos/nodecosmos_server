@@ -199,7 +199,7 @@ impl Authorization for ContributionRequest {
             return Ok(());
         }
 
-        if node.is_subscription_active.map_or(false, |is_active| is_active) {
+        if node.is_subscription_active() {
             Ok(())
         } else {
             Err(NodecosmosError::Forbidden("Subscription is not active!".to_string()))
