@@ -5,12 +5,13 @@ use uuid::Uuid;
 use crate::api::data::RequestData;
 use crate::api::request::current_user::OptCurrentUser;
 use crate::errors::NodecosmosError;
-use crate::models::branch::Branch;
+use crate::models::branch::{AuthBranch, Branch};
 use crate::models::comment::Comment;
 use crate::models::comment_thread::{CommentThread, ThreadObjectType};
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::invitation::{Invitation, InvitationStatus};
-use crate::models::traits::AuthorizationFields;
+use crate::models::node::{AuthNode, BaseNode, Node, UpdateTitleNode};
+use crate::models::traits::{AuthorizationFields, Branchable};
 use crate::models::user::User;
 
 /// Authorization for nodes is implemented with the `NodeAuthorization` derive.
@@ -50,6 +51,10 @@ pub trait Authorization: AuthorizationFields {
 
         if self.is_frozen() {
             return Err(NodecosmosError::Forbidden("This object is frozen!".to_string()));
+        }
+
+        if !self.is_subscription_active() {
+            return Err(NodecosmosError::Forbidden("Subscription is not active!".to_string()));
         }
 
         if !self.can_edit(data) {
@@ -98,6 +103,74 @@ pub trait Authorization: AuthorizationFields {
     }
 }
 
+macro_rules! imp_authorization_for_node_types {
+    ($struct_name:ident) => {
+        impl Authorization for $struct_name {
+            async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+                if self.is_original() {
+                    // auth info is already initialized
+                    if self.owner_id != Uuid::default() {
+                        return Ok(());
+                    }
+
+                    let auth_node = AuthNode::find_by_branch_id_and_id(self.branch_id, self.id)
+                        .execute(db_session)
+                        .await?;
+
+                    self.root_id = auth_node.root_id;
+                    self.owner_id = auth_node.owner_id;
+                    self.editor_ids = auth_node.editor_ids;
+                    self.viewer_ids = auth_node.viewer_ids;
+                    self.is_public = auth_node.is_public;
+                    self.is_subscription_active = auth_node.is_subscription_active;
+                    self.parent_id = auth_node.parent_id;
+                } else {
+                    // authorize by branch
+                    let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
+                    self.auth_branch = Some(Box::new(branch));
+                }
+
+                Ok(())
+            }
+
+            async fn auth_creation(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+                if !data.current_user.is_confirmed {
+                    return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+                }
+
+                if data.current_user.is_blocked {
+                    return Err(NodecosmosError::Unauthorized("User is blocked"));
+                }
+
+                if self.id != Uuid::default() {
+                    return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
+                }
+
+                if self.is_branch() {
+                    self.auth_update(data).await?;
+                } else if let Some(parent_id) = self.parent_id {
+                    let mut auth_parent_node = AuthNode::find_by_branch_id_and_id(self.original_id(), parent_id)
+                        .execute(data.db_session())
+                        .await?;
+
+                    auth_parent_node.auth_update(data).await?;
+                } else if !self.is_public() && data.stripe_cfg().is_some() {
+                    return Err(NodecosmosError::Forbidden(
+                        "You cannot create private node without a subscription!".to_string(),
+                    ));
+                }
+
+                Ok(())
+            }
+        }
+    };
+}
+
+imp_authorization_for_node_types!(Node);
+imp_authorization_for_node_types!(AuthNode);
+imp_authorization_for_node_types!(BaseNode);
+imp_authorization_for_node_types!(UpdateTitleNode);
+
 impl Authorization for Branch {
     async fn auth_creation(&mut self, _data: &RequestData) -> Result<(), NodecosmosError> {
         Err(NodecosmosError::Forbidden("Branches cannot be created".to_string()))
@@ -126,9 +199,11 @@ impl Authorization for ContributionRequest {
             return Ok(());
         }
 
-        node.auth_update(data).await?;
-
-        Ok(())
+        if node.is_subscription_active {
+            Ok(())
+        } else {
+            Err(NodecosmosError::Forbidden("Subscription is not active!".to_string()))
+        }
     }
 }
 

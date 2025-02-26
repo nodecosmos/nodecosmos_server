@@ -79,11 +79,9 @@ pub fn branchable_derive(input: TokenStream) -> TokenStream {
 pub fn node_parent_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let has_parent_field = input.struct_fields().iter().any(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "parent",
-            None => false,
-        }
+    let has_parent_field = input.struct_fields().iter().any(|field| match field.ident {
+        Some(ref ident) => ident == "parent",
+        None => false,
     });
 
     if !has_parent_field {
@@ -135,170 +133,13 @@ pub fn node_parent_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(NodeAuthorization)]
-pub fn authorization_node_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let has_auth_branch = input.struct_fields().iter().any(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "auth_branch",
-            None => false,
-        }
-    });
-
-    if !has_auth_branch {
-        return TokenStream::new();
-    }
-
-    let expanded = quote! {
-        impl crate::models::traits::AuthorizationFields for #name {
-            fn is_public(&self) -> bool {
-                use crate::models::traits::AuthorizationFields;
-
-                if self.is_original() {
-                    return self.is_public;
-                }
-
-                return match &self.auth_branch {
-                    Some(branch) => branch.is_public,
-                    None => {
-                        log::error!("Branched node {} has no branch!", self.id);
-
-                        false
-                    }
-                };
-            }
-
-            fn is_frozen(&self) -> bool {
-                use crate::models::traits::AuthorizationFields;
-
-                if self.is_branch() {
-                    return match &self.auth_branch {
-                        Some(branch) => branch.is_frozen(),
-                        None => {
-                            log::error!("Branched node {} has no branch!", self.id);
-
-                            false
-                        }
-                    };
-                }
-
-                false
-            }
-
-            fn owner_id(&self) -> Option<Uuid> {
-                if self.is_original() {
-                    return Some(self.owner_id);
-                }
-
-                return match &self.auth_branch {
-                    Some(branch) => Some(branch.owner_id),
-                    None => {
-                        log::error!("Branched node {} has no branch!", self.id);
-
-                        None
-                    }
-                };
-            }
-
-            fn editor_ids(&self) -> &Option<Set<Uuid>> {
-                if self.is_original() {
-                    return &self.editor_ids;
-                }
-
-                return match &self.auth_branch {
-                    Some(branch) => &branch.editor_ids,
-                    None => {
-                        log::error!("Branched node {} has no branch!", self.id);
-
-                        &None
-                    }
-                };
-            }
-
-            fn viewer_ids(&self) -> &Option<Set<Uuid>> {
-                if self.is_original() {
-                    return &self.viewer_ids;
-                }
-
-                return match &self.auth_branch {
-                    Some(branch) => &branch.viewer_ids,
-                    None => {
-                        log::error!("Branched node {} has no branch!", self.id);
-
-                        &None
-                    }
-                };
-            }
-        }
-
-        impl crate::models::traits::Authorization for #name {
-            async fn init_auth_info(&mut self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
-                 if self.is_original() {
-                    // auth info is already initialized
-                    if self.owner_id != Uuid::default() {
-                        return Ok(());
-                    }
-
-                    let auth_node = AuthNode::find_by_branch_id_and_id(self.branch_id, self.id)
-                        .execute(db_session)
-                        .await?;
-
-                    self.is_public = auth_node.is_public;
-                    self.viewer_ids = auth_node.viewer_ids;
-                    self.owner_id = auth_node.owner_id;
-                    self.editor_ids = auth_node.editor_ids;
-                } else {
-                    // authorize by branch
-                    let branch = AuthBranch::find_by_id(self.branch_id).execute(db_session).await?;
-                    self.auth_branch = Some(Box::new(branch));
-                }
-
-                Ok(())
-            }
-
-            async fn auth_creation(&mut self, data: &crate::api::data::RequestData) -> Result<(), NodecosmosError> {
-                use crate::models::traits::Parent;
-
-                if !data.current_user.is_confirmed {
-                    return Err(NodecosmosError::Unauthorized("User is not confirmed"));
-                }
-
-                if data.current_user.is_blocked {
-                    return Err(NodecosmosError::Unauthorized("User is blocked"));
-                }
-
-                if self.id != Uuid::default() {
-                    return Err(NodecosmosError::Unauthorized("Cannot create node with id"));
-                }
-
-                if self.is_branch() {
-                    self.auth_update(data).await?;
-                } else if let Some(parent_id) = self.parent_id {
-                    let mut auth_parent_node = crate::models::node::AuthNode::find_by_branch_id_and_id(self.original_id(), parent_id)
-                        .execute(data.db_session())
-                        .await?;
-
-                    auth_parent_node.auth_update(data).await?;
-                }
-
-                Ok(())
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}
-
 #[proc_macro_derive(Id)]
 pub fn id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "id",
-            None => false,
-        }
+    let id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "id",
+        None => false,
     });
 
     if id.is_none() {
@@ -320,11 +161,9 @@ pub fn id_derive(input: TokenStream) -> TokenStream {
 pub fn root_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let root_id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "root_id",
-            None => false,
-        }
+    let root_id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "root_id",
+        None => false,
     });
 
     if root_id.is_none() {
@@ -346,11 +185,9 @@ pub fn root_id_derive(input: TokenStream) -> TokenStream {
 pub fn object_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let object_id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "object_id",
-            None => false,
-        }
+    let object_id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "object_id",
+        None => false,
     });
 
     if object_id.is_none() {
@@ -372,11 +209,9 @@ pub fn object_id_derive(input: TokenStream) -> TokenStream {
 pub fn node_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let node_id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "node_id",
-            None => false,
-        }
+    let node_id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "node_id",
+        None => false,
     });
 
     if node_id.is_none() {
@@ -398,11 +233,9 @@ pub fn node_id_derive(input: TokenStream) -> TokenStream {
 pub fn pluck_flow_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "flow_id",
-            None => false,
-        }
+    let id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "flow_id",
+        None => false,
     });
 
     if id.is_none() {
@@ -424,11 +257,9 @@ pub fn pluck_flow_id_derive(input: TokenStream) -> TokenStream {
 pub fn maybe_flow_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "flow_id",
-            None => false,
-        }
+    let id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "flow_id",
+        None => false,
     });
 
     if id.is_none() {
@@ -451,11 +282,9 @@ pub fn maybe_flow_id_derive(input: TokenStream) -> TokenStream {
 pub fn maybe_flow_step_id_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let id = input.struct_fields().iter().find(|field| {
-        match field.ident {
-            Some(ref ident) => ident == "flow_step_id",
-            None => false,
-        }
+    let id = input.struct_fields().iter().find(|field| match field.ident {
+        Some(ref ident) => ident == "flow_step_id",
+        None => false,
     });
 
     if id.is_none() {

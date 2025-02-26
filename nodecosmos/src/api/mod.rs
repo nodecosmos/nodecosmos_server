@@ -12,6 +12,7 @@ pub use like_api::*;
 pub use node_api::*;
 pub use notification_api::*;
 pub use request::*;
+pub use subscription_api::*;
 pub use user_api::*;
 pub use workflow_api::*;
 
@@ -31,5 +32,6 @@ mod like_api;
 mod node_api;
 mod notification_api;
 pub mod request;
+mod subscription_api;
 mod user_api;
 mod workflow_api;

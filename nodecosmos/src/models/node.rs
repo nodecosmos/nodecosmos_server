@@ -3,8 +3,9 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::AuthBranch;
 use crate::models::node::delete::NodeDelete;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::subscription::Subscription;
 use crate::models::traits::{
-    Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
+    AuthorizationFields, Branchable, ElasticDocument, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
 };
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
@@ -17,7 +18,7 @@ use charybdis::model::AsNative;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use futures::StreamExt;
-use macros::{Branchable, Id, NodeAuthorization, NodeParent};
+use macros::{Branchable, Id, NodeParent};
 use scylla::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -29,6 +30,7 @@ pub mod import;
 pub mod reorder;
 pub mod search;
 pub mod sort;
+mod subscription;
 pub mod update_cover_image;
 mod update_creator;
 mod update_owner;
@@ -39,7 +41,7 @@ mod update_title;
     partition_keys = [branch_id],
     clustering_keys = [id],
 )]
-#[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, NodeParent, Id, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     /// Original records are ones where branch_id == root_id.
@@ -56,6 +58,9 @@ pub struct Node {
 
     #[serde(default)]
     pub is_public: Boolean,
+
+    #[serde(default = "Boolean::default")]
+    pub is_subscription_active: Boolean,
 
     #[serde(default)]
     pub is_root: Boolean,
@@ -117,7 +122,6 @@ impl Callbacks for Node {
             self.validate_root()?;
             self.validate_parent()?;
             self.validate_owner()?;
-            self.validate_visibility()?;
             self.update_branch_with_creation(data)
                 .await
                 .context("Failed to update branch")?;
@@ -232,6 +236,7 @@ partial_node!(
     parent_id,
     owner,
     is_public,
+    is_subscription_active,
     cover_image_url,
     created_at,
     updated_at,
@@ -247,6 +252,7 @@ partial_node!(
     editor_ids,
     viewer_ids,
     is_public,
+    is_subscription_active,
     parent_id,
     ancestor_ids,
     order_index,
@@ -267,6 +273,7 @@ partial_node!(
     editor_ids,
     viewer_ids,
     is_public,
+    is_subscription_active,
     ancestor_ids,
     title,
     updated_at,
@@ -333,6 +340,7 @@ partial_node!(
     editor_ids,
     viewer_ids,
     is_public,
+    is_subscription_active,
     parent_id,
     parent,
     auth_branch
@@ -391,12 +399,14 @@ impl UpdateEditorsNode {
 
     pub async fn update_editor_ids(
         data: &RequestData,
-        root_id: Uuid,
-        branch_id: Uuid,
-        node_id: Uuid,
+        node: &Node,
         added_editor_ids: &[Uuid],
         removed_editor_ids: &[Uuid],
     ) -> Result<(), NodecosmosError> {
+        let root_id = node.root_id;
+        let branch_id = node.branch_id;
+        let node_id = node.id;
+
         let mut batch: CharybdisModelBatch<(Vec<Uuid>, Uuid, Uuid), Node> = CharybdisModelBatch::new();
         let mut descendants = NodeDescendant::find_by_root_id_and_branch_id_and_node_id(root_id, branch_id, node_id)
             .execute(data.db_session())
@@ -471,8 +481,35 @@ impl UpdateEditorsNode {
                 e
             })?;
 
+        if data.stripe_cfg().is_some() && !node.is_public() {
+            // we can not remove members from subscription here, as users might be editor in other nodes.
+            // owners have to remove editors from subscription manually on organization page.
+            Subscription::update_members(data, node.root_id, added_editor_ids, &[])
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "FATAL: Failed to update subscription members! RootId: {}, BranchId: {}, NodeId: {}, \nError: {:?}",
+                        root_id,
+                        branch_id,
+                        node_id,
+                        e
+                    );
+
+                    e
+                })?;
+        }
+
         Ok(())
     }
 }
 
 partial_node!(FindCoverImageNode, branch_id, id, root_id, cover_image_url);
+
+partial_node!(
+    UpdateIsSubscriptionActiveNode,
+    branch_id,
+    id,
+    root_id,
+    is_subscription_active,
+    updated_at
+);

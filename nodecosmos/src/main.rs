@@ -199,6 +199,15 @@ fn main() {
                                 .service(mark_all_as_read),
                         )
                         .service(web::scope("contacts").service(create_contact_us))
+                        .service(
+                            web::scope("subscriptions")
+                                .service(subscription_webhook)
+                                .service(build_subscription_url)
+                                .service(get_customer_portal_url)
+                                .service(get_subscription)
+                                .service(delete_org_member)
+                                .service(build_new_url_for_cancelled_sub),
+                        )
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
                 .keep_alive(std::time::Duration::from_secs(60))

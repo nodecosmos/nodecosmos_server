@@ -270,7 +270,7 @@ partial_user!(
 );
 
 impl ShowUser {
-    pub async fn find_by_ids(db_session: &CachingSession, ids: Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &Set<Uuid>) -> Result<Vec<ShowUser>, NodecosmosError> {
         ids.where_in_chunked_query(db_session, |ids_chunk| find_show_user!("id IN ?", (ids_chunk,)))
             .await
             .try_collect()

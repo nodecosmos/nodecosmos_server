@@ -224,7 +224,7 @@ pub async fn undo_delete_initial_io(data: RequestData, params: web::Path<(Uuid, 
 pub async fn get_branch_editors(db_session: web::Data<CachingSession>, pk: web::Path<Uuid>) -> Response {
     let branch = Branch::find_by_id(pk.into_inner()).execute(&db_session).await?;
     let user_ids = branch.editor_ids.unwrap_or_default();
-    let users = ShowUser::find_by_ids(&db_session, user_ids).await?;
+    let users = ShowUser::find_by_ids(&db_session, &user_ids).await?;
 
     Ok(HttpResponse::Ok().json(users))
 }
