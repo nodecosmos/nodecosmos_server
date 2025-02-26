@@ -10,3 +10,7 @@ mod description_parser;
 mod image;
 mod recaptcha;
 pub mod serde;
+
+pub fn default_opt_false() -> Option<bool> {
+    Some(false)
+}

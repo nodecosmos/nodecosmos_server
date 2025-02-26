@@ -109,6 +109,7 @@ macro_rules! impl_auth_fields_for_node_type {
                 }
 
                 self.is_subscription_active
+                    .map_or(false, |is_sub_active| is_sub_active)
             }
         }
     };

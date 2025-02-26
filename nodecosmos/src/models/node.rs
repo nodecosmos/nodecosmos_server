@@ -59,8 +59,8 @@ pub struct Node {
     #[serde(default)]
     pub is_public: Boolean,
 
-    #[serde(default = "Boolean::default")]
-    pub is_subscription_active: Boolean,
+    #[serde(default = "crate::models::utils::default_opt_false")]
+    pub is_subscription_active: Option<Boolean>,
 
     #[serde(default)]
     pub is_root: Boolean,

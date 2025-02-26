@@ -55,7 +55,7 @@ impl Node {
             self.parent_id = None;
             self.order_index = 0.0;
             self.ancestor_ids = None;
-            self.is_subscription_active = false;
+            self.is_subscription_active = Some(false);
         }
 
         if self.branch_id == Uuid::default() {

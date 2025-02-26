@@ -7,7 +7,7 @@ use futures::StreamExt;
 
 impl Node {
     pub async fn update_sub_active(&mut self, app: &App, is_sub_active: bool) -> Result<(), NodecosmosError> {
-        self.is_subscription_active = is_sub_active;
+        self.is_subscription_active = Some(is_sub_active);
 
         let mut descendants = self.descendants(&app.db_session).await?;
 
@@ -17,7 +17,7 @@ impl Node {
             root_id: self.root_id,
             branch_id: self.branch_id,
             id: self.id,
-            is_subscription_active: is_sub_active,
+            is_subscription_active: Some(is_sub_active),
             updated_at: chrono::Utc::now(),
         });
 
@@ -28,7 +28,7 @@ impl Node {
                 root_id: descendant.root_id,
                 branch_id: descendant.branch_id,
                 id: descendant.id,
-                is_subscription_active: is_sub_active,
+                is_subscription_active: Some(is_sub_active),
                 updated_at: chrono::Utc::now(),
             });
         }
