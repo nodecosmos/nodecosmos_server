@@ -82,12 +82,18 @@ impl Callbacks for Invitation {
 
     async fn before_insert(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         let existing = self.maybe_find_by_primary_key().execute(data.db_session()).await?;
+        let node = self.node(data.db_session()).await?;
         if let Some(existing) = existing {
-            if existing.status == InvitationStatus::Accepted.to_string() {
+            if existing.status == InvitationStatus::Accepted.to_string()
+                && node
+                    .editor_ids
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(&data.current_user.id))
+            {
                 return Err(NodecosmosError::PreconditionFailed("Invitation already accepted."));
             }
 
-            if existing.expires_at > Utc::now() {
+            if existing.expires_at > Utc::now() && existing.status == InvitationStatus::Created.to_string() {
                 return Err(NodecosmosError::PreconditionFailed("Invitation already sent."));
             }
         }
@@ -180,15 +186,7 @@ impl Callbacks for Invitation {
         if self.ctx == InvitationContext::Confirm {
             let node = self.node(data.db_session()).await?;
 
-            UpdateEditorsNode::update_editor_ids(
-                data,
-                node.root_id,
-                node.branch_id,
-                node.id,
-                &[data.current_user.id],
-                &[],
-            )
-            .await?;
+            UpdateEditorsNode::update_editor_ids(data, node, &[data.current_user.id], &[]).await?;
         }
 
         Ok(())

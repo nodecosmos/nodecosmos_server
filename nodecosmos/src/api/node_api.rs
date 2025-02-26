@@ -100,14 +100,16 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
 
     node.auth_creation(&data).await?;
 
-    data.resource_locker()
-        .lock_resource_actions(
-            node.root_id,
-            node.branch_id,
-            &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
-            ResourceLocker::TWO_SECONDS,
-        )
-        .await?;
+    if node.root_id != Uuid::default() {
+        data.resource_locker()
+            .lock_resource_actions(
+                node.root_id,
+                node.branch_id,
+                &[ActionTypes::Reorder(ActionObject::Node), ActionTypes::Merge],
+                ResourceLocker::TWO_SECONDS,
+            )
+            .await?;
+    }
 
     let insert = node.insert_cb(&data).execute(data.db_session()).await;
 
@@ -287,7 +289,7 @@ pub async fn get_node_editors(db_session: web::Data<CachingSession>, pk: web::Pa
         .execute(&db_session)
         .await?;
     let user_ids = node.editor_ids.unwrap_or_default();
-    let users = ShowUser::find_by_ids(&db_session, user_ids).await?;
+    let users = ShowUser::find_by_ids(&db_session, &user_ids).await?;
 
     Ok(HttpResponse::Ok().json(users))
 }
@@ -310,7 +312,7 @@ pub async fn delete_node_editor(
         ));
     }
 
-    UpdateEditorsNode::update_editor_ids(&data, node.root_id, branch_id, id, &[], &[editor_id]).await?;
+    UpdateEditorsNode::update_editor_ids(&data, &node, &[], &[editor_id]).await?;
 
     Invitation::delete_by_editor_id(&db_session, branch_id, id, editor_id).await?;
 

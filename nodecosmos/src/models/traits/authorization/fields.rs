@@ -5,9 +5,10 @@ use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::contribution_request::{ContributionRequest, ContributionRequestStatus};
 use crate::models::invitation::Invitation;
+use crate::models::node::{AuthNode, BaseNode, Node, UpdateTitleNode};
+use crate::models::traits::Branchable;
 use crate::models::user::User;
 
-/// AuthorizationFields for nodes is implemented with the `NodeAuthorization` derive macro.
 pub trait AuthorizationFields {
     fn owner_id(&self) -> Option<Uuid>;
 
@@ -18,7 +19,105 @@ pub trait AuthorizationFields {
     fn is_frozen(&self) -> bool;
 
     fn is_public(&self) -> bool;
+
+    fn is_subscription_active(&self) -> bool {
+        true
+    }
 }
+
+macro_rules! impl_auth_fields_for_node_type {
+    ($struct_name:ident) => {
+        impl AuthorizationFields for $struct_name {
+            fn owner_id(&self) -> Option<Uuid> {
+                if self.is_original() {
+                    return Some(self.owner_id);
+                }
+
+                match &self.auth_branch {
+                    Some(branch) => Some(branch.owner_id),
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        None
+                    }
+                }
+            }
+
+            fn editor_ids(&self) -> &Option<Set<Uuid>> {
+                if self.is_original() {
+                    return &self.editor_ids;
+                }
+
+                match &self.auth_branch {
+                    Some(branch) => &branch.editor_ids,
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        &None
+                    }
+                }
+            }
+
+            fn viewer_ids(&self) -> &Option<Set<Uuid>> {
+                if self.is_original() {
+                    return &self.viewer_ids;
+                }
+
+                match &self.auth_branch {
+                    Some(branch) => &branch.viewer_ids,
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        &None
+                    }
+                }
+            }
+
+            fn is_frozen(&self) -> bool {
+                if self.is_branch() {
+                    return match &self.auth_branch {
+                        Some(branch) => branch.is_frozen(),
+                        None => {
+                            log::error!("Branched node {} has no branch!", self.id);
+
+                            false
+                        }
+                    };
+                }
+
+                false
+            }
+
+            fn is_public(&self) -> bool {
+                if self.is_original() {
+                    return self.is_public;
+                }
+
+                match &self.auth_branch {
+                    Some(branch) => branch.is_public,
+                    None => {
+                        log::error!("Branched node {} has no branch!", self.id);
+
+                        false
+                    }
+                }
+            }
+
+            fn is_subscription_active(&self) -> bool {
+                if self.is_public() {
+                    return true;
+                }
+
+                self.is_subscription_active
+            }
+        }
+    };
+}
+
+impl_auth_fields_for_node_type!(Node);
+impl_auth_fields_for_node_type!(AuthNode);
+impl_auth_fields_for_node_type!(BaseNode);
+impl_auth_fields_for_node_type!(UpdateTitleNode);
 
 impl AuthorizationFields for Branch {
     fn owner_id(&self) -> Option<Uuid> {

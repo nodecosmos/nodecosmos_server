@@ -52,3 +52,4 @@ openssl = "0.10.64"
 time = "0.3.37"
 yrs = "0.22.0"
 redis = { version = "0.29", features = ["json", "tls", "aio", "cluster-async", "tls-rustls", "tokio-rustls-comp", "tls-native-tls", "tokio-native-tls-comp", "tokio-comp", ] }
+async-stripe = { version = "0.40.0", features = ["runtime-tokio-hyper"] }

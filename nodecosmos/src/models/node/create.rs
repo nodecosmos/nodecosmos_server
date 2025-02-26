@@ -33,6 +33,7 @@ impl Node {
             let is_public = parent.is_public;
             let parent_id = parent.id;
             let owner_id = parent.owner_id;
+            let is_subscription_active = parent.is_subscription_active;
             let mut ancestor_ids = parent.ancestor_ids.clone().unwrap_or(Set::new());
             let owner = parent.owner.clone();
             ancestor_ids.insert(parent.id);
@@ -46,6 +47,7 @@ impl Node {
             self.ancestor_ids = Some(ancestor_ids);
             self.owner_id = owner_id;
             self.owner = owner;
+            self.is_subscription_active = is_subscription_active;
         } else {
             self.owner_id = data.current_user.id;
             self.owner = Some(Profile::init_from_current_user(&data.current_user));
@@ -53,6 +55,7 @@ impl Node {
             self.parent_id = None;
             self.order_index = 0.0;
             self.ancestor_ids = None;
+            self.is_subscription_active = false;
         }
 
         if self.branch_id == Uuid::default() {
@@ -88,16 +91,6 @@ impl Node {
     pub fn validate_owner(&mut self) -> Result<(), NodecosmosError> {
         if self.owner_id == Uuid::default() {
             return Err(NodecosmosError::ValidationError(("owner_id", "must be present")));
-        }
-
-        Ok(())
-    }
-
-    pub fn validate_visibility(&mut self) -> Result<(), NodecosmosError> {
-        if !self.is_public {
-            return Err(NodecosmosError::Forbidden(
-                "Currently only public nodes are allowed".to_string(),
-            ));
         }
 
         Ok(())

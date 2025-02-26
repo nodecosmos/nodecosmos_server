@@ -2,7 +2,7 @@ use crate::models::node::Node;
 use crate::models::udts::Profile;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
-use macros::{Branchable, Id, NodeAuthorization, NodeParent};
+use macros::{Branchable, Id, NodeParent};
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
         }
     "#
 )]
-#[derive(Branchable, NodeParent, NodeAuthorization, Id, Serialize, Deserialize, Default, Clone)]
+#[derive(Branchable, NodeParent, Id, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchivedNode {
     #[serde(default)]

@@ -8,7 +8,7 @@ use elasticsearch::Elasticsearch;
 use scylla::CachingSession;
 
 use crate::api::current_user::get_current_user;
-use crate::app::App;
+use crate::app::{App, StripeCfg};
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
 use crate::resources::description_ws_pool::DescriptionWsPool;
@@ -65,6 +65,10 @@ impl RequestData {
         let conn = self.app.redis_pool.get().await?;
 
         Ok(conn)
+    }
+
+    pub fn stripe_cfg(&self) -> &Option<StripeCfg> {
+        &self.app.stripe_cfg
     }
 }
 

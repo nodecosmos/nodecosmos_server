@@ -69,6 +69,13 @@ pub struct SmtpConfig {
     pub from_email: String,
 }
 
+#[derive(Clone, Deserialize)]
+pub struct StripeCfg {
+    pub secret_key: String,
+    pub price_id: String,
+    pub webhook_secret_key: String,
+}
+
 #[allow(unused)]
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -94,6 +101,7 @@ pub type RedisClusterManagerPool = deadpool::managed::Pool<RedisClusterManager>;
 #[derive(Clone)]
 pub struct App {
     pub config: Config,
+    pub stripe_cfg: Option<StripeCfg>,
     pub recaptcha_enabled: bool,
     pub recaptcha_secret: String,
     pub db_session: Arc<CachingSession>,
@@ -110,7 +118,7 @@ pub struct App {
 
 impl App {
     pub async fn new() -> Result<Self, NodecosmosError> {
-        let secret_key = env::var("SECRET_KEY").map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
+        let secret_key = env::var("SECRET_KEY").unwrap_or_default();
         let config_file = env::var("CONFIG_FILE").map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
         let contents = fs::read_to_string(config_file).map_err(|e| NodecosmosError::ConfigError(e.to_string()))?;
         let config_val = contents
@@ -133,8 +141,24 @@ impl App {
         let sse_broadcast = SseBroadcast::init_resource(()).await;
         let mailer = Mailer::init_resource(&config).await;
 
+        let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_or(None, |key| Some(key));
+        let stripe_price_id = env::var("STRIPE_PRICE_ID").map_or(None, |key| Some(key));
+        let webhook_secret_key = env::var("STRIPE_WEBHOOK_SECRET").map_or(None, |key| Some(key));
+        let stripe_cfg = if let (Some(secret_key), Some(price_id), Some(webhook_secret_key)) =
+            (stripe_secret_key, stripe_price_id, webhook_secret_key)
+        {
+            Some(StripeCfg {
+                secret_key,
+                price_id,
+                webhook_secret_key,
+            })
+        } else {
+            None
+        };
+
         Ok(Self {
             config,
+            stripe_cfg,
             recaptcha_enabled,
             recaptcha_secret,
             db_session: Arc::new(db_session),

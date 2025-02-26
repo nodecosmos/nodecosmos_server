@@ -66,6 +66,10 @@ impl ResourceLocker {
     ) -> Result<(), NodecosmosError> {
         let mut connection = self.pool.get().await?;
 
+        if id == Uuid::default() {
+            return Ok(());
+        }
+
         // Locking particular actions requires resource to be unlocked
         self.validate_resource_unlocked(id, branch_id, true)
             .await
