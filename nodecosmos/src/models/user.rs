@@ -4,7 +4,7 @@ use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
-use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
+use charybdis::types::{Boolean, Frozen, List, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
 use log::error;
@@ -64,6 +64,9 @@ pub struct User {
 
     #[serde(default)]
     pub is_blocked: Boolean,
+
+    #[serde(default)]
+    pub editor_at_nodes: Option<List<Frozen<List<Uuid>>>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -261,6 +264,7 @@ partial_user!(
     bio,
     first_name,
     last_name,
+    editor_at_nodes,
     created_at,
     updated_at,
     profile_image_filename,
