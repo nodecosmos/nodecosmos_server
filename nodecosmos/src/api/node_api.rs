@@ -163,7 +163,7 @@ pub async fn update_node_title(node: web::Json<UpdateTitleNode>, data: RequestDa
 pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> Response {
     let mut node = node.as_native();
 
-    node.auth_update(&data).await?;
+    node.auth_delete(&data).await?;
 
     data.resource_locker()
         .lock_resource_actions(
@@ -173,6 +173,16 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
             ResourceLocker::ONE_HOUR,
         )
         .await?;
+
+    if node.is_root && node.is_subscription_active.map_or(false, |v| v) {
+        return Err(NodecosmosError::Conflict(
+            r#"
+                Subscription is still active. Please go to subscription page
+                to deactivate your subscription before deleting the root node!
+            "#
+            .to_string(),
+        ));
+    }
 
     node.delete_cb(&data).execute(data.db_session()).await?;
 

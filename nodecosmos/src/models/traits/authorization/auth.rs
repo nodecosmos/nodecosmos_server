@@ -66,6 +66,30 @@ pub trait Authorization: AuthorizationFields {
         Ok(())
     }
 
+    async fn auth_delete(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if !data.current_user.is_confirmed {
+            return Err(NodecosmosError::Unauthorized("User is not confirmed"));
+        }
+
+        if data.current_user.is_blocked {
+            return Err(NodecosmosError::Unauthorized("User is blocked"));
+        }
+
+        self.init_auth_info(data.db_session()).await?;
+
+        if self.is_frozen() {
+            return Err(NodecosmosError::Forbidden("This object is frozen!".to_string()));
+        }
+
+        if !self.can_edit(data) {
+            return Err(NodecosmosError::Unauthorized(
+                "You are not allowed to update this resource!",
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn auth_view(
         &mut self,
         db_session: &CachingSession,
