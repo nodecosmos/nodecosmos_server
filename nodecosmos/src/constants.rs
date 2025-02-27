@@ -7,6 +7,7 @@ pub const MAX_DOC_SIZE: usize = 16 * 1024 * 1024;
 /// This limit places a bound on the size of IN tuples, especially when multiple clustering key columns have IN
 /// restrictions. Increasing this value can result in server instability.
 pub const MAX_WHERE_IN_CHUNK_SIZE: usize = 100;
+pub const MAX_CARTESIAN_PRODUCT_SIZE: usize = 100;
 
 pub const BLACKLIST_USERNAMES: [&str; 26] = [
     "404",

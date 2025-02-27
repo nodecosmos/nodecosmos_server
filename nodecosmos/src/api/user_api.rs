@@ -15,8 +15,9 @@ use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::materialized_views::likes_by_user::LikesByUser;
 use crate::models::materialized_views::nodes_by_owner::NodesByOwner;
+use crate::models::node::{find_base_node, BaseNode};
 use crate::models::token::{Token, TokenType};
-use crate::models::traits::Authorization;
+use crate::models::traits::{Authorization, WhereInDoubleChunkedExec};
 use crate::models::user::search::UserSearchQuery;
 use crate::models::user::{
     ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdatePasswordUser, UpdateProfileImageUser, User, UserContext,
@@ -144,10 +145,11 @@ pub async fn get_user_by_username(
     let user = ShowUser::find_first_by_username(username.into_inner())
         .execute(&db_session)
         .await?;
+    let is_current_user = opt_cu.0.as_ref().map_or(false, |cu| cu.id == user.id);
     let root_nodes = NodesByOwner::root_nodes(&db_session, &opt_cu, user.id)
         .await?
         .try_filter_map(|node| async move {
-            if node.branch_id == node.root_id {
+            if node.branch_id == node.root_id && (node.is_public || is_current_user) {
                 Ok(Some(node))
             } else {
                 Ok(None)
@@ -156,9 +158,31 @@ pub async fn get_user_by_username(
         .try_collect::<Vec<NodesByOwner>>()
         .await?;
 
+    let mut editor_at_nodes = vec![];
+    if let Some(editor_at_node_ids) = &user.editor_at_nodes {
+        editor_at_nodes = editor_at_node_ids
+            .double_cond_where_in_chunked_query(&db_session, |branch_and_node_ids| {
+                let (branch_ids, node_ids): (Vec<Uuid>, Vec<Uuid>) =
+                    branch_and_node_ids.iter().map(|bn_ids| (bn_ids[0], bn_ids[1])).unzip();
+
+                find_base_node!("branch_id in ? and id in ? ALLOW FILTERING", (branch_ids, node_ids))
+            })
+            .await
+            .try_filter_map(|node| async move {
+                if node.is_public || is_current_user {
+                    Ok(Some(node))
+                } else {
+                    Ok(None)
+                }
+            })
+            .try_collect()
+            .await?;
+    }
+
     Ok(HttpResponse::Ok().json(json!({
         "user": user,
         "rootNodes": root_nodes,
+        "editorAtNodes": editor_at_nodes
     })))
 }
 

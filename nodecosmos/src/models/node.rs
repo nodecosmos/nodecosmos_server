@@ -9,9 +9,10 @@ use crate::models::traits::{
 };
 use crate::models::traits::{Context as Ctx, ModelContext};
 use crate::models::udts::Profile;
+use crate::models::user::User;
 use crate::stream::MergedModelStream;
 use anyhow::Context;
-use charybdis::batch::CharybdisModelBatch;
+use charybdis::batch::{CharybdisModelBatch, ModelBatch};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::model::AsNative;
@@ -413,20 +414,20 @@ impl UpdateEditorsNode {
             .await?;
         let mut all_node_ids = vec![node_id];
 
-        let mut append = |stmt: &str, node_id: Uuid, editor_ids: &[Uuid]| {
+        let mut batch_append_query = |stmt: &str, node_id: Uuid, editor_ids: &[Uuid]| {
             for editor_id in editor_ids {
                 batch.append_statement(stmt, (vec![*editor_id], branch_id, node_id));
             }
         };
 
-        append(Node::PUSH_EDITOR_IDS_QUERY, node_id, added_editor_ids);
-        append(Node::PULL_EDITOR_IDS_QUERY, node_id, removed_editor_ids);
+        batch_append_query(Node::PUSH_EDITOR_IDS_QUERY, node_id, added_editor_ids);
+        batch_append_query(Node::PULL_EDITOR_IDS_QUERY, node_id, removed_editor_ids);
 
         while let Some(descendant) = descendants.next().await {
             let descendant = descendant?;
 
-            append(Node::PUSH_EDITOR_IDS_QUERY, descendant.id, added_editor_ids);
-            append(Node::PULL_EDITOR_IDS_QUERY, descendant.id, removed_editor_ids);
+            batch_append_query(Node::PUSH_EDITOR_IDS_QUERY, descendant.id, added_editor_ids);
+            batch_append_query(Node::PULL_EDITOR_IDS_QUERY, descendant.id, removed_editor_ids);
 
             all_node_ids.push(descendant.id);
         }
@@ -498,6 +499,34 @@ impl UpdateEditorsNode {
                     e
                 })?;
         }
+
+        let mut batch = User::statement_batch();
+
+        for editor_id in added_editor_ids {
+            batch.append_statement(
+                User::PUSH_EDITOR_AT_NODES_QUERY,
+                (vec![vec![branch_id, node_id]], *editor_id),
+            );
+        }
+
+        for editor_id in removed_editor_ids {
+            batch.append_statement(
+                User::PULL_EDITOR_AT_NODES_QUERY,
+                (vec![vec![branch_id, node_id]], *editor_id),
+            );
+        }
+
+        batch.execute(data.db_session()).await.map_err(|e| {
+            log::error!(
+                "Failed to update node ids for user! RootId: {}, BranchId: {}, NodeId: {}, \nError: {:?}",
+                root_id,
+                branch_id,
+                node_id,
+                e
+            );
+
+            e
+        })?;
 
         Ok(())
     }
