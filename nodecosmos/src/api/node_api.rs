@@ -19,6 +19,7 @@ use crate::models::node::import::Import;
 use crate::models::node::reorder::ReorderParams;
 use crate::models::node::search::{NodeSearch, NodeSearchQuery};
 use crate::models::node::*;
+use crate::models::subscription::{Subscription, SubscriptionStatus};
 use crate::models::traits::Authorization;
 use crate::models::traits::Descendants;
 use crate::models::user::ShowUser;
@@ -174,14 +175,34 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
         )
         .await?;
 
-    if node.is_root && node.is_subscription_active.map_or(false, |v| v) {
-        return Err(NodecosmosError::Conflict(
-            r#"
+    if node.is_root && !node.is_public {
+        if node.is_subscription_active.map_or(false, |v| v) {
+            return Err(NodecosmosError::Conflict(
+                r#"
                 Subscription is still active. Please go to subscription page
                 to deactivate your subscription before deleting the root node!
             "#
-            .to_string(),
-        ));
+                .to_string(),
+            ));
+        }
+
+        if let Some(sub) = Subscription::maybe_find_first_by_root_id(node.id)
+            .execute(data.db_session())
+            .await?
+        {
+            match sub.status.parse()? {
+                SubscriptionStatus::Active | SubscriptionStatus::Trialing => {
+                    return Err(NodecosmosError::Conflict(
+                        r#"
+'                            Subscription is still active. Please go to subscription page
+                            to deactivate your subscription before deleting the root node!'
+                        "#
+                        .to_string(),
+                    ));
+                }
+                _ => {}
+            }
+        }
     }
 
     node.delete_cb(&data).execute(data.db_session()).await?;
