@@ -251,11 +251,12 @@ impl Subscription {
         let root_id = Uuid::parse_str(root_id_string)
             .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to parse root_id: {}", e)))?;
 
-        Node::find_by_branch_id_and_id(root_id, root_id)
+        if let Some(mut node) = Node::maybe_find_first_by_branch_id_and_id(root_id, root_id)
             .execute(&app.db_session)
             .await?
-            .update_sub_active(&app, false)
-            .await?;
+        {
+            node.update_sub_active(&app, false).await?
+        }
 
         let mut subscription = Subscription::find_by_root_id(root_id).execute(&app.db_session).await?;
         subscription.status = status.to_string();
@@ -381,6 +382,20 @@ impl Subscription {
             stripe::Subscription::update(&client, &sub_id, params)
                 .await
                 .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to update subscription: {}", e)))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn cancel_subscription(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if let (Some(stripe_cfg), Some(sub_id)) = (data.stripe_cfg(), self.sub_id.as_ref()) {
+            let client = stripe::Client::new(stripe_cfg.secret_key.clone());
+            let sub_id = stripe::SubscriptionId::from_str(&sub_id.to_string())
+                .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to parse sub_id: {}", e)))?;
+            let params = stripe::CancelSubscription::new();
+            stripe::Subscription::cancel(&client, &sub_id, params)
+                .await
+                .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to cancel subscription: {}", e)))?;
         }
 
         Ok(())

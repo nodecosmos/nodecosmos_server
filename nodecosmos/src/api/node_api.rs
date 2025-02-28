@@ -194,13 +194,15 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
                 SubscriptionStatus::Active | SubscriptionStatus::Trialing => {
                     return Err(NodecosmosError::Conflict(
                         r#"
-'                            Subscription is still active. Please go to subscription page
+'                           Subscription is still active. Please go to subscription page
                             to deactivate your subscription before deleting the root node!'
                         "#
                         .to_string(),
                     ));
                 }
-                _ => {}
+                _ => {
+                    sub.cancel_subscription(&data).await?;
+                }
             }
         }
     }
