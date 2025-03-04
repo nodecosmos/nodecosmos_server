@@ -1304,9 +1304,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "charybdis"
-version = "0.7.13"
+version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053ad00feec7ed57a49cfafe74eb12533dc77cf52be8975094494a9e20f15a8d"
+checksum = "5e97bc33e06ce97af440a619eedf3aa991934ab4989717fdd430c1d578c6eddc"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1321,9 +1321,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "0.7.13"
+version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1146256cd57a51e9527ee80b5b01896a8263b808c8946347a01bc05b1da10bf"
+checksum = "1508a9fc333fc191bc5b516bdb08766fa37a0205754c261bca42b20a283a8616"
 dependencies = [
  "charybdis_parser",
  "proc-macro2",
@@ -1333,9 +1333,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "0.7.13"
+version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22438e1b122267f530064788f5a2a3e954ad7a8b735ba85fe8bc5ca680ad8b54"
+checksum = "445eee1950007fbede1d1c905f4e19f41f7dd9578798c355b05f8f6741aa3698"
 dependencies = [
  "colored 2.2.0",
  "darling",
@@ -2953,6 +2953,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+dependencies = [
+ "base64 0.22.1",
+ "js-sys",
+ "pem",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "language-tags"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3282,6 +3297,7 @@ dependencies = [
  "futures",
  "handlebars",
  "image",
+ "jsonwebtoken",
  "lettre",
  "log",
  "macros",
@@ -3535,6 +3551,16 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pem"
+version = "3.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38af38e8470ac9dee3ce1bae1af9c1671fffc44ddfd8bd1d0a3445bf349a8ef3"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
 
 [[package]]
 name = "percent-encoding"
@@ -4705,6 +4731,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95890f873bec569a0362c235787f3aca6e1e887302ba4840839bcc6459c42da6"
 dependencies = [
  "quote",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+dependencies = [
+ "num-bigint 0.4.6",
+ "num-traits",
+ "thiserror 2.0.7",
+ "time",
 ]
 
 [[package]]

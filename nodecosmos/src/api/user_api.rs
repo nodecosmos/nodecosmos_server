@@ -5,8 +5,9 @@ use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use futures::TryStreamExt;
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use scylla::CachingSession;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::api::current_user::{refresh_current_user, remove_current_user, set_current_user, OptCurrentUser};
@@ -20,7 +21,8 @@ use crate::models::token::{Token, TokenType};
 use crate::models::traits::{Authorization, WhereInDoubleChunkedExec};
 use crate::models::user::search::UserSearchQuery;
 use crate::models::user::{
-    ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdatePasswordUser, UpdateProfileImageUser, User, UserContext,
+    ConfirmUser, CurrentUser, ShowUser, UpdateBioUser, UpdatePasswordUser, UpdateProfileImageUser, UpdateUsernameUser,
+    User, UserContext, GOOGLE_LOGIN_PASSWORD,
 };
 use crate::models::user_counter::UserCounter;
 use crate::models::utils::validate_recaptcha;
@@ -84,6 +86,209 @@ pub async fn login(
         "user": current_user,
         "likes": likes
     })))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GoogleClaims {
+    iss: String,
+    sub: String,
+    aud: String,
+    exp: usize,
+    iat: usize,
+    email: String,
+    name: String,
+    email_verified: Option<bool>,
+    family_name: String,
+    given_name: String,
+    picture: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GoogleTokenResponse {
+    access_token: String,
+    expires_in: u64,
+    scope: String,
+    token_type: String,
+    id_token: String,
+    refresh_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GoogleAuthRequest {
+    code: String,
+}
+
+#[post("/google_auth")]
+async fn handle_google_auth(
+    body: web::Json<GoogleAuthRequest>,
+    app: web::Data<App>,
+    client_session: Session,
+) -> Response {
+    let code = body.code.clone();
+
+    if let Some(google_cfg) = &app.google_cfg {
+        // 1. Exchange the authorization code for tokens.
+        let client = reqwest::Client::new();
+        let redirect_uri = "postmessage".to_string();
+        let grant_type = "authorization_code".to_string();
+        let params = [
+            ("client_id", &google_cfg.client_id),
+            ("client_secret", &google_cfg.client_secret),
+            ("code", &code),
+            ("grant_type", &grant_type),
+            ("redirect_uri", &redirect_uri),
+        ];
+
+        let token_resp = client
+            .post("https://oauth2.googleapis.com/token")
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| {
+                log::error!("Failed to exchange authorization code: {}", e);
+
+                NodecosmosError::BadRequest("Failed to exchange authorization code".into())
+            })?;
+
+        if !token_resp.status().is_success() {
+            log::error!("Failed to exchange authorization code {:?}", token_resp);
+
+            // log body
+            let body = token_resp.text().await.unwrap_or_default();
+            log::error!("Response Body: {}", body);
+
+            return Err(NodecosmosError::BadRequest(
+                "Failed to exchange authorization code".into(),
+            ));
+        }
+
+        let token_json: GoogleTokenResponse = token_resp.json().await.map_err(|e| {
+            log::error!("Failed to parse token response: {:?}", e);
+
+            NodecosmosError::InternalServerError(e.to_string())
+        })?;
+
+        // 2. Verify the ID token.
+        let id_token = token_json.id_token;
+        let header =
+            decode_header(&id_token).map_err(|_| NodecosmosError::BadRequest("Invalid token header".into()))?;
+        let kid = header
+            .kid
+            .ok_or(NodecosmosError::BadRequest("kid not found in token header".into()))?;
+
+        // Fetch Google's public keys.
+        let certs_resp = client
+            .get("https://www.googleapis.com/oauth2/v3/certs")
+            .send()
+            .await
+            .map_err(|_| NodecosmosError::BadRequest("Failed to fetch Google certs".into()))?;
+
+        if !certs_resp.status().is_success() {
+            return Err(NodecosmosError::BadRequest("Failed to fetch Google certs".into()));
+        }
+
+        let certs: serde_json::Value = certs_resp
+            .json()
+            .await
+            .map_err(|e| NodecosmosError::InternalServerError(e.to_string()))?;
+        let keys = certs["keys"]
+            .as_array()
+            .ok_or(NodecosmosError::BadRequest("keys not found".into()))?;
+
+        let matching_key = keys
+            .iter()
+            .find(|key| key["kid"].as_str() == Some(&kid))
+            .ok_or(NodecosmosError::BadRequest("Matching key not found".into()))?;
+        let n = matching_key["n"]
+            .as_str()
+            .ok_or(NodecosmosError::BadRequest("n not found".into()))?;
+        let e = matching_key["e"]
+            .as_str()
+            .ok_or(NodecosmosError::BadRequest("e not found".into()))?;
+        let decoding_key = DecodingKey::from_rsa_components(n, e)
+            .map_err(|_| NodecosmosError::BadRequest("Failed to create decoding key".into()))?;
+
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.set_issuer(&["https://accounts.google.com", "accounts.google.com"]);
+        validation.set_audience(&[&google_cfg.client_id]);
+
+        let decoded = decode::<GoogleClaims>(&id_token, &decoding_key, &validation)
+            .map_err(|_| NodecosmosError::BadRequest("Token verification failed".into()))?;
+
+        if let Some(current_user) = CurrentUser::maybe_find_first_by_email(decoded.claims.email.clone())
+            .execute(&app.db_session)
+            .await?
+        {
+            set_current_user(&client_session, &current_user)?;
+
+            let likes = LikesByUser {
+                user_id: current_user.id,
+                ..Default::default()
+            }
+            .find_by_partition_key()
+            .execute(&app.db_session)
+            .await?
+            .try_collect()
+            .await?;
+
+            Ok(HttpResponse::Ok().json(json!({
+                "isExistingUser": true,
+                "user": current_user,
+                "likes": likes
+            })))
+        } else {
+            let id = Uuid::new_v4();
+            let mut user = User {
+                id,
+                email: decoded.claims.email.clone(),
+                username: id.to_string(),
+                first_name: decoded.claims.given_name.clone(),
+                last_name: decoded.claims.family_name.clone(),
+                bio: None,
+                address: None,
+                profile_image_filename: None,
+                profile_image_url: None,
+                is_confirmed: true,
+                is_blocked: false,
+                editor_at_nodes: None,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                password: GOOGLE_LOGIN_PASSWORD.to_string(),
+                ctx: Some(UserContext::GoogleSignUp),
+            };
+
+            user.insert_cb(&app).execute(&app.db_session).await?;
+
+            let current_user = CurrentUser::from_user(user);
+
+            set_current_user(&client_session, &current_user)?;
+
+            Ok(HttpResponse::Ok().json(json!({
+                "isExistingUser": false,
+                "user": current_user,
+                "likes": []
+            })))
+        }
+    } else {
+        Err(NodecosmosError::InternalServerError(
+            "Google login not configured".into(),
+        ))
+    }
+}
+
+#[put("/update_username")]
+pub async fn update_username(
+    data: RequestData,
+    client_session: Session,
+    mut user: web::Json<UpdateUsernameUser>,
+) -> Response {
+    user.as_native().auth_update(&data).await?;
+
+    user.update_cb(&data).execute(data.db_session()).await?;
+
+    refresh_current_user(&client_session, data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().json(user))
 }
 
 #[get("/session/sync")]

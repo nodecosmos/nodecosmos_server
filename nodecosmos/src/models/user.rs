@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bcrypt::{hash, verify};
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
-use charybdis::operations::Insert;
+use charybdis::operations::{Find, Insert};
 use charybdis::types::{Boolean, Frozen, List, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use colored::Colorize;
@@ -27,11 +27,14 @@ pub mod update_profile_image;
 
 const BCRYPT_COST: u32 = 6;
 
+pub const GOOGLE_LOGIN_PASSWORD: &str = "google_login_password_s6VoW8Bsgcj8Udp5Z/9QW3lwjvGEE62u7wSOYP";
+
 #[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum UserContext {
     #[default]
     Default,
     ConfirmInvitationTokenValid,
+    GoogleSignUp,
 }
 
 #[charybdis_model(
@@ -103,23 +106,27 @@ impl Callbacks for User {
             return Err(NodecosmosError::ValidationError(("username", "is not allowed")));
         }
 
-        if self.username.is_inappropriate() {
-            return Err(NodecosmosError::ValidationError(("username", "is inappropriate")));
+        if self.ctx != Some(UserContext::GoogleSignUp) {
+            if self.username.is_inappropriate() {
+                return Err(NodecosmosError::ValidationError(("username", "is inappropriate")));
+            }
+
+            if self.first_name.is_inappropriate() {
+                return Err(NodecosmosError::ValidationError(("firstName", "is inappropriate")));
+            }
+
+            if self.last_name.is_inappropriate() {
+                return Err(NodecosmosError::ValidationError(("lastName", "is inappropriate")));
+            }
+
+            self.id = Uuid::new_v4();
         }
 
-        if self.first_name.is_inappropriate() {
-            return Err(NodecosmosError::ValidationError(("firstName", "is inappropriate")));
+        if self.password != GOOGLE_LOGIN_PASSWORD {
+            self.hash_password()?;
         }
 
-        if self.last_name.is_inappropriate() {
-            return Err(NodecosmosError::ValidationError(("lastName", "is inappropriate")));
-        }
-
-        self.id = Uuid::new_v4();
-
-        self.hash_password()?;
-
-        if self.ctx == Some(UserContext::ConfirmInvitationTokenValid) {
+        if self.ctx == Some(UserContext::ConfirmInvitationTokenValid) || self.ctx == Some(UserContext::GoogleSignUp) {
             self.is_confirmed = true;
         } else if let Some(user) = Self::maybe_find_first_by_email(self.email.clone())
             .execute(db_session)
@@ -167,6 +174,10 @@ impl Callbacks for User {
 
 impl User {
     pub async fn verify_password(&self, password: &str) -> Result<bool, NodecosmosError> {
+        if self.password == GOOGLE_LOGIN_PASSWORD {
+            Err(NodecosmosError::ValidationError(("password", "is incorrect")))?
+        }
+
         let res = verify(password, &self.password)
             .map_err(|_| NodecosmosError::ValidationError(("password", "is incorrect")))?;
 
@@ -413,3 +424,39 @@ macro_rules! impl_full_name {
 }
 
 impl_full_name!(User, CurrentUser);
+
+partial_user!(UpdateUsernameUser, id, username, updated_at);
+
+impl Callbacks for UpdateUsernameUser {
+    type Extension = RequestData;
+    type Error = NodecosmosError;
+
+    async fn before_update(&mut self, db_session: &CachingSession, _ext: &RequestData) -> Result<(), NodecosmosError> {
+        self.updated_at = Utc::now();
+
+        if Self::maybe_find_first_by_username(self.username.clone())
+            .execute(db_session)
+            .await?
+            .is_some()
+        {
+            return Err(NodecosmosError::ValidationError(("username", "is taken")));
+        }
+
+        let current = self.find_by_primary_key().execute(db_session).await?;
+
+        if current.id.to_string() != current.username {
+            return Err(NodecosmosError::ValidationError((
+                "username",
+                "cannot be changed more than once",
+            )));
+        }
+
+        Ok(())
+    }
+
+    async fn after_update(&mut self, _: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
+        let _ = self.update_elastic_document(data.elastic_client()).await;
+
+        Ok(())
+    }
+}
