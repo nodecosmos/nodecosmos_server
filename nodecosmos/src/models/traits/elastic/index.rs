@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use crate::models::node::{
     Node, UpdateCoverImageNode, UpdateCreatorNode, UpdateEditorsNode, UpdateOwnerNode, UpdateTitleNode,
 };
-use crate::models::user::{ConfirmUser, UpdateBioUser, UpdateProfileImageUser, UpdateUser, User};
+use crate::models::user::{ConfirmUser, UpdateBioUser, UpdateProfileImageUser, UpdateUser, UpdateUsernameUser, User};
 
 pub trait ElasticIndex {
     const ELASTIC_IDX_NAME: &'static str;
@@ -284,3 +284,4 @@ impl_elastic_index!(UpdateUser, User);
 impl_elastic_index!(UpdateProfileImageUser, User);
 impl_elastic_index!(UpdateBioUser, User);
 impl_elastic_index!(ConfirmUser, User);
+impl_elastic_index!(UpdateUsernameUser, User);

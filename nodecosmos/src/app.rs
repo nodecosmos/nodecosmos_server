@@ -76,6 +76,12 @@ pub struct StripeCfg {
     pub webhook_secret_key: String,
 }
 
+#[derive(Clone, Deserialize)]
+pub struct GoogleCfg {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
 #[allow(unused)]
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -102,6 +108,7 @@ pub type RedisClusterManagerPool = deadpool::managed::Pool<RedisClusterManager>;
 pub struct App {
     pub config: Config,
     pub stripe_cfg: Option<StripeCfg>,
+    pub google_cfg: Option<GoogleCfg>,
     pub recaptcha_enabled: bool,
     pub recaptcha_secret: String,
     pub db_session: Arc<CachingSession>,
@@ -156,9 +163,22 @@ impl App {
             None
         };
 
+        let google_client_id = env::var("GOOGLE_CLIENT_ID").map_or(None, |key| Some(key));
+        let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").map_or(None, |key| Some(key));
+
+        let google_cfg = if let (Some(client_id), Some(client_secret)) = (google_client_id, google_client_secret) {
+            Some(GoogleCfg {
+                client_id,
+                client_secret,
+            })
+        } else {
+            None
+        };
+
         Ok(Self {
             config,
             stripe_cfg,
+            google_cfg,
             recaptcha_enabled,
             recaptcha_secret,
             db_session: Arc::new(db_session),

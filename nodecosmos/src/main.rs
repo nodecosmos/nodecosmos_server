@@ -70,6 +70,8 @@ fn main() {
                                 .service(update_bio)
                                 .service(delete_user)
                                 .service(login)
+                                .service(handle_google_auth)
+                                .service(update_username)
                                 .service(sync)
                                 .service(logout)
                                 .service(update_profile_image)
