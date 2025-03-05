@@ -4,6 +4,7 @@ use crate::api::types::Response;
 use crate::errors::NodecosmosError;
 use crate::models::archived_description::ArchivedDescription;
 use crate::models::description::{BaseDescription, Description};
+use crate::models::like::Like;
 use crate::models::node::{AuthNode, FindCoverImageNode};
 use crate::models::traits::{Branchable, ObjectType};
 use crate::resources::description_ws_pool::DescriptionWsConnection;
@@ -32,14 +33,23 @@ pub async fn get_description(
     )
     .await?;
 
-    let cover_image_url = if ObjectType::from_str(&description.object_type)? == ObjectType::Node {
+    let mut like_count = 0;
+    let mut cover_image_url = None;
+
+    if ObjectType::from_str(&description.object_type)? == ObjectType::Node {
         let node = FindCoverImageNode::maybe_find_first_by_branch_id_and_id(description.root_id, description.object_id)
             .execute(&db_session)
             .await?;
-        node.map(|node| node.cover_image_url)
-    } else {
-        None
-    };
+        if let Some(first_like) =
+            Like::maybe_find_first_by_object_id_and_branch_id(description.object_id, description.branch_id)
+                .execute(&db_session)
+                .await?
+        {
+            like_count = first_like.like_count(&db_session).await?;
+        }
+
+        cover_image_url = node.map(|node| node.cover_image_url);
+    }
 
     let description = match description.find_branched(&db_session).await {
         Ok(_) => Some(description.into_inner()),
@@ -50,6 +60,7 @@ pub async fn get_description(
     Ok(HttpResponse::Ok().json(json!({
         "description": description,
         "coverImageUrl": cover_image_url,
+        "likeCount": like_count,
     })))
 }
 
