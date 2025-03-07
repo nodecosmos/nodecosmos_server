@@ -80,6 +80,10 @@ pub struct User {
     #[serde(skip)]
     #[charybdis(ignore)]
     pub ctx: Option<UserContext>,
+
+    #[serde(skip_serializing)]
+    #[charybdis(ignore)]
+    pub redirect: Option<String>,
 }
 
 impl Callbacks for User {
@@ -137,7 +141,7 @@ impl Callbacks for User {
                 let token = self.generate_confirmation_token(db_session).await?;
 
                 app.mailer
-                    .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
+                    .send_confirm_user_email(&self.email, &self.username, &token.id, &self.redirect)
                     .await?;
             }
 
@@ -146,7 +150,7 @@ impl Callbacks for User {
             let token = self.generate_confirmation_token(db_session).await?;
 
             app.mailer
-                .send_confirm_user_email(self.email.clone(), self.username.clone(), token.id.to_string())
+                .send_confirm_user_email(&self.email, &self.username, &token.id, &self.redirect)
                 .await?;
         }
 
