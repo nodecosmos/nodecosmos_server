@@ -62,11 +62,16 @@ impl Mailer {
 
     pub async fn send_confirm_user_email(
         &self,
-        to: String,
-        username: String,
-        token: String,
+        to: &str,
+        username: &str,
+        token: &str,
+        redirect_url: &Option<String>,
     ) -> Result<(), NodecosmosError> {
-        let url = format!("{}/{}?token={}", self.client_url, username, token);
+        let mut url = format!("{}/{}?token={}", self.client_url, username, token);
+
+        if let Some(redirect_url) = redirect_url {
+            url = format!("{}&redirect={}", url, redirect_url);
+        }
 
         let mut ctx = HashMap::<&str, &str>::new();
         ctx.insert("confirmation_url", &url);
@@ -77,7 +82,7 @@ impl Mailer {
             .map_err(|e| NodecosmosError::TemplateError(e.to_string()))?;
 
         self.client
-            .send_email(to, "Confirm your nodecosmos account", message)
+            .send_email(to.to_string(), "Confirm your nodecosmos account", message)
             .await
     }
 

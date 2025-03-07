@@ -255,6 +255,7 @@ async fn handle_google_auth(
                 updated_at: chrono::Utc::now(),
                 password: GOOGLE_LOGIN_PASSWORD.to_string(),
                 ctx: Some(UserContext::GoogleSignUp),
+                redirect: None,
             };
 
             user.insert_cb(&app).execute(&app.db_session).await?;
@@ -503,7 +504,7 @@ pub async fn resend_confirmation_email(data: RequestData) -> Response {
     let token = user.generate_confirmation_token(data.db_session()).await?;
 
     data.mailer()
-        .send_confirm_user_email(user.email, user.username, token.id)
+        .send_confirm_user_email(&user.email, &user.username, &token.id, &user.redirect)
         .await?;
 
     Ok(HttpResponse::Ok().finish())
