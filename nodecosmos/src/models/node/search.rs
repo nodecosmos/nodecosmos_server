@@ -84,22 +84,16 @@ impl<'a> NodeSearch<'a> {
 
         let mut nodes: Vec<IndexNode> = Vec::new();
         for hit in hits {
-            let node: IndexNode = serde_json::from_value(hit["_source"].take())?;
+            let document = serde_json::from_value(hit["_source"].take())?;
 
-            if node.is_public
-                || node.owner_id == self.opt_cu.0.as_ref().map_or(Uuid::nil(), |cu| cu.id)
-                || node.editor_ids.as_ref().map_or(false, |ids| {
-                    self.opt_cu.0.as_ref().map_or(false, |cu| ids.contains(&cu.id))
-                })
-            {
-                nodes.push(node);
-            }
+            nodes.push(document);
         }
 
         Ok(nodes)
     }
 
     fn search_json(&self) -> Value {
+        // Base payload with sorting and pagination.
         let mut data = json!({
             "sort": [
                 { "likeCount": { "order": "desc" } },
@@ -111,23 +105,27 @@ impl<'a> NodeSearch<'a> {
                             "lang": "painless",
                             "source": "doc['ancestorIds'].size()"
                         },
-                        "order":"asc"
+                        "order": "asc"
                     }
                 },
-                { "createdAt": { "order": "desc" } },
+                { "createdAt": { "order": "desc" } }
             ],
             "from": self.node_search_query.page * PAGE_SIZE,
             "size": PAGE_SIZE
         });
 
+        // Initialize a base bool query.
+        let mut query = json!({ "bool": {} });
+
+        // If there's a search term, add the should clauses and adjust the sort.
         if let Some(term) = &self.node_search_query.q {
-            data["query"]["bool"]["should"] = json!([
-                { "match": { "title": { "query": &term, "boost": 2 } } },
-                { "match": { "description": &term } },
-                { "match": { "owner.name": &term } },
-                { "match": { "owner.username": &term } },
+            query["bool"]["should"] = json!([
+                { "match": { "title": { "query": term, "boost": 2 } } },
+                { "match": { "description": term } },
+                { "match": { "owner.name": term } },
+                { "match": { "owner.username": term } }
             ]);
-            data["query"]["bool"]["minimum_should_match"] = json!(1);
+            query["bool"]["minimum_should_match"] = json!(1);
             data["sort"] = json!([
                 { "_score": { "order": "desc" } },
                 { "isRoot": { "order": "desc" } },
@@ -136,6 +134,35 @@ impl<'a> NodeSearch<'a> {
             ]);
         }
 
+        // Build the filter based on whether a current user exists.
+        let filter = if let Some(current_user) = &self.opt_cu.0 {
+            let user_id = current_user.id.to_string();
+            json!({
+                "bool": {
+                    "should": [
+                        { "term": { "isPublic": true } },
+                        { "term": { "ownerId": user_id } },
+                        { "term": { "editorIds": user_id } }
+                    ],
+                    "minimum_should_match": 1
+                }
+            })
+        } else {
+            json!({
+                "bool": {
+                    "should": [
+                        { "term": { "isPublic": true } }
+                    ],
+                    "minimum_should_match": 1
+                }
+            })
+        };
+
+        // Attach the filter to our bool query.
+        query["bool"]["filter"] = filter;
+
+        // Set the query on the payload.
+        data["query"] = query;
         data
     }
 }
