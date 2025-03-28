@@ -7,7 +7,7 @@ use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::{http, web};
 use elasticsearch::Elasticsearch;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
 use toml::Value;
 

@@ -5,7 +5,7 @@ use charybdis::batch::ModelBatch;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Frozen, Text, Timestamp, Uuid};
 use futures::TryStreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

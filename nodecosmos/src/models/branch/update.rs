@@ -1,10 +1,3 @@
-use charybdis::batch::{CharybdisBatch, CharybdisModelBatch};
-use charybdis::errors::CharybdisError;
-use charybdis::operations::Update;
-use charybdis::types::{Frozen, Map, Set, Uuid};
-use log::error;
-use scylla::{CachingSession, QueryResult};
-
 use crate::errors::NodecosmosError;
 use crate::models::branch::{
     Branch, UpdateCreateFlowStepNodesBranch, UpdateCreateWorkflowInitialInputsBranch, UpdateCreatedFlowStepsBranch,
@@ -19,6 +12,13 @@ use crate::models::branch::{
 };
 use crate::models::traits::Merge;
 use crate::models::udts::BranchReorderData;
+use charybdis::batch::{CharybdisBatch, CharybdisModelBatch};
+use charybdis::errors::CharybdisError;
+use charybdis::operations::Update;
+use charybdis::types::{Frozen, Map, Set, Uuid};
+use log::error;
+use scylla::client::caching_session::CachingSession;
+use scylla::response::query_result::QueryResult;
 
 pub enum BranchUpdate {
     CreateNode((Uuid, Set<Uuid>)),

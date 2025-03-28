@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;

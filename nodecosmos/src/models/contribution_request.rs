@@ -6,7 +6,7 @@ use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
 use charybdis::types::{Frozen, Set, Text, Timestamp, Uuid};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
@@ -245,8 +245,7 @@ impl ContributionRequest {
             self.branch.replace(branch);
         }
 
-        self
-            .branch
+        self.branch
             .as_ref()
             .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))
     }

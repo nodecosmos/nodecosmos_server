@@ -1,6 +1,6 @@
 use actix_web::{delete, get, post, web, HttpResponse};
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde_json::json;
 
 use crate::api::data::RequestData;

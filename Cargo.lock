@@ -1305,8 +1305,6 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "charybdis"
 version = "0.7.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e97bc33e06ce97af440a619eedf3aa991934ab4989717fdd430c1d578c6eddc"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1322,8 +1320,6 @@ dependencies = [
 [[package]]
 name = "charybdis_macros"
 version = "0.7.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1508a9fc333fc191bc5b516bdb08766fa37a0205754c261bca42b20a283a8616"
 dependencies = [
  "charybdis_parser",
  "proc-macro2",
@@ -1334,8 +1330,6 @@ dependencies = [
 [[package]]
 name = "charybdis_parser"
 version = "0.7.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "445eee1950007fbede1d1c905f4e19f41f7dd9578798c355b05f8f6741aa3698"
 dependencies = [
  "colored 2.2.0",
  "darling",
@@ -2343,12 +2337,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
-name = "histogram"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12cb882ccb290b8646e554b157ab0b71e64e8d5bef775cd66b6531e52d302669"
-
-[[package]]
 name = "hkdf"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2914,9 +2902,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -3452,9 +3440,9 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openssl"
-version = "0.10.68"
+version = "0.10.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6174bc48f102d208783c2c84bf931bb75927a617866870de8a4ea85597f871f5"
+checksum = "5e14130c6a98cd258fdcb0fb6d744152343ff729cbfcb28c656a9d12b999fbcd"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
@@ -3484,9 +3472,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.104"
+version = "0.9.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45abf306cbf99debc8195b66b7346498d7b10c210de50418b5ccd7ceba08c741"
+checksum = "8bb61ea9811cc39e3c2069f40b8b8e2e70d8569b361f879786cc7ed48b777cdd"
 dependencies = [
  "cc",
  "libc",
@@ -3976,11 +3964,11 @@ dependencies = [
 
 [[package]]
 name = "rand_pcg"
-version = "0.3.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59cad018caf63deb318e5a4586d99a24424a364f40f1e5778c29aca23f4fc73e"
+checksum = "b48ac3f7ffaab7fac4d2376632268aa5f89abdb55f7ebf8f4d11fffccb2320f7"
 dependencies = [
- "rand_core 0.6.4",
+ "rand_core 0.9.1",
 ]
 
 [[package]]
@@ -4421,9 +4409,9 @@ dependencies = [
 
 [[package]]
 name = "scylla"
-version = "0.15.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0408e59e11f589071d1cefc3928270aa8fe4d03f654cb118e0c24d16013ea82"
+checksum = "d6f7075a5b5be59fd767b83567bf0c02e9c29626f47d8c4493946b2d6076eb17"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -4433,15 +4421,13 @@ dependencies = [
  "dashmap 5.5.3",
  "futures",
  "hashbrown 0.14.5",
- "histogram",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "lazy_static",
  "lz4_flex",
  "openssl",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rand_pcg",
  "scylla-cql",
- "scylla-macros",
  "smallvec",
  "snap",
  "socket2",
@@ -4454,15 +4440,16 @@ dependencies = [
 
 [[package]]
 name = "scylla-cql"
-version = "0.4.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0cefd8b924bb8f67525937a811038d5662f9febc30c74c778a8205f63c4b365"
+checksum = "85f1decfbb5ff3eb8da7883937c9bca318ccfa220d50bd5a2cdb573fb29bc19b"
 dependencies = [
  "async-trait",
  "bigdecimal",
  "byteorder",
  "bytes",
  "chrono",
+ "itertools 0.14.0",
  "lz4_flex",
  "num-bigint 0.3.3",
  "num-bigint 0.4.6",
@@ -4479,9 +4466,9 @@ dependencies = [
 
 [[package]]
 name = "scylla-macros"
-version = "0.7.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e878bfb8a235207864ac3fb0b51d7954c77fd38486e0e4fb4e037935ff7eb46c"
+checksum = "6c72a4a475ecca0ab180b995f63e079763baaa453ec1a84f6811ebd8d8fe18e8"
 dependencies = [
  "darling",
  "proc-macro2",

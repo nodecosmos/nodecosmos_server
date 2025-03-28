@@ -4,7 +4,8 @@ use charybdis::types::{Set, Uuid};
 use elasticsearch::Elasticsearch;
 use futures::{stream, StreamExt, TryFutureExt};
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
+use std::collections::HashSet;
 
 use crate::api::data::RequestData;
 use crate::constants::MAX_PARALLEL_REQUESTS;
@@ -13,6 +14,7 @@ use crate::models::branch::update::BranchUpdate;
 use crate::models::branch::Branch;
 use crate::models::node::Node;
 use crate::models::node_descendant::NodeDescendant;
+use crate::models::subscription::{Subscription, SubscriptionStatus};
 use crate::models::traits::ModelContext;
 use crate::models::traits::Parent;
 use crate::models::traits::RefCloned;
@@ -312,6 +314,23 @@ impl Node {
 
             e
         })
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_subscription(&self, db_session: &CachingSession) -> Result<(), NodecosmosError> {
+        Subscription {
+            root_id: self.root_id,
+            status: SubscriptionStatus::OpenSource.to_string(),
+            customer_id: None,
+            sub_id: None,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            member_ids: HashSet::from_iter(vec![self.owner_id]),
+        }
+        .insert()
+        .execute(db_session)
         .await?;
 
         Ok(())
