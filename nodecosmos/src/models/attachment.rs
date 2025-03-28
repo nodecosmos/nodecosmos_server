@@ -4,7 +4,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::{InsertWithCallbacks, New};
 use charybdis::types::{Text, Timestamp, Uuid};
 use futures::StreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;

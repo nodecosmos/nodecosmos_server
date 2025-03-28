@@ -13,7 +13,7 @@ use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use email_address::EmailAddress;
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

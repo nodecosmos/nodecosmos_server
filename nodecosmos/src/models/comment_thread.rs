@@ -3,7 +3,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Delete;
 use charybdis::types::{Int, Set, Text, Timestamp, Uuid};
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -172,11 +172,9 @@ impl CommentThread {
                     .as_mut()
                     .ok_or_else(|| NodecosmosError::NotFound("Branch not found".to_string()))
             }
-            _ => {
-                Err(NodecosmosError::InternalServerError(
-                    "Branch not found for non-ContributionRequest thread".to_string(),
-                ))
-            }
+            _ => Err(NodecosmosError::InternalServerError(
+                "Branch not found for non-ContributionRequest thread".to_string(),
+            )),
         }
     }
 
@@ -194,11 +192,9 @@ impl CommentThread {
                     .as_mut()
                     .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
             }
-            _ => {
-                Err(NodecosmosError::InternalServerError(
-                    "Node not found for non-Node thread".to_string(),
-                ))
-            }
+            _ => Err(NodecosmosError::InternalServerError(
+                "Node not found for non-Node thread".to_string(),
+            )),
         }
     }
 

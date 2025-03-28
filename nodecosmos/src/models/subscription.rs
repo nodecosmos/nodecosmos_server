@@ -23,6 +23,7 @@ pub enum SubscriptionStatus {
     Paused,
     Trialing,
     Unpaid,
+    OpenSource,
 }
 
 #[charybdis_model(

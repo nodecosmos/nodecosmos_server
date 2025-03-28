@@ -1,7 +1,7 @@
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Text, Timestamp, Uuid};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
@@ -108,7 +108,9 @@ impl Like {
 
                 Ok(lc)
             }
-            _ => Err(NodecosmosError::InternalServerError("Object type not supported".to_string())),
+            _ => Err(NodecosmosError::InternalServerError(
+                "Object type not supported".to_string(),
+            )),
         }
     }
 }

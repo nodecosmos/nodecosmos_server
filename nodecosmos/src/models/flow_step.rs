@@ -14,7 +14,7 @@ use charybdis::operations::{Find, Insert, UpdateWithCallbacks};
 use charybdis::types::{Decimal, Frozen, List, Map, Set, Timestamp, Uuid};
 use futures::StreamExt;
 use macros::{Branchable, FlowId, Id, NodeId};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

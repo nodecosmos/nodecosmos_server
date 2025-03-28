@@ -1,6 +1,6 @@
 use charybdis::batch::ModelBatch;
 use charybdis::model::AsNative;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;

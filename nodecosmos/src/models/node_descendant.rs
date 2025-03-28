@@ -3,7 +3,7 @@ use crate::stream::MergedModelStream;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Double, Text, Uuid};
 use macros::{Id, RootId};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_model(

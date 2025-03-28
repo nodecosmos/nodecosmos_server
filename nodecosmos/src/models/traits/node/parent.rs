@@ -1,4 +1,4 @@
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::errors::NodecosmosError;
 use crate::models::node::Node;

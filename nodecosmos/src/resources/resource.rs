@@ -1,4 +1,5 @@
 use redis::{AsyncCommands, ProtocolVersion};
+use scylla::client::session_builder::SessionBuilder;
 use std::io::Read;
 
 const PASSPHRASE: &str = "KEEP_CALM_AND_LET_IT_BE";
@@ -31,13 +32,13 @@ pub trait Resource<'a> {
     async fn init_resource(config: Self::Cfg) -> Self;
 }
 
-impl<'a> Resource<'a> for scylla::CachingSession {
+impl<'a> Resource<'a> for scylla::client::caching_session::CachingSession {
     type Cfg = &'a crate::app::Config;
 
     async fn init_resource(config: Self::Cfg) -> Self {
         let known_nodes: Vec<&str> = config.scylla.hosts.iter().map(|x| x.as_str()).collect();
 
-        let mut builder = scylla::SessionBuilder::new()
+        let mut builder = SessionBuilder::new()
             .known_nodes(&known_nodes)
             .connection_timeout(std::time::Duration::from_secs(3))
             .use_keyspace(&config.scylla.keyspace, false);
@@ -83,7 +84,7 @@ impl<'a> Resource<'a> for scylla::CachingSession {
                     .unwrap();
             }
 
-            builder = builder.ssl_context(Some(context_builder.build()));
+            builder = builder.tls_context(Some(context_builder.build()));
         }
 
         let db_session = builder
@@ -91,7 +92,7 @@ impl<'a> Resource<'a> for scylla::CachingSession {
             .await
             .unwrap_or_else(|e| panic!("Unable to connect to scylla hosts: {:?}. \nError: {}", known_nodes, e));
 
-        scylla::CachingSession::from(db_session, 1000)
+        scylla::client::caching_session::CachingSession::from(db_session, 1000)
     }
 }
 

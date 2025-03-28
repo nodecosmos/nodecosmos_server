@@ -10,7 +10,7 @@ use crate::stream::MergedModelStream;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Boolean, Frozen, List, Map, Set, Text, Uuid};
 use futures::stream::StreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
