@@ -1304,7 +1304,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "charybdis"
-version = "0.7.14"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a634576bf7db04859380b6c1dd663503f73a540e348e0f075ccc043cb3f034cb"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
@@ -1319,7 +1321,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "0.7.14"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f87391134b2ce609f789eb8fd254145de0fbae6682fdc368929b52c7deb8f2ff"
 dependencies = [
  "charybdis_parser",
  "proc-macro2",
@@ -1329,7 +1333,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "0.7.14"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b95caa29935fe20506658941575d1a407d0c1e1bd11a84d2abbaef9e338f5cbe"
 dependencies = [
  "colored 2.2.0",
  "darling",
