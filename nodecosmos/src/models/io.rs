@@ -5,7 +5,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Insert;
 use charybdis::types::{Boolean, Set, Text, Timestamp, Uuid};
 use futures::StreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use macros::{Branchable, Id, MaybeFlowId, MaybeFlowStepId};

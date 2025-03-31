@@ -2,7 +2,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use charybdis::model::AsNative;
 use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, New, UpdateWithCallbacks};
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde_json::json;
 
 use crate::api::data::RequestData;

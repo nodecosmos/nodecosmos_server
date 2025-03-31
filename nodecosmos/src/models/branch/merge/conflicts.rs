@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::Context;
 use charybdis::operations::Update;
 use charybdis::types::{Set, Uuid};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::errors::NodecosmosError;
 use crate::models::branch::merge::BranchMerge;

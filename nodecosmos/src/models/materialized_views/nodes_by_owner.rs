@@ -4,7 +4,7 @@ use charybdis::macros::charybdis_view_model;
 use charybdis::operations::Find;
 use charybdis::stream::CharybdisModelStream;
 use charybdis::types::{Boolean, Text, Uuid};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 #[charybdis_view_model(

@@ -2,7 +2,7 @@ use actix_web::{get, put, web, HttpResponse};
 use anyhow::Context;
 use charybdis::operations::Update;
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde_json::json;
 
 use crate::api::current_user::OptCurrentUser;

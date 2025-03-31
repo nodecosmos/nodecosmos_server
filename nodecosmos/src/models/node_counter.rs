@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
 use charybdis::types::{Counter, Uuid};
 use macros::Branchable;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;

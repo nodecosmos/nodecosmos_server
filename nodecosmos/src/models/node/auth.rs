@@ -1,5 +1,5 @@
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::api::current_user::OptCurrentUser;
 use crate::api::data::RequestData;

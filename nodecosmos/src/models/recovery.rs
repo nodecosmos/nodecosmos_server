@@ -11,7 +11,7 @@ use charybdis::operations::{Delete, Insert, Update};
 use charybdis::options::Consistency;
 use charybdis::types::{Text, Timestamp, TinyInt, Uuid};
 use futures::StreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

@@ -1,6 +1,6 @@
 use charybdis::macros::charybdis_model;
 use charybdis::types::{List, Text, Timestamp, Uuid};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

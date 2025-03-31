@@ -7,8 +7,7 @@ use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::Find;
-use charybdis::scylla::PagingState;
-use scylla::statement::PagingStateResponse;
+use charybdis::scylla::{PagingState, PagingStateResponse};
 use serde::Deserialize;
 use serde_json::json;
 

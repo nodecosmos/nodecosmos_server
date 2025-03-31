@@ -3,7 +3,7 @@ use charybdis::operations::Update;
 use charybdis::types::{Double, Uuid};
 use futures::{stream, StreamExt};
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use macros::Branchable;

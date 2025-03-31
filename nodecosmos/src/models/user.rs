@@ -9,7 +9,7 @@ use chrono::Utc;
 use colored::Colorize;
 use log::error;
 use rustrict::CensorStr;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;
@@ -19,7 +19,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
 use crate::models::traits::{Clean, ElasticDocument, WhereInChunksExec};
-use crate::models::udts::Address;
+use crate::models::udts::{Address, AssignedTask};
 use crate::models::user_counter::UserCounter;
 
 pub mod search;
@@ -70,6 +70,8 @@ pub struct User {
 
     #[serde(default)]
     pub editor_at_nodes: Option<List<Frozen<List<Uuid>>>>,
+
+    pub assigned_tasks: Option<List<Frozen<AssignedTask>>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -177,6 +179,13 @@ impl Callbacks for User {
 }
 
 impl User {
+    pub async fn find_by_ids(db_session: &CachingSession, ids: &[Uuid]) -> Result<Vec<Self>, NodecosmosError> {
+        ids.where_in_chunked_query(db_session, |ids_chunk| find_user!("id IN ?", (ids_chunk,)))
+            .await
+            .try_collect()
+            .await
+    }
+
     pub async fn verify_password(&self, password: &str) -> Result<bool, NodecosmosError> {
         if self.password == GOOGLE_LOGIN_PASSWORD {
             Err(NodecosmosError::ValidationError(("password", "is incorrect")))?
@@ -237,7 +246,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
             async fn before_update(
                 &mut self,
-                _session: &scylla::CachingSession,
+                _session: &scylla::client::caching_session::CachingSession,
                 _ext: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 self.updated_at = Utc::now();
@@ -247,7 +256,7 @@ macro_rules! impl_user_updated_at_with_elastic_ext_cb {
 
             async fn after_update(
                 &mut self,
-                _session: &scylla::CachingSession,
+                _session: &scylla::client::caching_session::CachingSession,
                 data: &Self::Extension,
             ) -> Result<(), crate::errors::NodecosmosError> {
                 use crate::models::node::UpdateOwnerNode;
@@ -300,6 +309,8 @@ impl ShowUser {
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
 partial_user!(UpdatePasswordUser, id, password, email, username, updated_at);
+
+partial_user!(UpdateAssignedTasksUser, id, assigned_tasks, updated_at);
 
 impl Callbacks for UpdatePasswordUser {
     type Extension = App;

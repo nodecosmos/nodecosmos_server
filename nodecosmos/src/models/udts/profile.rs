@@ -10,7 +10,7 @@ pub enum ProfileType {
     Organization,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 #[charybdis_udt_model(type_name = profile)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {

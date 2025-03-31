@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use charybdis::stream::CharybdisModelStream;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::errors::NodecosmosError;
 use crate::models::node::{BaseNode, GetStructureNode, Node};

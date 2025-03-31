@@ -1,5 +1,5 @@
 use charybdis::operations::Find;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use uuid::Uuid;
 
 use crate::api::data::RequestData;

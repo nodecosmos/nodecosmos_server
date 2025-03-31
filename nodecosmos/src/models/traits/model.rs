@@ -1,6 +1,6 @@
 use charybdis::model::Model;
 use charybdis::operations::Find;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
 
 use crate::errors::NodecosmosError;

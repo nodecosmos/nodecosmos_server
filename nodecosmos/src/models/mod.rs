@@ -24,6 +24,8 @@ pub mod node_descendant;
 pub mod notification;
 pub mod recovery;
 pub mod subscription;
+pub mod task;
+pub mod task_section;
 pub mod token;
 pub mod traits;
 pub mod udts;

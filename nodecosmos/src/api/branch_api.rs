@@ -1,7 +1,7 @@
 use crate::api::current_user::OptCurrentUser;
 use actix_web::{get, put, web, HttpResponse};
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
 use std::collections::HashSet;
 

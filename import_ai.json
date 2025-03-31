@@ -1,1396 +1,316 @@
 {
   "nodes": [
     {
-      "id": "aiSystem",
-      "title": "AI System",
+      "id": "carNode",
+      "title": "Car",
+      "description": "<description><paragraph>The top-level car node, containing all major subsystems.</paragraph></description>",
       "parent_id": "root",
-      "description": "<description><heading level=\"1\">AI System</heading><paragraph>This is the top-level node representing the entire Artificial Intelligence ecosystem, encompassing both hardware and software layers. It handles data processing, model training, inference, and much more.</paragraph></description>",
       "flows": [
         {
-          "title": "System Startup Flow",
-          "description": "<description><heading level=\"1\">System Startup Flow</heading><paragraph>This flow describes the high-level sequence of actions that take place when the AI system boots up, from powering on hardware to initializing software services.</paragraph></description>",
+          "title": "Start Car Flow",
+          "description": "<description><paragraph>This flow represents how the car’s engine is started from ignition.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
           "flow_steps": [
             {
-              "id": "startUpStep1",
+              "id": "startCarFlowStep1",
               "node_ids": [
-                "hardwareLayer"
+                "carNode"
               ],
-              "input_ids_by_node": {},
               "outputs_by_node": {
-                "hardwareLayer": [
+                "carNode": [
                   {
-                    "id": "hardwareInitialized",
-                    "title": "Hardware Initialized"
+                    "id": "ignitionKeyTurned",
+                    "title": "Ignition Key Turned",
+                    "description": "<description><paragraph>The key is turned in the ignition.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>All hardware components are powered on and checked.</paragraph></description>"
+              "description": "<description><paragraph>The driver (implicitly part of 'Car') turns the key.</paragraph></description>"
             },
             {
-              "id": "startUpStep2",
+              "id": "startCarFlowStep2",
               "node_ids": [
-                "softwareLayer"
+                "engineNode"
               ],
               "input_ids_by_node": {
-                "softwareLayer": [
-                  "hardwareInitialized"
+                "engineNode": [
+                  "ignitionKeyTurned"
                 ]
               },
               "outputs_by_node": {
-                "softwareLayer": [
+                "engineNode": [
                   {
-                    "id": "softwareBooted",
-                    "title": "Software Booted"
+                    "id": "engineCranking",
+                    "title": "Engine Cranking",
+                    "description": "<description><paragraph>The engine begins to crank once ignition is signaled.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>Operating systems, container runtimes, and core services are started.</paragraph></description>"
+              "description": "<description><paragraph>The engine receives the ignition signal and starts cranking.</paragraph></description>"
             },
             {
-              "id": "startUpStep3",
+              "id": "startCarFlowStep3",
               "node_ids": [
-                "aiSystem"
+                "engineNode"
               ],
               "input_ids_by_node": {
-                "aiSystem": [
-                  "softwareBooted"
+                "engineNode": [
+                  "engineCranking"
                 ]
               },
               "outputs_by_node": {
-                "aiSystem": [
+                "engineNode": [
                   {
-                    "id": "systemReady",
-                    "title": "System Ready"
+                    "id": "engineRunning",
+                    "title": "Engine Running",
+                    "description": "<description><paragraph>The engine fully starts and runs on its own power.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>The entire AI system is confirmed to be operational and ready for use.</paragraph></description>"
+              "description": "<description><paragraph>The engine transitions from cranking to running state.</paragraph></description>"
             }
-          ],
+          ]
+        },
+        {
+          "title": "Accelerate Flow",
+          "description": "<description><paragraph>This flow shows how accelerating the car involves the engine and transmission.</paragraph></description>",
           "initial_inputs": [],
-          "start_index": 0
+          "start_index": 0,
+          "flow_steps": [
+            {
+              "id": "accelerateFlowStep1",
+              "node_ids": [
+                "engineNode"
+              ],
+              "outputs_by_node": {
+                "engineNode": [
+                  {
+                    "id": "increasedPowerOutput",
+                    "title": "Increased Power Output",
+                    "description": "<description><paragraph>The engine produces extra torque/power for acceleration.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The driver presses the accelerator, prompting the engine to increase power.</paragraph></description>"
+            },
+            {
+              "id": "accelerateFlowStep2",
+              "node_ids": [
+                "transmissionNode"
+              ],
+              "input_ids_by_node": {
+                "transmissionNode": [
+                  "increasedPowerOutput"
+                ]
+              },
+              "outputs_by_node": {
+                "transmissionNode": [
+                  {
+                    "id": "wheelsAccelerate",
+                    "title": "Wheels Accelerate",
+                    "description": "<description><paragraph>The transmission transfers increased power to the wheels for acceleration.</paragraph></description>"
+                  }
+                ]
+              },
+              "description": "<description><paragraph>The transmission receives extra power and transmits it to the wheels.</paragraph></description>"
+            }
+          ]
         }
       ]
     },
     {
-      "id": "hardwareLayer",
-      "title": "Hardware Layer",
-      "parent_id": "aiSystem",
-      "description": "<description><heading level=\"1\">Hardware Layer</heading><paragraph>The Hardware Layer encompasses all physical infrastructure components that power the AI system, including compute resources (CPU, GPU, accelerators), storage subsystems, and networking equipment. Reliable and scalable hardware is essential to efficiently train and deploy AI models.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "computeResources",
-      "title": "Compute Resources",
-      "parent_id": "hardwareLayer",
-      "description": "<description><heading level=\"1\">Compute Resources</heading><paragraph>All processing units used for computation, such as CPU clusters and GPU clusters, along with specialized AI accelerators (e.g., TPUs). These resources enable parallel data processing and model training at scale.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuClusters",
-      "title": "CPU Clusters",
-      "parent_id": "computeResources",
-      "description": "<description><heading level=\"1\">CPU Clusters</heading><paragraph>Groups of CPUs designed to handle diverse workloads, from preprocessing tasks to serving requests. Clustering CPUs allows the system to distribute tasks and scale horizontally.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode1",
-      "title": "CPU Node #1",
-      "parent_id": "cpuClusters",
-      "description": "<description><heading level=\"1\">CPU Node #1</heading><paragraph>This node represents one physical or virtual CPU instance within the cluster. It includes multiple CPU cores and caches to optimize data processing.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode1Cores",
-      "title": "CPU Cores",
-      "parent_id": "cpuNode1",
-      "description": "<description><heading level=\"1\">CPU Cores</heading><paragraph>Each core can handle independent threads, allowing parallelism within a single CPU node.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode1Caches",
-      "title": "L1/L2/L3 Caches",
-      "parent_id": "cpuNode1",
-      "description": "<description><heading level=\"1\">L1/L2/L3 Caches</heading><paragraph>A multi-level caching system speeding up memory access for the CPU cores.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode2",
-      "title": "CPU Node #2",
-      "parent_id": "cpuClusters",
-      "description": "<description><heading level=\"1\">CPU Node #2</heading><paragraph>An additional CPU node in the cluster, offering redundant and/or additional processing power. Similar structure to CPU Node #1, including cores and caches.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode2Cores",
-      "title": "CPU Cores",
-      "parent_id": "cpuNode2",
-      "description": "<description><heading level=\"1\">CPU Cores</heading><paragraph>Parallel execution units in CPU Node #2, enabling concurrency in data operations.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cpuNode2Caches",
-      "title": "L1/L2/L3 Caches",
-      "parent_id": "cpuNode2",
-      "description": "<description><heading level=\"1\">L1/L2/L3 Caches</heading><paragraph>Cache system for CPU Node #2, reducing latency by storing frequently accessed data.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "gpuClusters",
-      "title": "GPU Clusters",
-      "parent_id": "computeResources",
-      "description": "<description><heading level=\"1\">GPU Clusters</heading><paragraph>High-performance parallel compute nodes, optimized for tasks like deep learning, graphics processing, and large-scale matrix operations.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "gpuNode1",
-      "title": "GPU Node #1",
-      "parent_id": "gpuClusters",
-      "description": "<description><heading level=\"1\">GPU Node #1</heading><paragraph>A single GPU node featuring multiple stream multiprocessors (SMs), dedicated memory (VRAM), and possibly specialized tensor cores.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "gpuNode1Cores",
-      "title": "GPU Cores (SMs)",
-      "parent_id": "gpuNode1",
-      "description": "<description><heading level=\"1\">GPU Cores (SMs)</heading><paragraph>Stream Multiprocessors that handle thousands of threads concurrently, accelerating large-scale computations for AI workloads.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "gpuNode1Memory",
-      "title": "Memory (VRAM)",
-      "parent_id": "gpuNode1",
-      "description": "<description><heading level=\"1\">Memory (VRAM)</heading><paragraph>Specialized video memory used by GPU cores to store model parameters, intermediate results, and textures.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "gpuNode1TensorCores",
-      "title": "Tensor Cores",
-      "parent_id": "gpuNode1",
-      "description": "<description><heading level=\"1\">Tensor Cores</heading><paragraph>Hardware units designed for matrix multiplication and acceleration of AI-related operations (if available on this GPU architecture).</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "specializedAIAccelerators",
-      "title": "Specialized AI Accelerators (TPUs)",
-      "parent_id": "computeResources",
-      "description": "<description><heading level=\"1\">Specialized AI Accelerators (TPUs)</heading><paragraph>Custom accelerators, such as Google's TPUs, specifically optimized for large-scale AI training and inference tasks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tpuPod1",
-      "title": "TPU Pod #1",
-      "parent_id": "specializedAIAccelerators",
-      "description": "<description><heading level=\"1\">TPU Pod #1</heading><paragraph>Group of interconnected TPU cores, often with high-bandwidth memory, designed for fast matrix computations and distributed model training.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "storageArrays",
-      "title": "Storage Arrays",
-      "parent_id": "hardwareLayer",
-      "description": "<description><heading level=\"1\">Storage Arrays</heading><paragraph>All storage-related hardware, including local SSDs, distributed file systems, and object storage interfaces. Ensures data is persistently and reliably stored.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "highPerfLocalStorage",
-      "title": "High-Performance Local Storage",
-      "parent_id": "storageArrays",
-      "description": "<description><heading level=\"1\">High-Performance Local Storage</heading><paragraph>Local storage devices offering fast read/write speeds, essential for real-time data access.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "nvmeSsds",
-      "title": "NVMe SSDs",
-      "parent_id": "highPerfLocalStorage",
-      "description": "<description><heading level=\"1\">NVMe SSDs</heading><paragraph>Non-Volatile Memory Express drives delivering high IOPS and low latency.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "hdds",
-      "title": "HDDs",
-      "parent_id": "highPerfLocalStorage",
-      "description": "<description><heading level=\"1\">HDDs</heading><paragraph>Traditional spinning disks used for larger, cost-efficient storage capacities.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "distributedFileSystems",
-      "title": "Distributed File Systems",
-      "parent_id": "storageArrays",
-      "description": "<description><heading level=\"1\">Distributed File Systems</heading><paragraph>Manage storage across multiple servers for large-scale data sets, balancing performance, redundancy, and fault tolerance.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "masterMetadataServer",
-      "title": "Master Metadata Server",
-      "parent_id": "distributedFileSystems",
-      "description": "<description><heading level=\"1\">Master Metadata Server</heading><paragraph>Tracks file locations, namespace info, and manages metadata for the distributed file system.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "dataNodes",
-      "title": "Data Nodes",
-      "parent_id": "distributedFileSystems",
-      "description": "<description><heading level=\"1\">Data Nodes</heading><paragraph>Store actual file blocks or data chunks. Scalable and distributed across servers for high availability.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "objectStorageInterfaces",
-      "title": "Object Storage Interfaces (S3, etc.)",
-      "parent_id": "storageArrays",
-      "description": "<description><heading level=\"1\">Object Storage Interfaces (S3, etc.)</heading><paragraph>Provides APIs for object-based data access, supporting large unstructured datasets and straightforward scaling.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "networkingEquipment",
-      "title": "Networking Equipment",
-      "parent_id": "hardwareLayer",
-      "description": "<description><heading level=\"1\">Networking Equipment</heading><paragraph>Switches, load balancers, and firewalls enabling the data transfer and security needed by the AI system.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "coreSwitches",
-      "title": "Core Switches",
-      "parent_id": "networkingEquipment",
-      "description": "<description><heading level=\"1\">Core Switches</heading><paragraph>High-bandwidth switches interconnecting the key subnets and data centers, minimizing network bottlenecks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "loadBalancers",
-      "title": "Load Balancers",
-      "parent_id": "networkingEquipment",
-      "description": "<description><heading level=\"1\">Load Balancers</heading><paragraph>Distribute incoming traffic across multiple servers or microservices, enhancing reliability and scalability.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "firewallsGateways",
-      "title": "Firewalls and Gateways",
-      "parent_id": "networkingEquipment",
-      "description": "<description><heading level=\"1\">Firewalls and Gateways</heading><paragraph>Protects network segments by enforcing security policies, filtering traffic, and sometimes handling protocol translations.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "softwareLayer",
-      "title": "Software Layer",
-      "parent_id": "aiSystem",
-      "description": "<description><heading level=\"1\">Software Layer</heading><paragraph>This layer encompasses all software components in the AI system: operating systems, container runtimes, orchestration tools, data management, and AI frameworks. It orchestrates data flow, resource usage, and algorithmic execution, ultimately enabling training and inference processes.</paragraph></description>",
+      "id": "engineNode",
+      "title": "Engine",
+      "description": "<description><paragraph>The engine node, responsible for combustion and power output.</paragraph></description>",
+      "parent_id": "carNode",
       "flows": [
         {
-          "title": "Model Training Flow",
-          "description": "<description><heading level=\"1\">Model Training Flow</heading><paragraph>Illustrates how raw data is ingested, preprocessed, fed into AI frameworks, and finally stored as a trained model artifact.</paragraph></description>",
+          "title": "Combustion Cycle Flow",
+          "description": "<description><paragraph>This flow details a simplified combustion cycle within the engine.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
           "flow_steps": [
             {
-              "id": "trainingStep1",
+              "id": "combustionStep1",
               "node_ids": [
-                "dataManagementSoftware"
+                "sparkPlugNode"
               ],
-              "input_ids_by_node": {},
               "outputs_by_node": {
-                "dataManagementSoftware": [
+                "sparkPlugNode": [
                   {
-                    "id": "rawDataReady",
-                    "title": "Raw Data Ready"
+                    "id": "spark",
+                    "title": "Spark",
+                    "description": "<description><paragraph>The spark plug generates a spark to ignite fuel-air mixture.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>Data ingestion: gather raw data from sources and make it available for training.</paragraph></description>"
+              "description": "<description><paragraph>The spark plug fires, producing the ignition spark.</paragraph></description>"
             },
             {
-              "id": "trainingStep2",
+              "id": "combustionStep2",
               "node_ids": [
-                "trainingComponents"
+                "pistonNode"
               ],
               "input_ids_by_node": {
-                "trainingComponents": [
-                  "rawDataReady"
+                "pistonNode": [
+                  "spark"
                 ]
               },
               "outputs_by_node": {
-                "trainingComponents": [
+                "pistonNode": [
                   {
-                    "id": "preprocessedData",
-                    "title": "Preprocessed Data"
+                    "id": "downwardForce",
+                    "title": "Downward Force",
+                    "description": "<description><paragraph>The ignited mixture forces the piston down, producing mechanical energy.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>Preprocess data (cleaning, normalization, feature extraction).</paragraph></description>"
-            },
-            {
-              "id": "trainingStep3",
-              "node_ids": [
-                "aiFrameworksLibraries",
-                "modelArchitectures"
-              ],
-              "input_ids_by_node": {
-                "aiFrameworksLibraries": [
-                  "preprocessedData"
-                ],
-                "modelArchitectures": [
-                  "preprocessedData"
-                ]
-              },
-              "outputs_by_node": {
-                "aiFrameworksLibraries": [
-                  {
-                    "id": "trainedModel",
-                    "title": "Trained Model"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>Using chosen AI frameworks and architectures to train the model with the preprocessed data.</paragraph></description>"
-            },
-            {
-              "id": "trainingStep4",
-              "node_ids": [
-                "trainingComponents"
-              ],
-              "input_ids_by_node": {
-                "trainingComponents": [
-                  "trainedModel"
-                ]
-              },
-              "outputs_by_node": {
-                "trainingComponents": [
-                  {
-                    "id": "finalModelArtifact",
-                    "title": "Final Model Artifact"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>Consolidate and store the fully trained model (weights, hyperparameters) for deployment.</paragraph></description>"
+              "description": "<description><paragraph>The piston reacts to the ignition, converting the expansion to mechanical force.</paragraph></description>"
             }
-          ],
-          "initial_inputs": [],
-          "start_index": 0
+          ]
         }
       ]
     },
     {
-      "id": "operatingSystemsRuntime",
-      "title": "Operating Systems and Runtime Environments",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Operating Systems and Runtime Environments</heading><paragraph>Base OS, libraries, and container runtimes providing the environment in which all AI-related processes run. Ensures resource isolation and standardized execution.</paragraph></description>",
+      "id": "sparkPlugNode",
+      "title": "Spark Plug",
+      "description": "<description><paragraph>A spark plug that ignites the fuel-air mixture in the combustion chamber.</paragraph></description>",
+      "parent_id": "engineNode",
       "flows": []
     },
     {
-      "id": "hostOS",
-      "title": "Host OS (Linux Distribution)",
-      "parent_id": "operatingSystemsRuntime",
-      "description": "<description><heading level=\"1\">Host OS (Linux Distribution)</heading><paragraph>The primary operating system on each physical or virtual machine. Manages hardware resources and provides foundational services to containers or VMs.</paragraph></description>",
+      "id": "pistonNode",
+      "title": "Piston",
+      "description": "<description><paragraph>The piston that moves within the cylinder, translating combustion into motion.</paragraph></description>",
+      "parent_id": "engineNode",
       "flows": []
     },
     {
-      "id": "kernelAndLibs",
-      "title": "Kernel, System Libraries, Services",
-      "parent_id": "hostOS",
-      "description": "<description><heading level=\"1\">Kernel, System Libraries, Services</heading><paragraph>Core components like the Linux kernel, shared libraries (glibc, etc.), and system daemons that handle low-level operations, network stacks, and essential background tasks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "containerRuntime",
-      "title": "Container Runtime (Docker)",
-      "parent_id": "operatingSystemsRuntime",
-      "description": "<description><heading level=\"1\">Container Runtime (Docker)</heading><paragraph>Manages creation, execution, and deletion of containers, providing isolated environments for individual applications or services.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "virtualizationOrchestration",
-      "title": "Virtualization and Orchestration",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Virtualization and Orchestration</heading><paragraph>Hypervisors, Kubernetes, and other management tools that organize resources, schedule workloads, and enable scalability or fault tolerance.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "hypervisors",
-      "title": "Hypervisors",
-      "parent_id": "virtualizationOrchestration",
-      "description": "<description><heading level=\"1\">Hypervisors</heading><paragraph>Software layers allowing multiple VMs to share physical hardware, isolating resources for security and stability.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "virtualMachines",
-      "title": "Virtual Machines",
-      "parent_id": "hypervisors",
-      "description": "<description><heading level=\"1\">Virtual Machines</heading><paragraph>Full operating system instances running on top of a hypervisor, each with its own virtualized CPU, memory, and storage.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "containerOrchestration",
-      "title": "Container Orchestration (Kubernetes)",
-      "parent_id": "virtualizationOrchestration",
-      "description": "<description><heading level=\"1\">Container Orchestration (Kubernetes)</heading><paragraph>Automates deployment, scaling, and management of containerized applications across clusters of hosts.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "k8sControlPlane",
-      "title": "Kubernetes Control Plane",
-      "parent_id": "containerOrchestration",
-      "description": "<description><heading level=\"1\">Kubernetes Control Plane</heading><paragraph>Includes the API server, scheduler, and etcd for maintaining the desired state of the cluster.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "k8sWorkerNodes",
-      "title": "Kubernetes Worker Nodes",
-      "parent_id": "containerOrchestration",
-      "description": "<description><heading level=\"1\">Kubernetes Worker Nodes</heading><paragraph>Run pods (containers), monitoring their health and resource usage via the kubelet. Scale horizontally to meet demand.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "infraTooling",
-      "title": "Infrastructure Tooling",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Infrastructure Tooling</heading><paragraph>CI/CD pipelines, config management, monitoring, and logging solutions that ensure continuous delivery, consistent configuration, and visibility into system health.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "ciCdPipelines",
-      "title": "CI/CD Pipelines",
-      "parent_id": "infraTooling",
-      "description": "<description><heading level=\"1\">CI/CD Pipelines</heading><paragraph>Automated processes for building, testing, and deploying applications or models, enabling rapid iteration and reliable releases.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "configManagementTools",
-      "title": "Configuration Management Tools",
-      "parent_id": "infraTooling",
-      "description": "<description><heading level=\"1\">Configuration Management Tools</heading><paragraph>Technologies like Ansible, Puppet, or Chef that enforce consistent environment configurations across multiple servers or containers.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "monitoringLoggingSystems",
-      "title": "Monitoring and Logging Systems",
-      "parent_id": "infraTooling",
-      "description": "<description><heading level=\"1\">Monitoring and Logging Systems</heading><paragraph>Solutions (e.g., Prometheus, ELK) that track metrics, collect logs, and provide alerting/dashboards to observe system performance.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "dataManagementSoftware",
-      "title": "Data Management Software",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Data Management Software</heading><paragraph>Handles ingestion, transformation, storage, and retrieval of data, feeding AI models with the necessary inputs to learn or infer.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "dataIngestionLayer",
-      "title": "Data Ingestion Layer",
-      "parent_id": "dataManagementSoftware",
-      "description": "<description><heading level=\"1\">Data Ingestion Layer</heading><paragraph>Extract, Transform, Load (ETL/ELT) pipelines pulling raw data from various sources into the system for further processing.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "dataStorageLayer",
-      "title": "Data Storage Layer",
-      "parent_id": "dataManagementSoftware",
-      "description": "<description><heading level=\"1\">Data Storage Layer</heading><paragraph>Encompasses data warehouses, lakes, and other repositories used for large-scale data analytics and AI training.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "metadataFeatureStores",
-      "title": "Metadata and Feature Stores",
-      "parent_id": "dataManagementSoftware",
-      "description": "<description><heading level=\"1\">Metadata and Feature Stores</heading><paragraph>Maintain detailed records of features used in models, ensuring consistent definitions across training and inference.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "trainingComponents",
-      "title": "Training Components",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Training Components</heading><paragraph>Infrastructure for running training loops, managing batches, handling distributed training across multiple GPUs or TPUs, and hosting reinforcement learning environments.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "evaluationValidation",
-      "title": "Evaluation and Validation",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Evaluation and Validation</heading><paragraph>Metrics calculation, validation datasets, and benchmarking tools ensuring models meet performance criteria before deployment.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "deploymentInferenceLayer",
-      "title": "Deployment and Inference Layer",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Deployment and Inference Layer</heading><paragraph>Hosts the final models, provides scalable serving endpoints, and manages load balancing and autoscaling for inference traffic.</paragraph></description>",
+      "id": "transmissionNode",
+      "title": "Transmission",
+      "description": "<description><paragraph>The transmission system controlling gear shifts and power transfer.</paragraph></description>",
+      "parent_id": "carNode",
       "flows": [
         {
-          "title": "Inference Flow",
-          "description": "<description><heading level=\"1\">Inference Flow</heading><paragraph>Demonstrates how a prediction request is received, the appropriate model is loaded, and a response is returned to the client.</paragraph></description>",
+          "title": "Shift Gears Flow",
+          "description": "<description><paragraph>This flow shows how the transmission shifts gears using the clutch and gearbox.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
           "flow_steps": [
             {
-              "id": "inferenceStep1",
+              "id": "shiftGearsStep1",
               "node_ids": [
-                "deploymentInferenceLayer"
+                "clutchNode"
               ],
-              "input_ids_by_node": {},
               "outputs_by_node": {
-                "deploymentInferenceLayer": [
+                "clutchNode": [
                   {
-                    "id": "inferenceRequest",
-                    "title": "Inference Request"
+                    "id": "clutchDisengaged",
+                    "title": "Clutch Disengaged",
+                    "description": "<description><paragraph>The clutch is disengaged, stopping power transfer briefly.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>A prediction request arrives via REST, gRPC, or another protocol.</paragraph></description>"
+              "description": "<description><paragraph>The clutch is pressed, disengaging from the engine.</paragraph></description>"
             },
             {
-              "id": "inferenceStep2",
+              "id": "shiftGearsStep2",
               "node_ids": [
-                "deploymentInferenceLayer"
+                "gearboxNode"
               ],
               "input_ids_by_node": {
-                "deploymentInferenceLayer": [
-                  "inferenceRequest"
+                "gearboxNode": [
+                  "clutchDisengaged"
                 ]
               },
               "outputs_by_node": {
-                "deploymentInferenceLayer": [
+                "gearboxNode": [
                   {
-                    "id": "modelLoaded",
-                    "title": "Model Loaded"
+                    "id": "gearChanged",
+                    "title": "Gear Changed",
+                    "description": "<description><paragraph>A new gear is selected in the gearbox.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>The system locates the correct model artifact, loads it into memory (GPU, TPU, or CPU).</paragraph></description>"
+              "description": "<description><paragraph>The driver shifts to the desired gear while the clutch is disengaged.</paragraph></description>"
             },
             {
-              "id": "inferenceStep3",
+              "id": "shiftGearsStep3",
               "node_ids": [
-                "deploymentInferenceLayer"
+                "clutchNode"
               ],
               "input_ids_by_node": {
-                "deploymentInferenceLayer": [
-                  "modelLoaded"
+                "clutchNode": [
+                  "gearChanged"
                 ]
               },
               "outputs_by_node": {
-                "deploymentInferenceLayer": [
+                "clutchNode": [
                   {
-                    "id": "inferenceResult",
-                    "title": "Inference Result"
+                    "id": "clutchEngaged",
+                    "title": "Clutch Engaged",
+                    "description": "<description><paragraph>Power transfer resumes with the new gear engaged.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>The loaded model processes the request data and produces an output (prediction, classification, or numerical result).</paragraph></description>"
-            },
-            {
-              "id": "inferenceStep4",
-              "node_ids": [
-                "deploymentInferenceLayer"
-              ],
-              "input_ids_by_node": {
-                "deploymentInferenceLayer": [
-                  "inferenceResult"
-                ]
-              },
-              "outputs_by_node": {
-                "deploymentInferenceLayer": [
-                  {
-                    "id": "responseToClient",
-                    "title": "Response to Client"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The final inference result is returned to the client or downstream system.</paragraph></description>"
+              "description": "<description><paragraph>The clutch is released, re-engaging power transfer in the new gear.</paragraph></description>"
             }
-          ],
-          "initial_inputs": [],
-          "start_index": 0
+          ]
         }
       ]
     },
     {
-      "id": "aiFrameworksLibraries",
-      "title": "AI Frameworks and Libraries",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">AI Frameworks and Libraries</heading><paragraph>Includes deep learning libraries (TensorFlow, PyTorch) and traditional ML libraries (scikit-learn). These frameworks provide building blocks for constructing, training, and deploying AI models.</paragraph></description>",
+      "id": "gearboxNode",
+      "title": "Gearbox",
+      "description": "<description><paragraph>The gearbox that selects different gear ratios.</paragraph></description>",
+      "parent_id": "transmissionNode",
       "flows": []
     },
     {
-      "id": "deepLearningFrameworks",
-      "title": "Deep Learning Frameworks",
-      "parent_id": "aiFrameworksLibraries",
-      "description": "<description><heading level=\"1\">Deep Learning Frameworks</heading><paragraph>TensorFlow, PyTorch, and similar libraries that specialize in neural network operations and automatic differentiation.</paragraph></description>",
+      "id": "clutchNode",
+      "title": "Clutch",
+      "description": "<description><paragraph>The clutch that engages/disengages the transmission from the engine.</paragraph></description>",
+      "parent_id": "transmissionNode",
       "flows": []
     },
     {
-      "id": "tensorFlow",
-      "title": "TensorFlow",
-      "parent_id": "deepLearningFrameworks",
-      "description": "<description><heading level=\"1\">TensorFlow</heading><paragraph>Enables computational graph execution, large-scale distributed training, and ecosystem tools (e.g., TensorBoard) for model debugging.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "pyTorch",
-      "title": "PyTorch",
-      "parent_id": "deepLearningFrameworks",
-      "description": "<description><heading level=\"1\">PyTorch</heading><paragraph>Uses a define-by-run approach (eager execution), featuring an autograd engine and a rich set of neural network modules.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "traditionalMlLibraries",
-      "title": "Traditional ML Libraries",
-      "parent_id": "aiFrameworksLibraries",
-      "description": "<description><heading level=\"1\">Traditional ML Libraries</heading><paragraph>Packages like scikit-learn, offering classical algorithms (SVM, random forest, linear/logistic regression) for less data-intensive tasks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "modelManagementTools",
-      "title": "Model Management Tools",
-      "parent_id": "aiFrameworksLibraries",
-      "description": "<description><heading level=\"1\">Model Management Tools</heading><paragraph>Registries, experiment trackers, and versioning solutions that store trained model artifacts, hyperparameters, and metrics for repeatable experiments.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "modelArchitectures",
-      "title": "Model Architectures (Software Representation)",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">Model Architectures (Software Representation)</heading><paragraph>Encompasses different categories of models like neural networks, tree-based ensembles, and linear models. Each architecture is represented as a software abstraction for training and deployment.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "neuralNetworks",
-      "title": "Neural Networks",
-      "parent_id": "modelArchitectures",
-      "description": "<description><heading level=\"1\">Neural Networks</heading><paragraph>High-level category for models like Transformers, CNNs, and RNNs, leveraging multiple layers of connected neurons to learn complex patterns.</paragraph></description>",
+      "id": "fuelInjectorNode",
+      "title": "Fuel Injector",
+      "description": "<description><paragraph>The fuel injector node that manages fuel delivery.</paragraph></description>",
+      "parent_id": "carNode",
       "flows": [
         {
-          "title": "Neural Network Response Flow",
-          "description": "<description><heading level=\"1\">Neural Network Response Flow</heading><paragraph>Demonstrates a simplified sequence for how input data flows through various neural network sub-architectures (e.g., Transformer, CNN, or RNN) to generate an output or response.</paragraph></description>",
+          "title": "Inject Fuel Flow",
+          "description": "<description><paragraph>This flow details the process of injecting fuel into the engine.</paragraph></description>",
+          "initial_inputs": [],
+          "start_index": 0,
           "flow_steps": [
             {
-              "id": "nnStep1",
+              "id": "injectFuelStep1",
               "node_ids": [
-                "transformerModels"
+                "injectorNozzleNode"
               ],
-              "input_ids_by_node": {},
               "outputs_by_node": {
-                "transformerModels": [
+                "injectorNozzleNode": [
                   {
-                    "id": "encoderOutput",
-                    "title": "Encoder Output"
+                    "id": "fuelSprayed",
+                    "title": "Fuel Sprayed",
+                    "description": "<description><paragraph>The nozzle atomizes and sprays fuel into the intake or combustion chamber.</paragraph></description>"
                   }
                 ]
               },
-              "description": "<description><paragraph>Transformer's encoder processes the input embedding, capturing contextual representations.</paragraph></description>"
-            },
-            {
-              "id": "nnStep2",
-              "node_ids": [
-                "transformerModels"
-              ],
-              "input_ids_by_node": {
-                "transformerModels": [
-                  "encoderOutput"
-                ]
-              },
-              "outputs_by_node": {
-                "transformerModels": [
-                  {
-                    "id": "decoderOutput",
-                    "title": "Decoder Output"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The decoder attends to encoder output, generating predictions step by step (e.g., language tokens).</paragraph></description>"
-            },
-            {
-              "id": "nnStep3",
-              "node_ids": [
-                "cnnModels"
-              ],
-              "input_ids_by_node": {
-                "cnnModels": [
-                  "decoderOutput"
-                ]
-              },
-              "outputs_by_node": {
-                "cnnModels": [
-                  {
-                    "id": "featureMap",
-                    "title": "Feature Map"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>A convolutional stage could refine or classify the intermediate representations (optional step).</paragraph></description>"
-            },
-            {
-              "id": "nnStep4",
-              "node_ids": [
-                "rnnModels"
-              ],
-              "input_ids_by_node": {
-                "rnnModels": [
-                  "featureMap"
-                ]
-              },
-              "outputs_by_node": {
-                "rnnModels": [
-                  {
-                    "id": "finalNeuralOutput",
-                    "title": "Final Neural Output"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>Optional RNN pass to handle sequential patterns or finalize the output over time (e.g., for time-series tasks).</paragraph></description>"
+              "description": "<description><paragraph>The injector nozzle activates and delivers fuel.</paragraph></description>"
             }
-          ],
-          "initial_inputs": [],
-          "start_index": 0
+          ]
         }
       ]
     },
     {
-      "id": "transformerModels",
-      "title": "Transformer Models",
-      "parent_id": "neuralNetworks",
-      "description": "<description><heading level=\"1\">Transformer Models</heading><paragraph>Self-attention-based architectures with explicit layers and neurons, each producing individual outputs. This demonstrates that each layer node can also generate an aggregate output, while every neuron node can produce its own output.</paragraph></description>",
-      "flows": [
-        {
-          "title": "Transformer Forward Pass Flow",
-          "description": "<description><heading level=\"1\">Transformer Forward Pass Flow</heading><paragraph>This flow shows signals flowing from Layer 1's 16 neurons, through Layer 2's 8 neurons, and then to the Output Layer's 2 neurons. Both individual neuron outputs and layer-level aggregated outputs are produced along the way.</paragraph></description>",
-          "flow_steps": [
-            {
-              "id": "layer1Step",
-              "node_ids": [
-                "transformerLayer1",
-                "tLayer1Neuron1",
-                "tLayer1Neuron2",
-                "tLayer1Neuron3",
-                "tLayer1Neuron4",
-                "tLayer1Neuron5",
-                "tLayer1Neuron6",
-                "tLayer1Neuron7",
-                "tLayer1Neuron8",
-                "tLayer1Neuron9",
-                "tLayer1Neuron10",
-                "tLayer1Neuron11",
-                "tLayer1Neuron12",
-                "tLayer1Neuron13",
-                "tLayer1Neuron14",
-                "tLayer1Neuron15",
-                "tLayer1Neuron16"
-              ],
-              "input_ids_by_node": {},
-              "outputs_by_node": {
-                "transformerLayer1": [
-                  {
-                    "id": "layer1AggregateOutput",
-                    "title": "Layer 1 Aggregate Output"
-                  }
-                ],
-                "tLayer1Neuron1": [
-                  {
-                    "id": "l1n1Output",
-                    "title": "L1 Neuron #1 Output"
-                  }
-                ],
-                "tLayer1Neuron2": [
-                  {
-                    "id": "l1n2Output",
-                    "title": "L1 Neuron #2 Output"
-                  }
-                ],
-                "tLayer1Neuron3": [
-                  {
-                    "id": "l1n3Output",
-                    "title": "L1 Neuron #3 Output"
-                  }
-                ],
-                "tLayer1Neuron4": [
-                  {
-                    "id": "l1n4Output",
-                    "title": "L1 Neuron #4 Output"
-                  }
-                ],
-                "tLayer1Neuron5": [
-                  {
-                    "id": "l1n5Output",
-                    "title": "L1 Neuron #5 Output"
-                  }
-                ],
-                "tLayer1Neuron6": [
-                  {
-                    "id": "l1n6Output",
-                    "title": "L1 Neuron #6 Output"
-                  }
-                ],
-                "tLayer1Neuron7": [
-                  {
-                    "id": "l1n7Output",
-                    "title": "L1 Neuron #7 Output"
-                  }
-                ],
-                "tLayer1Neuron8": [
-                  {
-                    "id": "l1n8Output",
-                    "title": "L1 Neuron #8 Output"
-                  }
-                ],
-                "tLayer1Neuron9": [
-                  {
-                    "id": "l1n9Output",
-                    "title": "L1 Neuron #9 Output"
-                  }
-                ],
-                "tLayer1Neuron10": [
-                  {
-                    "id": "l1n10Output",
-                    "title": "L1 Neuron #10 Output"
-                  }
-                ],
-                "tLayer1Neuron11": [
-                  {
-                    "id": "l1n11Output",
-                    "title": "L1 Neuron #11 Output"
-                  }
-                ],
-                "tLayer1Neuron12": [
-                  {
-                    "id": "l1n12Output",
-                    "title": "L1 Neuron #12 Output"
-                  }
-                ],
-                "tLayer1Neuron13": [
-                  {
-                    "id": "l1n13Output",
-                    "title": "L1 Neuron #13 Output"
-                  }
-                ],
-                "tLayer1Neuron14": [
-                  {
-                    "id": "l1n14Output",
-                    "title": "L1 Neuron #14 Output"
-                  }
-                ],
-                "tLayer1Neuron15": [
-                  {
-                    "id": "l1n15Output",
-                    "title": "L1 Neuron #15 Output"
-                  }
-                ],
-                "tLayer1Neuron16": [
-                  {
-                    "id": "l1n16Output",
-                    "title": "L1 Neuron #16 Output"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>Input data is fed into 16 neurons of Layer 1, each producing an individual output. The layer node itself also generates a combined (aggregate) output.</paragraph></description>"
-            },
-            {
-              "id": "layer2Step",
-              "node_ids": [
-                "transformerLayer2",
-                "tLayer2Neuron1",
-                "tLayer2Neuron2",
-                "tLayer2Neuron3",
-                "tLayer2Neuron4",
-                "tLayer2Neuron5",
-                "tLayer2Neuron6",
-                "tLayer2Neuron7",
-                "tLayer2Neuron8"
-              ],
-              "input_ids_by_node": {
-                "transformerLayer2": [
-                  "layer1AggregateOutput"
-                ],
-                "tLayer2Neuron1": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron2": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron3": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron4": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron5": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron6": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron7": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ],
-                "tLayer2Neuron8": [
-                  "l1n1Output",
-                  "l1n2Output",
-                  "l1n3Output",
-                  "l1n4Output",
-                  "l1n5Output",
-                  "l1n6Output",
-                  "l1n7Output",
-                  "l1n8Output",
-                  "l1n9Output",
-                  "l1n10Output",
-                  "l1n11Output",
-                  "l1n12Output",
-                  "l1n13Output",
-                  "l1n14Output",
-                  "l1n15Output",
-                  "l1n16Output"
-                ]
-              },
-              "outputs_by_node": {
-                "transformerLayer2": [
-                  {
-                    "id": "layer2AggregateOutput",
-                    "title": "Layer 2 Aggregate Output"
-                  }
-                ],
-                "tLayer2Neuron1": [
-                  {
-                    "id": "l2n1Output",
-                    "title": "L2 Neuron #1 Output"
-                  }
-                ],
-                "tLayer2Neuron2": [
-                  {
-                    "id": "l2n2Output",
-                    "title": "L2 Neuron #2 Output"
-                  }
-                ],
-                "tLayer2Neuron3": [
-                  {
-                    "id": "l2n3Output",
-                    "title": "L2 Neuron #3 Output"
-                  }
-                ],
-                "tLayer2Neuron4": [
-                  {
-                    "id": "l2n4Output",
-                    "title": "L2 Neuron #4 Output"
-                  }
-                ],
-                "tLayer2Neuron5": [
-                  {
-                    "id": "l2n5Output",
-                    "title": "L2 Neuron #5 Output"
-                  }
-                ],
-                "tLayer2Neuron6": [
-                  {
-                    "id": "l2n6Output",
-                    "title": "L2 Neuron #6 Output"
-                  }
-                ],
-                "tLayer2Neuron7": [
-                  {
-                    "id": "l2n7Output",
-                    "title": "L2 Neuron #7 Output"
-                  }
-                ],
-                "tLayer2Neuron8": [
-                  {
-                    "id": "l2n8Output",
-                    "title": "L2 Neuron #8 Output"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>Layer 2's 8 neurons each receive all 16 neuron outputs from Layer 1, plus the layer-level aggregate if needed. Each neuron in Layer 2 produces its own output, while the layer node creates a combined output.</paragraph></description>"
-            },
-            {
-              "id": "outputLayerStep",
-              "node_ids": [
-                "transformerOutputLayer",
-                "tOutputLayerNeuron1",
-                "tOutputLayerNeuron2"
-              ],
-              "input_ids_by_node": {
-                "transformerOutputLayer": [
-                  "layer2AggregateOutput"
-                ],
-                "tOutputLayerNeuron1": [
-                  "l2n1Output",
-                  "l2n2Output",
-                  "l2n3Output",
-                  "l2n4Output",
-                  "l2n5Output",
-                  "l2n6Output",
-                  "l2n7Output",
-                  "l2n8Output"
-                ],
-                "tOutputLayerNeuron2": [
-                  "l2n1Output",
-                  "l2n2Output",
-                  "l2n3Output",
-                  "l2n4Output",
-                  "l2n5Output",
-                  "l2n6Output",
-                  "l2n7Output",
-                  "l2n8Output"
-                ]
-              },
-              "outputs_by_node": {
-                "transformerOutputLayer": [
-                  {
-                    "id": "finalTransformerOutput",
-                    "title": "Final Transformer Output"
-                  }
-                ],
-                "tOutputLayerNeuron1": [
-                  {
-                    "id": "oln1Output",
-                    "title": "Output Neuron #1 Output"
-                  }
-                ],
-                "tOutputLayerNeuron2": [
-                  {
-                    "id": "oln2Output",
-                    "title": "Output Neuron #2 Output"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The Output Layer's 2 neurons each receive all 8 neuron outputs from Layer 2 (plus layer 2's aggregate if desired). The output layer node also produces a final aggregated output.</paragraph></description>"
-            }
-          ],
-          "initial_inputs": [],
-          "start_index": 0
-        }
-      ]
-    },
-    {
-      "id": "transformerLayer1",
-      "title": "Transformer Layer 1",
-      "parent_id": "transformerModels",
-      "description": "<description><heading level=\"1\">Transformer Layer 1</heading><paragraph>The first hidden layer, comprising 16 distinct neuron nodes. It collectively processes the input data and creates an aggregate output, in addition to the individual neuron outputs.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "transformerLayer2",
-      "title": "Transformer Layer 2",
-      "parent_id": "transformerModels",
-      "description": "<description><heading level=\"1\">Transformer Layer 2</heading><paragraph>A second hidden layer with 8 neuron nodes, refining the representation from Layer 1. This layer also provides a combined output representing the entire set of neurons.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "transformerOutputLayer",
-      "title": "Transformer Output Layer",
-      "parent_id": "transformerModels",
-      "description": "<description><heading level=\"1\">Transformer Output Layer</heading><paragraph>The final layer in this Transformer demonstration, with 2 neuron nodes that combine the signals from Layer 2 to generate the final inference (plus an optional aggregated output at the layer level).</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron1",
-      "title": "Layer 1 Neuron #1",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #1</heading><paragraph>Processes input signals, focusing on a particular subset of features.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron2",
-      "title": "Layer 1 Neuron #2",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #2</heading><paragraph>Captures different aspects of the embedding than Neuron #1.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron3",
-      "title": "Layer 1 Neuron #3",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #3</heading><paragraph>Specializes in a particular dimension or attention head if relevant.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron4",
-      "title": "Layer 1 Neuron #4",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #4</heading><paragraph>Another neuron contributing to the combined representation of Layer 1.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron5",
-      "title": "Layer 1 Neuron #5",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #5</heading><paragraph>Extracts yet another set of features from the input data.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron6",
-      "title": "Layer 1 Neuron #6",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #6</heading><paragraph>In a real transformer, might also handle multi-head self-attention computations.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron7",
-      "title": "Layer 1 Neuron #7",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #7</heading><paragraph>Identifies certain linguistic or visual patterns in the input signals.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron8",
-      "title": "Layer 1 Neuron #8",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #8</heading><paragraph>Works in tandem with the other neurons to form a comprehensive first-layer representation.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron9",
-      "title": "Layer 1 Neuron #9",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #9</heading><paragraph>Captures subtler relationships that might not be covered by earlier neurons.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron10",
-      "title": "Layer 1 Neuron #10",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #10</heading><paragraph>Further extends the representational power of the layer by focusing on unique feature subsets.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron11",
-      "title": "Layer 1 Neuron #11",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #11</heading><paragraph>Potentially handles attention weighting for certain positions in the input sequence.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron12",
-      "title": "Layer 1 Neuron #12",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #12</heading><paragraph>In synergy with the other neurons, helps produce a rich intermediate representation.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron13",
-      "title": "Layer 1 Neuron #13",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #13</heading><paragraph>Focuses on different feature interactions or attention heads within the same layer.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron14",
-      "title": "Layer 1 Neuron #14",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #14</heading><paragraph>Collects partial signals, building toward the final combined layer output.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron15",
-      "title": "Layer 1 Neuron #15",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #15</heading><paragraph>Extends the diversity of learned features, essential for complex tasks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer1Neuron16",
-      "title": "Layer 1 Neuron #16",
-      "parent_id": "transformerLayer1",
-      "description": "<description><heading level=\"1\">Layer 1 Neuron #16</heading><paragraph>The sixteenth neuron, completing Layer 1's coverage of the input signal space.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron1",
-      "title": "Layer 2 Neuron #1",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #1</heading><paragraph>Receives all outputs from Layer 1, further refining them.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron2",
-      "title": "Layer 2 Neuron #2",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #2</heading><paragraph>Captures an alternate view of the signals from the first layer, focusing on different features.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron3",
-      "title": "Layer 2 Neuron #3",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #3</heading><paragraph>Expands upon patterns gleaned from Layer 1's combined outputs.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron4",
-      "title": "Layer 2 Neuron #4",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #4</heading><paragraph>Helps create a deeper embedding representation by focusing on crucial signals from Layer 1.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron5",
-      "title": "Layer 2 Neuron #5",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #5</heading><paragraph>Works with attention or feed-forward transformations to refine partial signals.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron6",
-      "title": "Layer 2 Neuron #6",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #6</heading><paragraph>In real transformers, might also incorporate skip connections and layer normalization logic.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron7",
-      "title": "Layer 2 Neuron #7",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #7</heading><paragraph>Captures specialized signals relevant to the final output or next layer's computations.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tLayer2Neuron8",
-      "title": "Layer 2 Neuron #8",
-      "parent_id": "transformerLayer2",
-      "description": "<description><heading level=\"1\">Layer 2 Neuron #8</heading><paragraph>Completes the second hidden layer's coverage of all relevant features from Layer 1.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tOutputLayerNeuron1",
-      "title": "Output Layer Neuron #1",
-      "parent_id": "transformerOutputLayer",
-      "description": "<description><heading level=\"1\">Output Layer Neuron #1</heading><paragraph>Produces part of the final logits or classification scores after receiving signals from all Layer 2 neurons.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "tOutputLayerNeuron2",
-      "title": "Output Layer Neuron #2",
-      "parent_id": "transformerOutputLayer",
-      "description": "<description><heading level=\"1\">Output Layer Neuron #2</heading><paragraph>Works in tandem with Neuron #1 to generate the final output distribution or vector for the model.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "cnnModels",
-      "title": "Convolutional Neural Networks",
-      "parent_id": "neuralNetworks",
-      "description": "<description><heading level=\"1\">Convolutional Neural Networks</heading><paragraph>Layered convolution filters extracting spatial features from images or other grid-like data, often used for vision tasks.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "rnnModels",
-      "title": "Recurrent Neural Networks",
-      "parent_id": "neuralNetworks",
-      "description": "<description><heading level=\"1\">Recurrent Neural Networks</heading><paragraph>Networks maintaining internal states across sequences (e.g., language modeling, time-series forecasting). Includes LSTM, GRU variants.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "treeBasedModels",
-      "title": "Tree-Based Models",
-      "parent_id": "modelArchitectures",
-      "description": "<description><heading level=\"1\">Tree-Based Models</heading><paragraph>Ensemble methods like Random Forest or Gradient-Boosted Trees, useful for structured data and tabular predictions.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "linearModels",
-      "title": "Linear Models",
-      "parent_id": "modelArchitectures",
-      "description": "<description><heading level=\"1\">Linear Models</heading><paragraph>Classic models (e.g., linear and logistic regression) relying on weighted sums of input features for prediction.</paragraph></description>",
-      "flows": []
-    },
-    {
-      "id": "userInteractionInterfaces",
-      "title": "User Interaction Interfaces",
-      "parent_id": "softwareLayer",
-      "description": "<description><heading level=\"1\">User Interaction Interfaces</heading><paragraph>Dashboards, CLI tools, or other UIs enabling end-users and system administrators to interact with the AI system, monitor performance, and manage workflows.</paragraph></description>",
+      "id": "injectorNozzleNode",
+      "title": "Injector Nozzle",
+      "description": "<description><paragraph>The nozzle responsible for atomizing and spraying fuel.</paragraph></description>",
+      "parent_id": "fuelInjectorNode",
       "flows": []
     }
   ]
