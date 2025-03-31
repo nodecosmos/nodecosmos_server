@@ -13,7 +13,7 @@ use actix_web_actors::ws::WsResponseBuilder;
 use charybdis::errors::CharybdisError;
 use charybdis::operations::InsertWithCallbacks;
 use charybdis::types::Uuid;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
 use serde_json::json;
 use std::str::FromStr;

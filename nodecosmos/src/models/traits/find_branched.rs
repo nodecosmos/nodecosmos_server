@@ -1,7 +1,7 @@
 use charybdis::model::Model;
 use charybdis::types::{Set, Uuid};
 use futures::TryFutureExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;

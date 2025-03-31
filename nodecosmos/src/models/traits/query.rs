@@ -5,8 +5,8 @@ use charybdis::query::{CharybdisQuery, ModelStream};
 use charybdis::types::Uuid;
 use futures::stream::SelectAll;
 use futures::{stream, StreamExt};
-use scylla::CachingSession;
 use scylla::_macro_internal::SerializeRow;
+use scylla::client::caching_session::CachingSession;
 use std::collections::HashSet;
 
 pub trait IdsVec {

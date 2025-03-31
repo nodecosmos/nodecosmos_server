@@ -2,7 +2,7 @@ use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::types::{Frozen, Text, Timestamp, Uuid};
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

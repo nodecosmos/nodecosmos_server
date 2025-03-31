@@ -20,7 +20,7 @@ use charybdis::types::{Boolean, Double, Frozen, Set, Text, Timestamp, Uuid};
 use chrono::Utc;
 use futures::StreamExt;
 use macros::{Branchable, Id, NodeParent};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -126,6 +126,11 @@ impl Callbacks for Node {
             self.update_branch_with_creation(data)
                 .await
                 .context("Failed to update branch")?;
+        }
+
+        if self.is_public() && self.is_root {
+            // if it's not public, subscription is created before insert
+            self.create_subscription(db_session).await?;
         }
 
         self.create_workflow(data.db_session()).await?;

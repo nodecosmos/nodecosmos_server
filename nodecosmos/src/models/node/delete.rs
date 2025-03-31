@@ -1,7 +1,7 @@
 use charybdis::batch::ModelBatch;
 use charybdis::types::{Set, Uuid};
 use futures::StreamExt;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 
 use crate::api::data::RequestData;

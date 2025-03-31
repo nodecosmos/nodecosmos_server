@@ -6,7 +6,7 @@ use charybdis::operations::{DeleteWithCallbacks, Find, InsertWithCallbacks, Upda
 use charybdis::types::Uuid;
 use futures::TryStreamExt;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -251,6 +251,7 @@ async fn handle_google_auth(
                 is_confirmed: true,
                 is_blocked: false,
                 editor_at_nodes: None,
+                assigned_tasks: None,
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
                 password: GOOGLE_LOGIN_PASSWORD.to_string(),

@@ -1,6 +1,6 @@
 use charybdis::operations::Find;
 use chrono::Utc;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;

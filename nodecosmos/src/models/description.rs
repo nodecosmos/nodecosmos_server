@@ -12,7 +12,7 @@ use charybdis::operations::{Find, Insert};
 use charybdis::types::{Text, Timestamp, Uuid};
 use chrono::Utc;
 use macros::{Branchable, ObjectId};
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, Transact, Update};

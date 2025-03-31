@@ -4,7 +4,7 @@ use actix_session::{Session, SessionExt};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
 use log::error;
-use scylla::CachingSession;
+use scylla::client::caching_session::CachingSession;
 
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
