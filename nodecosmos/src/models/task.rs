@@ -1,5 +1,9 @@
 use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
+use crate::models::attachment::Attachment;
+use crate::models::comment::Comment;
+use crate::models::comment_thread::CommentThread;
+use crate::models::description::Description;
 use crate::models::udts::{AssignedTask, Profile};
 use crate::models::user::{UpdateAssignedTasksUser, User};
 use crate::models::utils::impl_updated_at_cb;
@@ -62,6 +66,30 @@ impl Callbacks for Task {
         self.updated_at = Utc::now();
         self.author_id = data.current_user.id;
         self.author = Profile::init_from_current_user(&data.current_user);
+
+        Ok(())
+    }
+
+    async fn after_delete(
+        &mut self,
+        db_session: &CachingSession,
+        _extension: &Self::Extension,
+    ) -> Result<(), Self::Error> {
+        CommentThread::delete_by_branch_id_and_object_id(self.branch_id, self.id)
+            .execute(db_session)
+            .await?;
+
+        Comment::delete_by_branch_id_and_thread_id(self.branch_id, self.id)
+            .execute(db_session)
+            .await?;
+
+        Attachment::delete_by_branch_id_and_node_id_and_object_id(self.branch_id, self.node_id, self.id)
+            .execute(db_session)
+            .await?;
+
+        Description::delete_by_branch_id_and_object_id(self.branch_id, self.id)
+            .execute(db_session)
+            .await?;
 
         Ok(())
     }
@@ -167,3 +195,7 @@ impl_updated_at_cb!(UpdatePositionTask);
 partial_task!(UpdateTitleTask, branch_id, node_id, id, title, updated_at);
 
 impl_updated_at_cb!(UpdateTitleTask);
+
+partial_task!(UpdateDueAtTask, branch_id, node_id, id, due_at, updated_at);
+
+impl_updated_at_cb!(UpdateDueAtTask);

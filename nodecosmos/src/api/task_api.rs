@@ -3,10 +3,10 @@ use crate::api::data::RequestData;
 use crate::api::types::Response;
 use crate::models::description::Description;
 use crate::models::node::AuthNode;
-use crate::models::task::{Task, UpdateAssigneesTask, UpdatePositionTask, UpdateTitleTask};
+use crate::models::task::{Task, UpdateAssigneesTask, UpdateDueAtTask, UpdatePositionTask, UpdateTitleTask};
 use crate::models::task_section::{TaskSection, UpdateOrderIndexTaskSection, UpdateTitleTaskSection};
-use actix_web::{get, post, put, web, HttpResponse};
-use charybdis::operations::{InsertWithCallbacks, UpdateWithCallbacks};
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use charybdis::operations::{DeleteWithCallbacks, InsertWithCallbacks, UpdateWithCallbacks};
 use charybdis::types::Uuid;
 use serde_json::json;
 
@@ -62,6 +62,19 @@ pub async fn update_section_title(data: RequestData, task_section: web::Json<Upd
     task_section.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(task_section))
+}
+
+#[delete("/section/{branch_id}/{node_id}/{task_section_id}")]
+pub async fn delete_task_section(data: RequestData, task_section: web::Path<(Uuid, Uuid, Uuid)>) -> Response {
+    let (branch_id, node_id, task_section_id) = task_section.into_inner();
+
+    AuthNode::auth_update(&data, branch_id, node_id, branch_id).await?;
+
+    TaskSection::delete_by_branch_id_and_node_id_and_id(branch_id, node_id, task_section_id)
+        .execute(data.db_session())
+        .await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 #[get("/{branch_id}/{node_id}")]
@@ -164,4 +177,34 @@ pub async fn update_task_position(data: RequestData, task: web::Json<UpdatePosit
     task.update_cb(&None).execute(data.db_session()).await?;
 
     Ok(HttpResponse::Ok().json(task))
+}
+
+#[put("/task_due_at")]
+pub async fn update_task_due_at(data: RequestData, task: web::Json<UpdateDueAtTask>) -> Response {
+    let mut task = task.into_inner();
+
+    AuthNode::auth_update(&data, task.branch_id, task.node_id, task.branch_id).await?;
+
+    task.update_cb(&None).execute(data.db_session()).await?;
+
+    Ok(HttpResponse::Ok().json(task))
+}
+
+#[delete("/task/{branch_id}/{node_id}/{task_id}")]
+pub async fn delete_task(data: RequestData, task: web::Path<(Uuid, Uuid, Uuid)>) -> Response {
+    let (branch_id, node_id, task_id) = task.into_inner();
+
+    AuthNode::auth_update(&data, branch_id, node_id, branch_id).await?;
+
+    Task {
+        branch_id,
+        node_id,
+        id: task_id,
+        ..Default::default()
+    }
+    .delete_cb(&data)
+    .execute(data.db_session())
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }

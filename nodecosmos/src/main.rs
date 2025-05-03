@@ -215,12 +215,15 @@ fn main() {
                                 .service(create_task_section)
                                 .service(update_section_order_index)
                                 .service(update_section_title)
+                                .service(delete_task_section)
                                 .service(get_node_tasks)
                                 .service(create_task)
                                 .service(get_task)
                                 .service(update_assignees)
                                 .service(update_task_position)
-                                .service(update_task_title),
+                                .service(update_task_title)
+                                .service(update_task_due_at)
+                                .service(delete_task),
                         )
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
