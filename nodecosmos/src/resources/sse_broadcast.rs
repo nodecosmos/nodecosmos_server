@@ -130,7 +130,7 @@ impl SseBroadcast {
     }
 }
 
-pub struct ModelEvent<'a, M: BaseModel + Serialize> {
+pub struct ModelEvent<'a, M: BaseModel> {
     pub root_id: Uuid,
     pub action_type: ActionTypes,
     pub model: &'a M,

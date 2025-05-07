@@ -1304,14 +1304,14 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "charybdis"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a634576bf7db04859380b6c1dd663503f73a540e348e0f075ccc043cb3f034cb"
+checksum = "6468392d1de6368a49d48cffd3e9fad25d4c792272907282522a82de4a9dc1e4"
 dependencies = [
  "bigdecimal",
  "charybdis_macros",
  "chrono",
- "colored 2.2.0",
+ "colored",
  "futures",
  "scylla",
  "serde",
@@ -1321,9 +1321,9 @@ dependencies = [
 
 [[package]]
 name = "charybdis_macros"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f87391134b2ce609f789eb8fd254145de0fbae6682fdc368929b52c7deb8f2ff"
+checksum = "da11abc331f451a20d5c290b2e20e8cf3f6731cfda27b7339ff90d046c6ecbcc"
 dependencies = [
  "charybdis_parser",
  "proc-macro2",
@@ -1333,19 +1333,19 @@ dependencies = [
 
 [[package]]
 name = "charybdis_parser"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b95caa29935fe20506658941575d1a407d0c1e1bd11a84d2abbaef9e338f5cbe"
+checksum = "fa0d1e1e6903a996a4a6827a83af6efe94d1f3217ae0ef6610c2ffb42216c85b"
 dependencies = [
- "colored 2.2.0",
+ "colored",
  "darling",
  "proc-macro2",
  "quote",
  "scylla",
  "serde",
  "serde_json",
- "strum 0.26.3",
- "strum_macros 0.26.4",
+ "strum",
+ "strum_macros",
  "syn 2.0.90",
  "walkdir",
 ]
@@ -1396,16 +1396,6 @@ name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
-
-[[package]]
-name = "colored"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
-dependencies = [
- "lazy_static",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "colored"
@@ -3281,7 +3271,7 @@ dependencies = [
  "bcrypt",
  "charybdis",
  "chrono",
- "colored 3.0.0",
+ "colored",
  "dashmap 6.1.0",
  "deadpool",
  "dotenv",
@@ -3305,8 +3295,8 @@ dependencies = [
  "scylla",
  "serde",
  "serde_json",
- "strum 0.27.1",
- "strum_macros 0.27.1",
+ "strum",
+ "strum_macros",
  "time",
  "tokio",
  "tokio-stream",
@@ -4415,9 +4405,9 @@ dependencies = [
 
 [[package]]
 name = "scylla"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6f7075a5b5be59fd767b83567bf0c02e9c29626f47d8c4493946b2d6076eb17"
+checksum = "bd81aa1c6de67ed43f78a64aa233c547c569979922ab2e6c6d58730f0d53b651"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -4446,9 +4436,9 @@ dependencies = [
 
 [[package]]
 name = "scylla-cql"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85f1decfbb5ff3eb8da7883937c9bca318ccfa220d50bd5a2cdb573fb29bc19b"
+checksum = "ae84054fed47b0a7e757d66aeb4574a4ca9696bf68c25ed6325b0f198c15795b"
 dependencies = [
  "async-trait",
  "bigdecimal",
@@ -4472,9 +4462,9 @@ dependencies = [
 
 [[package]]
 name = "scylla-macros"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c72a4a475ecca0ab180b995f63e079763baaa453ec1a84f6811ebd8d8fe18e8"
+checksum = "e67d343ebea5cc079bfa89ca4b231b432207c3748baaa3b00e5c238e7644e838"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -4885,28 +4875,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.26.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
-
-[[package]]
-name = "strum"
 version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f64def088c51c9510a8579e3c5d67c65349dcf755e5479ad3d010aa6454e2c32"
-
-[[package]]
-name = "strum_macros"
-version = "0.26.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 2.0.90",
-]
 
 [[package]]
 name = "strum_macros"

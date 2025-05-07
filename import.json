@@ -1,127 +1,689 @@
 {
   "nodes": [
     {
-      "id": "lightbulbCircuit",
-      "title": "Lightbulb Circuit",
-      "description": "<description><heading level=\"1\">Lightbulb Circuit</heading><paragraph>Top-level node representing the circuit.</paragraph></description>",
+      "id": "smartphone",
+      "title": "Smartphone",
       "parent_id": "root",
-      "flows": [
-        {
-          "title": "Turn On Flow",
-          "description": "<description><paragraph>This flow describes how the circuit is turned on.</paragraph></description>",
-          "initial_inputs": [],
-          "start_index": 0,
-          "flow_steps": [
-            {
-              "id": "flowStep1",
-              "node_ids": [
-                "userNode"
-              ],
-              "input_ids_by_node": {},
-              "outputs_by_node": {
-                "userNode": [
-                  {
-                    "id": "switchesOn",
-                    "title": "Switches On",
-                    "description": "<description><paragraph>Action from the user to flip the switch.</paragraph></description>"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>User flips the switch on.</paragraph></description>"
-            },
-            {
-              "id": "flowStep2",
-              "node_ids": [
-                "switchNode"
-              ],
-              "input_ids_by_node": {
-                "switchNode": [
-                  "switchesOn"
-                ]
-              },
-              "outputs_by_node": {
-                "switchNode": [
-                  {
-                    "id": "circuitClosed",
-                    "title": "Close ",
-                    "description": "<description><paragraph>Switch is now in closed position.</paragraph></description>"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The switch receives the 'Switches On' input and closes the circuit.</paragraph></description>"
-            },
-            {
-              "id": "flowStep3",
-              "node_ids": [
-                "batteryNode"
-              ],
-              "input_ids_by_node": {
-                "batteryNode": [
-                  "circuitClosed"
-                ]
-              },
-              "outputs_by_node": {
-                "batteryNode": [
-                  {
-                    "id": "current",
-                    "title": "Current",
-                    "description": "<description><paragraph>Battery outputs current once circuit is closed.</paragraph></description>"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The battery detects the closed circuit and supplies current.</paragraph></description>"
-            },
-            {
-              "id": "flowStep4",
-              "node_ids": [
-                "lightbulbNode"
-              ],
-              "input_ids_by_node": {
-                "lightbulbNode": [
-                  "current"
-                ]
-              },
-              "outputs_by_node": {
-                "lightbulbNode": [
-                  {
-                    "id": "light",
-                    "title": "Light",
-                    "description": "<description><paragraph>The lightbulb produces light once current is received.</paragraph></description>"
-                  }
-                ]
-              },
-              "description": "<description><paragraph>The lightbulb receives current and emits light.</paragraph></description>"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "userNode",
-      "title": "User",
-      "description": "<description><paragraph>The actor who initiates the switch action.</paragraph></description>",
-      "parent_id": "lightbulbCircuit",
+      "description": "<description><paragraph>The complete mobile computing device that integrates the hardware, software and mechanical assemblies listed below.</paragraph></description>",
       "flows": []
     },
     {
-      "id": "switchNode",
-      "title": "Switch",
-      "description": "<description><paragraph>The switch can open or close the circuit.</paragraph></description>",
-      "parent_id": "lightbulbCircuit",
+      "id": "hardware",
+      "title": "Hardware",
+      "parent_id": "smartphone",
+      "description": "<description><paragraph>All electronic and electromechanical subsystems.</paragraph></description>",
       "flows": []
     },
     {
-      "id": "batteryNode",
-      "title": "Battery",
-      "description": "<description><paragraph>The battery supplies power to the circuit when it is closed.</paragraph></description>",
-      "parent_id": "lightbulbCircuit",
+      "id": "software",
+      "title": "Software",
+      "parent_id": "smartphone",
+      "description": "<description><paragraph>Firmware, operating system and applications.</paragraph></description>",
       "flows": []
     },
     {
-      "id": "lightbulbNode",
-      "title": "Lightbulb",
-      "description": "<description><paragraph>The lightbulb receives current and produces light.</paragraph></description>",
-      "parent_id": "lightbulbCircuit",
+      "id": "mechanical",
+      "title": "Mechanical",
+      "parent_id": "smartphone",
+      "description": "<description><paragraph>Structural and enclosure components.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "soc",
+      "title": "System‑on‑Chip (SoC)",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Main integrated circuit that hosts CPU, GPU and specialised accelerators.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "memory",
+      "title": "Memory (LPDDR)",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>High‑bandwidth volatile system memory.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "storage",
+      "title": "Storage (UFS / NAND)",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Non‑volatile flash storage for OS, apps and user data.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "powerSubsystem",
+      "title": "Power Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Battery and power‑management circuitry.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "displaySubsystem",
+      "title": "Display Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Screen, driver IC and touch controller.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "cameraSubsystem",
+      "title": "Camera Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Rear and front camera assemblies with optics and sensors.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "audioSubsystem",
+      "title": "Audio Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Speakers, microphones and codec.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "connectivitySubsystem",
+      "title": "Connectivity Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Radio and short‑range communications silicon.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "sensorsSubsystem",
+      "title": "Sensors Suite",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Motion, environmental and biometric sensors.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "hapticsSubsystem",
+      "title": "Haptics Subsystem",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Vibration motor providing tactile feedback.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "antennaSubsystem",
+      "title": "Antenna System",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>RF antennas for cellular, Wi‑Fi, GNSS and NFC.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "thermalSubsystem",
+      "title": "Thermal Management",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Heat‑spreading and dissipation components.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "portsSubsystem",
+      "title": "External Ports",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>User‑accessible connectors and openings.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "securitySubsystem",
+      "title": "Security Hardware",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>Dedicated secure silicon and elements.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "ledSubsystem",
+      "title": "LED / Flash",
+      "parent_id": "hardware",
+      "description": "<description><paragraph>High‑brightness LEDs for flash or notifications.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "cpuClusterPerf",
+      "title": "CPU Cluster (Performance)",
+      "parent_id": "soc",
+      "description": "<description><paragraph>High‑performance CPU cores.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "cpuClusterEff",
+      "title": "CPU Cluster (Efficiency)",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Power‑efficient CPU cores.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "gpu",
+      "title": "GPU",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Graphics Processing Unit.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "dsp",
+      "title": "DSP",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Digital Signal Processor for audio and sensor tasks.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "isp",
+      "title": "ISP",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Image Signal Processor for camera pipelines.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "npu",
+      "title": "NPU / AI Accelerator",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Neural processing unit for ML workloads.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "modem",
+      "title": "Cellular Modem",
+      "parent_id": "soc",
+      "description": "<description><paragraph>5G/4G baseband integrated on die.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "secureEnclave",
+      "title": "Secure Enclave",
+      "parent_id": "soc",
+      "description": "<description><paragraph>Isolated hardware for cryptographic operations.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "lpddrRam",
+      "title": "LPDDR RAM Chips",
+      "parent_id": "memory",
+      "description": "<description><paragraph>Low‑power DDR memory packages.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "ufsController",
+      "title": "UFS Controller",
+      "parent_id": "storage",
+      "description": "<description><paragraph>High‑speed interface controller.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "nandFlash",
+      "title": "NAND Flash Array",
+      "parent_id": "storage",
+      "description": "<description><paragraph>Multi‑layer 3D NAND storage dies.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "battery",
+      "title": "Li‑ion Battery Pack",
+      "parent_id": "powerSubsystem",
+      "description": "<description><paragraph>Rechargeable cell that powers the phone.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "pmic",
+      "title": "PMIC",
+      "parent_id": "powerSubsystem",
+      "description": "<description><paragraph>Power‑Management IC for voltage regulation.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "chargingIc",
+      "title": "Charging IC",
+      "parent_id": "powerSubsystem",
+      "description": "<description><paragraph>Controls wired fast‑charging.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "wirelessCoil",
+      "title": "Wireless‑Charging Coil",
+      "parent_id": "powerSubsystem",
+      "description": "<description><paragraph>Inductive coil for Qi/PMA charging.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "displayPanel",
+      "title": "OLED / LCD Panel",
+      "parent_id": "displaySubsystem",
+      "description": "<description><paragraph>Main emissive display panel.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "ddic",
+      "title": "Display Driver IC",
+      "parent_id": "displaySubsystem",
+      "description": "<description><paragraph>Drives rows/columns of the panel.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "touchController",
+      "title": "Touch Controller",
+      "parent_id": "displaySubsystem",
+      "description": "<description><paragraph>Capacitive‑touch sensing ASIC.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "rearCamera",
+      "title": "Rear‑Camera Assembly",
+      "parent_id": "cameraSubsystem",
+      "description": "<description><paragraph>Module containing multiple rear sensors.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "frontCamera",
+      "title": "Front‑Camera Assembly",
+      "parent_id": "cameraSubsystem",
+      "description": "<description><paragraph>Selfie camera module.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "wideCamera",
+      "title": "Wide‑Angle Sensor",
+      "parent_id": "rearCamera",
+      "description": "<description><paragraph>Main 1× camera sensor + lens.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "ultraWideCamera",
+      "title": "Ultra‑Wide Sensor",
+      "parent_id": "rearCamera",
+      "description": "<description><paragraph>0.5× sensor for wide FoV shots.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "teleCamera",
+      "title": "Telephoto Sensor",
+      "parent_id": "rearCamera",
+      "description": "<description><paragraph>Optical zoom (≥2×) sensor.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "rearOis",
+      "title": "OIS Module",
+      "parent_id": "rearCamera",
+      "description": "<description><paragraph>Optical image stabilisation actuators.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "selfieCamera",
+      "title": "Selfie Sensor",
+      "parent_id": "frontCamera",
+      "description": "<description><paragraph>Front‑facing sensor for selfies and video calls.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "speakerModule",
+      "title": "Main Speaker",
+      "parent_id": "audioSubsystem",
+      "description": "<description><paragraph>Loudspeaker for media playback.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "earpiece",
+      "title": "Earpiece Speaker",
+      "parent_id": "audioSubsystem",
+      "description": "<description><paragraph>Narrow‑band speaker for calls.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "microphoneArray",
+      "title": "Microphones",
+      "parent_id": "audioSubsystem",
+      "description": "<description><paragraph>Multiple MEMS mics for voice & noise‑cancellation.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "audioCodec",
+      "title": "Audio Codec IC",
+      "parent_id": "audioSubsystem",
+      "description": "<description><paragraph>ADC/DAC converting between digital and analog audio.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "wifiBtChip",
+      "title": "Wi‑Fi / Bluetooth SoC",
+      "parent_id": "connectivitySubsystem",
+      "description": "<description><paragraph>Dual‑band Wi‑Fi 6 and Bluetooth 5 combo chip.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "uwbChip",
+      "title": "UWB Module",
+      "parent_id": "connectivitySubsystem",
+      "description": "<description><paragraph>Ultra‑wide‑band for precise ranging.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "nfcController",
+      "title": "NFC Controller",
+      "parent_id": "connectivitySubsystem",
+      "description": "<description><paragraph>Near‑field communication IC for payments & tags.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "gnssReceiver",
+      "title": "GNSS Receiver",
+      "parent_id": "connectivitySubsystem",
+      "description": "<description><paragraph>GPS / Galileo / BeiDou satellite positioning chip.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "accelerometer",
+      "title": "Accelerometer",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>3‑axis linear acceleration sensor.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "gyroscope",
+      "title": "Gyroscope",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>3‑axis rotational‑rate sensor.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "magnetometer",
+      "title": "Magnetometer",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>Compass sensor measuring Earth’s field.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "barometer",
+      "title": "Barometer",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>Absolute pressure sensor for altitude.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "proximitySensor",
+      "title": "Proximity Sensor",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>IR sensor for ear‑detection during calls.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "ambientLight",
+      "title": "Ambient‑Light Sensor",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>Measures scene brightness for auto‑brightness.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "fingerprint",
+      "title": "Fingerprint Sensor",
+      "parent_id": "sensorsSubsystem",
+      "description": "<description><paragraph>Capacitive or optical sensor for biometric unlock.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "lraMotor",
+      "title": "Linear Resonant Actuator",
+      "parent_id": "hapticsSubsystem",
+      "description": "<description><paragraph>Precision vibration motor for haptic feedback.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "cellAntenna",
+      "title": "Cellular Antenna",
+      "parent_id": "antennaSubsystem",
+      "description": "<description><paragraph>Multi‑band antennas for 5G/4G/3G.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "wifiAntenna",
+      "title": "Wi‑Fi Antenna",
+      "parent_id": "antennaSubsystem",
+      "description": "<description><paragraph>Dual‑band WLAN antenna.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "gnssAntenna",
+      "title": "GNSS Antenna",
+      "parent_id": "antennaSubsystem",
+      "description": "<description><paragraph>Antenna for positioning satellites.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "nfcAntenna",
+      "title": "NFC Antenna",
+      "parent_id": "antennaSubsystem",
+      "description": "<description><paragraph>Loop antenna for NFC field coupling.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "heatSpreader",
+      "title": "Copper Heat‑Spreader",
+      "parent_id": "thermalSubsystem",
+      "description": "<description><paragraph>Conducts heat away from hot silicon.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "graphiteSheet",
+      "title": "Graphite Sheet",
+      "parent_id": "thermalSubsystem",
+      "description": "<description><paragraph>Ultra‑thin composite for planar dissipation.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "vaporChamber",
+      "title": "Vapor Chamber",
+      "parent_id": "thermalSubsystem",
+      "description": "<description><paragraph>Two‑phase heat spreader for peak loads.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "usbC",
+      "title": "USB‑C Connector",
+      "parent_id": "portsSubsystem",
+      "description": "<description><paragraph>Main wired data‑and‑power port.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "simTray",
+      "title": "SIM Tray",
+      "parent_id": "portsSubsystem",
+      "description": "<description><paragraph>Removable holder for nano‑SIM / eSIM activation.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "micPort",
+      "title": "Mic Port",
+      "parent_id": "portsSubsystem",
+      "description": "<description><paragraph>Acoustic opening for microphones.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "speakerPort",
+      "title": "Speaker Port",
+      "parent_id": "portsSubsystem",
+      "description": "<description><paragraph>Acoustic grille for loudspeaker.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "secureElement",
+      "title": "Secure Element",
+      "parent_id": "securitySubsystem",
+      "description": "<description><paragraph>Tamper‑resistant chip for payments & keys.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "tpmModule",
+      "title": "TPM‑Lite",
+      "parent_id": "securitySubsystem",
+      "description": "<description><paragraph>Trusted Platform Module functions.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "flashLed",
+      "title": "Dual‑Tone Flash LED",
+      "parent_id": "ledSubsystem",
+      "description": "<description><paragraph>High‑intensity dual‑colour flash for photos.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "notificationLed",
+      "title": "Notification LED",
+      "parent_id": "ledSubsystem",
+      "description": "<description><paragraph>Status LED for discrete alerts (if present).</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "chassisFrame",
+      "title": "Metal Mid‑frame",
+      "parent_id": "mechanical",
+      "description": "<description><paragraph>Main structural frame holding PCBs and modules.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "displayGlass",
+      "title": "Front Glass",
+      "parent_id": "mechanical",
+      "description": "<description><paragraph>Ceramic‑shield / Gorilla Glass front cover.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "rearCover",
+      "title": "Rear Cover",
+      "parent_id": "mechanical",
+      "description": "<description><paragraph>Glass or composite back‑panel.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "buttonsGroup",
+      "title": "Physical Buttons",
+      "parent_id": "mechanical",
+      "description": "<description><paragraph>Physical interface actuators.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "powerButton",
+      "title": "Power Button",
+      "parent_id": "buttonsGroup",
+      "description": "<description><paragraph>Press to wake / sleep the device.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "volumeButtons",
+      "title": "Volume Buttons",
+      "parent_id": "buttonsGroup",
+      "description": "<description><paragraph>Raise and lower audio output.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "muteSwitch",
+      "title": "Mute Switch",
+      "parent_id": "buttonsGroup",
+      "description": "<description><paragraph>Hardware toggle for ringer‑mute (if present).</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "firmware",
+      "title": "Firmware",
+      "parent_id": "software",
+      "description": "<description><paragraph>Low‑level code stored in ROM/flash.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "operatingSystem",
+      "title": "Operating System",
+      "parent_id": "software",
+      "description": "<description><paragraph>Kernel, system libraries and core services.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "middleware",
+      "title": "Middleware Layer",
+      "parent_id": "software",
+      "description": "<description><paragraph>Abstraction APIs and service daemons.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "apps",
+      "title": "Applications",
+      "parent_id": "software",
+      "description": "<description><paragraph>First‑party and third‑party apps.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "bootloader",
+      "title": "Bootloader",
+      "parent_id": "firmware",
+      "description": "<description><paragraph>Initial code that validates and boots the OS.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "radioFirmware",
+      "title": "Radio Firmware",
+      "parent_id": "firmware",
+      "description": "<description><paragraph>Proprietary firmware for the cellular modem.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "kernel",
+      "title": "Kernel",
+      "parent_id": "operatingSystem",
+      "description": "<description><paragraph>Monolithic or hybrid kernel managing resources.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "hal",
+      "title": "Hardware Abstraction Layer",
+      "parent_id": "operatingSystem",
+      "description": "<description><paragraph>Standard interfaces between drivers and system.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "systemServices",
+      "title": "System Services",
+      "parent_id": "operatingSystem",
+      "description": "<description><paragraph>Core daemons (powerd, logd, etc.).</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "uiFramework",
+      "title": "UI Framework",
+      "parent_id": "operatingSystem",
+      "description": "<description><paragraph>Window manager, compositor and UI toolkits.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "systemApps",
+      "title": "System Apps",
+      "parent_id": "apps",
+      "description": "<description><paragraph>Pre‑installed first‑party applications.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "thirdPartyApps",
+      "title": "Third‑Party Apps",
+      "parent_id": "apps",
+      "description": "<description><paragraph>User‑installed applications.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "phoneApp",
+      "title": "Phone App",
+      "parent_id": "systemApps",
+      "description": "<description><paragraph>Dialer and call management UI.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "messagingApp",
+      "title": "Messaging App",
+      "parent_id": "systemApps",
+      "description": "<description><paragraph>SMS / RCS / IM conversations.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "cameraApp",
+      "title": "Camera App",
+      "parent_id": "systemApps",
+      "description": "<description><paragraph>Photo & video capture UI.</paragraph></description>",
+      "flows": []
+    },
+    {
+      "id": "settingsApp",
+      "title": "Settings App",
+      "parent_id": "systemApps",
+      "description": "<description><paragraph>System configuration interface.</paragraph></description>",
       "flows": []
     }
   ]
