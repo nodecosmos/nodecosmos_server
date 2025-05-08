@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 futures = "0.3.30"
-scylla = { version = "1.1.0", features = ["openssl-010"] }
+scylla = { version = "1.0.0", features = ["openssl-010"] }
 tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 serde = { version = "1.0.204", features = ["derive"] }

@@ -1,0 +1,143 @@
+name: Build, Migrate, and Deploy to GKE via Helm
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
+  GKE_ZONE: ${{ secrets.GKE_ZONE }}
+  ARTIFACT_REGISTRY_LOCATION: ${{ secrets.ARTIFACT_REGISTRY_LOCATION }}
+  ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Restore Buildx Cache
+        id: cache-buildx
+        uses: actions/cache@v4
+        with:
+          path: .buildx-cache
+          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/kubernetes/Dockerfile
+          tags: |
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:latest
+          cache-from: type=local,src=.buildx-cache
+          cache-to: type=local,dest=.buildx-cache,mode=max
+          load: true
+
+      - name: Authenticate Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev --verbosity=debug
+
+      - name: Push to Artifact Registry
+        run: docker push ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}:${{ github.sha }}
+
+      - name: Save Buildx Cache
+        uses: actions/cache@v4
+        with:
+          path: .buildx-cache
+          key: ${{ runner.os }}-buildx-cache-${{ hashFiles('docker/kubernetes/Dockerfile') }}
+
+  migrate:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code for migrations
+        uses: actions/checkout@v4
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Decode SSL Certificate
+        run: |
+          echo "::add-mask::${{ secrets.DB_CLIENT_CERT }}"
+          echo "${{ secrets.DB_CLIENT_CERT }}" | base64 --decode > client.crt
+
+      - name: Decode SSL Key
+        run: |
+          echo "::add-mask::${{ secrets.DB_CLIENT_KEY }}"
+          echo "${{ secrets.DB_CLIENT_KEY }}" | base64 --decode > client.key
+
+      - name: Decode CA Certificate
+        run: |
+          echo "::add-mask::${{ secrets.DB_CA_CERT }}"
+          echo "${{ secrets.DB_CA_CERT }}" | base64 --decode > ca.crt
+
+      - name: Install Migrate
+        run: cargo install charybdis-migrate --locked
+
+      - name: Run migrations
+        env:
+          SCYLLA_URL: ${{ secrets.SCYLLA_URL }}
+        run: |
+          migrate --keyspace nodecosmos --host "$SCYLLA_URL" \
+            --drop-and-replace --ca ca.crt --cert client.crt --key client.key
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: migrate
+    steps:
+      - name: Checkout Helm Charts Repo
+        uses: actions/checkout@v4
+        with:
+          repository: nodecosmos/kubernetes
+          ref: main
+          path: kubernetes
+          token: ${{ secrets.K8_PAT }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade nodecosmos kubernetes/nodecosmos \
+            --debug \
+            --install \
+            --values kubernetes/google-cloud/nodecosmos/nodecosmos-values.yaml \
+            --set image.repository=${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }} \
+            --set image.tag=${{ github.sha }} \
+            --wait -n nodecosmos
