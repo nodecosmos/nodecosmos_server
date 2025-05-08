@@ -210,17 +210,22 @@ fn main() {
                                 .service(delete_org_member)
                                 .service(build_new_url_for_cancelled_sub),
                         )
-                        // .service(
-                        //     web::scope("tasks")
-                        //         .service(create_task_section)
-                        //         .service(get_task_sections)
-                        //         .service(create_task)
-                        //         .service(get_task)
-                        //         .service(update_assignees)
-                        //         .service(update_is_completed)
-                        //         .service(update_is_archived)
-                        //         .service(update_order_index),
-                        // )
+                        .service(
+                            web::scope("tasks")
+                                .service(create_task_section)
+                                .service(update_section_order_index)
+                                .service(update_section_title)
+                                .service(delete_task_section)
+                                .service(get_node_tasks)
+                                .service(create_task)
+                                .service(get_task)
+                                .service(update_assignees)
+                                .service(update_task_position)
+                                .service(update_task_title)
+                                .service(update_task_due_at)
+                                .service(delete_task),
+                        )
+
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
                 .keep_alive(std::time::Duration::from_secs(60))

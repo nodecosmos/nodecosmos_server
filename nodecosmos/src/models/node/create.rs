@@ -301,7 +301,7 @@ impl Node {
             root_id: self.root_id,
             node_id: self.id,
             branch_id: self.branch_id,
-            title: Some("Workflow".to_string()),
+            title: Some("Flows".to_string()),
             created_at: self.created_at,
             updated_at: self.updated_at,
             initial_input_ids: None,
