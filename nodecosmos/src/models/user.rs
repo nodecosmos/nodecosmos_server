@@ -128,6 +128,7 @@ impl Callbacks for User {
             self.id = Uuid::new_v4();
         }
 
+        // users are not able to login with GOOGLE_LOGIN_PASSWORD
         if self.password != GOOGLE_LOGIN_PASSWORD {
             self.hash_password()?;
         }
