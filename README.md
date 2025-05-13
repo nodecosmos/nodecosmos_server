@@ -28,10 +28,6 @@
     CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 3};
     ```
 
-##### TODO:
-
-- [ ] Scylla Monitoring Stack
-
 ## Resources-Actions-Segmentation-Models
 
 * ### Resources (`resources/`)
@@ -45,16 +41,16 @@
   model-segment specific logic and returning the response.
   E.g. `update_node_description`, `update_user_profile_image`,
   etc.
-* ### Segmentation (`models/<model>/partial_<model>`)
+* ### Partial models (`models/<model>/partial_<model>`)
   This is the process of dividing models into segments required by action. In Charybdis we can make
   use
   of `partial<model>` that returns same things as base model but for subset of model fields. Each
-  segment is
+  partial is
   responsible for a specific task. E.g. `UpdateDescriptionNode`, `UpdateProfileImageUser`. One
-  benefit of segmentation
+  benefit of this
   is to reduce need for full model read before update. Instead we can read only data required for
   authorization and
-  update this fields without reading model beforehand. Another advantage of segmentation is that we
+  update this fields without reading model beforehand. Another advantage of partials is that we
   can have same traits
   implemented for same model but for different segments. E.g. `S3` trait
   for `UpdateProfileImageUser`
@@ -120,27 +116,4 @@ on Linux, macOS, and Unix; `%userprofile%\.aws\credentials` on Microsoft Windows
 [default]
   aws_access_key_id=YOUR-ACCESS-KEY
   aws_secret_access_key=YOUR-SECRET-KEY
-```
-
-# Systemd
-
-```shell
-# /etc/systemd/system/nodecosmos.service
-
-[Unit]
-Description=Nodecosmos Service
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/nodecosmos
-Restart=always
-RestartSec=5
-Environment="RECAPTCHA_ENABLED=false"
-Environment="RECAPTCHA_SECRET=secret-key"
-Environment="SECRET_KEY=test"
-Environment="CONFIG_FILE=/etc/nodecosmos/config.toml"
-
-[Install]
-WantedBy=multi-user.target
 ```

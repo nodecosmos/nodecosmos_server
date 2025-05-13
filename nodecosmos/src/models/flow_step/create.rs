@@ -67,23 +67,21 @@ impl FlowStep {
         data: &RequestData,
         branch_id: Uuid,
     ) -> Result<(), NodecosmosError> {
-        if self.is_original() {
-            let mut clone = self.clone();
-            clone.branch_id = branch_id;
+        let mut clone = self.clone();
+        clone.branch_id = branch_id;
 
-            if clone
-                .maybe_find_by_primary_key()
-                .execute(data.db_session())
-                .await?
-                .is_none()
-            {
-                clone.insert().execute(data.db_session()).await?;
-            }
-
-            clone.preserve_branch_flow(data).await?;
-            clone.preserve_flow_step_ios(data).await?;
-            clone.preserve_flow_step_nodes(data).await?;
+        if clone
+            .maybe_find_by_primary_key()
+            .execute(data.db_session())
+            .await?
+            .is_none()
+        {
+            clone.insert().execute(data.db_session()).await?;
         }
+
+        clone.preserve_branch_flow(data).await?;
+        clone.preserve_flow_step_ios(data).await?;
+        clone.preserve_flow_step_nodes(data).await?;
 
         Ok(())
     }

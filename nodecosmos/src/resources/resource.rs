@@ -345,6 +345,7 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
         }
 
         let mut conn = client.get_async_connection().await.expect("Failed to connect to Redis");
+
         // test write
         let _: () = conn.set("test", "test").await.expect("Failed to set key from client");
 

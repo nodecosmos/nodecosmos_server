@@ -5,7 +5,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::flow_step::FlowStep;
 use crate::models::io::Io;
-use crate::models::traits::ModelContext;
+use crate::models::traits::{Branchable, ModelContext};
 
 impl FlowStep {
     pub async fn pull_input_id(&mut self, data: &RequestData, input_id: Uuid) -> Result<(), NodecosmosError> {
@@ -21,6 +21,10 @@ impl FlowStep {
     }
 
     pub async fn delete_outputs(&self, data: &RequestData) -> Result<(), NodecosmosError> {
+        if self.is_branch() {
+            return Ok(());
+        }
+
         if let Some(output_ids_by_node_id) = &self.output_ids_by_node_id {
             for output_id in output_ids_by_node_id.values().flatten() {
                 let mut output = Io {

@@ -85,8 +85,11 @@ impl Callbacks for FlowStep {
 
     async fn before_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.delete_outputs(data).await?;
-        self.preserve_branch_flow(data).await?;
         self.update_branch_with_deletion(data).await?;
+
+        if self.is_branch() {
+            self.save_original_data_to_branch(data, self.branch_id).await?;
+        }
 
         Ok(())
     }

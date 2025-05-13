@@ -1,6 +1,3 @@
-use std::sync::Arc;
-use std::{env, fs};
-
 use actix_cors::Cors;
 use actix_session::config::PersistentSession;
 use actix_session::SessionMiddleware;
@@ -9,6 +6,9 @@ use actix_web::{http, web};
 use elasticsearch::Elasticsearch;
 use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::{env, fs};
 use toml::Value;
 
 use crate::api::data::RequestData;
@@ -99,6 +99,7 @@ pub struct Config {
     pub ca: Option<String>,
     pub cert: Option<String>,
     pub key: Option<String>,
+    pub region: Option<String>,
 }
 
 type RedisClients = Vec<redis::Client>;
@@ -250,4 +251,29 @@ impl App {
             .cookie_secure(self.config.ssl)
             .build()
     }
+
+    // redis-redis-cluster-0 is in us-central1-b
+    // redis-redis-cluster-1 is in us-central1-b
+    // redis-redis-cluster-2 is in us-central1-a
+    //
+    // pub fn find_local_zone_redis_client(&self) -> &redis::Client {
+    //     let mut config_map = HashMap::new();
+    //
+    //     config_map.insert("us-central1-a", "redis-redis-cluster-2");
+    //     config_map.insert("us-central1-b", "redis-redis-cluster-0");
+    //
+    //     if let Some(region) = &self.config.region {
+    //         let local_url = config_map
+    //             .get(region.as_str())
+    //             .unwrap_or_else(|| panic!("Region {} not found in config map", region));
+    //
+    //         self.redis_clients
+    //             .iter()
+    //             .find(|c| c.get_connection_info().addr.to_string().contains(local_url))
+    //             .or_else(|| self.redis_clients.first())
+    //             .unwrap()
+    //     } else {
+    //         self.redis_clients.first().unwrap()
+    //     }
+    // }
 }
