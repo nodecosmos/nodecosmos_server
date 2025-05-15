@@ -1,20 +1,27 @@
-****# NodeCosmos
+# NodeCosmos Server
 
-Nodecosmos is a collaborative product development platform that allows teams to structure projects,
-model how things work step-by-step, and drive evolution through peer-reviewed proposals—all in one place.****
+NodeCosmos is a collaborative platform for product development and system design. It enables teams to structure
+projects, model how things work step by step, and drive evolution through peer-reviewed proposals—all in one place.
+Think GitHub for systems and innovation.
 
-## 🔧 Key Features:
+## 🔧 Key Features
 
-* **Node Tree**: Organize your system or knowledge base into nested components (nodes), each with its own dedicated
-  page.
+* ### 🌳 Node Tree
+  Structure your product as a tree of nodes. Each node can represent a system or its components, ingredients in a
+  recipe,
+  or any type of constituent depending on the nature of a project.
 
-* **Workflows**: Visually define how components interact—step by step, including inputs and outputs.
+* ### 🔁 Flows
 
-* **Documentation**: Every Node, Flow, Step, and I/O element can be documented on the spot using our real-time
-  collaborative document editor
+  Visually define how each node works from beginning to end, step by step by laying out interactions between
+  nodes:  [Lightbulb Flow Sample](https://nodecosmos.com/nodes/0e71060b-000a-42c4-a29d-6afd204d79a1/0e71060b-000a-42c4-a29d-6afd204d79a1/workflow)
 
-* **Contribution Requests**: Propose changes to any part of the system with a clear visual diff and threaded peer
-  feedback—like GitHub, but for systems and processes.
+* ### 📝 Real-Time Documentation
+  Document every Node, Flow, Step, and I/O inline with a real-time collaborative editor—no context-switching required.
+
+* ### 💡 Contribution Requests
+  Propose changes to any part of the system with a visual diff and threaded feedback—just like GitHub Pull Requests, but
+  for structured systems and processes.
 
 # Installation
 
