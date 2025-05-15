@@ -20,11 +20,11 @@ hosts = ["http://127.0.0.1:9200"]
 bucket = "nodecosmos-development"
 
 
-#[smtp]
-#starttls = true
-#host = ""
-#port = 587
-#username = ""
-#password = ""
-#from_name = ""
-#from_email = ""
+[smtp]
+tls_mode = "none"         # "none" | "starttls" | "tls"
+host = "localhost"
+port = 1025
+username = ""
+password = ""
+from_name = "NodeCosmos"
+from_email = "test@nodecosmos.local"

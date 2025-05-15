@@ -4,10 +4,9 @@ use crate::models::attachment::Attachment;
 use crate::models::comment::Comment;
 use crate::models::comment_thread::CommentThread;
 use crate::models::description::Description;
-use crate::models::udts::{AssignedTask, Profile};
-use crate::models::user::{UpdateAssignedTasksUser, User};
+use crate::models::udts::Profile;
+use crate::models::user::User;
 use crate::models::utils::impl_updated_at_cb;
-use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
 use charybdis::macros::charybdis_model;
 use charybdis::operations::Find;
@@ -132,7 +131,7 @@ impl Callbacks for UpdateAssigneesTask {
             .collect::<Vec<Uuid>>();
 
         let added_users = User::find_by_ids(data.db_session(), &added_assignee_ids).await?;
-        let removed_users = User::find_by_ids(data.db_session(), &removed_assignee_ids).await?;
+        // let removed_users = User::find_by_ids(data.db_session(), &removed_assignee_ids).await?;
 
         // update assignees
         self.assignees = self
@@ -143,38 +142,14 @@ impl Callbacks for UpdateAssigneesTask {
             .chain(added_users.iter().map(|user| Profile::init(&user)))
             .collect::<Vec<Profile>>();
 
-        // update user records
-        let mut update_assignees_batch = UpdateAssignedTasksUser::statement_batch();
+        // TODO: create a table to track assigned tasks per user
+        // let mut update_assignees_batch = UpdateAssignedTasksUser::statement_batch();
+        //
+        // added_users.iter().for_each(|u| {});
+        //
+        // removed_users.iter().for_each(|u| {});
 
-        added_users.iter().for_each(|u| {
-            update_assignees_batch.append_statement(
-                User::PUSH_ASSIGNED_TASKS_QUERY,
-                (
-                    vec![AssignedTask {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                        task_id: self.id,
-                    }],
-                    u.id,
-                ),
-            );
-        });
-
-        removed_users.iter().for_each(|u| {
-            update_assignees_batch.append_statement(
-                User::PULL_ASSIGNED_TASKS_QUERY,
-                (
-                    vec![AssignedTask {
-                        node_id: self.node_id,
-                        branch_id: self.branch_id,
-                        task_id: self.id,
-                    }],
-                    u.id,
-                ),
-            );
-        });
-
-        update_assignees_batch.execute(data.db_session()).await?;
+        // update_assignees_batch.execute(data.db_session()).await?;
 
         Ok(())
     }

@@ -1,3 +1,23 @@
+****# NodeCosmos
+
+Nodecosmos is a collaborative product development platform that allows teams to structure projects,
+model how things work step-by-step, and drive evolution through peer-reviewed proposals—all in one place.****
+
+## 🔧 Key Features:
+
+* **Node Tree**: Organize your system or knowledge base into nested components (nodes), each with its own dedicated
+  page.
+
+* **Workflows**: Visually define how components interact—step by step, including inputs and outputs.
+
+* **Documentation**: Every Node, Flow, Step, and I/O element can be documented on the spot using our real-time
+  collaborative document editor
+
+* **Contribution Requests**: Propose changes to any part of the system with a clear visual diff and threaded peer
+  feedback—like GitHub, but for systems and processes.
+
+# Installation
+
 1) **Install related services with docker compose**
    ```shell
    docker-compose up
@@ -25,10 +45,10 @@
    ```
 3) **Create keyspace and replication factor 3:**
     ```cassandraql
-    CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 3};
+    CREATE KEYSPACE nodecosmos WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 3} AND tablets = { 'enabled': false };
     ```
 
-## Resources-Actions-Segmentation-Models
+## Resources-Actions-Models
 
 * ### Resources (`resources/`)
   They represent data structures that are alive during program runtime. They are usually related to
@@ -41,59 +61,22 @@
   model-segment specific logic and returning the response.
   E.g. `update_node_description`, `update_user_profile_image`,
   etc.
-* ### Partial models (`models/<model>/partial_<model>`)
-  This is the process of dividing models into segments required by action. In Charybdis we can make
-  use
-  of `partial<model>` that returns same things as base model but for subset of model fields. Each
-  partial is
-  responsible for a specific task. E.g. `UpdateDescriptionNode`, `UpdateProfileImageUser`. One
-  benefit of this
-  is to reduce need for full model read before update. Instead we can read only data required for
-  authorization and
-  update this fields without reading model beforehand. Another advantage of partials is that we
-  can have same traits
-  implemented for same model but for different segments. E.g. `S3` trait
-  for `UpdateProfileImageUser`
-  and `UpdateCoverImageUser`.
 * ### Models (`models/`)
   ORM layer that is used to store core application logic. Each model is table in db. If logic is
   reusable, it should
   utilize traits (`models/traits`). If logic is reusable within single model but for it's partials,
   we should
   define it in `models/traits/<model>`.
-   ```rust
-   #[charybdis_model(
-     table_name = users,
-     partition_keys = [id],
-     clustering_keys = [],
-   )]
-   pub struct User {
-     pub id: Uuid,
-     pub username: String,
-     pub email: String,
-     pub password: String,
-     pub profile_image: Option<String>,
-     pub cover_image: Option<String>,
-     pub created_at: DateTime<Utc>,
-     pub updated_at: DateTime<Utc>,
-   }
-  
-   partial_user!(UpdateProfileImageUser, id, profile_image);
-   partial_user!(UpdateCoverImageUser, id, cover_image);
-  
-   impl S3 for UpdateProfileImageUser {
-     fn s3_bucket() -> String {
-       "user-profile-images".to_string()
-     }
-   }
-  
-    impl S3 for UpdateCoverImageUser {
-      fn s3_bucket() -> String {
-         "user-cover-images".to_string()
-      }
-    }
-   
-   ```
+* ### Partial Models (`models/<model>/partial_<model>`)
+  This is the process of dividing models into segments required by action. In Charybdis we can make
+  use of [partial_model](https://github.com/nodecosmos/charybdis?tab=readme-ov-file#partial-model) that returns same
+  things as base model but for subset of model fields. Each partial is responsible for a specific task. E.g.
+  `UpdateDescriptionNode`, `UpdateProfileImageUser`. One
+  benefit of this is to reduce need for full model read before update. Instead, we can read only data required for
+  particular action
+  update this fields without reading model beforehand. Another advantage of partials is that we can have same traits
+  implemented for same model but for different segments. E.g. `S3` trait for `UpdateProfileImageUser` and
+  `UpdateCoverImageNode`.
 
 ### Note:
 
@@ -106,14 +89,21 @@ example, to set the stack size to 8MB, you can run the following command:
 RUST_MIN_STACK=8388608 cargo run
 ```
 
-# AWS
+## AWS (Currently only S3 and SES)
 
 As entries in the `credentials` file in the `.aws` directory in your home directory (`~
 /.aws/credentials`
 on Linux, macOS, and Unix; `%userprofile%\.aws\credentials` on Microsoft Windows):
 
-```shell
-[default]
-  aws_access_key_id=YOUR-ACCESS-KEY
-  aws_secret_access_key=YOUR-SECRET-KEY
 ```
+[default]
+aws_access_key_id=YOUR-ACCESS-KEY
+aws_secret_access_key=YOUR-SECRET-KEY
+```
+
+## Mailer (dev)
+
+For development purposes, we are using `maildev` as a mail server. It is a simple SMTP server that
+allows you to send and receive emails.
+
+`http://localhost:1080/`

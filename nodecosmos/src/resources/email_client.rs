@@ -2,7 +2,8 @@ use crate::app::SmtpConfig;
 use crate::errors::NodecosmosError;
 use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Address, Transport};
+use lettre::{Address, SmtpTransport, Transport};
+use serde::Deserialize;
 
 pub struct SesMailer {
     pub client: aws_sdk_ses::Client,
@@ -48,25 +49,43 @@ impl SesMailer {
     }
 }
 
+#[derive(Clone, Deserialize, strum_macros::Display, strum_macros::EnumString)]
+#[serde(rename_all = "lowercase")]
+pub enum TlsMode {
+    None,
+    Tls,
+    StartTls,
+}
+
 pub struct Smtp {
-    pub relay: String,
-    pub port: u16,
     pub from: Mailbox,
-    pub creds: Credentials,
-    pub starttls: bool,
+    pub client: SmtpTransport,
 }
 
 impl Smtp {
     pub fn new(smtp_cfg: SmtpConfig) -> Self {
+        let transport_builder = match smtp_cfg.tls_mode {
+            TlsMode::None => Ok(SmtpTransport::builder_dangerous(&smtp_cfg.host)),
+            TlsMode::Tls => SmtpTransport::relay(&smtp_cfg.host),
+            TlsMode::StartTls => SmtpTransport::starttls_relay(&smtp_cfg.host),
+        };
+
+        let mut client = transport_builder
+            .expect("SMTP transport builder failed")
+            .port(smtp_cfg.port);
+
+        if !smtp_cfg.username.is_empty() {
+            client = client.credentials(Credentials::new(smtp_cfg.username, smtp_cfg.password));
+        }
+
+        let client = client.build();
+
         Self {
-            relay: smtp_cfg.host,
-            port: smtp_cfg.port,
             from: Mailbox::new(
                 smtp_cfg.from_name,
                 smtp_cfg.from_email.parse::<Address>().expect("Invalid SMTP from email"),
             ),
-            creds: Credentials::new(smtp_cfg.username, smtp_cfg.password),
-            starttls: smtp_cfg.starttls,
+            client,
         }
     }
 
@@ -79,19 +98,7 @@ impl Smtp {
             .body(message)
             .map_err(|e| NodecosmosError::EmailError(format!("{:?}", e)))?;
 
-        let transport_builder = if self.starttls {
-            lettre::SmtpTransport::starttls_relay(&self.relay)
-        } else {
-            lettre::SmtpTransport::relay(&self.relay)
-        };
-
-        let mailer = transport_builder
-            .map_err(|e| NodecosmosError::EmailError(format!("Relay Error {:?}", e)))?
-            .port(self.port)
-            .credentials(self.creds.clone())
-            .build();
-
-        mailer
+        self.client
             .send(&email)
             .map_err(|e| NodecosmosError::EmailError(format!("{:?}", e)))?;
 

@@ -251,7 +251,6 @@ async fn handle_google_auth(
                 is_confirmed: true,
                 is_blocked: false,
                 editor_at_nodes: None,
-                assigned_tasks: None,
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
                 password: GOOGLE_LOGIN_PASSWORD.to_string(),

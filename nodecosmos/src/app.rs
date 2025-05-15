@@ -6,7 +6,6 @@ use actix_web::{http, web};
 use elasticsearch::Elasticsearch;
 use scylla::client::caching_session::CachingSession;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::{env, fs};
 use toml::Value;
@@ -17,6 +16,7 @@ use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::user::User;
 use crate::resources::description_ws_pool::DescriptionWsPool;
+use crate::resources::email_client::TlsMode;
 use crate::resources::mailer::Mailer;
 use crate::resources::resource::{RedisClusterManager, Resource};
 use crate::resources::resource_locker::ResourceLocker;
@@ -62,7 +62,7 @@ pub struct RedisConfig {
 pub struct SmtpConfig {
     pub host: String,
     pub port: u16,
-    pub starttls: bool,
+    pub tls_mode: TlsMode,
     pub username: String,
     pub password: String,
     pub from_name: Option<String>,
@@ -251,29 +251,4 @@ impl App {
             .cookie_secure(self.config.ssl)
             .build()
     }
-
-    // redis-redis-cluster-0 is in us-central1-b
-    // redis-redis-cluster-1 is in us-central1-b
-    // redis-redis-cluster-2 is in us-central1-a
-    //
-    // pub fn find_local_zone_redis_client(&self) -> &redis::Client {
-    //     let mut config_map = HashMap::new();
-    //
-    //     config_map.insert("us-central1-a", "redis-redis-cluster-2");
-    //     config_map.insert("us-central1-b", "redis-redis-cluster-0");
-    //
-    //     if let Some(region) = &self.config.region {
-    //         let local_url = config_map
-    //             .get(region.as_str())
-    //             .unwrap_or_else(|| panic!("Region {} not found in config map", region));
-    //
-    //         self.redis_clients
-    //             .iter()
-    //             .find(|c| c.get_connection_info().addr.to_string().contains(local_url))
-    //             .or_else(|| self.redis_clients.first())
-    //             .unwrap()
-    //     } else {
-    //         self.redis_clients.first().unwrap()
-    //     }
-    // }
 }

@@ -3,8 +3,6 @@ use crate::app::App;
 use crate::resources::sse_broadcast::{SseBroadcast, SseMessage};
 use futures::StreamExt;
 use log::info;
-use rand::prelude::IndexedRandom;
-use redis::ConnectionAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
@@ -55,7 +53,7 @@ pub async fn cleanup_rooms_task(sse_broadcast: Arc<SseBroadcast>) {
 }
 
 pub async fn listen_redis_events(app: &App) {
-    // TODO: get redis client from the same zone with app.find_local_zone_redis_client
+    // TODO: get redis client from the same zone
     let client = app.redis_clients.first().expect("Redis should have one client");
 
     let mut pubsub = client.get_async_pubsub().await.expect("Failed to get redis connection");

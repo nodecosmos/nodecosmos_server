@@ -117,6 +117,14 @@ services:
     networks:
       - esnet
 
+  maildev:
+    image: maildev/maildev
+    container_name: maildev
+    ports:
+      - "1080:1080"  # Web UI
+      - "1025:1025"  # SMTP server
+    restart: unless-stopped
+
 #---------------------------------------------------------------------------------------------------
 networks:
   scylla_net:

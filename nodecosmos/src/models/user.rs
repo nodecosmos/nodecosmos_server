@@ -19,7 +19,7 @@ use crate::errors::NodecosmosError;
 use crate::models::node::UpdateCreatorNode;
 use crate::models::token::Token;
 use crate::models::traits::{Clean, ElasticDocument, WhereInChunksExec};
-use crate::models::udts::{Address, AssignedTask};
+use crate::models::udts::Address;
 use crate::models::user_counter::UserCounter;
 
 pub mod search;
@@ -70,8 +70,6 @@ pub struct User {
 
     #[serde(default)]
     pub editor_at_nodes: Option<List<Frozen<List<Uuid>>>>,
-
-    pub assigned_tasks: Option<List<Frozen<AssignedTask>>>,
 
     #[serde(default = "chrono::Utc::now")]
     pub created_at: Timestamp,
@@ -310,8 +308,6 @@ impl ShowUser {
 partial_user!(UpdateUser, id, first_name, last_name, updated_at, address);
 
 partial_user!(UpdatePasswordUser, id, password, email, username, updated_at);
-
-partial_user!(UpdateAssignedTasksUser, id, assigned_tasks, updated_at);
 
 impl Callbacks for UpdatePasswordUser {
     type Extension = App;
