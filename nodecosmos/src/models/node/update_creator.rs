@@ -45,7 +45,6 @@ impl UpdateCreatorNode {
                 e
             })?;
 
-        let creator = Profile::init(&user);
         let mut nodes_to_update = vec![];
 
         while let Some(node_by_creator) = nodes_by_creator.next().await {
@@ -54,7 +53,7 @@ impl UpdateCreatorNode {
                     error!("[node_by_creator] {}", e);
                     e
                 })?,
-                creator.clone(),
+                (&user).into(),
             ))
         }
 

@@ -2,7 +2,7 @@ use charybdis::macros::charybdis_udt_model;
 use charybdis::types::{Frozen, Set, Uuid};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Eq, PartialEq, Clone)]
 #[charybdis_udt_model(type_name = conflict)]
 #[serde(rename_all = "camelCase")]
 pub struct Conflict {

@@ -1,6 +1,6 @@
-use futures::StreamExt;
-
 use crate::errors::NodecosmosError;
+use futures::StreamExt;
+use image::ImageFormat;
 
 const TARGET_SIZE_IN_KB: usize = 50;
 const DEFAULT_TARGET_SIZE_IN_BYTES: usize = TARGET_SIZE_IN_KB * 1024;
@@ -26,23 +26,19 @@ impl Image {
         Ok(buffer)
     }
 
-    fn read_image_format(buffer: &[u8]) -> Result<image::ImageFormat, NodecosmosError> {
+    fn read_image_format(buffer: &[u8]) -> Result<ImageFormat, NodecosmosError> {
         let image_format = image::guess_format(buffer)
             .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to guess image format: {:?}", e)))?;
 
-        if image_format != image::ImageFormat::Png
-            && image_format != image::ImageFormat::Jpeg
-            && image_format != image::ImageFormat::WebP
-        {
+        if image_format != ImageFormat::Png && image_format != ImageFormat::Jpeg && image_format != ImageFormat::WebP {
             return Err(NodecosmosError::UnsupportedMediaType);
         }
 
         Ok(image_format)
     }
 
-    fn decode_image(format: image::ImageFormat, buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosError> {
-        if format != image::ImageFormat::Png && format != image::ImageFormat::Jpeg && format != image::ImageFormat::WebP
-        {
+    fn decode_image(format: ImageFormat, buffer: &[u8]) -> Result<image::DynamicImage, NodecosmosError> {
+        if format != ImageFormat::Png && format != ImageFormat::Jpeg && format != ImageFormat::WebP {
             return Err(NodecosmosError::UnsupportedMediaType);
         }
 
@@ -60,9 +56,9 @@ impl Image {
         let width = image.width();
         let height = image.height();
         let extension = match format {
-            image::ImageFormat::Png => "png",
-            image::ImageFormat::Jpeg => "jpg",
-            image::ImageFormat::WebP => "webp",
+            ImageFormat::Png => "png",
+            ImageFormat::Jpeg => "jpg",
+            ImageFormat::WebP => "webp",
             _ => return Err(NodecosmosError::UnsupportedMediaType),
         };
 

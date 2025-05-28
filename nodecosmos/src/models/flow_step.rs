@@ -493,3 +493,28 @@ impl From<&FlowStep> for PkFlowStep {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl FlowStep {
+        pub async fn create_test_flow_step(data: &RequestData, branch_id: Uuid, node_id: Uuid, flow_id: Uuid) -> Self {
+            let mut flow_step = FlowStep {
+                node_id,
+                branch_id,
+                flow_id,
+                ..Default::default()
+            };
+
+            flow_step
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to insert test flow step");
+
+            flow_step
+        }
+    }
+}

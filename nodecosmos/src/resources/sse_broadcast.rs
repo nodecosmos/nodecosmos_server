@@ -34,7 +34,7 @@ impl ToRedisArgs for SseMessage {
     where
         W: ?Sized + RedisWrite,
     {
-        out.write_arg(&json!(self).to_string().as_bytes())
+        out.write_arg(json!(self).to_string().as_bytes())
     }
 }
 

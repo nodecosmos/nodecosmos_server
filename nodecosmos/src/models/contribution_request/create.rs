@@ -7,19 +7,17 @@ use crate::errors::NodecosmosError;
 use crate::models::branch::Branch;
 use crate::models::contribution_request::ContributionRequest;
 use crate::models::traits::ModelContext;
-use crate::models::udts::Profile;
 
 impl ContributionRequest {
     pub fn set_defaults(&mut self, data: &RequestData) {
         let now = chrono::Utc::now();
-        let owner = Profile::init_from_current_user(&data.current_user);
 
         self.id = Uuid::new_v4();
         self.created_at = now;
         self.updated_at = now;
 
-        self.owner_id = owner.id;
-        self.owner = Some(owner);
+        self.owner_id = data.current_user.id;
+        self.owner = Some((&data.current_user).into());
     }
 
     pub async fn create_branch_node(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {

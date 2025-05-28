@@ -45,7 +45,6 @@ impl UpdateOwnerNode {
                 e
             })?;
 
-        let owner = Profile::init(&user);
         let mut nodes_to_update = vec![];
 
         while let Some(node_by_owner) = nodes_by_owner.next().await {
@@ -54,7 +53,7 @@ impl UpdateOwnerNode {
                     error!("[node_by_owner] {}", e);
                     e
                 })?,
-                owner.clone(),
+                (&user).into(),
             ))
         }
 

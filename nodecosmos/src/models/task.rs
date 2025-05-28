@@ -64,7 +64,7 @@ impl Callbacks for Task {
         self.created_at = Utc::now();
         self.updated_at = Utc::now();
         self.author_id = data.current_user.id;
-        self.author = Profile::init_from_current_user(&data.current_user);
+        self.author = (&data.current_user).into();
 
         Ok(())
     }
@@ -139,7 +139,7 @@ impl Callbacks for UpdateAssigneesTask {
             .clone()
             .into_iter()
             .filter(|profile| !removed_assignee_ids.contains(&profile.id))
-            .chain(added_users.iter().map(|user| Profile::init(&user)))
+            .chain(added_users.iter().map(|user| user.into()))
             .collect::<Vec<Profile>>();
 
         // TODO: create a table to track assigned tasks per user

@@ -23,7 +23,7 @@ Think GitHub for systems and innovation.
   Propose changes to any part of the system with a visual diff and threaded feedback—just like GitHub Pull Requests, but
   for structured systems and processes.
 
-# Installation
+# Installation (DEV)
 
 1) **Install related services with docker compose**
    ```shell
@@ -87,8 +87,8 @@ Think GitHub for systems and innovation.
 
 ### Note:
 
-Looks like tokio has excessive stack usage in debug
-builds. `https://github.com/tokio-rs/tokio/issues/2055` In order to avoid stack overflow, we need to
+Looks like tokio has [excessive stack usage in debug
+builds](https://github.com/tokio-rs/tokio/issues/2055). In order to avoid stack overflow, we need to
 increase the stack size. This can be done by setting `RUST_MIN_STACK` environment variable. For
 example, to set the stack size to 8MB, you can run the following command:
 
@@ -114,3 +114,5 @@ For development purposes, we are using `maildev` as a mail server. It is a simpl
 allows you to send and receive emails.
 
 `http://localhost:1080/`
+
+ℹ️ Note that mailer support either **SES** or **SMTP**.

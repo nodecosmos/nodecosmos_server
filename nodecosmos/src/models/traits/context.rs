@@ -4,7 +4,7 @@ use crate::models::io::{Io, UpdateTitleIo};
 use crate::models::node::{Node, UpdateTitleNode};
 use crate::models::workflow::{UpdateInitialInputsWorkflow, Workflow};
 
-#[derive(PartialEq, Default, Clone, Copy)]
+#[derive(PartialEq, Debug, Default, Clone, Copy)]
 pub enum Context {
     #[default]
     None,

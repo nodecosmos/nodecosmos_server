@@ -3,7 +3,6 @@ use crate::errors::NodecosmosError;
 use crate::models::node::{Node, UpdateEditorsNode};
 use crate::models::notification::{Notification, NotificationType};
 use crate::models::token::Token;
-use crate::models::udts::Profile;
 use crate::models::user::User;
 use charybdis::batch::ModelBatch;
 use charybdis::callbacks::Callbacks;
@@ -169,7 +168,7 @@ impl Callbacks for Invitation {
                     NotificationType::NewInvitation,
                     format!("invited you to collaborate on the node {}", node_title),
                     format!("{}/invitations?token={}", data.app.config.client_url, token.id),
-                    Some(Profile::init_from_current_user(&data.current_user)),
+                    Some((&data.current_user).into()),
                 )
                 .create_for_receivers(data, receiver_ids)
                 .await

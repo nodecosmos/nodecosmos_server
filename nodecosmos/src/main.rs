@@ -225,7 +225,6 @@ fn main() {
                                 .service(update_task_due_at)
                                 .service(delete_task),
                         )
-
                         .service(web::resource("/health").route(web::get().to(|| async { "OK" })))
                 })
                 .keep_alive(std::time::Duration::from_secs(60))

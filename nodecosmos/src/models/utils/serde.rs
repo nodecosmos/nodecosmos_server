@@ -38,5 +38,6 @@ where
     }
 
     deserializer
-        .deserialize_option(OptionVisitor(std::marker::PhantomData)).map_err(|err| de::Error::custom(format!("Field is missing from JSON: {}", err)))
+        .deserialize_option(OptionVisitor(std::marker::PhantomData))
+        .map_err(|err| de::Error::custom(format!("Field is missing from JSON: {}", err)))
 }

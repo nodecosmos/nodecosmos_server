@@ -547,3 +547,165 @@ partial_node!(
     is_subscription_active,
     updated_at
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::traits::Descendants;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl Node {
+        pub async fn sample_node_tree(data: &RequestData) -> Node {
+            let root_id = Uuid::new_v4();
+            let mut root = Node {
+                id: root_id,
+                root_id,
+                is_root: true,
+                title: "Node Root".into(),
+                owner_id: data.current_user.id,
+                owner: Some((&data.current_user).into()),
+                ..Default::default()
+            };
+
+            root.insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to insert root node");
+
+            let child_nodes = root.create_child_nodes(data, None, None).await;
+
+            for node in child_nodes {
+                node.create_child_nodes(data, None, None).await;
+            }
+
+            root
+        }
+
+        pub async fn create_child_nodes(
+            &self,
+            data: &RequestData,
+            branch_id: Option<Uuid>,
+            count: Option<i8>,
+        ) -> Vec<Node> {
+            let mut child_nodes = vec![];
+            let branch_id = branch_id.unwrap_or(self.branch_id);
+            let count = count.unwrap_or(10);
+
+            for i in 0..count {
+                let mut child = Node {
+                    branch_id,
+                    root_id: self.root_id,
+                    id: Uuid::new_v4(),
+                    is_root: false,
+                    title: format!("Child Node {}", i),
+                    parent_id: Some(self.id),
+                    ..Default::default()
+                };
+
+                child
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .expect("Failed to insert child node");
+
+                child_nodes.push(child);
+            }
+
+            child_nodes
+        }
+    }
+
+    #[tokio::test]
+    async fn test_root_validations() {
+        let data = RequestData::new(None).await;
+        let root_id = Uuid::new_v4();
+        let mut node = Node {
+            id: root_id,
+            root_id,
+            branch_id: root_id,
+            title: "Test Node".into(),
+            owner_id: data.current_user.id,
+            owner: Some((&data.current_user).into()),
+            is_root: true,
+            ..Default::default()
+        };
+
+        // Test default context
+        assert!(node.is_default_context(), "Node should be in default context");
+
+        // Set defaults
+        node.set_defaults(&data).await.expect("Failed to set defaults");
+
+        // Validate root
+        assert!(node.validate_root().is_ok(), "Root validation failed");
+
+        // Validate parent
+        assert!(node.validate_parent().is_ok(), "Parent validation failed");
+
+        // Validate owner
+        assert!(node.validate_owner().is_ok(), "Owner validation failed");
+    }
+
+    #[tokio::test]
+    async fn test_child_validations() {
+        let data = RequestData::new(None).await;
+        let root = Node::sample_node_tree(&data).await;
+
+        // Create a child node
+        let mut child_node = Node {
+            branch_id: root.branch_id,
+            root_id: root.root_id,
+            id: Uuid::new_v4(),
+            title: "Child Node".into(),
+            parent_id: None,
+            owner_id: data.current_user.id,
+            owner: Some((&data.current_user).into()),
+            is_root: false,
+            ..Default::default()
+        };
+
+        // Set defaults
+        child_node.set_defaults(&data).await.expect("Failed to set defaults");
+
+        // Validate parent
+        assert!(
+            child_node.validate_parent().is_err(),
+            "Parent validation should fail without parent_id"
+        );
+
+        child_node.parent_id = child_node.id.into();
+
+        assert!(
+            child_node.validate_parent().is_err(),
+            "Parent validation should fail with self as parent_id"
+        );
+
+        child_node.parent_id = Some(root.id);
+
+        assert!(
+            child_node.validate_parent().is_ok(),
+            "Parent validation should pass with valid parent_id"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_descendants() {
+        let data = RequestData::new(None).await;
+        let tree_root = Node::sample_node_tree(&data).await;
+
+        let descendants = tree_root
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get descendants")
+            .try_collect()
+            .await
+            .expect("Failed to collect descendants");
+
+        assert!(!descendants.is_empty(), "Descendants should not be empty");
+        assert_eq!(
+            descendants.len(),
+            110,
+            "There should be 110 descendants (10 children + 100 grandchildren)"
+        );
+    }
+}

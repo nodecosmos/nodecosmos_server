@@ -209,3 +209,28 @@ partial_flow!(
     title,
     created_at
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl Flow {
+        pub async fn create_test_flow(data: &RequestData, branch_id: Uuid, root_id: Uuid) -> Flow {
+            let mut flow = Flow {
+                branch_id,
+                node_id: root_id,
+                root_id,
+                title: "Test Flow".into(),
+                ..Default::default()
+            };
+
+            flow.insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to create test flow");
+
+            flow
+        }
+    }
+}

@@ -23,6 +23,7 @@ mod flows;
 mod ios;
 mod nodes;
 
+#[derive(Debug)]
 pub struct MergeError {
     pub inner: NodecosmosError,
     pub branch: Branch,
@@ -407,5 +408,124 @@ impl Branch {
         }
 
         Ok(merge.branch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::data::RequestData;
+    use crate::models::branch::tests::create_branched_nodes_for_each_descendant;
+    use crate::models::contribution_request::ContributionRequest;
+    use crate::models::flow::Flow;
+    use crate::models::flow_step::FlowStep;
+    use crate::models::io::Io;
+    use crate::models::node::Node;
+    use crate::models::traits::{Descendants, Reload};
+
+    #[tokio::test]
+    async fn test_cr_branching_and_merge() {
+        let data = RequestData::new(None).await;
+        let root = Node::sample_node_tree(&data).await;
+        let mut cr = ContributionRequest::create_test_cr(&data, &root).await;
+        let branch_id = cr.id;
+        let mut branch = cr
+            .branch(data.db_session())
+            .await
+            .expect("Failed to get branch")
+            .clone();
+        let branch_node = Node::find_by_branch_id_and_id(branch_id, root.id)
+            .execute(data.db_session())
+            .await
+            .expect("Failed to find branch node");
+        create_branched_nodes_for_each_descendant(&data, &root, branch_id)
+            .await
+            .unwrap();
+
+        let original_flow = Flow::create_test_flow(&data, branch_id, root.id).await;
+        // Create a branch flow step for the original flow
+        FlowStep::create_test_flow_step(&data, branch_id, root.id, original_flow.id).await;
+
+        // Create a branch Flow
+        let branch_flow = Flow::create_test_flow(&data, branch_id, root.id).await;
+        // Create a branch FlowStep for the branch flow
+        let branch_flow_step = FlowStep::create_test_flow_step(&data, branch_id, root.id, branch_flow.id).await;
+        // Create an branch IO for the branch flow step
+        Io::create_test_io(&data, branch_id, root.id, Some(branch_flow_step.id)).await;
+
+        let original_descendants = root
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get descendants")
+            .try_collect()
+            .await
+            .expect("Failed to collect descendants");
+
+        assert_eq!(
+            original_descendants.len(),
+            110,
+            "Original node descendants count should be 110"
+        );
+        assert_eq!(
+            branch_node.branch_descendants(data.db_session()).await.unwrap().len(),
+            220,
+            "Branch node descendants count should be 220 (original + branched)"
+        );
+
+        branch.reload(data.db_session()).await.unwrap();
+
+        branch.merge(&data).await.unwrap();
+
+        let original_descendants = root
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get descendants")
+            .try_collect()
+            .await
+            .expect("Failed to collect descendants");
+
+        assert_eq!(
+            original_descendants.len(),
+            220,
+            "After merge, original node descendants count should be 220"
+        );
+
+        assert_eq!(
+            Flow::find_by_branch_id(root.id)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to find flows")
+                .try_collect()
+                .await
+                .expect("Failed to collect flows")
+                .len(),
+            2,
+            "After merge, there should be 2 flows (original + branched)"
+        );
+
+        assert_eq!(
+            FlowStep::find_by_branch_id(branch_id)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to find flow steps")
+                .try_collect()
+                .await
+                .expect("Failed to collect flow steps")
+                .len(),
+            2,
+            "After merge, there should be 2 flow steps (original + branched)"
+        );
+
+        assert_eq!(
+            Io::find_by_branch_id(branch_id)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to find IOs")
+                .try_collect()
+                .await
+                .expect("Failed to collect IOs")
+                .len(),
+            1,
+            "After merge, there should be 1 IO"
+        );
     }
 }

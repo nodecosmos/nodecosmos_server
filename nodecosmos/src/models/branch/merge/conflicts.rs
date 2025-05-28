@@ -469,3 +469,10 @@ impl<'a> MergeConflicts<'a> {
         Ok(())
     }
 }
+
+// TODO: write conflicts tests
+//  1. Create a nested node and then delete parent or ancestor
+//  2. Create a flow for deleted node or ancestor
+//  3. Create a flow step for deleted node or ancestor
+//  4. Create an IO for deleted node or ancestor
+//  5. Create an original flow step between two existing flow steps and then insert original one on the same place

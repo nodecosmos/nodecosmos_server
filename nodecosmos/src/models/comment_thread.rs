@@ -120,7 +120,7 @@ impl Callbacks for CommentThread {
         let now = chrono::Utc::now();
 
         self.author_id = Some(data.current_user.id);
-        self.author = Some(Profile::init_from_current_user(&data.current_user));
+        self.author = Some((&data.current_user).into());
 
         match self.thread_location() {
             Ok(ThreadLocation::ContributionRequest(ContributionRequestThreadLocation::MainThread)) => {

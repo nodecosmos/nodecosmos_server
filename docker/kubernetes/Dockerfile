@@ -1,3 +1,4 @@
+# Stage 1: Install essential build tools and Rust
 FROM ubuntu:24.10 AS base
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -17,8 +18,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /app
 
-# Stage 1: Dependencies - build only the dependencies
-FROM base AS dependencies
+# Stage 2: Build Rust application
+FROM base AS build
 # Copy dependency files
 COPY Cargo.toml Cargo.lock ./
 COPY nodecosmos/Cargo.toml nodecosmos/Cargo.toml
@@ -37,7 +38,7 @@ RUN touch nodecosmos/src/main.rs
 # Build the final binary.
 RUN cargo build --release --locked
 
-# Stage 3: Runtime - final minimal image
+# Stage 3: Create the runtime image
 FROM ubuntu:24.10
 RUN apt-get update && apt-get install -y \
     ca-certificates \

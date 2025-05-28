@@ -19,7 +19,6 @@ hosts = ["http://127.0.0.1:9200"]
 [aws]
 bucket = "nodecosmos-development"
 
-
 [smtp]
 tls_mode = "none"         # "none" | "starttls" | "tls"
 host = "localhost"

@@ -454,3 +454,29 @@ impl UpdateFlowStepIo {
         Ok(ios)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl Io {
+        pub async fn create_test_io(data: &RequestData, branch_id: Uuid, root_id: Uuid, fs_id: Option<Uuid>) -> Io {
+            let mut io = Io {
+                root_id,
+                node_id: root_id,
+                branch_id,
+                flow_step_id: fs_id,
+                title: Some(Text::from("Test Io")),
+                ..Default::default()
+            };
+
+            io.insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to create test io");
+
+            io
+        }
+    }
+}

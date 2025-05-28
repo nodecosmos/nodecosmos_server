@@ -383,7 +383,7 @@ impl deadpool::managed::Manager for RedisClusterManager {
         redis::cmd("PING")
             .query_async(obj)
             .await
-            .map_err(|e| deadpool::managed::RecycleError::Backend(e))
+            .map_err(deadpool::managed::RecycleError::Backend)
     }
 }
 

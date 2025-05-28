@@ -19,14 +19,13 @@ use crate::models::traits::ModelContext;
 use crate::models::traits::Parent;
 use crate::models::traits::RefCloned;
 use crate::models::traits::{Branchable, ElasticDocument};
-use crate::models::udts::Profile;
 use crate::models::workflow::Workflow;
 
 impl Node {
     pub async fn set_defaults(&mut self, data: &RequestData) -> Result<(), NodecosmosError> {
         self.id = Uuid::new_v4();
         self.creator_id = Some(data.current_user.id);
-        self.creator = Some(Profile::init_from_current_user(&data.current_user));
+        self.creator = Some((&data.current_user).into());
 
         if let Some(parent) = self.parent(data.db_session()).await? {
             let editor_ids = parent.editor_ids.clone();
@@ -52,7 +51,7 @@ impl Node {
             self.is_subscription_active = is_subscription_active;
         } else {
             self.owner_id = data.current_user.id;
-            self.owner = Some(Profile::init_from_current_user(&data.current_user));
+            self.owner = Some((&data.current_user).into());
             self.root_id = self.id;
             self.parent_id = None;
             self.order_index = 0.0;
@@ -80,6 +79,10 @@ impl Node {
     }
 
     pub fn validate_parent(&mut self) -> Result<(), NodecosmosError> {
+        if !self.is_root && self.parent_id.is_none() {
+            return Err(NodecosmosError::ValidationError(("parent_id", "must be present")));
+        }
+
         if self.parent_id == Some(self.id) {
             return Err(NodecosmosError::ValidationError((
                 "parent_id",

@@ -40,7 +40,7 @@ impl BranchStatus {
         gc_grace_seconds = 432000
     "#,
 )]
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub id: Uuid,
@@ -106,10 +106,6 @@ pub struct Branch {
     pub conflict: Option<Frozen<Conflict>>,
     pub description_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
     pub title_change_by_object: Option<Frozen<Map<Uuid, Frozen<TextChange>>>>,
-
-    #[serde(skip)]
-    #[charybdis(ignore)]
-    pub node: Option<Node>,
 }
 
 impl Branch {
@@ -122,20 +118,14 @@ impl Branch {
 
         Ok(branch
             .created_nodes
-            .map_or(false, |created_nodes| created_nodes.contains(&node_id)))
+            .is_some_and(|created_nodes| created_nodes.contains(&node_id)))
     }
 
-    pub async fn node(&mut self, db_session: &CachingSession) -> Result<&Node, NodecosmosError> {
-        if self.node.is_none() {
-            let node = Node::find_by_branch_id_and_id(self.original_id(), self.node_id)
-                .execute(db_session)
-                .await?;
-            self.node = Some(node);
-        }
-
-        self.node
-            .as_ref()
-            .ok_or_else(|| NodecosmosError::NotFound("Node not found".to_string()))
+    pub async fn node(&mut self, db_session: &CachingSession) -> Result<Node, NodecosmosError> {
+        Node::find_by_branch_id_and_id(self.original_id(), self.node_id)
+            .execute(db_session)
+            .await
+            .map_err(NodecosmosError::from)
     }
 
     pub fn all_edited_description_ids(&self) -> HashSet<Uuid> {
@@ -397,3 +387,87 @@ partial_branch!(UpdateRestoredIosBranch, id, restored_ios);
 partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
 
 partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::data::RequestData;
+    use crate::models::contribution_request::ContributionRequest;
+    use crate::models::node::Node;
+    use crate::models::traits::{Descendants, Reload};
+    use charybdis::operations::InsertWithCallbacks;
+    use futures::StreamExt;
+
+    pub async fn create_branched_nodes_for_each_descendant(
+        data: &RequestData,
+        root: &Node,
+        branch_id: Uuid,
+    ) -> Result<(), NodecosmosError> {
+        let mut descendants = root
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get descendants");
+        let mut i = 0;
+
+        while let Some(descendant) = descendants.next().await {
+            let descendant = descendant?;
+            let mut child = Node {
+                branch_id,
+                root_id: descendant.root_id,
+                is_root: false,
+                title: format!("Branch Child Node {}", i),
+                parent_id: Some(descendant.id),
+                ..Default::default()
+            };
+
+            child
+                .insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to insert child node");
+
+            i += 1;
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cr_branching() {
+        let data = RequestData::new(None).await;
+        let root = Node::sample_node_tree(&data).await;
+        let mut cr = ContributionRequest::create_test_cr(&data, &root).await;
+        let branch_id = cr.id;
+        let mut branch = cr
+            .branch(data.db_session())
+            .await
+            .expect("Failed to get branch")
+            .clone();
+
+        create_branched_nodes_for_each_descendant(&data, &root, branch_id)
+            .await
+            .unwrap();
+
+        let original_descendants = root
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get descendants")
+            .try_collect()
+            .await
+            .expect("Failed to collect descendants");
+
+        assert_eq!(
+            original_descendants.len(),
+            110,
+            "Original node descendants count should be 110"
+        );
+
+        branch.reload(data.db_session()).await.expect("Failed to reload branch");
+
+        assert_eq!(
+            branch.created_nodes.map_or(0, |nodes| nodes.len()),
+            110,
+            "Branch should have 110 created nodes"
+        )
+    }
+}

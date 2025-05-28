@@ -299,7 +299,7 @@ impl ContributionRequest {
                     node_id = node_id,
                     id = id
                 ),
-                Some(Profile::init_from_current_user(&data.current_user)),
+                Some((&data.current_user).into()),
             );
             let mut receiver_ids = HashSet::new();
             receiver_ids.insert(owner_id);
@@ -349,3 +349,29 @@ partial_contribution_request!(
 );
 
 sanitize_description_cb!(UpdateContributionRequestDescription);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::data::RequestData;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl ContributionRequest {
+        pub async fn create_test_cr(data: &RequestData, root: &Node) -> ContributionRequest {
+            let mut cr = ContributionRequest {
+                node_id: root.id,
+                root_id: root.id,
+                title: "Test Contribution Request".to_string(),
+                owner_id: data.current_user.id,
+                owner: Some((&data.current_user).into()),
+                ..Default::default()
+            };
+            cr.insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to insert CR");
+
+            cr
+        }
+    }
+}

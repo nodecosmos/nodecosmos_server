@@ -105,3 +105,37 @@ impl FromRequest for RequestData {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use charybdis::types::Uuid;
+
+    impl RequestData {
+        pub async fn new(current_user: Option<CurrentUser>) -> Self {
+            dotenv::dotenv().ok();
+
+            let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            let project_root = crate_root.parent().expect("Could not find project root");
+
+            std::env::set_current_dir(project_root).expect("Could not set current directory to project root");
+            let current_user = current_user.unwrap_or(CurrentUser {
+                id: Uuid::new_v4(),
+                email: "test@email.com".to_string(),
+                profile_image_filename: None,
+                profile_image_url: None,
+                is_confirmed: true,
+                first_name: "Test".to_string(),
+                last_name: "User".to_string(),
+                username: "testuser".to_string(),
+                is_blocked: false,
+            });
+
+            let app = App::new().await.expect("Could not create app");
+            RequestData {
+                app: web::Data::new(app),
+                current_user,
+            }
+        }
+    }
+}
