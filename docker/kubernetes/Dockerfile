@@ -47,5 +47,5 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/bin
 # Copy the built binary from the builder stage.
-COPY --from=dependencies /app/target/release/nodecosmos .
+COPY --from=build /app/target/release/nodecosmos .
 ENTRYPOINT ["./nodecosmos"]
