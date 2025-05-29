@@ -29,16 +29,13 @@ mod update_title;
 #[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Flow {
-    pub node_id: Uuid,
     pub branch_id: Uuid,
+    pub node_id: Uuid,
 
     #[branch(original_id)]
     pub root_id: Uuid,
 
-    // vertical index
     pub vertical_index: Double,
-
-    // start index is not conflicting, flows can start at same index
     pub start_index: Int,
 
     #[serde(default = "Uuid::new_v4")]

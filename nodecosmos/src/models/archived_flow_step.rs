@@ -21,10 +21,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Branchable, Id, NodeId, FlowId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchivedFlowStep {
+    pub branch_id: Uuid,
+
     #[branch(original_id)]
     pub node_id: Uuid,
 
-    pub branch_id: Uuid,
     pub flow_id: Uuid,
 
     #[serde(default)]

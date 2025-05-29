@@ -33,6 +33,7 @@ impl FromRequest for OptCurrentUser {
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let client_session = req.get_session();
+
         match get_current_user(&client_session) {
             Some(user) => ready(Ok(OptCurrentUser(Some(user)))),
             None => ready(Ok(OptCurrentUser(None))),

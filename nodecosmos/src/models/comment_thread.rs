@@ -84,10 +84,13 @@ impl ContributionRequestThreadLocation {
 pub struct CommentThread {
     pub branch_id: Uuid,
     pub object_id: Uuid,
+
     #[serde(default)]
     pub id: Uuid,
+
     #[serde(default)]
     pub root_id: Uuid,
+
     pub title: Text,
     pub author_id: Option<Uuid>,
     pub author: Option<Profile>,

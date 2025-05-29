@@ -34,9 +34,8 @@ mod update_output_ids;
 #[derive(Branchable, Id, NodeId, FlowId, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowStep {
-    pub node_id: Uuid,
-
     pub branch_id: Uuid,
+    pub node_id: Uuid,
     pub flow_id: Uuid,
 
     #[serde(default)]

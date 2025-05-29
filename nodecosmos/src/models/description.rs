@@ -29,9 +29,7 @@ mod save;
 #[serde(rename_all = "camelCase")]
 pub struct Description {
     pub node_id: Uuid,
-
     pub branch_id: Uuid,
-
     pub object_id: Uuid,
 
     #[branch(original_id)]

@@ -169,8 +169,8 @@ pub async fn description_ws(
         .start_with_addr()
         .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to start websocket connection: {}", e)))?;
 
-    let ws_desc_conn_pool = ws_desc_conn.pool;
-    ws_desc_conn_pool
+    ws_desc_conn
+        .pool
         .connections
         .entry(format!("{}{}", params.branch_id, params.room_id))
         .or_default()

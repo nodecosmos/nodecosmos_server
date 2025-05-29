@@ -31,7 +31,6 @@ pub enum LikeObjectType {
 #[serde(rename_all = "camelCase")]
 pub struct Like {
     pub object_id: Uuid,
-
     pub branch_id: Uuid,
 
     #[serde(default)]

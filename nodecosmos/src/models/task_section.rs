@@ -20,13 +20,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSection {
-    pub title: Text,
     pub branch_id: Uuid,
     pub node_id: Uuid,
 
     #[serde(default)]
     pub id: Uuid,
 
+    pub title: Text,
     pub order_index: Double,
 
     #[serde(default = "chrono::Utc::now")]

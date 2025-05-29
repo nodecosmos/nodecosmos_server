@@ -22,21 +22,18 @@ use serde::{Deserialize, Serialize};
 #[derive(Branchable, Id, MaybeFlowId, MaybeFlowStepId, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchivedIo {
+    pub branch_id: Uuid,
+
     #[branch(original_id)]
     pub root_id: Uuid,
 
     pub node_id: Uuid,
 
-    pub branch_id: Uuid,
-
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
 
     pub main_id: Option<Uuid>,
-
     pub flow_id: Option<Uuid>,
-
-    /// outputted by flow step
     pub flow_step_id: Option<Uuid>,
     pub inputted_by_flow_steps: Option<Set<Uuid>>,
     pub title: Option<Text>,

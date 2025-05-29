@@ -55,13 +55,9 @@ pub struct Commit {
     pub node_id: Uuid,
 
     pub branch_id: Uuid,
-
     pub object_id: Uuid,
-
     pub id: Uuid,
-
     pub commit_type: Text,
-
     pub data: Text,
 
     #[serde(default = "chrono::Utc::now")]

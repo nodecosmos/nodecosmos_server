@@ -76,7 +76,6 @@ pub struct Node {
     pub creator_id: Option<Uuid>,
 
     pub title: Text,
-
     pub parent_id: Option<Uuid>,
     pub ancestor_ids: Option<Set<Uuid>>,
     pub owner: Option<Frozen<Profile>>,

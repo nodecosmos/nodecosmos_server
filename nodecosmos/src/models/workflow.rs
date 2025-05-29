@@ -33,9 +33,8 @@ use macros::Branchable;
 #[derive(Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
-    pub node_id: Uuid,
-
     pub branch_id: Uuid,
+    pub node_id: Uuid,
 
     #[branch(original_id)]
     pub root_id: Uuid,

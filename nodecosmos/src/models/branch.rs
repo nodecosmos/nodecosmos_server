@@ -44,7 +44,6 @@ impl BranchStatus {
 #[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub id: Uuid,
-    // where branch is created
     pub node_id: Uuid,
     pub root_id: Uuid,
     pub title: Text,
@@ -52,6 +51,7 @@ pub struct Branch {
 
     #[serde(default = "BranchStatus::default")]
     pub status: Option<Text>,
+
     pub owner_id: Uuid,
     pub owner: Option<Frozen<Profile>>,
     pub editor_ids: Option<Set<Uuid>>,
@@ -66,17 +66,13 @@ pub struct Branch {
     pub edited_description_nodes: Option<Set<Uuid>>,
     pub reordered_nodes: Option<List<Frozen<BranchReorderData>>>,
     pub edited_nodes: Option<Set<Uuid>>,
-    /// node_id -> initial_input_ids
     pub created_initial_inputs: Option<Set<Uuid>>,
-    /// node_id -> initial_input_ids
     pub deleted_initial_inputs: Option<Set<Uuid>>,
-    // flows
     pub created_flows: Option<Set<Uuid>>,
     pub deleted_flows: Option<Set<Uuid>>,
     pub restored_flows: Option<Set<Uuid>>,
     pub edited_title_flows: Option<Set<Uuid>>,
     pub edited_description_flows: Option<Set<Uuid>>,
-
     // flow steps
     pub created_flow_steps: Option<Set<Uuid>>,
     pub deleted_flow_steps: Option<Set<Uuid>>,

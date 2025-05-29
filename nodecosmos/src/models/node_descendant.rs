@@ -23,12 +23,9 @@ use serde::{Deserialize, Serialize};
 pub struct NodeDescendant {
     /// Tree root node id.
     pub root_id: Uuid,
-
     pub branch_id: Uuid,
-
     /// Current root id.
     pub node_id: Uuid,
-
     pub order_index: Double,
     pub id: Uuid,
     pub parent_id: Uuid,

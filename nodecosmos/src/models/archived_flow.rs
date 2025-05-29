@@ -19,14 +19,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Id, Branchable, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchivedFlow {
-    #[branch(original_id)]
-    pub node_id: Uuid,
     pub branch_id: Uuid,
 
-    // vertical index
-    pub vertical_index: Double,
+    #[branch(original_id)]
+    pub node_id: Uuid,
 
-    // start index is not conflicting, flows can start at same index
+    pub vertical_index: Double,
     pub start_index: Int,
 
     #[serde(default = "Uuid::new_v4")]
