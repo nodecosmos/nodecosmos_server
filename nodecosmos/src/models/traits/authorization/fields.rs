@@ -190,7 +190,7 @@ impl AuthorizationFields for ContributionRequest {
     }
 
     fn is_public(&self) -> bool {
-        self.branch.as_ref().map_or(false, |branch| branch.is_public)
+        self.branch.as_ref().is_some_and(|branch| branch.is_public)
     }
 }
 

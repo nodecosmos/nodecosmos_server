@@ -151,9 +151,7 @@ impl NodeDelete {
         Node::find_by_ids(db_session, node.branch_id, &ids.iter().cloned().collect())
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     pub async fn deleted_descendants(
         db_session: &CachingSession,
@@ -199,9 +197,7 @@ impl NodeDelete {
         Workflow::find_by_node_ids(db_session, node.branch_id, &ids.iter().cloned().collect())
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     async fn deleted_flows(
         db_session: &CachingSession,
@@ -211,9 +207,7 @@ impl NodeDelete {
         Flow::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     async fn deleted_flow_steps(
         db_session: &CachingSession,
@@ -223,9 +217,7 @@ impl NodeDelete {
         FlowStep::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     async fn deleted_ios(
         db_session: &CachingSession,
@@ -235,9 +227,7 @@ impl NodeDelete {
         Io::find_by_branch_id_and_node_ids(db_session, node.branch_id, ids)
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     async fn deleted_descriptions(
         db_session: &CachingSession,
@@ -247,9 +237,7 @@ impl NodeDelete {
         Description::find_by_branch_id_and_ids(db_session, branch_id, &ids_to_del)
             .await
             .try_collect()
-            .await
-            .map_err(NodecosmosError::from)
-    }
+            .await}
 
     pub async fn new(data: &RequestData, node: &Node) -> Result<NodeDelete, NodecosmosError> {
         let mut node_ids_to_delete = Set::new();

@@ -124,10 +124,7 @@ impl ImportNodes {
         // Step 1: Build a map from parent_id to its children
         let mut parent_map: HashMap<String, Vec<ImportNode>> = HashMap::new();
         for node in self.nodes.drain(..) {
-            parent_map
-                .entry(node.parent_id.clone())
-                .or_insert_with(Vec::new)
-                .push(node);
+            parent_map.entry(node.parent_id.clone()).or_default().push(node);
         }
 
         // Step 2: Define a recursive function to traverse and collect sorted nodes
@@ -277,7 +274,7 @@ impl Import {
                 .copied()
                 .unwrap_or_else(|| {
                     log::error!("Failed to find parent_id: {}", import_node.parent_id);
-                    self.current_root.id.clone()
+                    self.current_root.id
                 });
 
             if import_node.parent_id == import_node.id {
@@ -331,9 +328,9 @@ impl Import {
 
             current_ancestors.iter().for_each(|ancestor_id| {
                 self.descendant_ids_by_node_id
-                    .entry(ancestor_id.clone())
-                    .or_insert_with(HashSet::new)
-                    .insert(new_node.id.clone());
+                    .entry(*ancestor_id)
+                    .or_default()
+                    .insert(new_node.id);
             });
 
             if import_node.id == TMP_ROOT_ID {
@@ -358,9 +355,7 @@ impl Import {
 
         for import_node in import_nodes.iter() {
             if let Some(flows) = &import_node.flows {
-                let mut vertical_index = 0;
-
-                for import_flow in flows.iter() {
+                for (vertical_index, import_flow) in flows.iter().enumerate() {
                     let start_index = import_flow.start_index.unwrap_or(0);
 
                     let mut new_flow = Flow {
@@ -368,11 +363,11 @@ impl Import {
                         root_id: self.current_root.root_id,
                         node_id: self.node_id_by_tmp_id.get(&import_node.id).copied().unwrap_or_else(|| {
                             log::error!("Failed to find node_id: {}", import_node.id);
-                            self.current_root.id.clone()
+                            self.current_root.id
                         }),
                         title: import_flow.title.clone(),
                         start_index,
-                        vertical_index: Double::from(vertical_index),
+                        vertical_index: vertical_index as Double,
                         ..Default::default()
                     };
 
@@ -400,8 +395,6 @@ impl Import {
                             self.insert_io(data, import_io, new_flow.node_id, None).await?;
                         }
                     }
-
-                    vertical_index += 1;
 
                     // first create all ios from the flow steps and populate fs_flow_id_by_tmp_id
                     for import_flow_step in import_flow.flow_steps.iter() {
@@ -501,7 +494,7 @@ impl Import {
         if let Some(desc) = &import_io.description {
             // ios share the title and description, so if main_id has a description,
             // we don't need to insert the description again
-            if main_id.map_or(false, |main_id| self.io_main_id_has_desc.get(&main_id).is_some()) {
+            if main_id.is_some_and(|main_id| self.io_main_id_has_desc.contains_key(&main_id)) {
                 return Ok(new_io);
             }
 
@@ -645,7 +638,7 @@ impl Import {
                     && self
                         .descendant_ids_by_node_id
                         .get(&fs_node_id)
-                        .map_or(true, |descendants| !descendants.contains(&node_id))
+                        .is_none_or(|descendants| !descendants.contains(&node_id))
                 {
                     return Err(NodecosmosError::ImportError(format!(
                         "Flow Step <b>{}</b> Creation Error: \

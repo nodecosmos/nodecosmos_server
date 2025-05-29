@@ -145,7 +145,7 @@ impl Recovery {
 
             log::info!(
                 "Recovery completed for {} with object id: {}",
-                recovery.object_type.to_string(),
+                recovery.object_type,
                 recovery.id
             );
 

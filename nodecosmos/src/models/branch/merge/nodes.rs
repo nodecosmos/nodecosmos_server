@@ -104,11 +104,11 @@ impl MergeNodes {
                     !branch
                         .deleted_nodes
                         .as_ref()
-                        .map_or(false, |deleted_nodes| deleted_nodes.contains(&reorder_data.id))
+                        .is_some_and(|deleted_nodes| deleted_nodes.contains(&reorder_data.id))
                         && !branch
                             .created_nodes
                             .as_ref()
-                            .map_or(false, |created_nodes| created_nodes.contains(&reorder_data.id))
+                            .is_some_and(|created_nodes| created_nodes.contains(&reorder_data.id))
                 })
                 .collect()
         })

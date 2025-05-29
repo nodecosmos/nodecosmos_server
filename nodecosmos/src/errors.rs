@@ -152,7 +152,7 @@ impl ResponseError for NodecosmosError {
                 })
             }),
             NodecosmosError::ResourceLocked(e) => {
-                warn!("{}", self.to_string());
+                warn!("{}", self);
 
                 HttpResponseBuilder::new(StatusCode::LOCKED).json({
                     json!({
@@ -163,7 +163,7 @@ impl ResponseError for NodecosmosError {
             }
             NodecosmosError::CharybdisError(e) => match e {
                 CharybdisError::NotFoundError(_e) => {
-                    warn!("{}", e.to_string());
+                    warn!("{}", e);
 
                     HttpResponse::NotFound().json(json!({
                         "status": 404,
@@ -173,7 +173,7 @@ impl ResponseError for NodecosmosError {
                 _ => NodecosmosError::InternalServerError(format!("CharybdisError: {}", e)).error_response(),
             },
             _ => {
-                error!("InternalServerError: {}", self.to_string());
+                error!("InternalServerError: {}", self);
 
                 HttpResponse::InternalServerError().json(json!({
                     "status": 500,

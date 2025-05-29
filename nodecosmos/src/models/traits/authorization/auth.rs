@@ -30,7 +30,7 @@ pub trait Authorization: AuthorizationFields {
         if self
             .editor_ids()
             .as_ref()
-            .map_or(false, |ids| ids.contains(&data.current_user.id))
+            .is_some_and(|ids| ids.contains(&data.current_user.id))
         {
             return true;
         }
@@ -107,11 +107,11 @@ pub trait Authorization: AuthorizationFields {
                     || self
                         .viewer_ids()
                         .as_ref()
-                        .map_or(false, |ids| ids.contains(&current_user.id))
+                        .is_some_and(|ids| ids.contains(&current_user.id))
                     || self
                         .editor_ids()
                         .as_ref()
-                        .map_or(false, |ids| ids.contains(&current_user.id))
+                        .is_some_and(|ids| ids.contains(&current_user.id))
                 {
                     return Ok(());
                 }

@@ -122,9 +122,7 @@ pub async fn create_node(node: web::Json<Node>, data: RequestData) -> Response {
         )
         .await?;
 
-    if let Err(e) = insert {
-        return Err(e);
-    }
+    insert?;
 
     Ok(HttpResponse::Ok().json(node))
 }
@@ -176,7 +174,7 @@ pub async fn delete_node(node: web::Path<PrimaryKeyNode>, data: RequestData) -> 
         .await?;
 
     if node.is_root && !node.is_public {
-        if node.is_subscription_active.map_or(false, |v| v) {
+        if node.is_subscription_active.is_some_and(|v| v) {
             return Err(NodecosmosError::Conflict(
                 r#"
                 Subscription is still active. Please go to subscription page
@@ -382,9 +380,7 @@ pub async fn import_nodes(data: RequestData, json_file: Multipart, params: web::
         )
         .await?;
 
-    if let Err(e) = import_run {
-        return Err(e);
-    }
+    import_run?;
 
     Ok(HttpResponse::Ok().finish())
 }

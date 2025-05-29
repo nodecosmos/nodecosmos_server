@@ -129,7 +129,7 @@ pub trait DescriptionParser<'a> {
     }
 
     fn text(&mut self, text: &str) -> Result<(), NodecosmosError> {
-        self.push_html(&text);
+        self.push_html(text);
 
         if self.blockquote_active() {
             self.push_markdown(&format!("> {}", text));

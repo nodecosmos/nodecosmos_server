@@ -414,51 +414,170 @@ impl Branch {
 #[cfg(test)]
 mod tests {
     use crate::api::data::RequestData;
-    use crate::models::branch::tests::create_branched_nodes_for_each_descendant;
+    use crate::models::branch::Branch;
     use crate::models::contribution_request::ContributionRequest;
     use crate::models::flow::Flow;
     use crate::models::flow_step::FlowStep;
     use crate::models::io::Io;
     use crate::models::node::Node;
-    use crate::models::traits::{Descendants, Reload};
+    use crate::models::node_descendant::NodeDescendant;
+    use crate::models::traits::{Descendants, NodeBranchParams, Reload};
+
+    pub struct TestMerge {
+        pub data: RequestData,
+        pub branch: Branch,
+        pub node: Node,
+        pub branch_node: Node,
+        pub branch_id: uuid::Uuid,
+    }
+
+    #[allow(unused)]
+    impl TestMerge {
+        async fn new() -> Self {
+            let data = RequestData::new(None).await;
+            let node = Node::sample_node_tree(&data).await;
+            let mut cr = ContributionRequest::create_test_cr(&data, &node).await;
+            let branch_id = cr.id;
+            let branch = cr
+                .branch(data.db_session())
+                .await
+                .expect("Failed to get branch")
+                .clone();
+            let branch_node = Node::find_by_branch_id_and_id(branch_id, node.id)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to find branch node");
+
+            Self {
+                data,
+                branch,
+                node,
+                branch_node,
+                branch_id,
+            }
+        }
+
+        async fn original_flows(&self) -> Vec<Flow> {
+            Flow::find_by_branch_id(self.node.root_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find flows")
+                .try_collect()
+                .await
+                .expect("Failed to collect flows")
+        }
+
+        async fn branch_flows(&self) -> Vec<Flow> {
+            Flow::find_by_branch_id(self.branch_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find flows")
+                .try_collect()
+                .await
+                .expect("Failed to collect flows")
+        }
+
+        async fn original_flow_steps(&self) -> Vec<FlowStep> {
+            FlowStep::find_by_branch_id(self.node.root_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find flow steps")
+                .try_collect()
+                .await
+                .expect("Failed to collect flow steps")
+        }
+
+        async fn branch_flow_steps(&self) -> Vec<FlowStep> {
+            FlowStep::find_by_branch_id(self.branch_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find flow steps")
+                .try_collect()
+                .await
+                .expect("Failed to collect flow steps")
+        }
+
+        async fn original_ios(&self) -> Vec<Io> {
+            Io::find_by_branch_id(self.node.root_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find IOs")
+                .try_collect()
+                .await
+                .expect("Failed to collect IOs")
+        }
+
+        async fn branch_ios(&self) -> Vec<Io> {
+            Io::find_by_branch_id(self.branch_id)
+                .execute(self.data.db_session())
+                .await
+                .expect("Failed to find IOs")
+                .try_collect()
+                .await
+                .expect("Failed to collect IOs")
+        }
+
+        async fn original_descendants(&self) -> Vec<NodeDescendant> {
+            self.node
+                .descendants(self.data.db_session())
+                .await
+                .expect("Failed to get descendants")
+                .try_collect()
+                .await
+                .expect("Failed to collect descendants")
+        }
+
+        async fn branch_descendants(&self) -> Vec<NodeDescendant> {
+            self.branch_node
+                .branch_descendants(self.data.db_session())
+                .await
+                .expect("Failed to collect branch descendants")
+        }
+    }
 
     #[tokio::test]
-    async fn test_cr_branching_and_merge() {
-        let data = RequestData::new(None).await;
-        let root = Node::sample_node_tree(&data).await;
-        let mut cr = ContributionRequest::create_test_cr(&data, &root).await;
-        let branch_id = cr.id;
-        let mut branch = cr
-            .branch(data.db_session())
-            .await
-            .expect("Failed to get branch")
-            .clone();
-        let branch_node = Node::find_by_branch_id_and_id(branch_id, root.id)
-            .execute(data.db_session())
-            .await
-            .expect("Failed to find branch node");
-        create_branched_nodes_for_each_descendant(&data, &root, branch_id)
+    async fn test_simple_merge() {
+        let mut test_merge = TestMerge::new().await;
+        let data = &test_merge.data;
+        let branch_id = test_merge.branch_id;
+        let root = &test_merge.node;
+        root.create_branched_nodes_for_each_descendant(data, branch_id)
             .await
             .unwrap();
+        let original_params = NodeBranchParams {
+            root_id: root.id,
+            branch_id: root.id,
+            node_id: root.id,
+        };
+        let branch_params = NodeBranchParams {
+            root_id: root.id,
+            branch_id,
+            node_id: root.id,
+        };
+        let original_descendants = test_merge.original_descendants().await;
 
-        let original_flow = Flow::create_test_flow(&data, branch_id, root.id).await;
+        // Create an original Flow
+        let original_flow = Flow::create_test_flow(data, &original_params).await;
+
         // Create a branch flow step for the original flow
-        FlowStep::create_test_flow_step(&data, branch_id, root.id, original_flow.id).await;
+        FlowStep::create_test_flow_step(data, &branch_params, original_flow.id).await;
 
-        // Create a branch Flow
-        let branch_flow = Flow::create_test_flow(&data, branch_id, root.id).await;
+        // Create a branch Flow for root
+        let branch_flow = Flow::create_test_flow(data, &branch_params).await;
+
+        // Create a branch Flow for 10 descendants
+        let desc = original_descendants.iter().take(10);
+
+        Flow::create_test_nodes_flows(data, &branch_params, desc).await;
+
         // Create a branch FlowStep for the branch flow
-        let branch_flow_step = FlowStep::create_test_flow_step(&data, branch_id, root.id, branch_flow.id).await;
-        // Create an branch IO for the branch flow step
-        Io::create_test_io(&data, branch_id, root.id, Some(branch_flow_step.id)).await;
+        let branch_flow_step = FlowStep::create_test_flow_step(data, &branch_params, branch_flow.id).await;
 
-        let original_descendants = root
-            .descendants(data.db_session())
-            .await
-            .expect("Failed to get descendants")
-            .try_collect()
-            .await
-            .expect("Failed to collect descendants");
+        // Create an branch IO for the branch flow step
+        Io::create_test_io(data, &branch_params, Some(branch_flow_step.id)).await;
+
+        // create test flows for 10 descendants
+        let original_descendants = test_merge.original_descendants().await;
 
         assert_eq!(
             original_descendants.len(),
@@ -466,64 +585,35 @@ mod tests {
             "Original node descendants count should be 110"
         );
         assert_eq!(
-            branch_node.branch_descendants(data.db_session()).await.unwrap().len(),
+            test_merge.branch_descendants().await.len(),
             220,
             "Branch node descendants count should be 220 (original + branched)"
         );
 
-        branch.reload(data.db_session()).await.unwrap();
+        test_merge.branch.reload(data.db_session()).await.unwrap();
 
-        branch.merge(&data).await.unwrap();
-
-        let original_descendants = root
-            .descendants(data.db_session())
-            .await
-            .expect("Failed to get descendants")
-            .try_collect()
-            .await
-            .expect("Failed to collect descendants");
+        test_merge.branch = test_merge.branch.merge(data).await.unwrap();
 
         assert_eq!(
-            original_descendants.len(),
+            test_merge.original_descendants().await.len(),
             220,
             "After merge, original node descendants count should be 220"
         );
 
         assert_eq!(
-            Flow::find_by_branch_id(root.id)
-                .execute(data.db_session())
-                .await
-                .expect("Failed to find flows")
-                .try_collect()
-                .await
-                .expect("Failed to collect flows")
-                .len(),
-            2,
-            "After merge, there should be 2 flows (original + branched)"
+            test_merge.original_flows().await.len(),
+            12,
+            "After merge, there should be 12 flows (1 original + 1 branch root + 10 branch descendants)"
         );
 
         assert_eq!(
-            FlowStep::find_by_branch_id(branch_id)
-                .execute(data.db_session())
-                .await
-                .expect("Failed to find flow steps")
-                .try_collect()
-                .await
-                .expect("Failed to collect flow steps")
-                .len(),
+            test_merge.original_flow_steps().await.len(),
             2,
             "After merge, there should be 2 flow steps (original + branched)"
         );
 
         assert_eq!(
-            Io::find_by_branch_id(branch_id)
-                .execute(data.db_session())
-                .await
-                .expect("Failed to find IOs")
-                .try_collect()
-                .await
-                .expect("Failed to collect IOs")
-                .len(),
+            test_merge.original_ios().await.len(),
             1,
             "After merge, there should be 1 IO"
         );

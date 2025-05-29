@@ -99,14 +99,13 @@ impl<T: ElasticIndex + Serialize> ElasticDocument<T> for T {
                 }),
             );
 
-            ops.push(op).map_err(|e| {
+            ops.push(op).inspect_err(|e| {
                 error!(
-                    "Failed to add update operation to bulk request! Index: {}, Id: {}",
+                    "Failed to add update operation to bulk request! Index: {}, Id: {}, \nError: {}",
                     T::ELASTIC_IDX_NAME,
-                    index_id
+                    index_id,
+                    e
                 );
-
-                e
             })?;
         }
 

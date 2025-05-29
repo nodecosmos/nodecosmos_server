@@ -204,10 +204,10 @@ impl Branch {
         records.into_iter().filter(|record| {
             !created_ids
                 .as_ref()
-                .map_or(false, |created_ids| created_ids.contains(&record.id()))
+                .is_some_and(|created_ids| created_ids.contains(&record.id()))
                 && !deleted_ids
                     .as_ref()
-                    .map_or(false, |deleted_ids| deleted_ids.contains(&record.id()))
+                    .is_some_and(|deleted_ids| deleted_ids.contains(&record.id()))
         })
     }
 
@@ -387,87 +387,3 @@ partial_branch!(UpdateRestoredIosBranch, id, restored_ios);
 partial_branch!(UpdateEditedTitleIosBranch, id, edited_title_ios);
 
 partial_branch!(UpdateEditedDescriptionIosBranch, id, edited_description_ios);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::data::RequestData;
-    use crate::models::contribution_request::ContributionRequest;
-    use crate::models::node::Node;
-    use crate::models::traits::{Descendants, Reload};
-    use charybdis::operations::InsertWithCallbacks;
-    use futures::StreamExt;
-
-    pub async fn create_branched_nodes_for_each_descendant(
-        data: &RequestData,
-        root: &Node,
-        branch_id: Uuid,
-    ) -> Result<(), NodecosmosError> {
-        let mut descendants = root
-            .descendants(data.db_session())
-            .await
-            .expect("Failed to get descendants");
-        let mut i = 0;
-
-        while let Some(descendant) = descendants.next().await {
-            let descendant = descendant?;
-            let mut child = Node {
-                branch_id,
-                root_id: descendant.root_id,
-                is_root: false,
-                title: format!("Branch Child Node {}", i),
-                parent_id: Some(descendant.id),
-                ..Default::default()
-            };
-
-            child
-                .insert_cb(data)
-                .execute(data.db_session())
-                .await
-                .expect("Failed to insert child node");
-
-            i += 1;
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_cr_branching() {
-        let data = RequestData::new(None).await;
-        let root = Node::sample_node_tree(&data).await;
-        let mut cr = ContributionRequest::create_test_cr(&data, &root).await;
-        let branch_id = cr.id;
-        let mut branch = cr
-            .branch(data.db_session())
-            .await
-            .expect("Failed to get branch")
-            .clone();
-
-        create_branched_nodes_for_each_descendant(&data, &root, branch_id)
-            .await
-            .unwrap();
-
-        let original_descendants = root
-            .descendants(data.db_session())
-            .await
-            .expect("Failed to get descendants")
-            .try_collect()
-            .await
-            .expect("Failed to collect descendants");
-
-        assert_eq!(
-            original_descendants.len(),
-            110,
-            "Original node descendants count should be 110"
-        );
-
-        branch.reload(data.db_session()).await.expect("Failed to reload branch");
-
-        assert_eq!(
-            branch.created_nodes.map_or(0, |nodes| nodes.len()),
-            110,
-            "Branch should have 110 created nodes"
-        )
-    }
-}

@@ -613,6 +613,40 @@ mod tests {
 
             child_nodes
         }
+
+        pub async fn create_branched_nodes_for_each_descendant(
+            &self,
+            data: &RequestData,
+            branch_id: Uuid,
+        ) -> Result<(), NodecosmosError> {
+            let mut descendants = self
+                .descendants(data.db_session())
+                .await
+                .expect("Failed to get descendants");
+            let mut i = 0;
+
+            while let Some(descendant) = descendants.next().await {
+                let descendant = descendant?;
+                let mut child = Node {
+                    branch_id,
+                    root_id: descendant.root_id,
+                    is_root: false,
+                    title: format!("Branch Child Node {}", i),
+                    parent_id: Some(descendant.id),
+                    ..Default::default()
+                };
+
+                child
+                    .insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .expect("Failed to insert child node");
+
+                i += 1;
+            }
+
+            Ok(())
+        }
     }
 
     #[tokio::test]

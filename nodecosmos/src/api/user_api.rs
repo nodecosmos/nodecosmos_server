@@ -351,7 +351,7 @@ pub async fn get_user_by_username(
     let user = ShowUser::find_first_by_username(username.into_inner())
         .execute(&db_session)
         .await?;
-    let is_current_user = opt_cu.0.as_ref().map_or(false, |cu| cu.id == user.id);
+    let is_current_user = opt_cu.0.as_ref().is_some_and(|cu| cu.id == user.id);
     let root_nodes = NodesByOwner::root_nodes(&db_session, &opt_cu, user.id)
         .await?
         .try_filter_map(|node| async move {

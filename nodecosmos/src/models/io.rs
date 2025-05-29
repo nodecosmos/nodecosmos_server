@@ -114,7 +114,7 @@ impl Callbacks for Io {
 
     async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
-        if !self.delete_dangling.map_or(false, |v| v) && self.is_main() && self.flow_step_id.is_some() {
+        if !self.delete_dangling.is_some_and(|v| v) && self.is_main() && self.flow_step_id.is_some() {
             // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
             // keep the main io in the database as it can be later used by flow steps where it was deleted.
             let mut self_clone = self.clone();
@@ -461,11 +461,11 @@ mod tests {
     use charybdis::operations::InsertWithCallbacks;
 
     impl Io {
-        pub async fn create_test_io(data: &RequestData, branch_id: Uuid, root_id: Uuid, fs_id: Option<Uuid>) -> Io {
+        pub async fn create_test_io(data: &RequestData, branch_params: &NodeBranchParams, fs_id: Option<Uuid>) -> Io {
             let mut io = Io {
-                root_id,
-                node_id: root_id,
-                branch_id,
+                node_id: branch_params.node_id,
+                branch_id: branch_params.branch_id,
+                root_id: branch_params.root_id,
                 flow_step_id: fs_id,
                 title: Some(Text::from("Test Io")),
                 ..Default::default()

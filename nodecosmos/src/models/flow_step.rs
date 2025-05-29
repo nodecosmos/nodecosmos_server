@@ -500,10 +500,15 @@ mod tests {
     use charybdis::operations::InsertWithCallbacks;
 
     impl FlowStep {
-        pub async fn create_test_flow_step(data: &RequestData, branch_id: Uuid, node_id: Uuid, flow_id: Uuid) -> Self {
+        pub async fn create_test_flow_step(
+            data: &RequestData,
+            branch_params: &NodeBranchParams,
+            flow_id: Uuid,
+        ) -> Self {
             let mut flow_step = FlowStep {
-                node_id,
-                branch_id,
+                node_id: branch_params.node_id,
+                branch_id: branch_params.branch_id,
+                root_id: branch_params.root_id,
                 flow_id,
                 ..Default::default()
             };

@@ -2,7 +2,6 @@ use crate::errors::NodecosmosError;
 use crate::resources::resource::RedisClusterManager;
 use actix_session::storage::{generate_session_key, LoadError, SaveError, SessionKey, SessionStore, UpdateError};
 use redis::{AsyncCommands, FromRedisValue, Value};
-use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use time::Duration;

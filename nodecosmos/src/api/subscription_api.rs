@@ -152,9 +152,7 @@ pub async fn build_subscription_url(node: web::Json<Node>, data: RequestData) ->
 
     let insert = node.insert_cb(&data).execute(data.db_session()).await;
 
-    if let Err(e) = insert {
-        return Err(e);
-    }
+    insert?;
 
     let url = Subscription::build_stripe_url(&data, node, None).await?;
 

@@ -213,14 +213,17 @@ partial_flow!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::node_descendant::NodeDescendant;
     use charybdis::operations::InsertWithCallbacks;
+    use std::iter::Take;
+    use std::slice::Iter;
 
     impl Flow {
-        pub async fn create_test_flow(data: &RequestData, branch_id: Uuid, root_id: Uuid) -> Flow {
+        pub async fn create_test_flow(data: &RequestData, branch_params: &NodeBranchParams) -> Flow {
             let mut flow = Flow {
-                branch_id,
-                node_id: root_id,
-                root_id,
+                node_id: branch_params.node_id,
+                branch_id: branch_params.branch_id,
+                root_id: branch_params.root_id,
                 title: "Test Flow".into(),
                 ..Default::default()
             };
@@ -231,6 +234,33 @@ mod tests {
                 .expect("Failed to create test flow");
 
             flow
+        }
+
+        pub async fn create_test_nodes_flows(
+            data: &RequestData,
+            branch_params: &NodeBranchParams,
+            nodes: Take<Iter<'_, NodeDescendant>>,
+        ) -> Vec<Flow> {
+            let mut flows = vec![];
+
+            for node in nodes {
+                let mut flow = Flow {
+                    node_id: node.id,
+                    branch_id: branch_params.branch_id,
+                    root_id: branch_params.root_id,
+                    title: format!("Flow for Node {}", node.id),
+                    ..Default::default()
+                };
+
+                flow.insert_cb(data)
+                    .execute(data.db_session())
+                    .await
+                    .expect("Failed to create test flow");
+
+                flows.push(flow);
+            }
+
+            flows
         }
     }
 }

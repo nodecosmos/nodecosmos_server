@@ -36,7 +36,7 @@ impl Token {
         let mut random_bytes = [0u8; 32];
         rng.try_fill_bytes(&mut random_bytes)
             .expect("Failed to generate random bytes with OS RNG");
-        URL_SAFE.encode(&random_bytes)
+        URL_SAFE.encode(random_bytes)
     }
 
     pub fn new_user_confirmation(email: Text) -> Self {

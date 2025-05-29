@@ -257,7 +257,7 @@ impl<'a> Resource<'a> for Vec<redis::Client> {
                     .read_to_end(&mut client_cert_vec)
                     .expect("Unable to read client cert file");
 
-                let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+                let key_file = std::fs::File::open(config.redis.key.clone().expect("redis must have key defined"))
                     .expect("cannot open private key file");
                 let mut client_key_vec = Vec::new();
                 std::io::BufReader::new(key_file)
@@ -317,7 +317,7 @@ impl<'a> Resource<'a> for redis::cluster::ClusterClient {
                 .read_to_end(&mut client_cert_vec)
                 .expect("Unable to read client cert file");
 
-            let key_file = std::fs::File::open(&config.redis.key.clone().expect("redis must have key defined"))
+            let key_file = std::fs::File::open(config.redis.key.clone().expect("redis must have key defined"))
                 .expect("cannot open private key file");
             let mut client_key_vec = Vec::new();
             std::io::BufReader::new(key_file)

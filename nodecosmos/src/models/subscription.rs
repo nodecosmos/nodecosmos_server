@@ -171,7 +171,7 @@ impl Subscription {
 
             let descendants = root_node.descendants(&app.db_session).await?.try_collect().await?;
 
-            if descendants.len() > 0 {
+            if !descendants.is_empty() {
                 log::error!("Expired stripe session node {} should not have descendants", root_id);
 
                 return Ok(());
@@ -187,7 +187,7 @@ impl Subscription {
                 return Ok(());
             }
 
-            if root_node.editor_ids.as_ref().map_or(false, |ids| ids.len() > 0) {
+            if root_node.editor_ids.as_ref().is_some_and(|ids| !ids.is_empty()) {
                 log::error!("Expired stripe session node {} should not have editors", root_id);
 
                 return Ok(());
@@ -223,7 +223,7 @@ impl Subscription {
         Node::find_by_branch_id_and_id(root_id, root_id)
             .execute(&app.db_session)
             .await?
-            .update_sub_active(&app, true)
+            .update_sub_active(app, true)
             .await?;
 
         let mut subscription = Subscription::find_by_root_id(root_id).execute(&app.db_session).await?;
@@ -256,7 +256,7 @@ impl Subscription {
             .execute(&app.db_session)
             .await?
         {
-            node.update_sub_active(&app, false).await?
+            node.update_sub_active(app, false).await?
         }
 
         let mut subscription = Subscription::find_by_root_id(root_id).execute(&app.db_session).await?;
@@ -304,7 +304,7 @@ impl Subscription {
             Node::find_by_branch_id_and_id(root_id, root_id)
                 .execute(&app.db_session)
                 .await?
-                .update_sub_active(&app, false)
+                .update_sub_active(app, false)
                 .await?;
         } else if subscription.status != SubscriptionStatus::Active.to_string()
             && object.status == stripe::SubscriptionStatus::Active
@@ -318,7 +318,7 @@ impl Subscription {
             Node::find_by_branch_id_and_id(root_id, root_id)
                 .execute(&app.db_session)
                 .await?
-                .update_sub_active(&app, true)
+                .update_sub_active(app, true)
                 .await?;
         }
 

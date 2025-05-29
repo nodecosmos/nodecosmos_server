@@ -149,9 +149,9 @@ impl App {
         let sse_broadcast = SseBroadcast::init_resource(()).await;
         let mailer = Mailer::init_resource(&config).await;
 
-        let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_or(None, |key| Some(key));
-        let stripe_price_id = env::var("STRIPE_PRICE_ID").map_or(None, |key| Some(key));
-        let webhook_secret_key = env::var("STRIPE_WEBHOOK_SECRET").map_or(None, |key| Some(key));
+        let stripe_secret_key = env::var("STRIPE_SECRET_KEY").ok();
+        let stripe_price_id = env::var("STRIPE_PRICE_ID").ok();
+        let webhook_secret_key = env::var("STRIPE_WEBHOOK_SECRET").ok();
         let stripe_cfg = if let (Some(secret_key), Some(price_id), Some(webhook_secret_key)) =
             (stripe_secret_key, stripe_price_id, webhook_secret_key)
         {
@@ -164,8 +164,8 @@ impl App {
             None
         };
 
-        let google_client_id = env::var("GOOGLE_CLIENT_ID").map_or(None, |key| Some(key));
-        let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").map_or(None, |key| Some(key));
+        let google_client_id = env::var("GOOGLE_CLIENT_ID").ok();
+        let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").ok();
 
         let google_cfg = if let (Some(client_id), Some(client_secret)) = (google_client_id, google_client_secret) {
             Some(GoogleCfg {
@@ -209,7 +209,7 @@ impl App {
 
         tasks::recovery_task(data).await;
         tasks::cleanup_rooms_task(self.sse_broadcast.clone()).await;
-        tasks::listen_redis_events(&self).await;
+        tasks::listen_redis_events(self).await;
     }
 
     pub fn cors(&self) -> Cors {
