@@ -50,6 +50,7 @@ pub async fn restore_node(data: RequestData, params: web::Json<BranchPayload>) -
     let mut branch = Branch::find_by_id(params.branch_id).execute(data.db_session()).await?;
 
     branch.auth_update(&data).await?;
+
     let branch = Branch::update(
         data.db_session(),
         params.branch_id,
