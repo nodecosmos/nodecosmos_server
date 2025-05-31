@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 futures = "0.3.30"
-scylla = { version = "1.0.0", features = ["openssl-010"] }
+scylla = { version = "1.2.0", features = ["openssl-010"] }
 tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -33,7 +33,7 @@ aws-sdk-ses = "1.36.0"
 image = "0.25.1"
 mozjpeg = "0.10.7"
 dashmap = "6.0.1"
-charybdis = "1.0.1"
+charybdis = "1.0.2"
 base64 = "0.22.1"
 uuid = "1.8.0"
 quick-xml = "0.37.1"

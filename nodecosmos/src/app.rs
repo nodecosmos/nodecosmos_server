@@ -15,12 +15,12 @@ use crate::errors::NodecosmosError;
 use crate::models::node::Node;
 use crate::models::traits::ElasticIndex;
 use crate::models::user::User;
-use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::email_client::TlsMode;
 use crate::resources::mailer::Mailer;
 use crate::resources::resource::{RedisClusterManager, Resource};
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use crate::resources::ws_broadcast::WsBroadcast;
 use crate::session_store::RedisClusterSessionStore;
 use crate::tasks;
 
@@ -116,7 +116,7 @@ pub struct App {
     pub elastic_client: Arc<Elasticsearch>,
     pub s3_client: Arc<aws_sdk_s3::Client>,
     pub resource_locker: Arc<ResourceLocker>,
-    pub description_ws_pool: Arc<DescriptionWsPool>,
+    pub ws_broadcast: Arc<WsBroadcast>,
     pub sse_broadcast: Arc<SseBroadcast>,
     pub redis_pool: RedisClusterManagerPool,
     pub redis_clients: RedisClients,
@@ -145,7 +145,7 @@ impl App {
 
         // app
         let resource_locker = ResourceLocker::init_resource((&redis_pool, config.redis.replicas)).await;
-        let description_ws_pool = DescriptionWsPool::init_resource(()).await;
+        let ws_broadcast = WsBroadcast::init_resource(()).await;
         let sse_broadcast = SseBroadcast::init_resource(()).await;
         let mailer = Mailer::init_resource(&config).await;
 
@@ -189,7 +189,7 @@ impl App {
             redis_clients,
             // app
             resource_locker: Arc::new(resource_locker),
-            description_ws_pool: Arc::new(description_ws_pool),
+            ws_broadcast: Arc::new(ws_broadcast),
             sse_broadcast: Arc::new(sse_broadcast),
             mailer: Arc::new(mailer),
             secret_key,

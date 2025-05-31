@@ -61,7 +61,7 @@ Think GitHub for systems and innovation.
   They represent data structures that are alive during program runtime. They are usually related to
   external services
   sessions: e.g. `ScyllaDb`, `Redis`, `ElasticSearch`, etc. But it can also be app specific e.g.
-  `SseBroadcast`, `Locker`, `DescriptionWsPool`, etc.
+  `SseBroadcast`, `Locker`, `WsBroadcast`, etc.
 * ### Actions (`api/`)
   They represent entry point of the request. They are responsible for parsing request or triggering
   model or
@@ -87,7 +87,7 @@ Think GitHub for systems and innovation.
 
 ### Note:
 
-Looks like tokio has [excessive stack usage in debug
+Looks like tokio spawn comes with [excessive stack usage in debug
 builds](https://github.com/tokio-rs/tokio/issues/2055). In order to avoid stack overflow, we need to
 increase the stack size. This can be done by setting `RUST_MIN_STACK` environment variable. For
 example, to set the stack size to 8MB, you can run the following command:

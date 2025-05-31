@@ -650,8 +650,6 @@ mod tests {
 
         test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
 
-        println!("[DEBUG] Branch before deletion: {:?}", test_merge.branch);
-
         // Delete the node in the original branch
         node_to_delete
             .delete_cb(&test_merge.data)
@@ -668,8 +666,6 @@ mod tests {
 
         branch_clone.reload(test_merge.data.db_session()).await.unwrap();
         let conflict = branch_clone.conflict.expect("Branch should have conflicts");
-
-        println!("[DEBUG] Conflict: {:?}", conflict);
 
         assert!(
             conflict.deleted_edited_nodes.is_some(),

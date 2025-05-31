@@ -8,30 +8,30 @@ use log::error;
 type RoomId = String; // BranchId + RoomId
 
 #[derive(Default)]
-pub struct DescriptionWsPool {
-    pub connections: DashMap<RoomId, Vec<Addr<DescriptionWsConnection>>>,
+pub struct WsBroadcast {
+    pub connections: DashMap<RoomId, Vec<Addr<WsConnection>>>,
 }
 
 #[derive(Clone)]
-pub struct DescriptionWsConnection {
+pub struct WsConnection {
     pub room_id: RoomId,
-    pub pool: Arc<DescriptionWsPool>,
+    pub broadcast: Arc<WsBroadcast>,
 }
 
-impl Actor for DescriptionWsConnection {
+impl Actor for WsConnection {
     type Context = ws::WebsocketContext<Self>;
 }
 
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for DescriptionWsConnection {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Binary(bin)) => {
-                if let Some(connections) = self.pool.connections.get(&self.room_id) {
+                if let Some(connections) = self.broadcast.connections.get(&self.room_id) {
                     for conn in connections.iter() {
                         let address = ctx.address();
-                        // this will call `handle` method of `DescriptionUpdateMessage` actor
-                        let message = DescriptionUpdateMessage {
+                        // this will call `handle` method of `WsMessage` actor
+                        let message = WsMessage {
                             message: ws::Message::Binary(bin.clone()),
                             origin_address: address,
                         };
@@ -53,7 +53,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for DescriptionWsConn
     }
 
     fn finished(&mut self, ctx: &mut Self::Context) {
-        if let Some(mut connections) = self.pool.connections.get_mut(&self.room_id) {
+        if let Some(mut connections) = self.broadcast.connections.get_mut(&self.room_id) {
             connections.retain(|addr| *addr != ctx.address());
         }
 
@@ -63,15 +63,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for DescriptionWsConn
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct DescriptionUpdateMessage {
+pub struct WsMessage {
     pub message: ws::Message,
-    pub origin_address: Addr<DescriptionWsConnection>,
+    pub origin_address: Addr<WsConnection>,
 }
 
-impl Handler<DescriptionUpdateMessage> for DescriptionWsConnection {
+impl Handler<WsMessage> for WsConnection {
     type Result = ();
 
-    fn handle(&mut self, msg: DescriptionUpdateMessage, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) {
         if msg.origin_address != ctx.address() {
             match msg.message {
                 ws::Message::Binary(bin) => ctx.binary(bin),

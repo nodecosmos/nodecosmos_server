@@ -10,11 +10,7 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.1
-    deploy:
-      resources:
-        limits:
-          cpus: "4.0"
-          memory: 16gb
+
     volumes:
       - ./volumes/scylla1:/var/lib/scylla
   scylla2:
@@ -26,11 +22,7 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.2
-    deploy:
-      resources:
-        limits:
-          cpus: "4.0"
-          memory: 16gb
+
     volumes:
       - ./volumes/scylla2:/var/lib/scylla
 
@@ -43,11 +35,7 @@ services:
     networks:
       scylla_net:
         ipv4_address: 172.28.1.3
-    deploy:
-      resources:
-        limits:
-          cpus: "4.0"
-          memory: 16gb
+
     volumes:
       - ./volumes/scylla3:/var/lib/scylla
 

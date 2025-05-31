@@ -5,9 +5,9 @@ use crate::api::current_user::get_current_user;
 use crate::app::{App, StripeCfg};
 use crate::errors::NodecosmosError;
 use crate::models::user::CurrentUser;
-use crate::resources::description_ws_pool::DescriptionWsPool;
 use crate::resources::resource_locker::ResourceLocker;
 use crate::resources::sse_broadcast::SseBroadcast;
+use crate::resources::ws_broadcast::WsBroadcast;
 use actix_session::SessionExt;
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
@@ -50,8 +50,8 @@ impl RequestData {
         &self.app.resource_locker
     }
 
-    pub fn description_ws_pool(&self) -> Arc<DescriptionWsPool> {
-        self.app.description_ws_pool.clone()
+    pub fn ws_broadcast(&self) -> Arc<WsBroadcast> {
+        self.app.ws_broadcast.clone()
     }
 
     pub fn sse_broadcast(&self) -> Arc<SseBroadcast> {

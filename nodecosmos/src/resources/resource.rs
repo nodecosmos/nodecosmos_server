@@ -217,11 +217,11 @@ impl<'a> Resource<'a> for crate::resources::resource_locker::ResourceLocker {
     }
 }
 
-impl<'a> Resource<'a> for crate::resources::description_ws_pool::DescriptionWsPool {
+impl<'a> Resource<'a> for crate::resources::ws_broadcast::WsBroadcast {
     type Cfg = ();
 
     async fn init_resource(_config: ()) -> Self {
-        crate::resources::description_ws_pool::DescriptionWsPool::default()
+        crate::resources::ws_broadcast::WsBroadcast::default()
     }
 }
 

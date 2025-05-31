@@ -8,7 +8,7 @@ license = "MIT"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0.71", features = ["full"] }
-quote = "1.0.36"
+syn = { version = "2.0.71", default-features = false, features = ["derive"] }
+quote = { version = "1.0.36", default-features = false }
 log = "0.4.22"
 darling = "0.20.10"

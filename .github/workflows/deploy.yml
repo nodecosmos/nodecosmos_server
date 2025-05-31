@@ -18,8 +18,57 @@ env:
   DOCKER_BUILDKIT: 1
 
 jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup NodeCosmos Test Environment
+        run: |
+          sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
+          docker compose -f docker-compose.yml up -d --wait
+      - name: Create NodeCosmos Keyspace
+        run: |
+          docker exec scylla1 cqlsh -e \
+          "CREATE KEYSPACE nodecosmos WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3} AND tablets = { 'enabled': false };"
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Update rust toolchain
+        run: rustup update
+      - name: Print rustc version
+        run: rustc --version
+      - name: Print rustfmt version
+        run: cargo fmt --version
+      - name: Print clippy version
+        run: cargo clippy --version
+      - name: Compile tests
+        run: cargo test --workspace --all-features -vv --timings --no-run
+      - name: Format check
+        run: cargo fmt --verbose -- --check
+      - name: Clippy check
+        run: cargo clippy --verbose
+      - name: Cargo check
+        run: cargo check --verbose
+      - name: Install Charybdis Migration Tool
+        run: cargo install charybdis-migrate
+      - name: Run Charybdis Migration Tool
+        run: |
+          cd nodecosmos
+          migrate --keyspace nodecosmos --host 127.0.0.1:9042 --drop-and-replace
+      - name: Run tests
+        run: RUST_MIN_STACK=4194304 cargo test --workspace --all-features
+
   build:
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       id-token: write
       contents: read

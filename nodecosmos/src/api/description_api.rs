@@ -7,7 +7,7 @@ use crate::models::description::{BaseDescription, Description};
 use crate::models::like::Like;
 use crate::models::node::{AuthNode, FindCoverImageNode};
 use crate::models::traits::{Branchable, ObjectType};
-use crate::resources::description_ws_pool::DescriptionWsConnection;
+use crate::resources::ws_broadcast::WsConnection;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws::WsResponseBuilder;
 use charybdis::errors::CharybdisError;
@@ -160,9 +160,9 @@ pub async fn description_ws(
 ) -> Response {
     AuthNode::auth_update(&data, params.branch_id, params.node_id, params.root_id).await?;
 
-    let ws_desc_conn = DescriptionWsConnection {
+    let ws_desc_conn = WsConnection {
         room_id: format!("{}{}", params.branch_id, params.room_id),
-        pool: data.description_ws_pool(),
+        broadcast: data.ws_broadcast(),
     };
     let ws_builder = WsResponseBuilder::new(ws_desc_conn.clone(), &req, stream);
     let (addr, resp) = ws_builder
@@ -170,7 +170,7 @@ pub async fn description_ws(
         .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to start websocket connection: {}", e)))?;
 
     ws_desc_conn
-        .pool
+        .broadcast
         .connections
         .entry(format!("{}{}", params.branch_id, params.room_id))
         .or_default()

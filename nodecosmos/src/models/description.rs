@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, Transact, Update};
 
-mod save;
+mod update;
 
 #[charybdis_model(
     table_name = description,
