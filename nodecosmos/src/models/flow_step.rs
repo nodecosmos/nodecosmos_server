@@ -3,7 +3,8 @@ use crate::errors::NodecosmosError;
 use crate::models::archived_flow_step::ArchivedFlowStep;
 use crate::models::io::UpdateFlowStepIo;
 use crate::models::traits::{
-    Branchable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams, WhereInChunksExec,
+    Branchable, Descriptionable, FindOrInsertBranched, GroupById, Merge, ModelBranchParams, NodeBranchParams,
+    WhereInChunksExec,
 };
 use crate::models::traits::{Context, ModelContext};
 use crate::models::utils::updated_at_cb_fn;
@@ -96,6 +97,7 @@ impl Callbacks for FlowStep {
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         // TODO: see nodecosmos/src/models/node/create.rs:258
         self.create_branched_if_original_exists(data).await?;
+        self.delete_description(data).await?;
 
         let _ = ArchivedFlowStep::from(&*self)
             .insert()

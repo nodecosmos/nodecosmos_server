@@ -413,37 +413,42 @@ impl Branch {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::data::RequestData;
-    use crate::models::branch::Branch;
+    use super::*;
+    use crate::models::branch::update::BranchUpdate;
     use crate::models::contribution_request::ContributionRequest;
+    use crate::models::description::Description;
     use crate::models::flow::Flow;
     use crate::models::flow_step::FlowStep;
     use crate::models::io::Io;
     use crate::models::node::Node;
     use crate::models::node_descendant::NodeDescendant;
     use crate::models::traits::{Descendants, NodeBranchParams, Reload};
+    use charybdis::operations::{DeleteWithCallbacks, UpdateWithCallbacks};
 
     pub struct TestMerge {
         pub data: RequestData,
         pub branch: Branch,
-        pub node: Node,
+        pub root: Node,
         pub branch_node: Node,
         pub branch_id: uuid::Uuid,
+        pub original_params: NodeBranchParams,
+        pub branch_params: NodeBranchParams,
     }
 
     #[allow(unused)]
     impl TestMerge {
         async fn new() -> Self {
             let data = RequestData::new(None).await;
-            let node = Node::sample_node_tree(&data).await;
-            let mut cr = ContributionRequest::create_test_cr(&data, &node).await;
+            let root = Node::sample_node_tree(&data).await;
+            let root_id = root.root_id;
+            let mut cr = ContributionRequest::create_test_cr(&data, &root).await;
             let branch_id = cr.id;
             let branch = cr
                 .branch(data.db_session())
                 .await
                 .expect("Failed to get branch")
                 .clone();
-            let branch_node = Node::find_by_branch_id_and_id(branch_id, node.id)
+            let branch_node = Node::find_by_branch_id_and_id(branch_id, root_id)
                 .execute(data.db_session())
                 .await
                 .expect("Failed to find branch node");
@@ -451,14 +456,24 @@ mod tests {
             Self {
                 data,
                 branch,
-                node,
+                root,
                 branch_node,
                 branch_id,
+                original_params: NodeBranchParams {
+                    root_id,
+                    branch_id: root_id,
+                    node_id: root_id,
+                },
+                branch_params: NodeBranchParams {
+                    root_id,
+                    branch_id,
+                    node_id: root_id,
+                },
             }
         }
 
         async fn original_flows(&self) -> Vec<Flow> {
-            Flow::find_by_branch_id(self.node.root_id)
+            Flow::find_by_branch_id(self.root.root_id)
                 .execute(self.data.db_session())
                 .await
                 .expect("Failed to find flows")
@@ -478,7 +493,7 @@ mod tests {
         }
 
         async fn original_flow_steps(&self) -> Vec<FlowStep> {
-            FlowStep::find_by_branch_id(self.node.root_id)
+            FlowStep::find_by_branch_id(self.root.root_id)
                 .execute(self.data.db_session())
                 .await
                 .expect("Failed to find flow steps")
@@ -498,7 +513,7 @@ mod tests {
         }
 
         async fn original_ios(&self) -> Vec<Io> {
-            Io::find_by_branch_id(self.node.root_id)
+            Io::find_by_branch_id(self.root.root_id)
                 .execute(self.data.db_session())
                 .await
                 .expect("Failed to find IOs")
@@ -518,7 +533,7 @@ mod tests {
         }
 
         async fn original_descendants(&self) -> Vec<NodeDescendant> {
-            self.node
+            self.root
                 .descendants(self.data.db_session())
                 .await
                 .expect("Failed to get descendants")
@@ -536,48 +551,37 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_simple_merge() {
+    async fn test_merge_with_no_conflicts() {
         let mut test_merge = TestMerge::new().await;
-        let data = &test_merge.data;
-        let branch_id = test_merge.branch_id;
-        let root = &test_merge.node;
-        root.create_branched_nodes_for_each_descendant(data, branch_id)
+        test_merge
+            .root
+            .create_branched_nodes_for_each_descendant(&test_merge.data, test_merge.branch_id)
             .await
             .unwrap();
-        let original_params = NodeBranchParams {
-            root_id: root.id,
-            branch_id: root.id,
-            node_id: root.id,
-        };
-        let branch_params = NodeBranchParams {
-            root_id: root.id,
-            branch_id,
-            node_id: root.id,
-        };
         let original_descendants = test_merge.original_descendants().await;
 
         // Create an original Flow
-        let original_flow = Flow::create_test_flow(data, &original_params).await;
+        let original_flow = Flow::create_test_flow(&test_merge.data, &test_merge.original_params).await;
 
         // Create a branch flow step for the original flow
-        FlowStep::create_test_flow_step(data, &branch_params, original_flow.id).await;
+        FlowStep::create_test_flow_step(&test_merge.data, &test_merge.branch_params, original_flow.id).await;
 
         // Create a branch Flow for root
-        let branch_flow = Flow::create_test_flow(data, &branch_params).await;
+        let branch_flow = Flow::create_test_flow(&test_merge.data, &test_merge.branch_params).await;
 
-        // Create a branch Flow for 10 descendants
-        let desc = original_descendants.iter().take(10);
-
-        Flow::create_test_nodes_flows(data, &branch_params, desc).await;
+        Flow::create_test_node_flows(
+            &test_merge.data,
+            &test_merge.branch_params,
+            original_descendants.iter().take(10),
+        )
+        .await;
 
         // Create a branch FlowStep for the branch flow
-        let branch_flow_step = FlowStep::create_test_flow_step(data, &branch_params, branch_flow.id).await;
+        let branch_flow_step =
+            FlowStep::create_test_flow_step(&test_merge.data, &test_merge.branch_params, branch_flow.id).await;
 
         // Create an branch IO for the branch flow step
-        Io::create_test_io(data, &branch_params, Some(branch_flow_step.id)).await;
-
-        // create test flows for 10 descendants
-        let original_descendants = test_merge.original_descendants().await;
+        Io::create_test_io(&test_merge.data, &test_merge.branch_params, Some(branch_flow_step.id)).await;
 
         assert_eq!(
             original_descendants.len(),
@@ -590,9 +594,9 @@ mod tests {
             "Branch node descendants count should be 220 (original + branched)"
         );
 
-        test_merge.branch.reload(data.db_session()).await.unwrap();
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
 
-        test_merge.branch = test_merge.branch.merge(data).await.unwrap();
+        test_merge.branch = test_merge.branch.merge(&test_merge.data).await.unwrap();
 
         assert_eq!(
             test_merge.original_descendants().await.len(),
@@ -616,6 +620,201 @@ mod tests {
             test_merge.original_ios().await.len(),
             1,
             "After merge, there should be 1 IO"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_merge_with_deleted_edited_nodes_conflict() {
+        // Create test environment
+        let mut test_merge = TestMerge::new().await;
+
+        // Get original descendants
+        let original_descendants = test_merge.original_descendants().await;
+        let last_descendant = original_descendants.last().unwrap();
+
+        // Delete a node in the original branch
+        let mut node_to_delete = Node::find_by_branch_id_and_id(test_merge.root.root_id, last_descendant.id)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to find node to delete");
+
+        // edit node that will be deleted
+        Description::create_test_description(
+            &test_merge.data,
+            test_merge.branch_id,
+            node_to_delete.root_id,
+            node_to_delete.id,
+            node_to_delete.id,
+        )
+        .await;
+
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+
+        println!("[DEBUG] Branch before deletion: {:?}", test_merge.branch);
+
+        // Delete the node in the original branch
+        node_to_delete
+            .delete_cb(&test_merge.data)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to delete node");
+
+        // Check for conflicts
+        let mut branch_clone = test_merge.branch.clone();
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+        let merge_result = test_merge.branch.merge(&test_merge.data).await;
+
+        assert!(merge_result.is_err(), "Expected the conflict error but got Ok");
+
+        branch_clone.reload(test_merge.data.db_session()).await.unwrap();
+        let conflict = branch_clone.conflict.expect("Branch should have conflicts");
+
+        println!("[DEBUG] Conflict: {:?}", conflict);
+
+        assert!(
+            conflict.deleted_edited_nodes.is_some(),
+            "Branch should have deleted_edited_nodes conflict"
+        );
+
+        assert!(
+            conflict
+                .deleted_edited_nodes
+                .is_some_and(|ids| ids.contains(&last_descendant.id)),
+            "Conflict should contain the deleted and edited node"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_merge_with_conflicting_flow_steps() {
+        // Create test environment
+        let mut test_merge = TestMerge::new().await;
+
+        // Create branched nodes for each descendant
+        test_merge
+            .root
+            .create_branched_nodes_for_each_descendant(&test_merge.data, test_merge.branch_id)
+            .await
+            .unwrap();
+
+        // Create an original Flow
+        let original_flow = Flow::create_test_flow(&test_merge.data, &test_merge.original_params).await;
+
+        // Create a flow step for the original flow with a specific step_index
+        let mut original_flow_step =
+            FlowStep::create_test_flow_step(&test_merge.data, &test_merge.original_params, original_flow.id).await;
+        original_flow_step.step_index = 1.into();
+        original_flow_step
+            .update_cb(&test_merge.data)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to update original flow step");
+
+        // Create a flow step for the same flow in the branch with the same step_index
+        let mut branch_flow_step =
+            FlowStep::create_test_flow_step(&test_merge.data, &test_merge.branch_params, original_flow.id).await;
+        branch_flow_step.step_index = 1.into();
+        branch_flow_step
+            .update_cb(&test_merge.data)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to update branch flow step");
+
+        // Check for conflicts
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+        let check_conflict_res = test_merge
+            .branch
+            .clone()
+            .check_conflicts(test_merge.data.db_session())
+            .await;
+
+        assert!(check_conflict_res.is_err(), "check_conflict_res should return an error");
+
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+
+        let conflict = test_merge
+            .branch
+            .conflict
+            .clone()
+            .expect("Branch should have conflicts");
+        assert!(
+            conflict.conflicting_flow_steps.is_some(),
+            "Branch should have conflicting_flow_steps conflict"
+        );
+
+        assert!(
+            conflict
+                .conflicting_flow_steps
+                .is_some_and(|ids| ids.contains(&branch_flow_step.id)),
+            "Conflict should contain the conflicting flow step"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_merge_recovery_from_conflicts() {
+        // Create test environment
+        let mut test_merge = TestMerge::new().await;
+
+        // Get original descendants
+        let original_descendants = test_merge.original_descendants().await;
+        let last_descendant = original_descendants.first().unwrap();
+
+        // Find the node to delete in the original branch
+        let mut node_to_delete = Node::find_by_branch_id_and_id(test_merge.root.root_id, last_descendant.id)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to find node to delete");
+
+        // Edit the same node in the branch by creating a description
+        Description::create_test_description(
+            &test_merge.data,
+            test_merge.branch_id,
+            node_to_delete.root_id,
+            node_to_delete.id,
+            node_to_delete.id,
+        )
+        .await;
+
+        // Delete a node in the original branch
+        node_to_delete
+            .delete_cb(&test_merge.data)
+            .execute(test_merge.data.db_session())
+            .await
+            .expect("Failed to delete node");
+
+        // Check for conflicts
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+        let check_conflict_res = test_merge
+            .branch
+            .clone()
+            .check_conflicts(test_merge.data.db_session())
+            .await;
+
+        assert!(check_conflict_res.is_err(), "check_conflict_res should return an error");
+
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+
+        // Verify that the conflict is correctly identified
+        assert!(test_merge.branch.conflict.is_some(), "Branch should have conflicts");
+
+        // Clear the conflicts to simulate resolving them
+        // restore the deleted node
+        Branch::update(
+            test_merge.data.db_session(),
+            test_merge.branch_id,
+            BranchUpdate::RestoreNode(node_to_delete.id),
+        )
+        .await
+        .unwrap();
+
+        // Attempt to merge again
+        test_merge.branch.reload(test_merge.data.db_session()).await.unwrap();
+        let merged_branch = test_merge.branch.merge(&test_merge.data).await.unwrap();
+
+        // Verify that the merge was successful
+        assert_eq!(
+            merged_branch.status,
+            Some("Merged".into()),
+            "Branch status should be Merged"
         );
     }
 }

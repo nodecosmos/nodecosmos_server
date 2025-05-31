@@ -18,7 +18,7 @@ use yrs::updates::decoder::Decode;
 use yrs::{Doc, Transact, Update};
 
 mod save;
-// TODO: fix flow step deletions
+
 #[charybdis_model(
     table_name = description,
     partition_keys = [branch_id],
@@ -28,9 +28,10 @@ mod save;
 #[derive(Default, Clone, Branchable, ObjectId, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Description {
-    pub node_id: Uuid,
     pub branch_id: Uuid,
     pub object_id: Uuid,
+
+    pub node_id: Uuid,
 
     #[branch(original_id)]
     pub root_id: Uuid,
@@ -65,7 +66,7 @@ impl Callbacks for Description {
 
             *self = current;
             self.branch_id = branch_id;
-        } else {
+        } else if self.is_branch() {
             self.update_branch(data).await?;
         }
 
@@ -252,3 +253,40 @@ macro_rules! find_branched {
 
 find_branched!(Description);
 find_branched!(BaseDescription);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::traits::ObjectType;
+    use charybdis::operations::InsertWithCallbacks;
+
+    impl Description {
+        pub async fn create_test_description(
+            data: &RequestData,
+            branch_id: Uuid,
+            root_id: Uuid,
+            node_id: Uuid,
+            object_id: Uuid,
+        ) -> Self {
+            let mut desc = Self {
+                branch_id,
+                object_id,
+                root_id,
+                node_id,
+                object_type: ObjectType::Node.to_string(),
+                short_description: Some(Text::from("Test Description")),
+                html: Some(Text::from("<p>Test HTML</p>")),
+                markdown: Some(Text::from("Test Markdown")),
+                base64: Some(Text::from("dGVzdA==")), // Base64 for "test"
+                ..Default::default()
+            };
+
+            desc.insert_cb(data)
+                .execute(data.db_session())
+                .await
+                .expect("Failed to insert test description");
+
+            desc
+        }
+    }
+}

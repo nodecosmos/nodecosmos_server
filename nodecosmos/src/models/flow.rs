@@ -14,8 +14,7 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_flow::ArchivedFlow;
 use crate::models::flow_step::FlowStep;
-use crate::models::traits::{Branchable, NodeBranchParams};
-use crate::models::traits::{Context, ModelContext};
+use crate::models::traits::{Branchable, Context, Descriptionable, ModelContext, NodeBranchParams};
 
 pub mod create;
 mod update_title;
@@ -96,6 +95,7 @@ impl Callbacks for Flow {
     async fn after_delete(&mut self, _db_session: &CachingSession, data: &RequestData) -> Result<(), Self::Error> {
         // TODO: see nodecosmos/src/models/node/create.rs:258
         self.create_branched_if_original_exists(data).await?;
+        self.delete_description(data).await?;
 
         let _ = ArchivedFlow::from(&*self)
             .insert()
@@ -233,7 +233,7 @@ mod tests {
             flow
         }
 
-        pub async fn create_test_nodes_flows(
+        pub async fn create_test_node_flows(
             data: &RequestData,
             branch_params: &NodeBranchParams,
             nodes: Take<Iter<'_, NodeDescendant>>,

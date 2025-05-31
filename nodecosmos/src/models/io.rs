@@ -14,7 +14,9 @@ use crate::api::data::RequestData;
 use crate::errors::NodecosmosError;
 use crate::models::archived_io::ArchivedIo;
 use crate::models::node::Node;
-use crate::models::traits::{Branchable, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec};
+use crate::models::traits::{
+    Branchable, Descriptionable, FindBranchedOrOriginalNode, NodeBranchParams, WhereInChunksExec,
+};
 use crate::models::traits::{Context, ModelContext};
 use crate::stream::MergedModelStream;
 
@@ -112,6 +114,7 @@ impl Callbacks for Io {
 
     async fn after_delete(&mut self, db_session: &CachingSession, data: &RequestData) -> Result<(), NodecosmosError> {
         self.create_branched_if_original_exists(data).await?;
+        self.delete_description(data).await?;
         if !self.delete_dangling.is_some_and(|v| v) && self.is_main() && self.flow_step_id.is_some() {
             // NOTE: not the best way to handle this, but we still want to run `before_delete` logic for all ios, but
             // keep the main io in the database as it can be later used by flow steps where it was deleted.
