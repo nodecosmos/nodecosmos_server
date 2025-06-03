@@ -19,19 +19,11 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup NodeCosmos Test Environment
-        run: |
-          sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
-          docker compose -f docker-compose.yml up -d --wait
-      - name: Create NodeCosmos Keyspace
-        run: |
-          docker exec scylla1 cqlsh -e \
-          "CREATE KEYSPACE nodecosmos WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3} AND tablets = { 'enabled': false };"
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
@@ -50,21 +42,29 @@ jobs:
       - name: Print clippy version
         run: cargo clippy --version
       - name: Compile tests
-        run: cargo test --workspace --all-features -vv --timings --no-run
+        run: cargo test -vv --no-run
       - name: Format check
         run: cargo fmt --verbose -- --check
       - name: Clippy check
         run: cargo clippy --verbose
       - name: Cargo check
         run: cargo check --verbose
+      - name: Setup NodeCosmos Test Environment
+        run: |
+          sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
+          docker compose -f docker-compose.yml up -d --wait
       - name: Install Charybdis Migration Tool
         run: cargo install charybdis-migrate
+      - name: Create NodeCosmos Keyspace
+        run: |
+          docker exec scylla1 cqlsh -e \
+          "CREATE KEYSPACE nodecosmos WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3} AND tablets = { 'enabled': false };"
       - name: Run Charybdis Migration Tool
         run: |
           cd nodecosmos
           migrate --keyspace nodecosmos --host 127.0.0.1:9042 --drop-and-replace
       - name: Run tests
-        run: RUST_MIN_STACK=4194304 cargo test --workspace --all-features
+        run: RUST_MIN_STACK=4194304 cargo test
 
   build:
     runs-on: ubuntu-latest
