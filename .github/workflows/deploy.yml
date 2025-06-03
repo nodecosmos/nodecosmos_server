@@ -16,10 +16,20 @@ env:
   ARTIFACT_REGISTRY_LOCATION: ${{ secrets.ARTIFACT_REGISTRY_LOCATION }}
   ARTIFACT_REGISTRY_REPOSITORY: ${{ secrets.ARTIFACT_REGISTRY_REPOSITORY }}
   DOCKER_BUILDKIT: 1
+  CARGO_TERM_COLOR: always
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      CONFIG_FILE: config.development.toml
+      RECAPTCHA_ENABLED: false
+      SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
+      STRIPE_PRICE_ID: ${{ secrets.TEST_STRIPE_PRICE_ID }}
+      STRIPE_SECRET_KEY: ${{ secrets.TEST_STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.TEST_GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.TEST_GOOGLE_CLIENT_SECRET }}
     timeout-minutes: 60
     steps:
       - name: Checkout code
