@@ -371,18 +371,30 @@ impl Subscription {
                 .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to retrieve subscription: {}", e)))?;
 
             let mut params = stripe::UpdateSubscription::new();
-            let item = subscription.items.data.into_iter().next().unwrap();
-            let update_sub_item = stripe::UpdateSubscriptionItems {
-                id: Some(item.id.to_string()),
-                quantity: Some(new_members_len as u64),
-                ..Default::default()
-            };
+            let item = subscription.items.data.into_iter().next();
 
-            params.items = Some(vec![update_sub_item]);
+            match item {
+                Some(item) => {
+                    let update_sub_item = stripe::UpdateSubscriptionItems {
+                        id: Some(item.id.to_string()),
+                        quantity: Some(new_members_len as u64),
+                        ..Default::default()
+                    };
 
-            stripe::Subscription::update(&client, &sub_id, params)
-                .await
-                .map_err(|e| NodecosmosError::InternalServerError(format!("Failed to update subscription: {}", e)))?;
+                    params.items = Some(vec![update_sub_item]);
+
+                    stripe::Subscription::update(&client, &sub_id, params)
+                        .await
+                        .map_err(|e| {
+                            NodecosmosError::InternalServerError(format!("Failed to update subscription: {}", e))
+                        })?;
+                }
+                None => {
+                    return Err(NodecosmosError::InternalServerError(
+                        "No subscription items found".to_string(),
+                    ));
+                }
+            }
         }
 
         Ok(())

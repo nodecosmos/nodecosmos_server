@@ -4,7 +4,7 @@
 
 On dedicated monitoring node we need to install `Scylla Manager`.
 
-###### ⚠️ Scylla manager has its own scylladb. Its important to separate that node from the cluster on the main nodes.
+###### ⚠️ Scylla manager has its own database. It's important to separate that node from the cluster on the main nodes.
 
 ##### Scylla Manager Config:
 

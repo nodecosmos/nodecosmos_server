@@ -740,5 +740,26 @@ mod tests {
             110,
             "There should be 110 descendants (10 children + 100 grandchildren)"
         );
+
+        // root child should have 10 descendants
+        let root_child = descendants.iter().find(|d| d.parent_id == tree_root.id).unwrap();
+        let root_child_node = Node::find_by_branch_id_and_id(root_child.branch_id, root_child.id)
+            .execute(data.db_session())
+            .await
+            .expect("Failed to find first child");
+
+        let root_child_node_descendants = root_child_node
+            .descendants(data.db_session())
+            .await
+            .expect("Failed to get grandchildren")
+            .try_collect()
+            .await
+            .expect("Failed to collect grandchildren");
+
+        assert_eq!(
+            root_child_node_descendants.len(),
+            10,
+            "First child should have 10 descendants"
+        );
     }
 }

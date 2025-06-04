@@ -6,25 +6,23 @@ pub trait IncrementFraction {
     fn increment_fraction(&mut self) -> &mut Self;
 }
 
-// TODO: update this to utilize the Decimal type without converting to string
 impl IncrementFraction for Decimal {
     fn increment_fraction(&mut self) -> &mut Self {
         // Determine the number of decimal places in the number
         let num_str = self.to_string();
-        // if it's whole number increment by 0.1
-        if !num_str.contains('.') {
-            *self = Decimal::from_str(&(num_str + ".1")).expect("Failed to parse new number");
-            return self;
-        }
-        let last_digit = num_str.chars().last().unwrap().to_digit(10).unwrap();
-        let new_last_digit = last_digit + 1;
-        let new_num_str = num_str
-            .chars()
-            .take(num_str.len() - 1)
-            .chain(std::char::from_digit(new_last_digit, 10))
-            .collect::<String>();
+        let decimal_places = num_str.split('.').nth(1).map(|d| d.len()).unwrap_or(0);
 
-        *self = Decimal::from_str(&new_num_str).expect("Failed to parse new number");
+        // Create an increment that will add exactly 1 to the last decimal place
+        let increment = if decimal_places == 0 {
+            Decimal::from_str("1").expect("Failed to parse increment")
+        } else {
+            let zeros = "0".repeat(decimal_places - 1);
+            let inc = format!("0.{}1", zeros);
+            Decimal::from_str(&inc).expect("Failed to parse increment")
+        };
+
+        // Add the increment
+        *self += increment;
 
         self
     }

@@ -116,3 +116,15 @@ allows you to send and receive emails.
 `http://localhost:1080/`
 
 ℹ️ Note that mailer support either **SES** or **SMTP**.
+
+## .ENV file
+
+```shell
+CONFIG_FILE=config.development.toml
+SECRET_KEY='your-secret-key for authentication middleware'
+RECAPTCHA_ENABLED=false
+RECAPTCHA_SECRET='your-secret-key' # optional, if RECAPTCHA_ENABLED is true
+RECAPTCHA_SITE_KEY='your-site-key' # optional, if RECAPTCHA_ENABLED is true
+GOOGLE_CLIENT_ID='your-client-id' # optional
+GOOGLE_CLIENT_SECRET='your-client-secret' # optional
+```

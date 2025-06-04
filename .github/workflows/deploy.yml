@@ -64,7 +64,7 @@ jobs:
           sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
           docker compose -f docker-compose.yml up -d --wait
       - name: Install Charybdis Migration Tool
-        run: cargo install charybdis-migrate
+        run: cargo install charybdis-migrate --force
       - name: Create NodeCosmos Keyspace
         run: |
           docker exec scylla1 cqlsh -e \
