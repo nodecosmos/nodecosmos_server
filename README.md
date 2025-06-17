@@ -1,8 +1,14 @@
+<p align="center">
+  <img src="https://nodecosmos.com/static/logo.svg" />
+</p>
+
 # NodeCosmos Server
 
 NodeCosmos is a collaborative platform for product development and system design. It enables teams to structure
 projects, model how things work step by step, and drive evolution through peer-reviewed proposals—all in one place.
 Think GitHub for systems and innovation.
+
+For client-side code, see [NodeCosmos Client](https://github.com/nodecosmos/nodecosmos_client)
 
 ## 🔧 Key Features
 
@@ -74,7 +80,7 @@ Think GitHub for systems and innovation.
   utilize traits (`models/traits`). If logic is reusable within single model but for it's partials,
   we should
   define it in `models/traits/<model>`.
-* ### Partial Models (`models/<model>/partial_<model>`)
+* ### Partial Models
   This is the process of dividing models into segments required by action. In Charybdis we can make
   use of [partial_model](https://github.com/nodecosmos/charybdis?tab=readme-ov-file#partial-model) that returns same
   things as base model but for subset of model fields. Each partial is responsible for a specific task. E.g.
